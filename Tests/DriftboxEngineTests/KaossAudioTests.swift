@@ -64,11 +64,18 @@ struct KaossAudioTests {
       }
       let decibels = worst > 0 ? 20 * log10(worst / peak) : -Double.infinity
       report += "\(name): \(String(format: "%.1f", decibels))dB, worst at frame \(worstAt)\n"
-      // Idle is the case every mix goes through, and measures -141dB. The gestures measure -78 to
-      // -98dB: tones match to a step of a float all the way through a glide, and what is left
-      // shows only on full-band noise while a release is gliding, which is not understood and,
-      // for a control nobody touches during a render, not chased.
-      #expect(decibels <= (name == "idle" ? -130 : -70), "\(name) is \(decibels)dB from the reference")
+      // Against the arm64 Chrome this was developed on, idle — the case every mix goes through —
+      // measures -141dB, and the gestures -78 to -98dB: tones match to a step of a float all the
+      // way through a glide, and what is left shows only on full-band noise while a release is
+      // gliding, which is not understood and, for a control nobody touches during a render, not
+      // chased.
+      //
+      // Against an x64 Chrome everything measures about -76dB, idle included, because that is how
+      // far the two browsers are from *each other*: -76, -74, -86 and -70dB on these four cases.
+      // A high-pass at 20Hz has its poles almost on top of each other, which is the hardest thing
+      // to ask of a biquad's arithmetic, and the two builds do that arithmetic differently. The
+      // bounds are the browsers' own disagreement with a little room.
+      #expect(decibels <= (name == "idle" ? -72 : -66), "\(name) is \(decibels)dB from the reference")
     }
     if ProcessInfo.processInfo.environment["DRIFTBOX_REPORT"] != nil { print(report) }
   }

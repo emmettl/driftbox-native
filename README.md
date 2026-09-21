@@ -161,7 +161,10 @@ there. Things learned by measuring rather than reading:
   for sample its output differs from its input by nearly the whole signal: a 20Hz high-pass turns
   the phase of the bass, and a 20kHz low-pass shaves the top. Nobody hears it, and every mix the
   reference has ever rendered went through it — so `Kaoss` is in the chain here too, idle, and
-  matches at -141dB.
+  matches an arm64 Chrome at -141dB. (An x64 Chrome differs from the arm64 one by -76dB on the same
+  idle pad: a high-pass at 20Hz has its poles almost on top of each other, and the two builds do
+  that arithmetic differently. So -76dB is about as closely as *any* whole mix can be held to the
+  reference across processors.)
 - **A glide arrives at ten time constants, not after them.** `setTargetAtTime` never finishes on its
   own, so the browser declares it finished — and a glide of 0.02s begun on a render quantum is ten
   time constants old on another one exactly. "After" is a quantum late, which on a resonant filter
