@@ -37,14 +37,13 @@ gone native at all.
    then biquad, oscillator, noise, and the `VoiceSpec` interpreter. The 22 voices are data handed
    to one interpreter, so this is one interpreter and a set of small functions rather than 22
    synths. Done when each voice renders within tolerance of the browser, and a listening pass.
-3. **The 303s, strips, sends, master, the performance filter.** ← *here.* Done so far: the 303,
-   held to catalogue lines rendered in Chromium, and both send effects — the tempo-synced delay
-   and the generated-room reverb — held to the reference's own `Sends`. The reverb is a whole-signal
-   convolution for now; the real-time form, a partitioned one, comes with the host. And the master
-   inserts — drive, the pattern-controlled filter, and the browser's compressor — held to the
-   reference's own `MasterEffects`. And the performance filter, which is in every mix even when
-   nobody touches it. Next: the offline song render that puts all of it together — and with it,
-   something to listen to.
+3. **The 303s, strips, sends, master, the performance filter.** ← *here.* The 303, both sends,
+   the master inserts including the browser's compressor, the performance filter, and
+   `SongRenderer`, which wires them together as `renderMix` does. Four of eight catalogue songs
+   match the reference whole at -80 to -98dB. Left: the channel-count effect in Chromium's delay
+   loop that the other four trip over; effect and tempo automation in the offline render, which
+   nothing in the catalogue uses and which the renderer refuses rather than ignores; and the
+   listening pass, which `driftbox-render` now makes possible.
    What was planned: Done when whole songs match
    `renderMix` by spectral fingerprint.
 4. **A real-time host on the Mac.** `AUAudioUnit` from the start, sequencing sample-accurately

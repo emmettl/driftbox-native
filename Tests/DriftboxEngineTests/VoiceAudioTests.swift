@@ -23,6 +23,8 @@ private struct Manifest: Decodable {
     let frames: Int
     let peak: Double
     let file: String
+    /// When the hit was struck. Absent means zero.
+    var time: Double?
 
     func spec() throws -> VoiceSpec {
       let found = DriftboxEngine.voice(id: voice)
@@ -104,6 +106,46 @@ struct VoiceAudioTests {
     }
     if ProcessInfo.processInfo.environment["DRIFTBOX_REPORT"] != nil { print(report) }
     #expect(compared.count == 22)
+  }
+
+  /// Every voice again, struck at a time that is not on a sample frame — which is where nearly
+  /// every hit in a real song falls.
+  @Test(.enabled(if: isGenerated))
+  func voicesStruckBetweenFramesSoundLikeTheReference() throws {
+    var renderer = VoiceRenderer(sampleRate: 48000)
+    renderer.emulatesBrowserSourceStart = true
+    var report = ""
+    let renders = try Manifest.load("offset.json").renders
+    #expect(renders.count == 88)
+    for render in renders {
+      let spec = try render.spec()
+      let mine = renderer.renderStereo(
+        spec, voiceId: render.voice, at: render.time ?? 0, frames: render.frames
+      ).left
+      let reference = try render.reference()
+      var worst = 0.0
+      var firstAt = -1
+      for (index, pair) in zip(mine, reference).enumerated() {
+        let difference = abs(Double(pair.0) - Double(pair.1))
+        worst = max(worst, difference)
+        if firstAt < 0, difference > 1e-5 { firstAt = index }
+      }
+      let decibels = worst > 0 ? 20 * log10(worst / render.peak) : -Double.infinity
+      report += "OFFSET \(render.voice) \(render.case): \(String(format: "%.1f", decibels))dB\n"
+
+      // As for a hit on a frame, except the 909's cymbals: resampled noise started between frames
+      // measures -71 to -83dB where on a frame it measures -120dB, and the difference has not been
+      // run down.
+      let resampled = spec.sources.contains {
+        if case .noise(let noise) = $0.generator { return noise.playbackRate != nil }
+        return false
+      }
+      #expect(
+        decibels <= (resampled ? -66 : Self.toleranceDecibels(for: spec)),
+        "\(render.voice) \(render.case) is \(decibels)dB from the reference")
+      _ = firstAt
+    }
+    if ProcessInfo.processInfo.environment["DRIFTBOX_REPORT"] != nil { print(report) }
   }
 
   /// Every voice again with its pan knob off centre, into a stereo context: the mono renders

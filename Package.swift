@@ -26,6 +26,9 @@ let package = Package(
     .target(name: "DriftboxDocument", dependencies: ["DriftboxSeq"]),
     .target(name: "DriftboxHost", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
 
+    // A song document in, a WAV file out: something to listen to.
+    .executableTarget(name: "driftbox-render", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
+
     // Finds and reads `conformance/fixtures` for every test target.
     .target(name: "ConformanceSupport", dependencies: ["DriftboxDocument"], path: "Tests/ConformanceSupport"),
 
