@@ -24,13 +24,32 @@ jobs:
         with:
           node-version: 24
       - run: scripts/check-fixtures.sh
+      # What is too large to check in, or never the same twice: whole-song plans, and every voice
+      # rendered in a real Chromium. Made here from the pinned reference and handed to the Swift
+      # job, so those tests run in CI rather than only on a laptop that happened to make them.
+      - name: Generate the large fixtures
+        run: |
+          node --no-warnings conformance/emit/emit.mjs --full
+          node --no-warnings conformance/emit/emit-audio.mjs
+      - uses: actions/upload-artifact@v5
+        with:
+          name: generated-fixtures
+          path: conformance/generated
+          retention-days: 3
 
   swift:
     name: Swift
+    needs: fixtures
     runs-on: ubuntu-latest
     container: swift:6.4-bookworm
+    env:
+      DRIFTBOX_REQUIRE_GENERATED: 1
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v6
+        with:
+          name: generated-fixtures
+          path: conformance/generated
       - name: Format
         run: swift format lint --strict -r Sources Tests Package.swift
       - name: Test

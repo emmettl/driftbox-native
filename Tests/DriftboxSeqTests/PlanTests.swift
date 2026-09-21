@@ -23,7 +23,7 @@ struct PlanTests {
 
     var differences: [String] = []
     for (index, pair) in zip(planned, expected).enumerated() {
-      compare(pair.0, pair.1, at: "steps[\(index)]", into: &differences)
+      collectDifferences(between: pair.0, and: pair.1, at: "steps[\(index)]", into: &differences)
     }
     #expect(differences.isEmpty, "\(differences.count) differences, first: \(differences.prefix(5))")
   }
@@ -48,7 +48,7 @@ struct PlanTests {
 
       var differences: [String] = []
       for (index, pair) in zip(planned, expected).enumerated() {
-        compare(pair.0, pair.1, at: "steps[\(index)]", into: &differences)
+        collectDifferences(between: pair.0, and: pair.1, at: "steps[\(index)]", into: &differences)
       }
       #expect(
         differences.isEmpty, "\(name): \(differences.count) differences, first: \(differences.prefix(5))")
@@ -68,35 +68,20 @@ struct PlanTests {
 
     var differences: [String] = []
     for (index, pair) in zip(planned, expected).enumerated() {
-      compare(pair.0, pair.1, at: "steps[\(index)]", into: &differences)
+      collectDifferences(between: pair.0, and: pair.1, at: "steps[\(index)]", into: &differences)
     }
     #expect(differences.isEmpty, "\(differences.count) differences, first: \(differences.prefix(5))")
   }
 
+  @Test func theWholeSongPlansAreThereWhenTheyMustBe() {
+    let required = ProcessInfo.processInfo.environment["DRIFTBOX_REQUIRE_GENERATED"] != nil
+    #expect(
+      FileManager.default.fileExists(atPath: generated.path) || !required,
+      "DRIFTBOX_REQUIRE_GENERATED is set and emit.mjs --full has not run")
+  }
+
   @Test func theCatalogueIsAllThere() throws {
     #expect(try Fixtures.songIds().count == 25)
-  }
-}
-
-/// Walks two values together and says where they part. Numbers are compared as doubles, exactly.
-private func compare(_ actual: JSONValue, _ expected: JSONValue, at path: String, into out: inout [String]) {
-  switch (actual, expected) {
-  case (.object(let a), .object(let b)):
-    if a.members.map(\.key) != b.members.map(\.key) {
-      out.append("\(path): keys \(a.members.map(\.key)) != \(b.members.map(\.key))")
-      return
-    }
-    for (x, y) in zip(a.members, b.members) { compare(x.value, y.value, at: "\(path).\(x.key)", into: &out) }
-  case (.array(let a), .array(let b)):
-    if a.count != b.count {
-      out.append("\(path): \(a.count) elements != \(b.count)")
-      return
-    }
-    for (index, pair) in zip(a, b).enumerated() {
-      compare(pair.0, pair.1, at: "\(path)[\(index)]", into: &out)
-    }
-  default:
-    if actual != expected { out.append("\(path): \(actual.text) != \(expected.text)") }
   }
 }
 

@@ -32,6 +32,7 @@ const { bpmAt } = await import(join(engine, 'automation.ts'))
 const { songBars } = await import(join(engine, 'pattern.ts'))
 const { seededRandom } = await import(join(engine, 'render.ts'))
 const { Ladder } = await import(join(engine, 'dsp', 'ladder.ts'))
+const { ALL_VOICES, buildVoice } = await import(join(engine, 'kit.ts'))
 
 /** How many bars of each song's plan are checked in. The whole song is `--full`. */
 const PLAN_BARS = 4
@@ -275,6 +276,30 @@ write(join(fixtures, 'prng'), 'xorshift32.json', json(SEEDS.map((seed) => {
   const next = seededRandom(seed)
   return { seed, first: Array.from({ length: 32 }, () => next() * 0x1_0000_0000) }
 })))
+
+// Every drum voice is a function from its panel to a description of a sound. The description is
+// data, so it compares exactly — and with it pinned down, any difference in the *sound* belongs to
+// the renderer and not to the voice. Panels: the defaults, every knob at each end, and a run of
+// arbitrary ones from the reference's own PRNG.
+{
+  const KNOBS = ['level', 'tune', 'decay', 'tone', 'colour', 'pan']
+  const all = (value) => Object.fromEntries(KNOBS.map((knob) => [knob, value]))
+  const random = seededRandom(0x5eed)
+  const panels = [
+    all(0.5), { ...all(0.5), level: 0.8 }, all(0), all(1),
+    ...Array.from({ length: 5 }, () => Object.fromEntries(KNOBS.map((knob) => [knob, random()]))),
+  ]
+  const lines = []
+  for (const voice of ALL_VOICES) {
+    for (const params of panels) {
+      for (const accent of [1, 0.55]) {
+        lines.push(JSON.stringify({ voice: voice.id, params, accent, spec: buildVoice(voice, params, accent) }))
+      }
+    }
+  }
+  write(join(fixtures, 'voices'), 'specs.json', `[\n${lines.join(',\n')}\n]\n`)
+  write(join(fixtures, 'voices'), 'kit.json', json(ALL_VOICES.map(({ id, name, machine, choke, trim, pitched }) => ({ id, name, machine, choke, trim, pitched }))))
+}
 
 // ── Level 3: audio ───────────────────────────────────────────────────────────────────────
 // Only what is plain arithmetic, so far. Four little-endian float64 columns per frame — input,

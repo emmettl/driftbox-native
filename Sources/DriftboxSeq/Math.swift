@@ -22,13 +22,13 @@ func clamp(_ value: Double, _ low: Double, _ high: Double) -> Double {
 }
 
 /// Map a 0...1 knob onto a real range.
-func range(_ value: Double, _ low: Double, _ high: Double) -> Double {
+public func range(_ value: Double, _ low: Double, _ high: Double) -> Double {
   low + (high - low) * clamp(value, 0, 1)
 }
 
 /// Map a knob onto a range where equal movement means equal musical change — right for anything
 /// in Hz or seconds, where the ear hears ratios.
-func ratioRange(_ value: Double, _ low: Double, _ high: Double) -> Double {
+public func ratioRange(_ value: Double, _ low: Double, _ high: Double) -> Double {
   low * seqPow(high / low, clamp(value, 0, 1))
 }
 

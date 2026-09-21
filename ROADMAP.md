@@ -29,7 +29,13 @@ gone native at all.
    faithful form and builds arrays as it goes, so it is not what the render thread will call —
    phase 4 plans from a song compiled ahead of time into indices and fixed storage, and checks
    that against this. The editing half of `pattern.ts` arrives with the editor.
-2. **DSP and the drum voices.** ← *next.* `ParamTimeline` — the Web Audio automation calls, per sample —
+2. **DSP and the drum voices.** ← *here.* Done so far: the browser-rendered reference, the
+   parameter timeline, the biquad, all 22 voices as data (exact), and a renderer for sine, noise,
+   envelopes and filters — nine voices, within -100dB of Chromium. Still to come, in this order:
+   the band-limited triangle and square (Chromium builds these from wavetables, three to the
+   octave, and matching them closely means doing the same), resampled noise for the 909's cymbals,
+   the 2x-oversampled waveshaper, and pan. Then a listening pass.
+   What was planned: `ParamTimeline` — the Web Audio automation calls, per sample —
    then biquad, oscillator, noise, and the `VoiceSpec` interpreter. The 22 voices are data handed
    to one interpreter, so this is one interpreter and a set of small functions rather than 22
    synths. Done when each voice renders within tolerance of the browser, and a listening pass.

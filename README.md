@@ -6,10 +6,11 @@ of TB-303s, synthesised from scratch — for the Mac first, then iOS. Swift thro
 The web app is the reference implementation and is treated as finished. It is here as a pinned
 submodule in `driftbox/`, and nothing in this repository changes it.
 
-**Where this is:** phase 1 of [ROADMAP.md](ROADMAP.md) is done. There is no app and no sound yet.
-There is a harness that holds Swift to the web engine's behaviour, and behind it: a song model, a
-codec that reads and writes the web app's documents to the byte, and a sequencer that plans every
-catalogue song exactly as the reference does.
+**Where this is:** phase 2 of [ROADMAP.md](ROADMAP.md) is under way. There is no app yet. There is
+a harness that holds Swift to the web engine's behaviour, and behind it: a song model, a codec that
+reads and writes the web app's documents to the byte, a sequencer that plans every catalogue song
+exactly as the reference does, all 22 drum voices as data, and a renderer that so far turns nine of
+them into sound within -100dB of the browser's.
 
 ## Layout
 
@@ -55,13 +56,25 @@ The one thing the DSP takes from outside is `exp` and `tanh` from the C library
 ```bash
 node conformance/emit/emit.mjs          # rewrite the checked-in fixtures
 node conformance/emit/emit.mjs --full   # also whole-song plans, into conformance/generated
+node conformance/emit/emit-audio.mjs    # every voice rendered in Chromium, into conformance/generated
 scripts/check-fixtures.sh               # fail if the fixtures are stale against the submodule (emit --check)
 swift test
 ```
 
-Needs Node 24 or later and nothing else: Node strips the types itself, and
-`conformance/emit/ts-resolve.mjs` points the reference's `./x.js` imports at the `./x.ts` files
-that exist. The submodule is never built or installed.
+Needs Node 24 or later and, for the audio, a Chromium — and nothing else. Node strips the types
+itself, and `conformance/emit/ts-resolve.mjs` points the reference's `./x.js` imports at the
+`./x.ts` files that exist. The submodule is never built or installed.
+
+The audio step drives a real browser because only a real `OfflineAudioContext` renders the
+reference's Web Audio graph. `conformance/emit/browser.mjs` does it in two small pieces: an HTTP
+server that serves the submodule's TypeScript with its types stripped on the way out, and the
+DevTools protocol over Node's built-in WebSocket. It finds `DRIFTBOX_CHROMIUM`, then a Playwright
+cache, then an installed Chrome.
+
+What lands in `conformance/generated` is not checked in: it is tens of megabytes, and Chromium does
+not render one graph to the same bits twice. Tests that need it skip when it is absent — except
+under `DRIFTBOX_REQUIRE_GENERATED`, which CI sets after generating it, so that there a missing
+fixture is a failure.
 
 Three levels, in rising cost:
 
@@ -69,7 +82,8 @@ Three levels, in rising cost:
 |---|---|---|
 | Documents | every catalogue song as the web app saves it; 19 damaged and legacy documents with what the reference makes of each | exactly |
 | Events | `planSong` for every song — each hit, its time, its resolved knobs and sends; three deliberately awkward songs; the PRNG as raw bits | exactly |
-| Audio | renders of voices, effects and whole songs | within a tolerance |
+| Voices | what each of the 22 voices *describes* — its `VoiceSpec` — over nine panels and both velocities | exactly |
+| Audio | each voice rendered in Chromium, over four panels | within -100dB of the voice's peak |
 
 **Documents** go both ways: a catalogue song decodes and encodes back to the same bytes, which
 needs object keys kept in document order and numbers printed as JavaScript prints them —
@@ -90,6 +104,31 @@ Only the ladder has an audio fixture so far; the ones that need a browser to ren
 **Songs are data.** `conformance/fixtures/documents` is also the catalogue the app will ship, so
 a song added on the web arrives here by bumping the submodule and re-running the emitter. The
 diff is the list of what changed, and the tests say what it broke.
+
+**Voices** are split the way the reference splits them. A voice is a function from its panel to a
+description of a sound, and the description is data, so all 396 compare exactly. With that pinned,
+any difference in the *sound* belongs to the one renderer and not to 22 voices.
+
+**Audio** is that renderer against the browser. Measured: noise through filters lands within one
+step of a 32-bit float, -135 to -142dB; a swept sine between -104 and -121dB, the gap being the
+browser's wavetable sine and single-precision ramps against a true sine and double-precision ones.
+Chromium differs from itself by up to 5e-7. Two things were learned by measuring rather than
+reading:
+
+- **A source starts when it is told to, not on the next frame.** A clap's retriggers fall between
+  sample frames, and the browser begins each one a fraction of a frame in, interpolating the noise.
+  Rounding them to a frame is a whole sample out, and two copies of one noise a sample apart is a
+  comb filter: -11dB, not -140.
+- **The reference clicks, rarely.** See `theReferenceClicks` in `VoiceAudioTests`: at one knob
+  setting the 808 clap's tail is due 5e-13 of a frame after a frame boundary, Chromium starts the
+  source on that frame, and the gain envelope's first event is still in the future — so the
+  `GainNode` is at its default of 1 for one frame. This renderer does not reproduce it.
+
+The renderer is being built one kind of node at a time, each measured before the next. It says
+what it cannot render yet (`VoiceRenderer.unsupported`) rather than rendering something close:
+today that is the band-limited triangle and square oscillators, the oversampled waveshaper,
+resampled noise and pan. The test lists the voices still waiting, so one can only leave that list
+by being compared.
 
 ### Exactness
 

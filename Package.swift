@@ -27,11 +27,14 @@ let package = Package(
     .target(name: "DriftboxHost", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
 
     // Finds and reads `conformance/fixtures` for every test target.
-    .target(name: "ConformanceSupport", path: "Tests/ConformanceSupport"),
+    .target(name: "ConformanceSupport", dependencies: ["DriftboxDocument"], path: "Tests/ConformanceSupport"),
 
     .testTarget(name: "DriftboxDSPTests", dependencies: ["DriftboxDSP", "ConformanceSupport"]),
     .testTarget(
       name: "DriftboxSeqTests", dependencies: ["DriftboxSeq", "DriftboxDocument", "ConformanceSupport"]),
+    .testTarget(
+      name: "DriftboxEngineTests",
+      dependencies: ["DriftboxEngine", "DriftboxSeq", "DriftboxDocument", "ConformanceSupport"]),
     .testTarget(
       name: "DriftboxDocumentTests",
       dependencies: ["DriftboxDocument", "DriftboxSeq", "ConformanceSupport"]),
