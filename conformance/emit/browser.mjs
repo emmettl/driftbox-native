@@ -54,16 +54,18 @@ function serve(root) {
     if (!file.startsWith(root)) return response.writeHead(403).end()
 
     const typescript = extname(file) === '.js' ? `${file.slice(0, -3)}.ts` : file
+    // Read first and answer second: a full Chrome asks for a favicon, and a file that is not there
+    // must become a 404 rather than an exception halfway through a 200.
+    let body
     try {
-      if (extname(typescript) === '.ts' && existsSync(typescript)) {
-        const source = stripTypeScriptTypes(readFileSync(typescript, 'utf8'))
-        response.writeHead(200, { 'content-type': 'text/javascript' }).end(source)
-      } else {
-        response.writeHead(200, { 'content-type': 'text/javascript' }).end(readFileSync(file))
-      }
+      body = extname(typescript) === '.ts' && existsSync(typescript)
+        ? stripTypeScriptTypes(readFileSync(typescript, 'utf8'))
+        : readFileSync(file)
     } catch (error) {
       response.writeHead(404).end(String(error))
+      return
     }
+    response.writeHead(200, { 'content-type': 'text/javascript' }).end(body)
   })
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)))
 }
