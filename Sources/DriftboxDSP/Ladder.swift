@@ -13,6 +13,7 @@ public struct Ladder {
 
   public let sampleRate: Double
 
+  @_noAllocation
   public init(sampleRate: Double) {
     self.sampleRate = sampleRate
   }

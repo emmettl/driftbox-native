@@ -27,7 +27,35 @@ public struct TargetSmoother {
   private var startFrame = 0
   private var timeConstant = 0.0
   private var arrived = true
-  private var pending: [(frame: Int, target: Float, timeConstant: Double)] = []
+  // Up to four targets waiting their turn, inline. A knob is only ever set a few times per block.
+  private var pendingCount = 0
+  private var p0 = Pending(), p1 = Pending(), p2 = Pending(), p3 = Pending()
+
+  struct Pending {
+    var frame = 0
+    var target: Float = 0
+    var timeConstant = 0.0
+  }
+
+  @_noAllocation
+  private func pending(_ index: Int) -> Pending {
+    switch index {
+    case 0: p0
+    case 1: p1
+    case 2: p2
+    default: p3
+    }
+  }
+
+  @_noAllocation
+  private mutating func setPending(_ value: Pending, at index: Int) {
+    switch index {
+    case 0: p0 = value
+    case 1: p1 = value
+    case 2: p2 = value
+    default: p3 = value
+    }
+  }
 
   public init(value: Float, sampleRate: Double) {
     self.value = value
@@ -35,15 +63,22 @@ public struct TargetSmoother {
     self.sampleRate = sampleRate
   }
 
-  /// Head for `target` from `frame` on. Calls must come in frame order.
+  /// Head for `target` from `frame` on. Calls must come in frame order. A fifth target waiting
+  /// its turn replaces the fourth.
+  @_noAllocation
   public mutating func setTarget(_ target: Float, at frame: Int, timeConstant: Double) {
-    pending.append((frame, target, timeConstant))
+    let entry = Pending(frame: frame, target: target, timeConstant: timeConstant)
+    setPending(entry, at: min(pendingCount, 3))
+    pendingCount = min(pendingCount + 1, 4)
   }
 
   /// The value for `frame`. Call once per frame, in order.
+  @_noAllocation
   public mutating func next(frame: Int) -> Float {
-    while let first = pending.first, first.frame <= frame {
-      pending.removeFirst()
+    while pendingCount > 0, pending(0).frame <= frame {
+      let first = pending(0)
+      for index in 1..<4 { setPending(pending(index), at: index - 1) }
+      pendingCount -= 1
       target = first.target
       timeConstant = first.timeConstant
       startFrame = first.frame

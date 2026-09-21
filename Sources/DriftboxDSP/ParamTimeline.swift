@@ -18,6 +18,10 @@ public struct ParamTimeline {
     var kind: Kind
     var value: Double
     var time: Double
+    /// For a ramp cut short by `cancel`: where and to what it was originally heading, so that the
+    /// part already played is computed exactly as it was played. `time` and `value` then say
+    /// where it was cut.
+    var heading: (value: Double, time: Double)?
   }
 
   /// What the parameter holds before its first event.
@@ -71,9 +75,14 @@ public struct ParamTimeline {
       switch events[first].kind {
       case .linearRamp, .exponentialRamp:
         if lastRendered > before.time {
-          // A stretch of a line is a line, and of an exponential an exponential, so the part
-          // already played is the same kind of ramp ending sooner.
-          played.append(Event(kind: events[first].kind, value: value(at: lastRendered), time: lastRendered))
+          // The part already played stays exactly as it was played: the ramp is cut at
+          // `lastRendered` but keeps heading where it was heading, so the arithmetic for every
+          // frame before the cut is unchanged.
+          var cut = events[first]
+          cut.heading = (cut.value, cut.time)
+          cut.value = value(at: lastRendered)
+          cut.time = lastRendered
+          played.append(cut)
           played.append(Event(kind: .set, value: before.value, time: lastRendered.nextUp))
         }
       case .set, .target:
@@ -89,6 +98,24 @@ public struct ParamTimeline {
   private mutating func insert(_ event: Event) {
     let index = events.firstIndex { $0.time > event.time } ?? events.count
     events.insert(event, at: index)
+  }
+
+  /// A ramp's value at `time`, from `value` at `previousTime`. The same arithmetic in the same order
+  /// as `FixedTimeline`, which is what lets a real-time form be held to an offline one to the bit.
+  @inline(__always)
+  static func ramp(_ event: Event, from value: Double, at previousTime: Double, to time: Double) -> Double {
+    let endValue = event.heading?.value ?? event.value
+    let endTime = event.heading?.time ?? event.time
+    let span = endTime - previousTime
+    switch event.kind {
+    case .linearRamp:
+      return span > 0 ? value + (endValue - value) * ((time - previousTime) / span) : value
+    case .exponentialRamp:
+      if span <= 0 || value == 0 || endValue == 0 || (value < 0) != (endValue < 0) { return value }
+      return value * dbPow(endValue / value, (time - previousTime) / span)
+    case .set, .target:
+      return value
+    }
   }
 
   /// The value at `time`.
@@ -111,16 +138,7 @@ public struct ParamTimeline {
       guard low < events.count else { return value }
       let previousTime = low > 0 ? events[low - 1].time : 0
       let event = events[low]
-      let span = event.time - previousTime
-      switch event.kind {
-      case .linearRamp:
-        return span > 0 ? value + (event.value - value) * ((time - previousTime) / span) : value
-      case .exponentialRamp:
-        if span <= 0 || value == 0 || event.value == 0 || (value < 0) != (event.value < 0) { return value }
-        return value * dbPow(event.value / value, (time - previousTime) / span)
-      case .set, .target:
-        return value
-      }
+      return Self.ramp(event, from: value, at: previousTime, to: time)
     }
 
     var value = defaultValue
@@ -131,22 +149,10 @@ public struct ParamTimeline {
       let next = index + 1 < events.count ? events[index + 1] : nil
 
       if event.time > time {
-        // Not reached yet. It only matters now if it is a ramp, which is already under way.
-        switch event.kind {
-        case .linearRamp:
-          let span = event.time - previousTime
-          return span > 0 ? value + (event.value - value) * ((time - previousTime) / span) : value
-        case .exponentialRamp:
-          let span = event.time - previousTime
-          // A ramp to, from or through zero has no exponential; the specification holds the
-          // start value until the ramp's end.
-          if span <= 0 || value == 0 || event.value == 0 || (value < 0) != (event.value < 0) {
-            return value
-          }
-          return value * dbPow(event.value / value, (time - previousTime) / span)
-        case .set, .target:
-          return value
-        }
+        // Not reached yet. It only matters now if it is a ramp, which is already under way. (A
+        // ramp to, from or through zero has no exponential; the specification holds the start
+        // value until the ramp's end.)
+        return Self.ramp(event, from: value, at: previousTime, to: time)
       }
 
       switch event.kind {
