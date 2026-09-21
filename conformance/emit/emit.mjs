@@ -27,7 +27,8 @@ const fixtures = check ? mkdtempSync(join(tmpdir(), 'driftbox-fixtures-')) : che
 
 const { SONGS } = await import(join(engine, 'songs', 'index.ts'))
 const { encodeSong, decodeSong, SONG_FORMAT } = await import(join(engine, 'song-io.ts'))
-const { planSong } = await import(join(engine, 'schedule.ts'))
+const { planSong, planStep, barLengthForSelection } = await import(join(engine, 'schedule.ts'))
+const { bpmAt } = await import(join(engine, 'automation.ts'))
 const { songBars } = await import(join(engine, 'pattern.ts'))
 const { seededRandom } = await import(join(engine, 'render.ts'))
 const { Ladder } = await import(join(engine, 'dsp', 'ladder.ts'))
@@ -49,11 +50,126 @@ rmSync(fixtures, { recursive: true, force: true })
 const catalogue = []
 for (const preset of SONGS) {
   const text = encodeSong(preset.build())
-  if (decodeSong(text) === null) throw new Error(`${preset.id} does not survive its own codec`)
+  const decoded = decodeSong(text)
+  if (decoded === null) throw new Error(`${preset.id} does not survive its own codec`)
+  // The Swift codec is tested by decoding this text and encoding it again, expecting the same
+  // bytes. That is only a fair test while the reference can do it too.
+  if (encodeSong(decoded) !== text) throw new Error(`${preset.id} is not a fixed point of its own codec`)
   write(join(fixtures, 'documents'), `${preset.id}.song.json`, text)
   catalogue.push({ id: preset.id, name: preset.name, blurb: preset.blurb, visual: preset.visual })
 }
 write(fixtures, 'catalogue.json', json({ songFormat: SONG_FORMAT, songs: catalogue }))
+
+// Documents from outside: older formats, hand edits, damage. `decodeSong` repairs what it can and
+// refuses the rest, and that behaviour is as much a part of the format as the happy path. Each
+// case is an input text and what the reference makes of it, re-encoded — or null for a refusal.
+{
+  const track = (...on) => Array.from({ length: 16 }, (_, i) => (on.includes(i) ? 1 : 0))
+  const base = () => ({
+    bpm: 124,
+    swing: 0.2,
+    patterns: [
+      { id: 'a', name: 'A', length: 16, tracks: { '808.bd': track(0, 4, 8, 12) }, bass: {} },
+      { id: 'b', name: 'B', length: 8, tracks: { '909.sd': [0, 0, 2, 0, 0, 0, 1, 0] }, bass: {} },
+    ],
+    chain: [{ pattern: 'a', repeat: 2 }, { pattern: 'b', repeat: 1 }],
+    kit: { params: {}, bass: {}, sends: {}, swing: {} },
+  })
+  const enveloped = (song, v = SONG_FORMAT) => JSON.stringify({ v, song })
+  const edit = (change) => {
+    const song = base()
+    change(song)
+    return song
+  }
+
+  const inputs = {
+    'not json': '{"v":7,"song":',
+    'not an object': '[1,2,3]',
+    'no patterns': enveloped(edit((s) => (s.patterns = []))),
+    'patterns are not objects': enveloped(edit((s) => (s.patterns = [1, 'x', null]))),
+    'a future format': enveloped(base(), SONG_FORMAT + 1),
+    'a bare song with no envelope': JSON.stringify(base()),
+    'a v1 chain of pattern ids': JSON.stringify({ v: 1, song: edit((s) => (s.chain = ['a', 'a', 'b', 'missing'])) }),
+    'everything optional missing': enveloped({ patterns: [{}] }),
+    'numbers out of range': enveloped(edit((s) => {
+      s.bpm = 999
+      s.swing = -3
+      s.patterns[0].length = 200
+      s.chain[0].repeat = 0
+      s.kit.params['808.bd'] = { level: 7, tune: -1, decay: 'loud', tone: null }
+      s.kit.flam = 4
+    })),
+    'numbers that are not numbers': enveloped(edit((s) => {
+      s.bpm = '120'
+      s.swing = null
+      s.patterns[0].length = 'long'
+      s.kit.flam = 'wide'
+    })),
+    'halves round the way Math.round does': enveloped(edit((s) => {
+      s.bpm = 120.5
+      s.patterns[0].length = 12.5
+      s.chain[0].repeat = 2.5
+      s.patterns[1].trackLengths = { '909.sd': 4.5, '909.bd': 8, '': 3, '909.ch': 'x' }
+    })),
+    'bad steps cost the step, not the track': enveloped(edit((s) => {
+      s.patterns[0].tracks['808.sd'] = [1, 2, 3, -1, 'x', null, true, 1.5]
+      s.patterns[0].tracks['808.ch'] = 'not an array'
+      s.patterns[0].pcf = [0, 1, 2, 9]
+      s.patterns[0].flams = { '909.sd': [true, 1, 'yes', false], '909.bd': {} }
+    })),
+    'bass lines': enveloped(edit((s) => {
+      s.patterns[0].bass = {
+        '303.a': [
+          { note: 0, accent: true, slide: false },
+          { note: 30, accent: 1, slide: 'yes' },
+          { note: -4, accent: false, slide: true, gate: false },
+          { note: 7.5, accent: false, slide: false, gate: 'open' },
+          { note: null, accent: false, slide: true },
+          'rest',
+          null,
+        ],
+        '303.b': 12,
+      }
+      s.kit.bass = { '303.a': { cutoff: 0.9, resonance: 2, extra: 1 } }
+    })),
+    'clips keep only slots and patterns that exist': enveloped(edit((s) => {
+      s.chain[0].clips = { tr808: 'b', tr909: 'missing', '303.a': 7, 'tr707': 'a' }
+      s.chain[1].clips = { tr909: 'ghost' }
+      s.chain.push({ pattern: 'missing', repeat: 4 }, { repeat: 2 }, 'a')
+    })),
+    'automation is de-duplicated, sorted and clamped': enveloped(edit((s) => {
+      s.automation = [
+        { target: 'song/bpm', interpolation: 'hold', points: [{ bar: 2, index: 0, value: 900 }, { bar: 0, index: 4, value: 5 }, { bar: 0, index: 4, value: 140 }] },
+        { target: 'voice/808.bd/decay', points: [{ bar: 1.5, index: 70, value: 2 }, { bar: -1, index: -1, value: -2 }] },
+        { target: 'voice/808.bd/decay', points: [{ bar: 0, index: 0, value: 0.1 }] },
+        { target: 'host/unknown', interpolation: 'cubic', points: [{ bar: 0, index: 0, value: 5e9 }] },
+        { target: '   ', points: [{ bar: 0, index: 0, value: 1 }] },
+        { target: 'fx/drive', points: [] },
+        { target: 'fx/drive', points: [{ bar: 0, index: 0, value: 'x' }, 4] },
+        'nonsense',
+      ]
+    })),
+    'visual is trimmed and kit send and swing are repaired': enveloped(edit((s) => {
+      s.visual = '   trench   '
+      s.kit.sends = { '808.bd': { delay: 0.3 }, '909.sd': 'wet' }
+      s.kit.swing = { '808.ch': 1.4, '909.ch': 'late' }
+      s.fx = { drive: 0.4, delayTime: 3, unknown: 1 }
+    })),
+    'an empty visual is dropped': enveloped(edit((s) => (s.visual = '   '))),
+    'names fall back to ids and ids to positions': enveloped(edit((s) => {
+      s.patterns = [{ length: 4, tracks: {} }, { id: '', name: '', length: 4, tracks: {} }, { id: 'c', name: 7 }]
+      s.chain = [{ pattern: 'pattern-0', repeat: 1 }, { pattern: 'pattern-1', repeat: 1 }]
+    })),
+    'escapes and unicode survive': enveloped(edit((s) => {
+      s.patterns[0].name = 'Quote " slash \\ tab \t nl \n é 日本 🥁 \u0001'
+    })),
+  }
+
+  write(fixtures, 'documents-repair.json', json(Object.entries(inputs).map(([name, input]) => {
+    const song = decodeSong(input)
+    return { name, input, output: song === null ? null : encodeSong(song) }
+  })))
+}
 
 // ── Level 2: events ──────────────────────────────────────────────────────────────────────
 // What the sequencer decides, with no audio involved: every hit, its time, and the knobs and
@@ -66,6 +182,91 @@ for (const preset of SONGS) {
   const steps = planSong(song, PLAN_BARS).map((step) => JSON.stringify(step)).join(',\n')
   write(join(fixtures, 'events'), `${preset.id}.plan.json`, `{"bars":${PLAN_BARS},"songBars":${bars},"steps":[\n${steps}\n]}\n`)
   if (full) write(join(generated, 'events'), `${preset.id}.plan.json`, JSON.stringify({ bars, steps: planSong(song, bars) }))
+}
+
+// The catalogue does not use everything the sequencer can do — no song in it has machine clips,
+// short drum lanes, flams or filter strikes — so a plan that matched all 25 would say nothing about
+// those. These songs exist to be awkward: they are written here, passed through the reference's
+// own decoder so they are valid, and planned whole.
+{
+  const steps = (length, ...on) => Array.from({ length }, (_, i) => (on.includes(i) ? (i % 8 === 0 ? 2 : 1) : 0))
+  const line = (length, notes) => Array.from({ length }, (_, i) => notes[i] ?? { note: null, accent: false, slide: false })
+  const n = (note, accent = false, slide = false, gate) => ({ note, accent, slide, ...(gate === undefined ? {} : { gate }) })
+
+  const awkward = {
+    bpm: 132,
+    swing: 0.3,
+    patterns: [
+      {
+        id: 'groove', name: 'Groove', length: 16,
+        tracks: {
+          '808.bd': steps(16, 0, 4, 8, 12), '808.ch': steps(16, 1, 3, 5, 7, 9, 11, 13, 15),
+          '909.sd': steps(16, 4, 12), '909.ch': steps(16, 2, 3, 6, 7, 10, 11, 14, 15), 'x.unknown': steps(16, 0, 7),
+        },
+        trackLengths: { '808.ch': 6, '909.sd': 5 },
+        flams: { '909.sd': Array.from({ length: 16 }, (_, i) => i === 4), '808.bd': Array.from({ length: 16 }, () => true) },
+        bass: {
+          '303.a': line(16, { 0: n(0, true), 1: n(12, false, true), 2: n(7), 3: n(3, false, true, false), 4: n(5), 7: n(24, true, true), 8: n(0), 15: n(10, false, true) }),
+        },
+        pcf: steps(16, 0, 6, 8, 14),
+      },
+      { id: 'short909', name: 'Short 909', length: 8, tracks: { '909.bd': steps(8, 0, 3, 6), '909.sd': steps(8, 2, 5) }, flams: { '909.sd': [false, false, true, false, false, true, false, false] }, bass: {} },
+      { id: 'long303', name: 'Long 303', length: 24, tracks: {}, bass: { '303.a': line(24, { 0: n(0), 5: n(7, true, true), 6: n(9), 23: n(2, false, true) }), '303.b': line(24, { 3: n(12), 11: n(15, true) }) } },
+      { id: 'odd', name: 'Odd', length: 7, tracks: { '808.bd': steps(7, 0, 3, 5), '808.cp': steps(7, 6) }, bass: { '303.b': line(7, { 0: n(4, false, true), 1: n(4), 6: n(16, true, true) }) }, pcf: steps(7, 0, 3) },
+    ],
+    chain: [
+      { pattern: 'groove', repeat: 2 },
+      { pattern: 'groove', repeat: 1, clips: { tr909: 'short909', '303.a': 'long303', '303.b': 'long303' } },
+      { pattern: 'odd', repeat: 3 },
+      { pattern: 'odd', repeat: 1, clips: { tr808: 'groove', tr909: 'short909' } },
+    ],
+    kit: {
+      params: { '808.bd': { level: 0.9, tune: 0.4, decay: 0.6, tone: 0.5, colour: 0.2, pan: 0.5 } },
+      bass: { '303.a': { tune: 0.37, wave: 0.8, cutoff: 0.41, resonance: 0.93, envMod: 0.77, decay: 0.18, accent: 0.85, level: 0.66 } },
+      sends: { '909.sd': { delay: 0.3, reverb: 0.5 }, '303.a': { delay: 0.2, reverb: 0.1 } },
+      swing: { '808.ch': 0.9, '909.ch': 0.1, '303.a': 0.5 },
+      flam: 0.85,
+    },
+    fx: { drive: 0.2, pcfAmount: 0.7 },
+    automation: [
+      { target: 'song/bpm', interpolation: 'linear', points: [{ bar: 0, index: 8, value: 132 }, { bar: 2, index: 12, value: 171.5 }, { bar: 5, index: 3, value: 96 }] },
+      { target: 'song/swing', interpolation: 'hold', points: [{ bar: 1, index: 0, value: 0.7 }, { bar: 4, index: 2, value: 0 }] },
+      { target: 'swing/808.bd', interpolation: 'linear', points: [{ bar: 0, index: 0, value: 0.5 }, { bar: 3, index: 0, value: 1 }] },
+      { target: 'voice/808.bd/decay', interpolation: 'linear', points: [{ bar: 1, index: 4, value: 0.1 }, { bar: 3, index: 6, value: 1 }] },
+      { target: 'bass/303.a/cutoff', interpolation: 'linear', points: [{ bar: 0, index: 0, value: 0 }, { bar: 6, index: 6, value: 1 }] },
+      { target: 'send/909.sd/reverb', interpolation: 'hold', points: [{ bar: 2, index: 0, value: 1 }] },
+      { target: 'fx/delayFeedback', interpolation: 'linear', points: [{ bar: 0, index: 0, value: 0.1 }, { bar: 0, index: 0, value: 0.2 }, { bar: 7, index: 0, value: 0.9 }] },
+    ],
+  }
+
+  const cases = [
+    { name: 'awkward', song: awkward, bars: 9 },
+    { name: 'awkward with clips launched', song: awkward, bars: 5, selection: { tr909: 'short909', '303.a': 'long303', tr808: 'missing' } },
+    { name: 'no chain plays the first pattern', song: { ...awkward, chain: [], automation: [] }, bars: 2 },
+  ]
+
+  const planned = cases.map(({ name, song: raw, bars, selection }) => {
+    const text = encodeSong(decodeSong(JSON.stringify(raw)))
+    const song = decodeSong(text)
+    let planned
+    if (!selection) {
+      planned = planSong(song, bars)
+    } else {
+      // `planSong` has no way to say a clip was launched, so this walks the same ground by hand.
+      planned = []
+      let time = 0
+      for (let bar = 0; bar < bars; bar++) {
+        for (let index = 0; index < barLengthForSelection(song, bar, selection); index++) {
+          const stepSeconds = 60 / bpmAt(song, bar, index) / 4
+          planned.push(planStep(song, { absolute: planned.length, index, bar, time, stepSeconds }, selection))
+          time += stepSeconds
+        }
+      }
+    }
+    const head = JSON.stringify({ name, song: text, bars, ...(selection ? { selection } : {}) })
+    return `${head.slice(0, -1)},"steps":[\n${planned.map((step) => JSON.stringify(step)).join(',\n')}\n]}`
+  })
+  write(join(fixtures, 'events'), 'synthetic.json', `[\n${planned.join(',\n')}\n]\n`)
 }
 
 // The noise generator, as the integers behind the floats so no decimal printing is involved.
