@@ -154,7 +154,11 @@ export async function openReference(packagesRoot) {
       chromium.kill()
       server.close()
       await new Promise((resolve) => chromium.on('exit', resolve))
-      rmSync(profile, { recursive: true, force: true })
+      // Chrome's helper processes can outlive it by a moment and are still writing here. It is a
+      // temporary directory: try properly, and do not let a leftover fail a run whose work is done.
+      try {
+        rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+      } catch {}
     },
   }
 }
