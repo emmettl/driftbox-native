@@ -300,7 +300,7 @@ struct RenderedSource {
         generator = .oscillator(frequency: frequency, phase: wave.advance(phase, frequency: hertz))
       case .noise(let buffer, let position, let increment):
         let count = buffer.samples.count
-        let wrapped = position.truncatingRemainder(dividingBy: Double(count))
+        let wrapped = wrapPosition(position, Double(count))
         let index = Int(wrapped)
         let fraction = wrapped - Double(index)
         let here = Double(buffer.samples[index])

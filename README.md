@@ -6,7 +6,7 @@ of TB-303s, synthesised from scratch — for the Mac first, then iOS. Swift thro
 The web app is the reference implementation and is treated as finished. It is here as a pinned
 submodule in `driftbox/`, and nothing in this repository changes it.
 
-**Where this is:** phase 2 of [ROADMAP.md](ROADMAP.md) is under way. There is no app yet. There is
+**Where this is:** phase 4 of [ROADMAP.md](ROADMAP.md) is under way. There is no app yet. There is
 a harness that holds Swift to the web engine's behaviour, and behind it: a song model, a codec that
 reads and writes the web app's documents to the byte, a sequencer that plans every catalogue song
 exactly as the reference does, and the instruments: all 22 drum voices — as data, exactly, and as
@@ -251,6 +251,25 @@ there. Things learned by measuring rather than reading:
   found here on the 808 clap at one setting — and then on the 909 clap at its *default* panel, all
   four retriggers. Fixed in driftbox#297; this renderer never reproduced it, and the case that
   found it is now an ordinary one that matches at -141dB.
+
+### Offline forms and real-time forms
+
+Everything that makes sound exists twice, on purpose. The **offline form** is where a thing is
+understood: it allocates what it likes, reads like the reference, and is held to the browser. The
+**real-time form** is where it is played: fixed storage, no allocation, no locks, no classes, every
+function on the render path marked `@_noAllocation` — and it is held to the offline form, *to the
+bit* where the arithmetic allows, so that nothing shown against the browser has to be shown again.
+
+`VoicePool` is the first: `VoiceRenderer` for a render thread. A hit is turned into a
+`FixedVoiceSpec` — plain bytes, small enough for a ring — on a thread that may allocate, and
+started and rendered on one that may not. All 22 voices, struck on and between frames, rendered in
+blocks of 97 frames, match `VoiceRenderer` exactly; so does an open hat choked by a closed one.
+
+Three things the compiler taught along the way, all of which are rules now: an array cannot be
+read from a function that promises not to allocate, so storage is pointers owned by a
+non-copyable type; nor can a generic type be touched, so fixed arrays are written out; and such a
+function can only call what makes the same promise, across files as well as modules — which
+includes reading a `static let`, because that is initialised on first use, behind a lock.
 
 ### Listening
 
