@@ -70,17 +70,8 @@ function serve(root) {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)))
 }
 
-/**
- * Open a page with the submodule's packages served beside it, and hand back `evaluate`.
- *
- * `evaluate(expression)` runs in the page, awaits a promise if the expression is one, and returns
- * the value — which has to survive JSON, so audio comes back as base64 (see `floats`).
- */
-export async function openReference(packagesRoot) {
-  const server = await serve(packagesRoot)
-  const origin = `http://127.0.0.1:${server.address().port}`
+async function launch(binary) {
   const profile = mkdtempSync(join(tmpdir(), 'driftbox-chromium-'))
-  const binary = findChromium()
   const chromium = spawn(binary, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run',
     '--no-default-browser-check', '--disable-gpu', '--mute-audio',
@@ -92,14 +83,50 @@ export async function openReference(packagesRoot) {
 
   const endpoint = await new Promise((resolve, reject) => {
     let log = ''
+    // Cleared the moment it listens: left running, it would kill a browser in the middle of its work.
+    const patience = setTimeout(() => {
+      chromium.kill()
+      reject(new Error(`${binary} did not start listening within a minute:\n${log}`))
+    }, 60000)
     chromium.stderr.on('data', (chunk) => {
       log += chunk
       const match = log.match(/DevTools listening on (ws:\/\/\S+)/)
-      if (match) resolve(match[1])
+      if (match) {
+        clearTimeout(patience)
+        resolve(match[1])
+      }
     })
-    chromium.on('exit', (code) => reject(new Error(`${binary} exited (${code}) before listening:\n${log}`)))
-    setTimeout(() => reject(new Error(`${binary} did not start listening:\n${log}`)), 20000)
+    chromium.on('exit', (code) => {
+      clearTimeout(patience)
+      reject(new Error(`${binary} exited (${code}) before listening:\n${log}`))
+    })
   })
+  return { chromium, endpoint, profile }
+}
+
+
+/**
+ * Open a page with the submodule's packages served beside it, and hand back `evaluate`.
+ *
+ * `evaluate(expression)` runs in the page, awaits a promise if the expression is one, and returns
+ * the value — which has to survive JSON, so audio comes back as base64 (see `floats`).
+ */
+export async function openReference(packagesRoot) {
+  const server = await serve(packagesRoot)
+  const origin = `http://127.0.0.1:${server.address().port}`
+  const binary = findChromium()
+  // A hosted runner's Chrome sometimes sits for a long while before it listens, and once in a
+  // while never does. Give it a minute, and a second and a third go.
+  let chromium, endpoint, profile
+  for (let attempt = 1; ; attempt++) {
+    try {
+      ;({ chromium, endpoint, profile } = await launch(binary))
+      break
+    } catch (error) {
+      if (attempt >= 3) throw error
+      console.error(`${error.message.split('\n')[0]} — trying again`)
+    }
+  }
 
   const socket = new WebSocket(endpoint)
   await new Promise((resolve, reject) => {
