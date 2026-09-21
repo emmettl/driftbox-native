@@ -24,7 +24,22 @@
           TransportBar(player: player)
           Divider()
           if let song = player.song {
-            Sequencer(player: player, song: song)
+            HStack(alignment: .top, spacing: 0) {
+              Sequencer(player: player, song: song)
+              Divider()
+              VStack(spacing: 0) {
+                if let id = player.selectedVoice, let voice = voice(id: id) {
+                  VoicePanel(
+                    player: player, voice: voice, params: song.kit.params[id] ?? VoiceParams(),
+                    sends: song.kit.sends[id] ?? SendLevels())
+                } else {
+                  FxPanel(player: player, fx: song.fx)
+                }
+                Divider()
+                KaossPad(player: player).frame(width: 220, height: 160).padding(12)
+                Spacer()
+              }
+            }
           } else {
             ContentUnavailableView("Pick a song", systemImage: "music.note.list")
           }
@@ -84,7 +99,12 @@
           Grid(alignment: .leading, horizontalSpacing: 4, verticalSpacing: 4) {
             ForEach(voices, id: \.id) { voice in
               GridRow {
-                Text(voice.name).font(.caption).frame(width: 90, alignment: .leading)
+                Button(voice.name) {
+                  player.selectedVoice = player.selectedVoice == voice.id ? nil : voice.id
+                }
+                .buttonStyle(.plain)
+                .font(.caption.weight(player.selectedVoice == voice.id ? .bold : .regular))
+                .frame(width: 90, alignment: .leading)
                 ForEach(steps, id: \.self) { index in
                   StepButton(
                     value: pattern.step(voice.id, at: index), playing: index == playhead,

@@ -111,6 +111,17 @@
       isPlaying ? stop() : play()
     }
 
+    func pad(x: Double, y: Double) {
+      unit?.send(.pad(x: x, y: y))
+    }
+
+    func padRelease() {
+      unit?.send(.padRelease)
+    }
+
+    /// Which voice's panel is showing.
+    var selectedVoice: String?
+
     /// Change the song and have the engine take it up where it is, without stopping.
     func edit(_ change: (inout Song) -> Void) {
       guard var edited = song else { return }
