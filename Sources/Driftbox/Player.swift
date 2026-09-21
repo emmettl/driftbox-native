@@ -52,6 +52,14 @@
     private(set) var songFrame = 0
     private(set) var sampleRate = 48000.0
     private(set) var error: String?
+    /// The last voice struck, by index into `allVoices`, and when: for anything that wants to
+    /// flash. Taken from the engine's events ring thirty times a second.
+    private(set) var lastHits: [Int: Int] = [:]
+    /// The engine's own clock, which the events are stamped in.
+    private(set) var engineFrame = 0
+    /// Where the song came from, if a file; where Save goes.
+    var fileURL: URL?
+    var undoManager: UndoManager?
 
     private let audio = AVAudioEngine()
     private var unit: DriftboxAudioUnit?
@@ -89,14 +97,56 @@
       songFrame = max(0, host.songFrame.load(ordering: .relaxed))
       isPlaying = host.playing.load(ordering: .relaxed)
       host.collect()
+      engineFrame = host.engineFrame.load(ordering: .relaxed)
+      while let event = host.nextEvent() {
+        if event.kind == .hit { lastHits[event.voice] = event.frame }
+      }
     }
 
     func open(_ entry: CatalogueEntry) {
       guard let loaded = Catalogue.song(entry.id) else { return }
       current = entry
+      fileURL = nil
+      undoManager?.removeAllActions()
       song = loaded
       unit?.load(loaded)
       unit?.send(.play)
+    }
+
+    /// A song document from disk, in the web app's format.
+    func open(file url: URL) {
+      guard let data = try? Data(contentsOf: url),
+        let loaded = SongCodec.decode(String(decoding: data, as: UTF8.self))
+      else {
+        error = "\(url.lastPathComponent) is not a song"
+        return
+      }
+      current = CatalogueEntry(
+        id: url.path, name: url.deletingPathExtension().lastPathComponent, blurb: "",
+        visual: loaded.visual ?? "")
+      fileURL = url
+      undoManager?.removeAllActions()
+      song = loaded
+      unit?.load(loaded)
+      unit?.send(.play)
+    }
+
+    func save(to url: URL) {
+      guard let song else { return }
+      do {
+        try Data(SongCodec.encode(song).utf8).write(to: url)
+        fileURL = url
+      } catch {
+        self.error = "\(error)"
+      }
+    }
+
+    /// Jump to the start of a bar of the arrangement.
+    func seek(toBar bar: Int) {
+      guard let song else { return }
+      let plan = song.plan(bars: min(bar, song.bars))
+      let time = plan.last.map { $0.time + $0.stepSeconds } ?? 0
+      unit?.send(.seek(songFrame: bar == 0 ? 0 : Int(time * sampleRate)))
     }
 
     func play() {
@@ -122,11 +172,19 @@
     /// Which voice's panel is showing.
     var selectedVoice: String?
 
-    /// Change the song and have the engine take it up where it is, without stopping.
+    /// Change the song and have the engine take it up where it is, without stopping. Undoable.
     func edit(_ change: (inout Song) -> Void) {
-      guard var edited = song else { return }
+      guard let before = song else { return }
+      var edited = before
       change(&edited)
+      replace(with: edited, undoing: before)
+    }
+
+    private func replace(with edited: Song, undoing before: Song) {
       song = edited
+      undoManager?.registerUndo(withTarget: self) { player in
+        MainActor.assumeIsolated { player.replace(with: before, undoing: edited) }
+      }
       let position = songFrame
       unit?.load(edited)
       unit?.send(.seek(songFrame: position))

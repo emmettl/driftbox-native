@@ -1,10 +1,14 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
+  import AppKit
+  import DriftboxDocument
   import DriftboxEngine
   import DriftboxSeq
   import SwiftUI
+  import UniformTypeIdentifiers
 
   struct ContentView: View {
     @Bindable var player: Player
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
       NavigationSplitView {
@@ -45,12 +49,35 @@
           }
         }
       }
+      .onChange(of: undoManager, initial: true) { _, manager in player.undoManager = manager }
+      .toolbar {
+        ToolbarItemGroup {
+          Button("Open…") { openFile() }.keyboardShortcut("o")
+          Button("Save…") { saveFile() }.keyboardShortcut("s").disabled(player.song == nil)
+        }
+      }
       .overlay(alignment: .bottom) {
         if let error = player.error {
           Text(error).padding(8).background(.red.opacity(0.8)).foregroundStyle(.white).cornerRadius(6)
             .padding()
         }
       }
+    }
+  }
+
+  extension ContentView {
+    func openFile() {
+      let panel = NSOpenPanel()
+      panel.allowedContentTypes = [.json]
+      panel.allowsMultipleSelection = false
+      if panel.runModal() == .OK, let url = panel.url { player.open(file: url) }
+    }
+
+    func saveFile() {
+      let panel = NSSavePanel()
+      panel.allowedContentTypes = [.json]
+      panel.nameFieldStringValue = (player.current?.name ?? "song") + ".song.json"
+      if panel.runModal() == .OK, let url = panel.url { player.save(to: url) }
     }
   }
 
@@ -75,10 +102,35 @@
         }
         Spacer()
         if let song = player.song {
+          Arrangement(player: player, song: song)
           Text("\(Int(song.bpm)) bpm").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
         }
       }
       .padding(12)
+    }
+  }
+
+  /// The chain, one box per entry, the one playing lit; a click jumps to its first bar.
+  struct Arrangement: View {
+    let player: Player
+    let song: Song
+
+    var body: some View {
+      let bar = player.position?.bar ?? -1
+      HStack(spacing: 3) {
+        ForEach(Array(song.chain.enumerated()), id: \.offset) { index, entry in
+          let start = song.chain.prefix(index).reduce(0) { $0 + max(1, $1.repeat) }
+          let playing = bar >= start && bar < start + max(1, entry.repeat)
+          Button {
+            player.seek(toBar: start)
+          } label: {
+            Text(song.pattern(id: entry.pattern)?.name.prefix(6) ?? "?")
+              .font(.system(size: 9)).padding(.horizontal, 4).padding(.vertical, 3)
+              .background(playing ? Color.orange : Color.secondary.opacity(0.2)).cornerRadius(3)
+          }
+          .buttonStyle(.plain)
+        }
+      }
     }
   }
 
@@ -99,11 +151,14 @@
           Grid(alignment: .leading, horizontalSpacing: 4, verticalSpacing: 4) {
             ForEach(voices, id: \.id) { voice in
               GridRow {
+                let index = allVoices.firstIndex { $0.id == voice.id } ?? -1
+                let struck = player.lastHits[index].map { player.engineFrame - $0 < 4800 } ?? false
                 Button(voice.name) {
                   player.selectedVoice = player.selectedVoice == voice.id ? nil : voice.id
                 }
                 .buttonStyle(.plain)
                 .font(.caption.weight(player.selectedVoice == voice.id ? .bold : .regular))
+                .foregroundStyle(struck ? Color.orange : Color.primary)
                 .frame(width: 90, alignment: .leading)
                 ForEach(steps, id: \.self) { index in
                   StepButton(

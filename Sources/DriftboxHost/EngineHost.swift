@@ -20,6 +20,7 @@ public final class EngineHost: @unchecked Sendable {
 
   /// What the render thread last reported: where the song is, and whether it is playing.
   public let songFrame = Atomic<Int>(-1)
+  public let engineFrame = Atomic<Int>(0)
   public let playing = Atomic<Bool>(false)
 
   public init(sampleRate: Double, voiceCapacity: Int = 32) {
@@ -46,6 +47,11 @@ public final class EngineHost: @unchecked Sendable {
   }
 
   public var preparer: HitPreparer { engine.pointee.voices.preparer }
+
+  /// The next thing the engine reports having played, from the interface's thread only.
+  public func nextEvent() -> EngineEvent? {
+    engine.pointee.events.receive()
+  }
 
   // MARK: - From the interface
 
@@ -91,6 +97,7 @@ public final class EngineHost: @unchecked Sendable {
     }
     engine.pointee.render(frames: frames, left: left, right: right)
     songFrame.store(engine.pointee.songFrame(), ordering: .relaxed)
+    engineFrame.store(engine.pointee.frame, ordering: .relaxed)
     playing.store(engine.pointee.isPlaying, ordering: .relaxed)
   }
 }
