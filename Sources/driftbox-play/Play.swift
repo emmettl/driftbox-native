@@ -5,6 +5,11 @@
   import DriftboxHost
   import Foundation
 
+  /// Somewhere for an instantiation callback to leave what it made.
+  final class Made: @unchecked Sendable {
+    var unit: AVAudioUnit?
+  }
+
   /// Plays a song through the speakers: the engine as an Audio Unit, hosted in an AVAudioEngine.
   ///
   ///     swift run -c release driftbox-play conformance/fixtures/documents/acid.song.json
@@ -22,11 +27,6 @@
         return value
       }
     }
-  }
-
-  /// Somewhere for an instantiation callback to leave what it made.
-  final class Made: @unchecked Sendable {
-    var unit: AVAudioUnit?
   }
 
   @main
@@ -109,11 +109,6 @@
     }
   }
 #else
-  /// Somewhere for an instantiation callback to leave what it made.
-  final class Made: @unchecked Sendable {
-    var unit: AVAudioUnit?
-  }
-
   @main
   struct Play {
     static func main() { print("driftbox-play needs AVFoundation") }
