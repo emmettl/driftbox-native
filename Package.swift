@@ -23,7 +23,7 @@ let package = Package(
     .target(name: "DriftboxEngine", dependencies: ["DriftboxDSP", "DriftboxSeq"]),
 
     // Unconstrained: Foundation and the platform are allowed from here up.
-    .target(name: "DriftboxDocument", dependencies: ["DriftboxSeq"]),
+    .target(name: "DriftboxDocument", dependencies: ["DriftboxSeq", "DriftboxEngine"]),
     .target(name: "DriftboxHost", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
 
     // A song document in, a WAV file out: something to listen to.

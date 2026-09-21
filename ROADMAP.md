@@ -51,19 +51,21 @@ gone native at all.
    its offline one rather than to the browser again: the drum voices and the 303 to the bit,
    the reverb within single precision, the whole engine within -90dB. `driftbox-play` hosts the
    engine as an `AUAudioUnit` in an `AVAudioEngine` and plays the catalogue. Carried forward: the
-   ring back to the interface carries position and a playing flag but not yet *events* (which
-   voice, accents, slides, sections) for scenes to react to; and the reverb wants a non-uniform
-   partitioning before it is cheap.
+   reverb wants a non-uniform partitioning before it is cheap. (The events ring — which voice,
+   accents, notes, passes — landed with phase 5.)
    What was planned: `AUAudioUnit` from the start, sequencing sample-accurately
    inside the render block, lock-free rings both ways. The ring back to the interface carries
    *events* — which voice, accents, slides, sections — not only levels, so scenes can react to
    what was played rather than to a spectrum. Done when a bare player plays the catalogue.
-5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable for now: the
-   catalogue as a library, a transport with the bar and step it is on, and the step grid of the
-   pattern the transport is in — live, and editable, a click cycling a step off, on, accent and
-   the engine taking the change up where it is. Everything else below is still to come, and so is
-   a look at it: this slice was run and stayed up, but nobody has seen it yet. Sequencer, voice and bass panels, pattern tools, arrangement, effects, the
-   pad, the library, keys. Document-based, undo, CoreMIDI including clock follow, stems.
+5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable for now, and
+   never yet looked at — every slice was run and stayed up, and nobody has seen it. In so far:
+   the catalogue as a library; open and save of the web app's documents; a transport with the
+   bar, step and pattern it is on, and the chain as a strip to jump around; the step grid of the
+   pattern playing, live and editable; the 303 grids, with pitch, accent and slide; a panel of
+   knobs and sends per voice, and the effects; the pad; undo of every edit; export of the mix to
+   WAV; and voice names that flash from the engine's events ring. Still to come: pattern tools
+   (add, copy, rotate, randomise), editing the chain, tempo and swing, per-voice loop lengths
+   and flams, keys, stems, CoreMIDI including clock follow, and a proper document model.
 6. **Visuals.** A thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.

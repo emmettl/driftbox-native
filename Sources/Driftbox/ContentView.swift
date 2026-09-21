@@ -54,6 +54,7 @@
         ToolbarItemGroup {
           Button("Open…") { openFile() }.keyboardShortcut("o")
           Button("Save…") { saveFile() }.keyboardShortcut("s").disabled(player.song == nil)
+          Button("Export Mix…") { exportMix() }.keyboardShortcut("e").disabled(player.song == nil)
         }
       }
       .overlay(alignment: .bottom) {
@@ -71,6 +72,20 @@
       panel.allowedContentTypes = [.json]
       panel.allowsMultipleSelection = false
       if panel.runModal() == .OK, let url = panel.url { player.open(file: url) }
+    }
+
+    /// The whole song, offline, to a WAV file: the same render `driftbox-render` makes.
+    func exportMix() {
+      guard let song = player.song else { return }
+      let panel = NSSavePanel()
+      panel.allowedContentTypes = [.wav]
+      panel.nameFieldStringValue = (player.current?.name ?? "song") + ".wav"
+      guard panel.runModal() == .OK, let url = panel.url else { return }
+      let sampleRate = player.sampleRate
+      Task.detached {
+        let audio = SongRenderer.render(song, options: .init(sampleRate: sampleRate))
+        try? WAV.data(audio, sampleRate: sampleRate).write(to: url)
+      }
     }
 
     func saveFile() {
