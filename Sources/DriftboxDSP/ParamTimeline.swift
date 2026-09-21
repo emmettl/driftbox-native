@@ -23,6 +23,8 @@ public struct ParamTimeline {
   /// What the parameter holds before its first event.
   public var defaultValue: Double
   var events: [Event] = []
+  /// Whether any event is an approach to a target, which is the one kind that carries history.
+  var hasTargets = false
 
   public init(defaultValue: Double) {
     self.defaultValue = defaultValue
@@ -43,6 +45,7 @@ public struct ParamTimeline {
   }
 
   public mutating func setTarget(_ value: Double, at time: Double, timeConstant: Double) {
+    hasTargets = true
     insert(Event(kind: .target(timeConstant: timeConstant), value: value, time: time))
   }
 
@@ -93,6 +96,33 @@ public struct ParamTimeline {
   /// A ramp runs from the event before it — from that event's time and the value the parameter
   /// had reached there — to its own time and value, and holds afterwards.
   public func value(at time: Double) -> Double {
+    // A timeline of sets and ramps is decided by the two events either side of `time`, which a
+    // search finds directly. Only an approach to a target carries history, and needs the walk
+    // below. A whole song's worth of 303 notes is thousands of events read millions of times, so
+    // this is the difference between a render that takes seconds and one that takes minutes.
+    if !hasTargets {
+      var low = 0
+      var high = events.count
+      while low < high {
+        let middle = (low + high) / 2
+        if events[middle].time <= time { low = middle + 1 } else { high = middle }
+      }
+      let value = low > 0 ? events[low - 1].value : defaultValue
+      guard low < events.count else { return value }
+      let previousTime = low > 0 ? events[low - 1].time : 0
+      let event = events[low]
+      let span = event.time - previousTime
+      switch event.kind {
+      case .linearRamp:
+        return span > 0 ? value + (event.value - value) * ((time - previousTime) / span) : value
+      case .exponentialRamp:
+        if span <= 0 || value == 0 || event.value == 0 || (value < 0) != (event.value < 0) { return value }
+        return value * dbPow(event.value / value, (time - previousTime) / span)
+      case .set, .target:
+        return value
+      }
+    }
+
     var value = defaultValue
     var previousTime = 0.0
     var index = 0

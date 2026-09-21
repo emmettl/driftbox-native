@@ -50,6 +50,21 @@ public enum ReverbSend {
     return scale
   }
 
+  /// A stereo signal through the room: each side through its own side of the response.
+  public static func render(
+    left: [Float], right: [Float], fx: FxParams, sampleRate: Double, frames: Int
+  ) -> VoiceRenderer.Stereo {
+    let response = impulseResponse(for: fx, sampleRate: sampleRate)
+    let scale = Float(normalisation(response, sampleRate: sampleRate))
+    func wet(_ input: [Float], _ side: [Float]) -> [Float] {
+      guard input.contains(where: { $0 != 0 }) else { return [Float](repeating: 0, count: frames) }
+      var out = Convolution.convolve(input, with: side).prefix(frames).map { $0 * scale }
+      out += [Float](repeating: 0, count: max(0, frames - out.count))
+      return out
+    }
+    return VoiceRenderer.Stereo(left: wet(left, response[0]), right: wet(right, response[1]))
+  }
+
   /// A mono signal through the room: one side of the response for each side out.
   public static func render(_ input: [Float], fx: FxParams, sampleRate: Double, frames: Int)
     -> VoiceRenderer.Stereo

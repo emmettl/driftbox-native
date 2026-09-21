@@ -169,6 +169,30 @@ try {
   }
   writeFileSync(join(out, 'stereo.json'), `${JSON.stringify({ renders: stereo }, null, 1)}\n`)
 
+  // Every voice once more, struck at a time that is not on a sample frame — which is where nearly
+  // every hit in a real song falls, since a step is rarely a whole number of frames and swing moves
+  // it again. The renders above all start at zero and cannot see how a source starts between frames.
+  mkdirSync(join(out, 'offset'), { recursive: true })
+  const offsetRenders = []
+  // Several times, falling early, in the middle and late in a render quantum — how much of a
+  // quantum is left when a hit starts turned out to matter — and one several seconds in.
+  for (const time of [0.0123456789, 0.9523809523809526, 0.23809523809523808, 3.8095238095238093]) for (const id of voices) {
+    const encoded = await reference.evaluate(`(async () => {
+      const encode = ${FLOATS_TO_BASE64}
+      const voice = [...engine.TR808_VOICES, ...engine.TR909_VOICES].find((voice) => voice.id === ${JSON.stringify(id)})
+      const spec = { ...voice.build(${JSON.stringify(DEFAULTS)}, 1), ...(voice.trim === undefined ? {} : { trim: voice.trim }) }
+      const frames = Math.max(1, Math.ceil((${time} + spec.duration + 0.05) * ${SAMPLE_RATE}))
+      const ctx = new OfflineAudioContext(1, frames, ${SAMPLE_RATE})
+      engine.renderVoice(ctx, spec, ctx.destination, ${time}, voice.id)
+      return encode((await ctx.startRendering()).getChannelData(0))
+    })()`)
+    const samples = floats(encoded)
+    const file = `offset/${id}.at-${time}.f32`
+    writeFileSync(join(out, file), Buffer.from(samples.buffer))
+    offsetRenders.push({ voice: id, case: `at ${time}`, time, params: DEFAULTS, accent: 1, sampleRate: SAMPLE_RATE, frames: samples.length, peak: samples.reduce((peak, value) => Math.max(peak, Math.abs(value)), 0), file })
+  }
+  writeFileSync(join(out, 'offset.json'), `${JSON.stringify({ renders: offsetRenders }, null, 1)}\n`)
+
   // The 303. One oscillator running continuously through one ladder filter, with notes scheduled
   // onto it — so what is rendered is a line, not a hit. The notes are the reference's own plan of
   // a catalogue song, which brings slides, accents and ties with it, and they are played the way
@@ -446,6 +470,42 @@ try {
     })
   }
   writeFileSync(join(out, 'kaoss.json'), `${JSON.stringify(kaossCases, null, 1)}\n`)
+
+  // Whole mixes, through the reference's own `renderMix`: every voice, both 303s, the sends, the
+  // master inserts, the idle pad. A window of each song rather than all of it — `renderMix` takes a
+  // start and a duration, and drops whatever was struck before the window, which is easy to do the
+  // same way — starting eight bars in, where a song has usually got going. DRIFTBOX_MIX_SONGS=all
+  // renders the whole catalogue.
+  mkdirSync(join(out, 'mixes'), { recursive: true })
+  const chosen = ['acid', 'chillwave', 'garage', 'hothouse', 'orrery', 'saturn', 'smallhours', 'timevortex']
+  const mixIds = process.env.DRIFTBOX_MIX_SONGS === 'all'
+    ? await reference.evaluate(`engine.SONGS.map((preset) => preset.id)`)
+    : chosen
+  const mixes = []
+  for (const id of mixIds) {
+    const result = await reference.evaluate(`(async () => {
+      const encode = ${FLOATS_TO_BASE64}
+      const { planSong } = await import('${reference.origin}/engine/src/schedule.js')
+      const { barLengthForBar, songBars } = await import('${reference.origin}/engine/src/pattern.js')
+      const song = engine.SONGS.find((preset) => preset.id === ${JSON.stringify(id)}).build()
+      const bars = songBars(song)
+      const fromBar = Math.min(8, Math.max(0, bars - 4))
+      const plan = planSong(song, bars)
+      let index = 0
+      for (let bar = 0; bar < fromBar; bar++) index += barLengthForBar(song, bar)
+      const start = plan[index].time
+      const options = { sampleRate: ${SAMPLE_RATE}, start, duration: 5, tail: 1.5 }
+      const buffer = await engine.renderMix(song, options)
+      return { fromBar, options, frames: buffer.length, left: encode(buffer.getChannelData(0)), right: encode(buffer.getChannelData(1)) }
+    })()`)
+    const left = floats(result.left), right = floats(result.right)
+    writeFileSync(join(out, 'mixes', `${id}.left.f32`), Buffer.from(left.buffer))
+    writeFileSync(join(out, 'mixes', `${id}.right.f32`), Buffer.from(right.buffer))
+    let peak = 0
+    for (let i = 0; i < left.length; i++) peak = Math.max(peak, Math.abs(left[i]), Math.abs(right[i]))
+    mixes.push({ song: id, fromBar: result.fromBar, ...result.options, frames: result.frames, peak, left: `mixes/${id}.left.f32`, right: `mixes/${id}.right.f32` })
+  }
+  writeFileSync(join(out, 'mixes.json'), `${JSON.stringify(mixes, null, 1)}\n`)
 
   writeFileSync(join(out, 'voices.json'), `${JSON.stringify({ chromium: reference.product, renders: manifest }, null, 1)}\n`)
   const worst = Math.max(...manifest.map((render) => render.selfDifference))

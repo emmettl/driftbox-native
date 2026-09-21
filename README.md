@@ -57,7 +57,7 @@ The one thing the DSP takes from outside is `exp` and `tanh` from the C library
 ```bash
 node conformance/emit/emit.mjs          # rewrite the checked-in fixtures
 node conformance/emit/emit.mjs --full   # also whole-song plans, into conformance/generated
-node conformance/emit/emit-audio.mjs    # every voice rendered in Chromium, into conformance/generated
+node conformance/emit/emit-audio.mjs    # everything rendered in Chromium, into conformance/generated
 scripts/check-fixtures.sh               # fail if the fixtures are stale against the submodule (emit --check)
 swift test
 ```
@@ -124,6 +124,8 @@ any difference in the *sound* belongs to the one renderer and not to 22 voices.
 | the browser's compressor alone, three settings | -125 to -138dB |
 | the master inserts whole: drive, struck filter, compressor | -94 to -136dB; -63dB after one kind of strike |
 | the performance filter: idle, and through three gestures | -141dB idle; -78 to -98dB moving |
+| every voice struck between sample frames, at four times | as on a frame; the 909's cymbals -71 to -83dB |
+| **whole mixes**: a window of eight catalogue songs | four at **-80 to -98dB**; four in level to 0.3dB, differing in a few stretches |
 | the oversampler alone, against its measured impulse response | under 1e-6 |
 | Chromium against itself | up to 5e-7 between two renders of one graph |
 
@@ -156,6 +158,33 @@ there. Things learned by measuring rather than reading:
   127 frames before a note; a sequencer that schedules to the sample, as this one will, has no
   such window. (Scheduled all up front, as the reference's *stem* export does, every overlapped
   sweep is cancelled before it plays at all — a bug there, reported.)
+- **The reference starts every oscillator at the wrong pitch, and this does not.** A hit almost
+  never starts on the first frame of a render quantum, and when it does not, Chromium — for the
+  rest of that quantum — reads the oscillator's pitch from the *start of the quantum* instead of
+  from where the oscillator started. One that begins 36 frames into a quantum plays 36 frames at
+  440Hz, an `OscillatorNode`'s default, then its pitch envelope 36 frames early, and is right again
+  at the next quantum. Measured on a bare sine at six start times, and exact. (A buffer's playback
+  rate is read once per quantum, so the 909's cymbals start at the wrong speed for the same
+  stretch.) It is why the reference's own notes record a closed hat's peak moving between 0.67 and
+  3.97 "purely with where the hit falls inside a quantum". The delays and phase shifts elsewhere
+  are kept because they are the same every time; this is different on every hit and no two plays
+  agree, so the engine does not do it. `emulatesBrowserSourceStart` turns it on for the
+  comparisons, which without it are at 0dB.
+- **Two single-precision details in how noise is read.** An oscillator starts at the top of its
+  cycle on its first frame however late that frame is, where a buffer starts a fraction of a frame
+  in. And a buffer's start offset goes through single precision before it is rounded to a frame:
+  one kick in one song has an offset of 48374.4995 frames, which is 48374.502 as a float, rounds
+  the other way, and came out with its click inverted.
+- **Four whole mixes are not understood yet.** Four of eight songs match the reference whole at
+  -80 to -98dB — every voice, both 303s, the sends, the compressor, the idle pad. The other four
+  agree in level to 0.3dB throughout and differ in a few tenths of a second each. Bisected in the
+  browser: give a song a voice that is both panned and sending to the delay, and the *reference's
+  own* render of the 303 changes, before that voice has played a note, for the length of one bass
+  note after the first thing scheduled from a suspend — and then goes back. This renderer gives the
+  same 303 either way. It is a channel-count effect inside Chromium's delay loop, and it is not
+  stable there either: those four are the songs on which an x64 and an arm64 Chrome disagree with
+  *each other* most, by -30 to -37dB, where they agree on the other four to -56 to -81dB. The test
+  holds the four to level and coverage until it is pinned down.
 - **An idle filter is not an absent one.** The performance pad is a low-pass into a high-pass,
   both "wide open" when nobody is touching it, and the reference calls that a true bypass. Sample
   for sample its output differs from its input by nearly the whole signal: a 20Hz high-pass turns
@@ -222,6 +251,16 @@ there. Things learned by measuring rather than reading:
   found here on the 808 clap at one setting — and then on the 909 clap at its *default* panel, all
   four retriggers. Fixed in driftbox#297; this renderer never reproduced it, and the case that
   found it is now an ordinary one that matches at -141dB.
+
+### Listening
+
+```bash
+swift run -c release driftbox-render conformance/fixtures/documents/smallhours.song.json smallhours.wav
+swift run -c release driftbox-render song.json out.wav --start 15.2 --duration 8 --rate 48000
+```
+
+A song document in, a 32-bit float WAV out, at about thirty times real time. This is the native
+render as the engine means it — without the browser's faults switched on.
 
 ### Exactness
 
