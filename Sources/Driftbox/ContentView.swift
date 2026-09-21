@@ -117,6 +117,9 @@
             }
           }
           .padding(12)
+          ForEach(["303.a", "303.b"].filter { pattern.bass[$0] != nil }, id: \.self) { voiceId in
+            BassGrid(player: player, pattern: pattern, voiceId: voiceId, playhead: playhead).padding(12)
+          }
         }
       }
     }

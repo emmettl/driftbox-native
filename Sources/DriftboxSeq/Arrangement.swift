@@ -57,6 +57,49 @@ extension Pattern {
   }
 }
 
+extension BassStep {
+  /// Note/Pause, without throwing away the pitch authored for a silent step.
+  public func settingGate(_ sounds: Bool) -> BassStep {
+    var out = self
+    if !sounds {
+      if note != nil { out.gate = false }
+      return out
+    }
+    out.gate = nil
+    if out.note == nil { out.note = 0 }
+    return out
+  }
+
+  /// Slide; assigning it to a blank rest creates a silent root pitch to edit.
+  public func settingSlide(_ slide: Bool) -> BassStep {
+    var out = self
+    if slide, note == nil {
+      out.note = 0
+      out.gate = false
+    }
+    out.slide = slide
+    return out
+  }
+}
+
+extension Pattern {
+  public func bassStep(_ voiceId: String, at step: Int) -> BassStep {
+    guard let line = bass[voiceId], length > 0 else { return .rest }
+    let index = step % length
+    return index < line.count ? line[index] : .rest
+  }
+
+  /// Replace one step of a 303 line, filling in rests if the line is not there yet.
+  public func settingBassStep(_ voiceId: String, at step: Int, to value: BassStep) -> Pattern {
+    var out = self
+    var line = bass[voiceId] ?? []
+    if line.count < length { line += [BassStep](repeating: .rest, count: length - line.count) }
+    line[step % length] = value
+    out.bass[voiceId] = line
+    return out
+  }
+}
+
 extension Song {
   public func pattern(id: String) -> Pattern? {
     patterns.first { $0.id == id }
