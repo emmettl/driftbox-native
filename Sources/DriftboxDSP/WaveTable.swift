@@ -92,6 +92,44 @@ public struct WaveTable: Sendable {
     }
   }
 
+  /// The same tables in storage that stays put, for a real-time engine: a `Reader` from here is
+  /// good for as long as the bank is, where one from `withReader` is good only for the call.
+  public struct Bank: ~Copyable {
+    let storage: UnsafeMutablePointer<Float>
+    let readers: (sine: Reader, triangle: Reader, square: Reader, sawtooth: Reader)
+
+    public init(sampleRate: Double) {
+      let shapes: [Shape] = [.sine, .triangle, .square, .sawtooth]
+      let tables = shapes.map { WaveTable(shape: $0, sampleRate: sampleRate) }
+      let each = tables[0].tables.count
+      storage = .allocate(capacity: each * shapes.count)
+      var built: [Reader] = []
+      for (index, table) in tables.enumerated() {
+        let base = storage + index * each
+        for (offset, value) in table.tables.enumerated() { base[offset] = value }
+        built.append(
+          Reader(
+            tables: base, size: table.size, ranges: table.ranges, lowestFundamental: table.lowestFundamental,
+            rateScale: table.rateScale))
+      }
+      readers = (built[0], built[1], built[2], built[3])
+    }
+
+    deinit {
+      storage.deallocate()
+    }
+
+    @_noAllocation
+    public func reader(_ shape: Shape) -> Reader {
+      switch shape {
+      case .sine: readers.sine
+      case .triangle: readers.triangle
+      case .square: readers.square
+      case .sawtooth: readers.sawtooth
+      }
+    }
+  }
+
   public struct Reader {
     let tables: UnsafePointer<Float>
     let size: Int

@@ -15,6 +15,7 @@ public struct Biquad {
   var b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0
   var x1 = 0.0, x2 = 0.0, y1 = 0.0, y2 = 0.0
 
+  @_noAllocation
   public init(response: Response, sampleRate: Double) {
     self.response = response
     self.sampleRate = sampleRate

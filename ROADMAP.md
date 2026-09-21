@@ -37,16 +37,23 @@ gone native at all.
    then biquad, oscillator, noise, and the `VoiceSpec` interpreter. The 22 voices are data handed
    to one interpreter, so this is one interpreter and a set of small functions rather than 22
    synths. Done when each voice renders within tolerance of the browser, and a listening pass.
-3. **The 303s, strips, sends, master, the performance filter.** ← *here.* The 303, both sends,
-   the master inserts including the browser's compressor, the performance filter, and
-   `SongRenderer`, which wires them together as `renderMix` does. Four of eight catalogue songs
-   match the reference whole at -80 to -98dB. Left: the channel-count effect in Chromium's delay
-   loop that the other four trip over; effect and tempo automation in the offline render, which
-   nothing in the catalogue uses and which the renderer refuses rather than ignores; and the
-   listening pass, which `driftbox-render` now makes possible.
+3. ~~**The 303s, strips, sends, master, the performance filter.**~~ Done, with two things
+   carried forward. The 303, both sends, the master inserts including the browser's compressor,
+   the performance filter, and `SongRenderer`, which wires them together as `renderMix` does.
+   Four of eight catalogue songs match the reference whole at -80 to -98dB, and the listening
+   pass — thirty seconds each of two songs through `driftbox-render` — came back "sounded fine".
+   Carried forward: the channel-count effect in Chromium's delay loop that the other four songs
+   trip over, and effect and tempo automation in the offline render, which nothing in the
+   catalogue uses and which the renderer refuses rather than ignores.
    What was planned: Done when whole songs match
    `renderMix` by spectral fingerprint.
-4. **A real-time host on the Mac.** `AUAudioUnit` from the start, sequencing sample-accurately
+4. **A real-time host on the Mac.** ← *here.* In slices, each real-time form held to its offline
+   one rather than to the browser again. Done so far: `VoicePool`, the drum voices for a render
+   thread — fixed slots, everything allocated up front, `render` marked `@_noAllocation` — which
+   is `VoiceRenderer` **to the bit**, chokes included. Next: the 303, a compiled song and a
+   sequencer that runs inside the render call, the partitioned convolver the reverb needs, and
+   then the `AUAudioUnit` and its rings.
+   What was planned: `AUAudioUnit` from the start, sequencing sample-accurately
    inside the render block, lock-free rings both ways. The ring back to the interface carries
    *events* — which voice, accents, slides, sections — not only levels, so scenes can react to
    what was played rather than to a spectrum. Done when a bare player plays the catalogue.
