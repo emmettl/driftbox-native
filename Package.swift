@@ -28,6 +28,10 @@ let package = Package(
 
     // A song document in, a WAV file out: something to listen to.
     .executableTarget(name: "driftbox-render", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
+    // The Mac app.
+    .executableTarget(
+      name: "Driftbox", dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq"],
+      resources: [.copy("Resources/Songs"), .copy("Resources/catalogue.json")]),
     // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine.
     .executableTarget(
       name: "driftbox-play", dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument"]),

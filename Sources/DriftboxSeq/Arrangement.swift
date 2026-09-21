@@ -28,6 +28,35 @@ extension Pattern {
   }
 }
 
+extension Pattern {
+  /// Off → on → accent → off, as the machines' step buttons go. A step that goes off loses its
+  /// flam mark too.
+  public func cyclingStep(_ voiceId: String, at step: Int) -> Pattern {
+    let current = self.step(voiceId, at: step)
+    let next: StepValue =
+      switch current {
+      case .off: .on
+      case .on: .accent
+      case .accent: .off
+      }
+    return settingStep(voiceId, at: step, to: next)
+  }
+
+  public func settingStep(_ voiceId: String, at step: Int, to value: StepValue) -> Pattern {
+    var out = self
+    var track = tracks[voiceId] ?? [StepValue](repeating: .off, count: length)
+    if track.count < length { track += [StepValue](repeating: .off, count: length - track.count) }
+    let index = wrap(step, trackLength(voiceId))
+    track[index] = value
+    out.tracks[voiceId] = track
+    if value == .off, var marks = flams[voiceId] {
+      if index < marks.count { marks[index] = false }
+      out.flams[voiceId] = marks
+    }
+    return out
+  }
+}
+
 extension Song {
   public func pattern(id: String) -> Pattern? {
     patterns.first { $0.id == id }

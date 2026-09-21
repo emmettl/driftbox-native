@@ -58,7 +58,11 @@ gone native at all.
    inside the render block, lock-free rings both ways. The ring back to the interface carries
    *events* — which voice, accents, slides, sections — not only levels, so scenes can react to
    what was played rather than to a spectrum. Done when a bare player plays the catalogue.
-5. **The editor.** ← *next.* Sequencer, voice and bass panels, pattern tools, arrangement, effects, the
+5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable for now: the
+   catalogue as a library, a transport with the bar and step it is on, and the step grid of the
+   pattern the transport is in — live, and editable, a click cycling a step off, on, accent and
+   the engine taking the change up where it is. Everything else below is still to come, and so is
+   a look at it: this slice was run and stayed up, but nobody has seen it yet. Sequencer, voice and bass panels, pattern tools, arrangement, effects, the
    pad, the library, keys. Document-based, undo, CoreMIDI including clock follow, stems.
 6. **Visuals.** A thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not

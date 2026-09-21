@@ -281,6 +281,16 @@ non-copyable type; nor can a generic type be touched, so fixed arrays are writte
 function can only call what makes the same promise, across files as well as modules — which
 includes reading a `static let`, because that is initialised on first use, behind a lock.
 
+### The app
+
+```bash
+swift run -c release Driftbox
+```
+
+The Mac app, as far as it goes: the catalogue as a library, a transport, and the step grid of the
+pattern the transport is in, live and editable. A SwiftPM executable rather than an Xcode
+project for now, which is why it announces itself to the system by hand on launch.
+
 ### Playing
 
 ```bash
