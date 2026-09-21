@@ -169,6 +169,73 @@ try {
   }
   writeFileSync(join(out, 'stereo.json'), `${JSON.stringify({ renders: stereo }, null, 1)}\n`)
 
+  // The 303. One oscillator running continuously through one ladder filter, with notes scheduled
+  // onto it — so what is rendered is a line, not a hit. The notes are the reference's own plan of
+  // a catalogue song, which brings slides, accents and ties with it, and they are played the way
+  // `renderMix` plays them: the context is suspended at the render quantum each note falls in and
+  // the note is scheduled from there. That matters, because `Bassline.play` cancels what it had
+  // scheduled, and when a cancellation is made is part of what it does.
+  mkdirSync(join(out, 'bass'), { recursive: true })
+  const LINES = [
+    { name: 'pump 303.a', song: 'pump', voice: '303.a', bars: 2, fromBar: 4 },
+    { name: 'acid 303.a from the second section', song: 'acid', voice: '303.a', bars: 2, fromBar: 8 },
+    { name: 'smallhours 303.a', song: 'smallhours', voice: '303.a', bars: 2 },
+  ]
+  const lines = []
+  for (const line of LINES) {
+    const result = await reference.evaluate(`(async () => {
+      const encode = ${FLOATS_TO_BASE64}
+      const { planSong } = await import('${reference.origin}/engine/src/schedule.js')
+      const { Bassline } = await import('${reference.origin}/engine/src/bassline.js')
+      const song = engine.SONGS.find((preset) => preset.id === ${JSON.stringify(line.song)}).build()
+      const fromBar = ${line.fromBar ?? 0}
+      const plan = planSong(song, fromBar + ${line.bars})
+      // Steps of the bars asked for, re-timed to start at zero.
+      let origin = null
+      const notes = []
+      let end = 0
+      {
+        const { barLengthForBar } = await import('${reference.origin}/engine/src/pattern.js')
+        let index = 0
+        for (let bar = 0; bar < fromBar + ${line.bars}; bar++) {
+          for (let i = 0; i < barLengthForBar(song, bar); i++, index++) {
+            const step = plan[index]
+            if (bar < fromBar) continue
+            if (origin === null) origin = step.time
+            end = step.time + step.stepSeconds - origin
+            for (const hit of step.bass) if (hit.voiceId === ${JSON.stringify(line.voice)}) notes.push({ time: hit.time - origin, note: hit.note })
+          }
+        }
+      }
+      const frames = Math.ceil((end + 0.5) * ${SAMPLE_RATE})
+      const ctx = new OfflineAudioContext(1, frames, ${SAMPLE_RATE})
+      const { bassline, usingLadder } = await Bassline.create(ctx)
+      bassline.output.connect(ctx.destination)
+      const byQuantum = new Map()
+      for (const entry of notes) {
+        const quantum = Math.floor((entry.time * ${SAMPLE_RATE}) / 128)
+        entry.scheduledAt = (Math.max(0, quantum) * 128) / ${SAMPLE_RATE}
+        if (quantum <= 0) bassline.play(entry.note, entry.time)
+        else byQuantum.set(quantum, [...(byQuantum.get(quantum) ?? []), entry])
+      }
+      const suspensions = [...byQuantum].map(([quantum, entries]) =>
+        ctx.suspend((quantum * 128) / ${SAMPLE_RATE}).then(async () => {
+          for (const entry of entries) bassline.play(entry.note, entry.time)
+          await ctx.resume()
+        }))
+      const rendering = ctx.startRendering()
+      await Promise.all(suspensions)
+      const buffer = await rendering
+      return { usingLadder, notes, frames, audio: encode(buffer.getChannelData(0)) }
+    })()`)
+    if (!result.usingLadder) throw new Error('the reference fell back to a biquad: no AudioWorklet in this Chromium?')
+    const samples = floats(result.audio)
+    const file = `bass/${line.name.replaceAll(' ', '-')}.f32`
+    writeFileSync(join(out, file), Buffer.from(samples.buffer))
+    lines.push({ name: line.name, sampleRate: SAMPLE_RATE, frames: result.frames, notes: result.notes, peak: samples.reduce((peak, value) => Math.max(peak, Math.abs(value)), 0), file })
+  }
+  writeFileSync(join(out, 'bass.json'), `${JSON.stringify(lines, null, 1)}\n`)
+
   writeFileSync(join(out, 'voices.json'), `${JSON.stringify({ chromium: reference.product, renders: manifest }, null, 1)}\n`)
   const worst = Math.max(...manifest.map((render) => render.selfDifference))
   console.log(`${manifest.length} voice renders from ${reference.product}; Chromium differs from itself by at most ${worst}`)
