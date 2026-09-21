@@ -1,0 +1,155 @@
+{
+ "songFormat": 7,
+ "songs": [
+  {
+   "id": "chillwave",
+   "name": "Sundown",
+   "blurb": "Chillwave — slow, swung, lots of space",
+   "visual": "sunset"
+  },
+  {
+   "id": "acid",
+   "name": "Acieed",
+   "blurb": "Acid house — 126bpm, straight, 303 doing its thing",
+   "visual": "web"
+  },
+  {
+   "id": "papercities",
+   "name": "Paper Cities",
+   "blurb": "Trip-hop — 86bpm, swung drums and a melody that gets an answer",
+   "visual": "papercities"
+  },
+  {
+   "id": "daydream",
+   "name": "Daydream Receiver",
+   "blurb": "Melodic electronica — 96bpm, soft edges and a half-remembered melody",
+   "visual": "daydream"
+  },
+  {
+   "id": "smallhours",
+   "name": "Small Hours",
+   "blurb": "Nocturnal jazz-electronica — 78bpm, soft drums and suspended harmony",
+   "visual": "smallhours"
+  },
+  {
+   "id": "darkwave",
+   "name": "Undertow",
+   "blurb": "Darkwave — 82bpm, no snare, mostly room",
+   "visual": "water"
+  },
+  {
+   "id": "cycles",
+   "name": "Light Cycles",
+   "blurb": "Electro — 128bpm, broken kick, clap for a backbeat, no snare at all",
+   "visual": "cycles"
+  },
+  {
+   "id": "transmission",
+   "name": "Transmission",
+   "blurb": "ISDN-era FSOL — 104bpm, nothing lines up, no backbeat at all",
+   "visual": "lifeforms"
+  },
+  {
+   "id": "timevortex",
+   "name": "Time Vortex",
+   "blurb": "Radiophonic sci-fi — 142bpm, galloping pulse and a signal lost in tape echo",
+   "visual": "graphic"
+  },
+  {
+   "id": "offset",
+   "name": "Offset",
+   "blurb": "Interlocking percussion — 110bpm, fifteen steps against sixteen",
+   "visual": "weave"
+  },
+  {
+   "id": "defcon",
+   "name": "Defcon",
+   "blurb": "Downtempo — 68bpm, built on the tritone, the slowest beat here",
+   "visual": "defcon"
+  },
+  {
+   "id": "clouds",
+   "name": "Cumulus",
+   "blurb": "Ambient house — 116bpm, the heaviest swing here, and the only cheerful one",
+   "visual": "clouds"
+  },
+  {
+   "id": "pump",
+   "name": "Pump",
+   "blurb": "Hip house — 124bpm, a 303 playing stabs instead of a line",
+   "visual": "dancers"
+  },
+  {
+   "id": "assembly",
+   "name": "Assembly",
+   "blurb": "Minimal techno — 132bpm, a production line driven by the drum rack",
+   "visual": "machine"
+  },
+  {
+   "id": "garage",
+   "name": "Last Bus",
+   "blurb": "UK garage — 134bpm, two-step drums, swung hats and a sub in the gaps",
+   "visual": "nightbus"
+  },
+  {
+   "id": "hothouse",
+   "name": "Hothouse",
+   "blurb": "Dub techno — 118bpm, muted stabs and echoes growing in the gaps",
+   "visual": "hothouse"
+  },
+  {
+   "id": "ascend",
+   "name": "Ascend",
+   "blurb": "Trance — 138bpm, straight, built to arrive rather than sit there",
+   "visual": "wireframe"
+  },
+  {
+   "id": "oneup",
+   "name": "1UP",
+   "blurb": "Chiptune — 162bpm, a 303 arpeggiating because one voice cannot play a chord",
+   "visual": "jumpman"
+  },
+  {
+   "id": "saturn",
+   "name": "Rings of Saturn",
+   "blurb": "Breakbeat — 170bpm, two-bar patterns, ghosts on the rimshot",
+   "visual": "saturn"
+  },
+  {
+   "id": "switchback",
+   "name": "Switchback",
+   "blurb": "Footwork-inspired — 160bpm, skipping kicks and abrupt turns",
+   "visual": "switchback"
+  },
+  {
+   "id": "runner",
+   "name": "Runner",
+   "blurb": "Upbeat — 150bpm, toms not hats, and a major line that leaps",
+   "visual": "trench"
+  },
+  {
+   "id": "cubik",
+   "name": "Cübik Olympic",
+   "blurb": "Manchester rave — 124bpm, distorted square stabs and rippling 808s",
+   "visual": "cubik"
+  },
+  {
+   "id": "mobilise",
+   "name": "Mobilise",
+   "blurb": "Industrial electro — 90bpm, rolling riff, toms for caterpillar tracks",
+   "visual": "convoy"
+  },
+  {
+   "id": "orrery",
+   "name": "Orrery",
+   "blurb": "Orbital electronica — 92bpm, five- and seven-beat melodies finding each other",
+   "visual": "orrery"
+  },
+  {
+   "id": "firstlight",
+   "name": "First Light",
+   "blurb": "Beatless ambient — overlapping tones, isolated notes and a slow thaw",
+   "visual": "frost"
+  }
+ ]
+}

@@ -1,0 +1,9 @@
+.DS_Store
+.build/
+.build-release/
+.swiftpm/
+xcuserdata/
+DerivedData/
+*.xcuserstate
+conformance/generated/
+node_modules/

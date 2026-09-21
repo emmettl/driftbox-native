@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Everything here runs on Linux on purpose. The packages under test have no platform in them —
+# that is the point of them — and a private repository pays ten times as much for a macOS minute.
+# A macOS job arrives with the first target that needs one.
+jobs:
+  fixtures:
+    name: Fixtures match the reference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: scripts/check-fixtures.sh
+
+  swift:
+    name: Swift
+    runs-on: ubuntu-latest
+    container: swift:6.4-bookworm
+    steps:
+      - uses: actions/checkout@v5
+      - name: Format
+        run: swift format lint --strict -r Sources Tests Package.swift
+      - name: Test
+        run: swift test
+      - name: Audio targets stay constrained
+        run: scripts/check-constrained.sh

@@ -1,0 +1,3 @@
+[submodule "driftbox"]
+	path = driftbox
+	url = https://github.com/emmettl/driftbox.git

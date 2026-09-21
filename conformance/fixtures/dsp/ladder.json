@@ -1,0 +1,10 @@
+{
+ "sampleRate": 48000,
+ "frames": 4096,
+ "columns": [
+  "input",
+  "cutoff",
+  "resonance",
+  "output"
+ ]
+}
