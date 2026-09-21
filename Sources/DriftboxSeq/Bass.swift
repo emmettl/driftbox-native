@@ -24,6 +24,23 @@ public struct BassNote: Equatable, Sendable {
   public var filterPeak: Double
   public var filterBase: Double
   public var filterDecay: Double
+
+  public init(
+    frequency: Double, glide: Double, glideFrom: Double? = nil, retrigger: Bool, gate: Double, wave: BassWave,
+    gain: Double, resonance: Double, filterPeak: Double, filterBase: Double, filterDecay: Double
+  ) {
+    self.frequency = frequency
+    self.glide = glide
+    self.glideFrom = glideFrom
+    self.retrigger = retrigger
+    self.gate = gate
+    self.wave = wave
+    self.gain = gain
+    self.resonance = resonance
+    self.filterPeak = filterPeak
+    self.filterBase = filterBase
+    self.filterDecay = filterDecay
+  }
 }
 
 /// The 303's slide time. Fixed on the hardware, and short enough to read as a lean into the next

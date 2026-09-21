@@ -29,7 +29,7 @@ gone native at all.
    faithful form and builds arrays as it goes, so it is not what the render thread will call —
    phase 4 plans from a song compiled ahead of time into indices and fixed storage, and checks
    that against this. The editing half of `pattern.ts` arrives with the editor.
-2. **DSP and the drum voices.** ← *here.* All 22 voices render, in stereo, within tolerance of
+2. ~~**DSP and the drum voices.**~~ Done. All 22 voices render, in stereo, within tolerance of
    Chromium: the parameter timeline, the biquad, wavetable oscillators, noise (resampled too),
    the 2x-oversampled waveshaper and pan. What is left is the listening pass — which needs
    something to listen with, so it comes with the offline song render in phase 3.
@@ -37,7 +37,12 @@ gone native at all.
    then biquad, oscillator, noise, and the `VoiceSpec` interpreter. The 22 voices are data handed
    to one interpreter, so this is one interpreter and a set of small functions rather than 22
    synths. Done when each voice renders within tolerance of the browser, and a listening pass.
-3. **The 303s, strips, sends, master, the performance filter.** Done when whole songs match
+3. **The 303s, strips, sends, master, the performance filter.** ← *here.* Done so far: the 303
+   itself, held to catalogue lines rendered in Chromium. Next: the send effects (a tempo-synced
+   delay and a generated-impulse reverb, so a convolver), the master inserts (drive, the
+   pattern-controlled filter, and the browser's compressor, which has no specification), the
+   performance filter, and then the offline song render that puts them together.
+   What was planned: Done when whole songs match
    `renderMix` by spectral fingerprint.
 4. **A real-time host on the Mac.** `AUAudioUnit` from the start, sequencing sample-accurately
    inside the render block, lock-free rings both ways. The ring back to the interface carries

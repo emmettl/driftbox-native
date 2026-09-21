@@ -46,6 +46,41 @@ public struct ParamTimeline {
     insert(Event(kind: .target(timeConstant: timeConstant), value: value, time: time))
   }
 
+  /// `cancelScheduledValues`: forget everything due at or after `time`.
+  ///
+  /// A ramp is due when it *ends*, so one still under way is forgotten too. What it had already
+  /// done is not undone — the call is made at some moment, and the part of the ramp before that
+  /// moment has been played. `lastRendered` is the time of the last frame rendered before the
+  /// call: the ramp is kept up to there.
+  ///
+  /// And then the parameter **jumps back** to where the ramp started, because with the ramp gone
+  /// the last thing the timeline knows is the event before it. It does not hold where the ramp had
+  /// got to. That was measured against the browser rather than assumed: a 303's filter, its sweep
+  /// cancelled by the next note, snaps back open for the frames until that note begins.
+  ///
+  /// With no `lastRendered` the call is taken to be made before anything has played, and a ramp
+  /// under way is simply forgotten.
+  public mutating func cancel(from time: Double, lastRendered: Double? = nil) {
+    guard let first = events.firstIndex(where: { $0.time >= time }) else { return }
+    var played: [Event] = []
+    if let lastRendered, lastRendered < events[first].time {
+      let before = first > 0 ? events[first - 1] : Event(kind: .set, value: defaultValue, time: 0)
+      switch events[first].kind {
+      case .linearRamp, .exponentialRamp:
+        if lastRendered > before.time {
+          // A stretch of a line is a line, and of an exponential an exponential, so the part
+          // already played is the same kind of ramp ending sooner.
+          played.append(Event(kind: events[first].kind, value: value(at: lastRendered), time: lastRendered))
+          played.append(Event(kind: .set, value: before.value, time: lastRendered.nextUp))
+        }
+      case .set, .target:
+        break
+      }
+    }
+    events.removeSubrange(first...)
+    events.append(contentsOf: played)
+  }
+
   /// Kept in time order; an event at the same time as another goes after it, as the
   /// specification says.
   private mutating func insert(_ event: Event) {

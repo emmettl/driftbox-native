@@ -9,8 +9,9 @@ submodule in `driftbox/`, and nothing in this repository changes it.
 **Where this is:** phase 2 of [ROADMAP.md](ROADMAP.md) is under way. There is no app yet. There is
 a harness that holds Swift to the web engine's behaviour, and behind it: a song model, a codec that
 reads and writes the web app's documents to the byte, a sequencer that plans every catalogue song
-exactly as the reference does, and all 22 drum voices: as data, exactly, and as sound, within
--100dB of the browser's (looser where there are square waves or drive, for reasons given below).
+exactly as the reference does, and the instruments: all 22 drum voices — as data, exactly, and as
+sound, within -100dB of the browser's — and the 303 (looser where there are square waves, drive or
+a resonant ladder, for reasons given below).
 
 ## Layout
 
@@ -117,6 +118,7 @@ any difference in the *sound* belongs to the one renderer and not to 22 voices.
 | sines and triangles | -104 to -125dB |
 | squares and sawtooths | -78 to -116dB |
 | through drive (the 909 kick, snare and clap) | -98 to -131dB |
+| 303 lines from the catalogue: slides, accents, ties | -94 and -116dB sawtooth, -85dB square |
 | the oversampler alone, against its measured impulse response | under 1e-6 |
 | Chromium against itself | up to 5e-7 between two renders of one graph |
 
@@ -140,6 +142,15 @@ there. Things learned by measuring rather than reading:
   hundred-thousandth of a sample in where the table is read, which a waveform with edges spreads
   evenly over every harmonic. That is the browser's arithmetic, a nanosecond, and not chased
   further.
+- **Cancelling a ramp snaps back; it does not hold.** Every 303 note cancels what was scheduled
+  before it, and a filter sweep still under way is a ramp due in the future, so it goes. In the
+  browser the parameter then jumps back to where the ramp *started* — the last thing the timeline
+  still knows — rather than holding where it had got to. `ParamTimeline.cancel` does the same, and
+  takes the moment the call is made, because what had already played stays played. The reference's
+  mix schedules each note from the start of its render quantum, so its filter snaps open for up to
+  127 frames before a note; a sequencer that schedules to the sample, as this one will, has no
+  such window. (Scheduled all up front, as the reference's *stem* export does, every overlapped
+  sweep is cancelled before it plays at all — a bug there, reported.)
 - **The waveshaper delays by 128 frames, and that is kept.** The browser oversamples drive with
   two windowed-sinc filters, and they are audible: they ring a little either side of a transient
   and they hold the signal back 2.7ms. A 909 kick in the reference has always landed that far
