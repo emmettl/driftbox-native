@@ -9,7 +9,7 @@
 // Every voice is rendered through the reference's own `renderVoiceOffline` — the kit, the builder,
 // the trim and the Web Audio graph exactly as a song would use them — so what the Swift renderer
 // is compared with is the sound, not a description of it.
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FLOATS_TO_BASE64, floats, openReference } from './browser.mjs'
@@ -295,6 +295,106 @@ try {
     sendCases.push({ name: test.name, into: test.into, startAt: test.startAt ?? 0, fx: test.fx, bpm: test.bpm, updates: test.updates ?? [], sampleRate: SAMPLE_RATE, frames, peak, input: `sends/${name}.in.f32`, left: `sends/${name}.left.f32`, right: `sends/${name}.right.f32` })
   }
   writeFileSync(join(out, 'sends.json'), `${JSON.stringify(sendCases, null, 1)}\n`)
+
+  // The browser's compressor, alone, set up the way the mix sets it up. It has no specification —
+  // the standard says what its knobs mean and nothing about how it behaves — so this is the only
+  // description of it there is. The input is made to show its moves: silence, tones stepping up
+  // through and past the threshold, a gap to release into, a burst of noise, and a right channel
+  // that is not the left, because it listens to whichever side is louder.
+  mkdirSync(join(out, 'compressor'), { recursive: true })
+  const SETTINGS = [
+    { name: 'as the mix sets it', threshold: -14, knee: 8, ratio: 4, attack: 0.004, release: 0.18 },
+    { name: 'gentle', threshold: -2.8, knee: 8, ratio: 1.6, attack: 0.004, release: 0.18 },
+    { name: 'assertive', threshold: -28, knee: 8, ratio: 7, attack: 0.004, release: 0.18 },
+  ]
+  const compressorCases = []
+  for (const settings of SETTINGS) {
+    const [inL, inR, outL, outR] = await reference.evaluate(`(async () => {
+      const encode = ${FLOATS_TO_BASE64}
+      const { seededRandom } = await import('${reference.origin}/engine/src/render.js')
+      const random = seededRandom(0xc0de)
+      const rate = ${SAMPLE_RATE}, frames = rate * 3
+      const left = new Float32Array(frames), right = new Float32Array(frames)
+      const tone = (from, seconds, level, hertz) => {
+        for (let i = 0; i < seconds * rate; i++) {
+          const fade = Math.min(1, i / 48, (seconds * rate - i) / 48)
+          left[from * rate + i] = level * fade * Math.sin((2 * Math.PI * hertz * i) / rate)
+          right[from * rate + i] = 0.6 * level * fade * Math.sin((2 * Math.PI * hertz * 1.5 * i) / rate)
+        }
+      }
+      tone(0.1, 0.2, 0.05, 220); tone(0.4, 0.2, 0.2, 220); tone(0.7, 0.2, 0.6, 220); tone(1.0, 0.3, 0.95, 110)
+      tone(1.8, 0.05, 0.9, 60); tone(2.0, 0.05, 0.9, 60); tone(2.2, 0.05, 0.9, 60)
+      for (let i = 0; i < 0.3 * rate; i++) {
+        const level = 0.8 * (1 - i / (0.3 * rate))
+        left[2.4 * rate + i] = level * (random() * 2 - 1)
+        right[2.4 * rate + i] = 1.2 * level * (random() * 2 - 1)
+      }
+      const ctx = new OfflineAudioContext(2, frames, rate)
+      const buffer = ctx.createBuffer(2, frames, rate)
+      buffer.copyToChannel(left, 0); buffer.copyToChannel(right, 1)
+      const player = ctx.createBufferSource()
+      player.buffer = buffer
+      const compressor = ctx.createDynamicsCompressor()
+      const settings = ${JSON.stringify(settings)}
+      for (const knob of ['threshold', 'knee', 'ratio', 'attack', 'release']) compressor[knob].value = settings[knob]
+      player.connect(compressor).connect(ctx.destination)
+      player.start(0)
+      const rendered = await ctx.startRendering()
+      return [encode(left), encode(right), encode(rendered.getChannelData(0)), encode(rendered.getChannelData(1))]
+    })()`)
+    const name = settings.name.replaceAll(' ', '-')
+    const files = { inputLeft: `compressor/${name}.in.left.f32`, inputRight: `compressor/${name}.in.right.f32`, left: `compressor/${name}.left.f32`, right: `compressor/${name}.right.f32` }
+    for (const [key, data] of Object.entries({ inputLeft: inL, inputRight: inR, left: outL, right: outR })) writeFileSync(join(out, files[key]), Buffer.from(floats(data).buffer))
+    compressorCases.push({ ...settings, sampleRate: SAMPLE_RATE, ...files })
+  }
+  writeFileSync(join(out, 'compressor.json'), `${JSON.stringify(compressorCases, null, 1)}\n`)
+
+  // The master inserts whole, through the reference's own `MasterEffects`: drive, the
+  // pattern-controlled filter mixed in beside the dry signal, and the compressor. `strikes` are
+  // later calls to `update` — a filter strike on a step, or a knob moving — made from a suspend at
+  // the render quantum they fall in, as `renderMix` makes them.
+  mkdirSync(join(out, 'master'), { recursive: true })
+  const MASTERS = [
+    { name: 'at its defaults', fx: FX },
+    { name: 'driven', fx: { ...FX, drive: 0.5 } },
+    { name: 'filter struck on the steps', fx: { ...FX, pcfAmount: 0.8, pcfResonance: 0.6 }, strikes: [{ time: 0.4, pcf: 1 }, { time: 0.71, pcf: 2 }, { time: 1.02, pcf: 1 }, { time: 1.1, pcf: 1 }, { time: 1.8, pcf: 2 }, { time: 2.41, pcf: 1 }] },
+    { name: 'everything and knobs moving', fx: { ...FX, drive: 0.3, pcfAmount: 0.5, compressor: 0.9 }, strikes: [{ time: 0.4, pcf: 1 }, { time: 1.0, pcf: 0, fx: { ...FX, drive: 0.3, pcfAmount: 1, pcfCutoff: 0.6, compressor: 0.2 } }, { time: 1.81, pcf: 2, fx: { ...FX, drive: 0.3, pcfAmount: 1, pcfCutoff: 0.6, compressor: 0.2 } }] },
+  ]
+  const masterCases = []
+  for (const test of MASTERS) {
+    const [outL, outR] = await reference.evaluate(`(async () => {
+      const encode = ${FLOATS_TO_BASE64}
+      const decode = (text) => { const bytes = Uint8Array.from(atob(text), (c) => c.charCodeAt(0)); return new Float32Array(bytes.buffer) }
+      const { MasterEffects } = await import('${reference.origin}/engine/src/master-effects.js')
+      const left = decode(${JSON.stringify(Buffer.from(readFileSync(join(out, compressorCases[0].inputLeft))).toString('base64'))})
+      const right = decode(${JSON.stringify(Buffer.from(readFileSync(join(out, compressorCases[0].inputRight))).toString('base64'))})
+      const rate = ${SAMPLE_RATE}
+      const ctx = new OfflineAudioContext(2, left.length, rate)
+      const buffer = ctx.createBuffer(2, left.length, rate)
+      buffer.copyToChannel(left, 0); buffer.copyToChannel(right, 1)
+      const player = ctx.createBufferSource()
+      player.buffer = buffer
+      const inserts = new MasterEffects(ctx)
+      const fx = ${JSON.stringify(test.fx)}
+      inserts.update(fx, 0, 0)
+      player.connect(inserts.input)
+      inserts.output.connect(ctx.destination)
+      player.start(0)
+      const suspensions = ${JSON.stringify(test.strikes ?? [])}.map((strike) => {
+        const at = (Math.floor((strike.time * rate) / 128) * 128) / rate
+        return ctx.suspend(at).then(async () => { inserts.update(strike.fx ?? fx, strike.time, strike.pcf); await ctx.resume() })
+      })
+      const rendering = ctx.startRendering()
+      await Promise.all(suspensions)
+      const rendered = await rendering
+      return [encode(rendered.getChannelData(0)), encode(rendered.getChannelData(1))]
+    })()`)
+    const name = test.name.replaceAll(' ', '-')
+    writeFileSync(join(out, 'master', `${name}.left.f32`), Buffer.from(floats(outL).buffer))
+    writeFileSync(join(out, 'master', `${name}.right.f32`), Buffer.from(floats(outR).buffer))
+    masterCases.push({ name: test.name, fx: test.fx, strikes: test.strikes ?? [], sampleRate: SAMPLE_RATE, inputLeft: compressorCases[0].inputLeft, inputRight: compressorCases[0].inputRight, left: `master/${name}.left.f32`, right: `master/${name}.right.f32` })
+  }
+  writeFileSync(join(out, 'master.json'), `${JSON.stringify(masterCases, null, 1)}\n`)
 
   writeFileSync(join(out, 'voices.json'), `${JSON.stringify({ chromium: reference.product, renders: manifest }, null, 1)}\n`)
   const worst = Math.max(...manifest.map((render) => render.selfDifference))

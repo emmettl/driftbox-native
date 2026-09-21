@@ -121,6 +121,8 @@ any difference in the *sound* belongs to the one renderer and not to 22 voices.
 | 303 lines from the catalogue: slides, accents, ties | -94 and -116dB sawtooth, -85dB square |
 | the delay send: settled, gliding, and retimed mid-tail | -139 to -142dB |
 | the reverb send, three rooms | -112 to -131dB |
+| the browser's compressor alone, three settings | -125 to -138dB |
+| the master inserts whole: drive, struck filter, compressor | -94 to -136dB; -63dB after one kind of strike |
 | the oversampler alone, against its measured impulse response | under 1e-6 |
 | Chromium against itself | up to 5e-7 between two renders of one graph |
 
@@ -153,6 +155,23 @@ there. Things learned by measuring rather than reading:
   127 frames before a note; a sequencer that schedules to the sample, as this one will, has no
   such window. (Scheduled all up front, as the reference's *stem* export does, every overlapped
   sweep is cancelled before it plays at all — a bug there, reported.)
+- **The compressor has no specification, only an implementation.** The standard names the
+  `DynamicsCompressorNode`'s knobs and says nothing of how it behaves, so "the compressor" in the
+  reference is Chromium's, inherited from WebKit, and the songs were mixed through it. `Compressor`
+  follows it move for move: six milliseconds of look-ahead, a soft knee whose steepness is found by
+  bisection, makeup gain that is automatic (quiet signals come out 1.7 times louder), a detector
+  that follows attenuation rather than level, gain that moves in 32-frame steps with a release
+  that is faster the harder it was compressing, and a sine on the way out to round the corners. It
+  also starts with its detector at zero, so the first fifty milliseconds of any render duck and
+  recover. Written from the algorithm and then measured: -125 to -138dB on the first run.
+- **Turning the drive up from zero moves the mix 2.7ms later.** At zero the master waveshaper has
+  no curve, and passes the signal straight through: the chain is then bit-identical to the
+  compressor alone. With any drive it oversamples, and brings its 128 frames of delay.
+- **One thing here is not understood.** A filter strike that arrives while the sweep before it is
+  still running matches the browser to -63dB for a quarter of a second, where a strike that finds
+  the filter at rest matches to -120dB. Snapping back to the cancelled sweep's peak is certainly
+  most of what the browser does — holding is 18dB worse, snapping elsewhere 44dB worse — and the
+  rest is unexplained. No catalogue song strikes the filter.
 - **A delay in a loop is 128 frames longer than it says, every time round.** The browser computes
   a feedback loop a render quantum at a time, and the way it breaks the cycle hands the filter the
   delay's output from the quantum before. So the second repeat of the reference's delay lands 128
