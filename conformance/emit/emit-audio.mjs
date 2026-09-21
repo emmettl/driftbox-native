@@ -236,6 +236,66 @@ try {
   }
   writeFileSync(join(out, 'bass.json'), `${JSON.stringify(lines, null, 1)}\n`)
 
+  // The send effects, through the reference's own `Sends`: a tempo-synced delay with a filter
+  // inside its feedback loop, and a convolver fed a generated room. One short burst goes in — a
+  // click, then a little noise, then a tone — and what comes out is the effect and nothing else.
+  // `updates` are later calls to `update`, made from a suspend at that time, as `renderMix` makes
+  // them when tempo or effect automation moves.
+  mkdirSync(join(out, 'sends'), { recursive: true })
+  const FX = { drive: 0, pcfAmount: 0, pcfCutoff: 0.35, pcfResonance: 0.3, pcfEnv: 0.65, pcfDecay: 0.3, compressor: 0.5, delayTime: 0.25, delayFeedback: 0.42, delayTone: 0.5, reverbSize: 0.45, reverbDamping: 0.55 }
+  const SENDS = [
+    // `startAt` is when the burst goes in. A second in, every knob's glide has arrived and the
+    // delay is simply a delay; at zero the burst is read back while the delay time is still moving.
+    { name: 'delay at its defaults', into: 'delay', seconds: 4, startAt: 1, fx: FX, bpm: 126 },
+    { name: 'delay short dark and regenerating', into: 'delay', seconds: 4, startAt: 1, fx: { ...FX, delayTime: 0, delayFeedback: 1, delayTone: 0.1 }, bpm: 174 },
+    { name: 'delay retimed by a tempo change', into: 'delay', seconds: 5, startAt: 1, fx: FX, bpm: 126, updates: [{ time: 2.0, fx: { ...FX, delayFeedback: 0.7 }, bpm: 90 }] },
+    { name: 'delay while its time is still gliding', into: 'delay', seconds: 3, startAt: 0, fx: FX, bpm: 126 },
+    { name: 'reverb at its defaults', into: 'reverb', seconds: 3, fx: FX, bpm: 126 },
+    { name: 'reverb small and bright', into: 'reverb', seconds: 1.5, fx: { ...FX, reverbSize: 0, reverbDamping: 0 }, bpm: 126 },
+    { name: 'reverb large and damped', into: 'reverb', seconds: 5, fx: { ...FX, reverbSize: 1, reverbDamping: 1 }, bpm: 126 },
+  ]
+  const sendCases = []
+  for (const test of SENDS) {
+    const frames = Math.ceil(test.seconds * SAMPLE_RATE)
+    const [sent, left, right] = await reference.evaluate(`(async () => {
+      const encode = ${FLOATS_TO_BASE64}
+      const { Sends } = await import('${reference.origin}/engine/src/effects.js')
+      const { seededRandom } = await import('${reference.origin}/engine/src/render.js')
+      const random = seededRandom(0x5e4d)
+      const data = new Float32Array(4800)
+      data[24] = 0.9
+      for (let i = 480; i < 1440; i++) data[i] = 0.5 * (random() * 2 - 1) * (1 - (i - 480) / 960)
+      for (let i = 2400; i < 4800; i++) data[i] = 0.6 * Math.sin((i - 2400) * 0.11) * (1 - (i - 2400) / 2400)
+
+      const ctx = new OfflineAudioContext(2, ${frames}, ${SAMPLE_RATE})
+      const buffer = ctx.createBuffer(1, data.length, ${SAMPLE_RATE})
+      buffer.copyToChannel(data, 0)
+      const player = ctx.createBufferSource()
+      player.buffer = buffer
+      const sends = new Sends(ctx, ctx.destination)
+      sends.update(${JSON.stringify(test.fx)}, ${test.bpm}, 0)
+      player.connect(${JSON.stringify(test.into)} === 'delay' ? sends.delayInput : sends.reverbInput)
+      player.start(${test.startAt ?? 0})
+      const suspensions = ${JSON.stringify(test.updates ?? [])}.map((change) => {
+        const at = (Math.floor((change.time * ${SAMPLE_RATE}) / 128) * 128) / ${SAMPLE_RATE}
+        return ctx.suspend(at).then(async () => { sends.update(change.fx, change.bpm, change.time); await ctx.resume() })
+      })
+      const rendering = ctx.startRendering()
+      await Promise.all(suspensions)
+      const rendered = await rendering
+      return [encode(data), encode(rendered.getChannelData(0)), encode(rendered.getChannelData(1))]
+    })()`)
+    const name = test.name.replaceAll(' ', '-')
+    const l = floats(left), r = floats(right)
+    writeFileSync(join(out, 'sends', `${name}.in.f32`), Buffer.from(floats(sent).buffer))
+    writeFileSync(join(out, 'sends', `${name}.left.f32`), Buffer.from(l.buffer))
+    writeFileSync(join(out, 'sends', `${name}.right.f32`), Buffer.from(r.buffer))
+    let peak = 0
+    for (let i = 0; i < l.length; i++) peak = Math.max(peak, Math.abs(l[i]), Math.abs(r[i]))
+    sendCases.push({ name: test.name, into: test.into, startAt: test.startAt ?? 0, fx: test.fx, bpm: test.bpm, updates: test.updates ?? [], sampleRate: SAMPLE_RATE, frames, peak, input: `sends/${name}.in.f32`, left: `sends/${name}.left.f32`, right: `sends/${name}.right.f32` })
+  }
+  writeFileSync(join(out, 'sends.json'), `${JSON.stringify(sendCases, null, 1)}\n`)
+
   writeFileSync(join(out, 'voices.json'), `${JSON.stringify({ chromium: reference.product, renders: manifest }, null, 1)}\n`)
   const worst = Math.max(...manifest.map((render) => render.selfDifference))
   console.log(`${manifest.length} voice renders from ${reference.product}; Chromium differs from itself by at most ${worst}`)

@@ -37,11 +37,13 @@ gone native at all.
    then biquad, oscillator, noise, and the `VoiceSpec` interpreter. The 22 voices are data handed
    to one interpreter, so this is one interpreter and a set of small functions rather than 22
    synths. Done when each voice renders within tolerance of the browser, and a listening pass.
-3. **The 303s, strips, sends, master, the performance filter.** ← *here.* Done so far: the 303
-   itself, held to catalogue lines rendered in Chromium. Next: the send effects (a tempo-synced
-   delay and a generated-impulse reverb, so a convolver), the master inserts (drive, the
-   pattern-controlled filter, and the browser's compressor, which has no specification), the
-   performance filter, and then the offline song render that puts them together.
+3. **The 303s, strips, sends, master, the performance filter.** ← *here.* Done so far: the 303,
+   held to catalogue lines rendered in Chromium, and both send effects — the tempo-synced delay
+   and the generated-room reverb — held to the reference's own `Sends`. The reverb is a whole-signal
+   convolution for now; the real-time form, a partitioned one, comes with the host. Next: the
+   master inserts (drive, the pattern-controlled filter, and the browser's compressor, which has
+   no specification), the performance filter, and then the offline song render that puts them
+   together.
    What was planned: Done when whole songs match
    `renderMix` by spectral fingerprint.
 4. **A real-time host on the Mac.** `AUAudioUnit` from the start, sequencing sample-accurately
