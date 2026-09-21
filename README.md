@@ -6,9 +6,10 @@ of TB-303s, synthesised from scratch — for the Mac first, then iOS. Swift thro
 The web app is the reference implementation and is treated as finished. It is here as a pinned
 submodule in `driftbox/`, and nothing in this repository changes it.
 
-**Where this is:** phase 0 of [ROADMAP.md](ROADMAP.md). There is no app yet. There is a harness
-that holds Swift to the web engine's behaviour, a package laid out for what comes next, and two
-small ports — the 303's ladder filter and the noise generator — that prove the harness end to end.
+**Where this is:** phase 1 of [ROADMAP.md](ROADMAP.md) is done. There is no app and no sound yet.
+There is a harness that holds Swift to the web engine's behaviour, and behind it: a song model, a
+codec that reads and writes the web app's documents to the byte, and a sequencer that plans every
+catalogue song exactly as the reference does.
 
 ## Layout
 
@@ -66,9 +67,21 @@ Three levels, in rising cost:
 
 | Level | Fixture | Compared |
 |---|---|---|
-| Documents | every catalogue song as the web app saves it | exactly |
-| Events | `planSong` for every song — each hit, its time, its resolved knobs and sends; the PRNG as raw bits | exactly |
+| Documents | every catalogue song as the web app saves it; 19 damaged and legacy documents with what the reference makes of each | exactly |
+| Events | `planSong` for every song — each hit, its time, its resolved knobs and sends; three deliberately awkward songs; the PRNG as raw bits | exactly |
 | Audio | renders of voices, effects and whole songs | within a tolerance |
+
+**Documents** go both ways: a catalogue song decodes and encodes back to the same bytes, which
+needs object keys kept in document order and numbers printed as JavaScript prints them —
+`Sources/DriftboxDocument/JSONValue.swift` exists for those two things. The damaged documents pin
+down the repairs: a v1 chain, halves that round the way `Math.round` does, a bad step costing the
+step and not the track.
+
+**Events** check in the first four bars of each song. `--full` writes whole songs, and the same
+test walks them start to finish when they are there. The catalogue uses no machine clips, short
+drum lanes, flams or filter strikes, so `events/synthetic.json` holds songs written to be awkward:
+all of those at once, bars of three different lengths, tempo and swing under automation, a voice
+no machine owns, and clips launched over the top.
 
 The first two are what keep two implementations *agreeing*. The third keeps them sounding alike.
 Only the ladder has an audio fixture so far; the ones that need a browser to render the reference

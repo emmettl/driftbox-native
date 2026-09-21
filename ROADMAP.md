@@ -22,11 +22,14 @@ gone native at all.
 
 ## Milestone 1 — the groovebox
 
-0. **Harness and skeleton.** ← *here.* The submodule, the emitter, the package, the constraint
+0. ~~**Harness and skeleton.**~~ Done. The submodule, the emitter, the package, the constraint
    checks, CI.
-1. **Seq and Document.** Every catalogue song decodes, and plans identically to `planSong`.
-   No sound. Done when the document and event fixtures pass for all 25 songs.
-2. **DSP and the drum voices.** `ParamTimeline` — the Web Audio automation calls, per sample —
+1. ~~**Seq and Document.**~~ Done. Every catalogue song decodes, encodes back to the same bytes,
+   and plans identically to `planSong`, whole. No sound. What it left for later: `planStep` is the
+   faithful form and builds arrays as it goes, so it is not what the render thread will call —
+   phase 4 plans from a song compiled ahead of time into indices and fixed storage, and checks
+   that against this. The editing half of `pattern.ts` arrives with the editor.
+2. **DSP and the drum voices.** ← *next.* `ParamTimeline` — the Web Audio automation calls, per sample —
    then biquad, oscillator, noise, and the `VoiceSpec` interpreter. The 22 voices are data handed
    to one interpreter, so this is one interpreter and a set of small functions rather than 22
    synths. Done when each voice renders within tolerance of the browser, and a listening pass.
