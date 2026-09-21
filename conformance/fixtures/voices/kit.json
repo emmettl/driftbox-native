@@ -1,0 +1,162 @@
+[
+ {
+  "id": "909.bd",
+  "name": "Bass Drum",
+  "machine": "tr909",
+  "trim": 0.61
+ },
+ {
+  "id": "909.sd",
+  "name": "Snare",
+  "machine": "tr909",
+  "trim": 0.52
+ },
+ {
+  "id": "909.cp",
+  "name": "Clap",
+  "machine": "tr909",
+  "trim": 1.06
+ },
+ {
+  "id": "909.lt",
+  "name": "Low Tom",
+  "machine": "tr909",
+  "trim": 0.81,
+  "pitched": {
+   "low": 65,
+   "high": 122
+  }
+ },
+ {
+  "id": "909.mt",
+  "name": "Mid Tom",
+  "machine": "tr909",
+  "trim": 0.8,
+  "pitched": {
+   "low": 100,
+   "high": 192
+  }
+ },
+ {
+  "id": "909.ht",
+  "name": "Hi Tom",
+  "machine": "tr909",
+  "trim": 0.8,
+  "pitched": {
+   "low": 150,
+   "high": 288
+  }
+ },
+ {
+  "id": "909.rim",
+  "name": "Rim",
+  "machine": "tr909",
+  "trim": 1.71
+ },
+ {
+  "id": "909.ch",
+  "name": "Closed Hat",
+  "machine": "tr909",
+  "choke": "909.hats",
+  "trim": 3.23
+ },
+ {
+  "id": "909.oh",
+  "name": "Open Hat",
+  "machine": "tr909",
+  "choke": "909.hats",
+  "trim": 2.6
+ },
+ {
+  "id": "909.rd",
+  "name": "Ride",
+  "machine": "tr909",
+  "trim": 2.34
+ },
+ {
+  "id": "909.cr",
+  "name": "Crash",
+  "machine": "tr909",
+  "trim": 2.06
+ },
+ {
+  "id": "808.bd",
+  "name": "Bass Drum",
+  "machine": "tr808",
+  "trim": 0.8
+ },
+ {
+  "id": "808.sd",
+  "name": "Snare",
+  "machine": "tr808",
+  "trim": 0.66
+ },
+ {
+  "id": "808.cp",
+  "name": "Clap",
+  "machine": "tr808",
+  "trim": 3.35
+ },
+ {
+  "id": "808.lt",
+  "name": "Low Tom",
+  "machine": "tr808",
+  "trim": 0.87,
+  "pitched": {
+   "low": 55,
+   "high": 105
+  }
+ },
+ {
+  "id": "808.mt",
+  "name": "Mid Tom",
+  "machine": "tr808",
+  "trim": 0.86,
+  "pitched": {
+   "low": 90,
+   "high": 170
+  }
+ },
+ {
+  "id": "808.ht",
+  "name": "Hi Tom",
+  "machine": "tr808",
+  "trim": 0.86,
+  "pitched": {
+   "low": 140,
+   "high": 265
+  }
+ },
+ {
+  "id": "808.rs",
+  "name": "Rimshot",
+  "machine": "tr808",
+  "trim": 1.79
+ },
+ {
+  "id": "808.cb",
+  "name": "Cowbell",
+  "machine": "tr808",
+  "trim": 2.16
+ },
+ {
+  "id": "808.ch",
+  "name": "Closed Hat",
+  "machine": "tr808",
+  "choke": "808.hats",
+  "trim": 8.59
+ },
+ {
+  "id": "808.oh",
+  "name": "Open Hat",
+  "machine": "tr808",
+  "choke": "808.hats",
+  "trim": 4.28
+ },
+ {
+  "id": "808.ma",
+  "name": "Maracas",
+  "machine": "tr808",
+  "trim": 1.14
+ }
+]
