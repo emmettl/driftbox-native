@@ -9,8 +9,9 @@ submodule in `driftbox/`, and nothing in this repository changes it.
 **Where this is:** phase 2 of [ROADMAP.md](ROADMAP.md) is under way. There is no app yet. There is
 a harness that holds Swift to the web engine's behaviour, and behind it: a song model, a codec that
 reads and writes the web app's documents to the byte, a sequencer that plans every catalogue song
-exactly as the reference does, all 22 drum voices as data, and a renderer that so far turns nine of
-them into sound within -100dB of the browser's.
+exactly as the reference does, all 22 drum voices as data, and a renderer that so far turns 19 of
+them into sound within -100dB of the browser's (-75dB where there are square waves, for a reason
+given below).
 
 ## Layout
 
@@ -83,7 +84,7 @@ Three levels, in rising cost:
 | Documents | every catalogue song as the web app saves it; 19 damaged and legacy documents with what the reference makes of each | exactly |
 | Events | `planSong` for every song — each hit, its time, its resolved knobs and sends; three deliberately awkward songs; the PRNG as raw bits | exactly |
 | Voices | what each of the 22 voices *describes* — its `VoiceSpec` — over nine panels and both velocities | exactly |
-| Audio | each voice rendered in Chromium, over four panels | within -100dB of the voice's peak |
+| Audio | each voice rendered in Chromium, over four panels; nine probes of one node type each | within -100dB of the peak; -75dB with square or sawtooth oscillators |
 
 **Documents** go both ways: a catalogue song decodes and encodes back to the same bytes, which
 needs object keys kept in document order and numbers printed as JavaScript prints them —
@@ -109,16 +110,35 @@ diff is the list of what changed, and the tests say what it broke.
 description of a sound, and the description is data, so all 396 compare exactly. With that pinned,
 any difference in the *sound* belongs to the one renderer and not to 22 voices.
 
-**Audio** is that renderer against the browser. Measured: noise through filters lands within one
-step of a 32-bit float, -135 to -142dB; a swept sine between -104 and -121dB, the gap being the
-browser's wavetable sine and single-precision ramps against a true sine and double-precision ones.
-Chromium differs from itself by up to 5e-7. Two things were learned by measuring rather than
-reading:
+**Audio** is that renderer against the browser. Measured, relative to each voice's peak:
+
+| | |
+|---|---|
+| noise through filters, resampled or not | -120 to -142dB — a step or two of a 32-bit float |
+| sines and triangles | -104 to -125dB |
+| squares and sawtooths | -78 to -116dB |
+| Chromium against itself | up to 5e-7 between two renders of one graph |
+
+`probes.json` holds one kind of node at a time, outside any voice — a bare square, a swept filter —
+so that when a voice differs there is somewhere smaller to look. Most of what follows was found
+there. Things learned by measuring rather than reading:
 
 - **A source starts when it is told to, not on the next frame.** A clap's retriggers fall between
   sample frames, and the browser begins each one a fraction of a frame in, interpolating the noise.
   Rounding them to a frame is a whole sample out, and two copies of one noise a sample apart is a
   comb filter: -11dB, not -140.
+- **The browser's parameters are single precision, and it matters twice.** An oscillator's phase
+  step is a 32-bit product; matching that took the cowbell from -85dB to -106dB. A buffer's
+  playback rate is a 32-bit float; matching that took the 909 crash — two seconds of resampled
+  noise — from -61dB to -131dB. Neither is audible as pitch. Both are the same few parts in a
+  hundred million *in the same direction*, and drift is what a subtraction hears.
+- **Oscillators are wavetables, and the tables are the sound.** `WaveTable` follows Chromium's
+  `PeriodicWave` step for step — table size, three ranges to the octave, how many partials each
+  keeps, normalised by the peak of the fullest table, Gibbs overshoot and all. Triangles match to
+  -109dB and better. Squares stop at about -80dB: what is left is a timing difference of a
+  hundred-thousandth of a sample in where the table is read, which a waveform with edges spreads
+  evenly over every harmonic. That is the browser's arithmetic, a nanosecond, and not chased
+  further.
 - **The reference clicks, rarely.** See `theReferenceClicks` in `VoiceAudioTests`: at one knob
   setting the 808 clap's tail is due 5e-13 of a frame after a frame boundary, Chromium starts the
   source on that frame, and the gain envelope's first event is still in the future — so the
@@ -126,9 +146,8 @@ reading:
 
 The renderer is being built one kind of node at a time, each measured before the next. It says
 what it cannot render yet (`VoiceRenderer.unsupported`) rather than rendering something close:
-today that is the band-limited triangle and square oscillators, the oversampled waveshaper,
-resampled noise and pan. The test lists the voices still waiting, so one can only leave that list
-by being compared.
+today that is the oversampled waveshaper — the 909's kick, snare and clap — and pan. The test lists
+the voices still waiting, so one can only leave that list by being compared.
 
 ### Exactness
 

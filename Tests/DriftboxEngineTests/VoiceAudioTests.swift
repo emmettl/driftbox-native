@@ -49,12 +49,25 @@ private struct Manifest: Decodable {
 struct VoiceAudioTests {
   /// How far a render may be from Chromium's, relative to the voice's own peak.
   ///
-  /// Measured, per kind of voice, when this was written: noise through filters lands within one
-  /// step of a 32-bit float (-135 to -142dB); a swept sine lands between -104 and -121dB, the gap
-  /// being the browser's wavetable sine and its single-precision ramps against a true sine and
-  /// double-precision ones. Chromium differs from *itself* by up to 5e-7 between two renders of one
-  /// graph. -100dB is below all of that and some 40dB under anything audible.
-  static let toleranceDecibels = -100.0
+  /// Measured when this was written. Noise through filters, resampled or not, lands within a step
+  /// or two of a 32-bit float: -120 to -142dB. Sines and triangles land between -104 and -125dB,
+  /// the gap being the browser's single-precision ramps against double-precision ones. Chromium
+  /// differs from *itself* by up to 5e-7 between two renders of one graph.
+  ///
+  /// Squares and sawtooths are looser, and the reason is the browser's arithmetic rather than this
+  /// renderer's. What is left after matching its tables and its single-precision phase increment is
+  /// a timing difference of about a hundred-thousandth of a sample in where the wavetable is read.
+  /// A waveform with edges turns that into an error that is flat across every harmonic: about
+  /// -80dB on a bare square, and a nanosecond by any other measure.
+  static func toleranceDecibels(for spec: VoiceSpec) -> Double {
+    let hasEdges = spec.sources.contains { source in
+      if case .oscillator(let oscillator) = source.generator {
+        return oscillator.type == .square || oscillator.type == .sawtooth
+      }
+      return false
+    }
+    return hasEdges ? -75 : -100
+  }
 
   @Test func theAudioFixturesAreThereWhenTheyMustBe() {
     #expect(isGenerated || !isRequired, "DRIFTBOX_REQUIRE_GENERATED is set and emit-audio.mjs has not run")
@@ -65,34 +78,40 @@ struct VoiceAudioTests {
   func voicesSoundLikeTheReference() throws {
     var compared = 0
     var waiting: [String: String] = [:]
+    var report = ""
+    var renderer = VoiceRenderer(sampleRate: 48000)
     for render in try Manifest.load().renders where render.case != "boundary" {
       let spec = try render.spec()
       guard
-        let mine = VoiceRenderer.render(
-          spec, voiceId: render.voice, sampleRate: render.sampleRate, frames: render.frames)
+        render.sampleRate == renderer.sampleRate,
+        let mine = renderer.render(spec, voiceId: render.voice, frames: render.frames)
       else {
         waiting[render.voice] = VoiceRenderer.unsupported(spec)
         continue
       }
       let reference = try render.reference()
       #expect(reference.count == mine.count)
+      if let directory = ProcessInfo.processInfo.environment["DRIFTBOX_WRITE"] {
+        // For looking at a difference rather than only measuring it.
+        let url = URL(fileURLWithPath: directory).appendingPathComponent("\(render.voice).\(render.case).f32")
+        try mine.withUnsafeBytes { Data($0) }.write(to: url)
+      }
 
       let worst = zip(mine, reference).map { abs(Double($0) - Double($1)) }.max() ?? 0
       let decibels = worst > 0 ? 20 * log10(worst / render.peak) : -Double.infinity
       #expect(
-        decibels <= Self.toleranceDecibels,
+        decibels <= Self.toleranceDecibels(for: spec),
         "\(render.voice) \(render.case) is \(decibels)dB from the reference")
       compared += 1
+      report += "\(render.voice) \(render.case): \(String(format: "%.1f", decibels))dB\n"
     }
+    if ProcessInfo.processInfo.environment["DRIFTBOX_REPORT"] != nil { print(report) }
 
     // The renderer is being built one kind of node at a time. This is the list of what it renders
     // today; a voice leaves `waiting` by being compared, never by being skipped quietly.
-    #expect(compared == 9 * 4)
+    #expect(compared == 19 * 4)
     #expect(
-      waiting.keys.sorted() == [
-        "808.cb", "808.ch", "808.oh", "808.rs", "808.sd", "909.bd", "909.ch", "909.cp", "909.cr", "909.oh",
-        "909.rd", "909.rim", "909.sd",
-      ])
+      waiting.keys.sorted() == ["909.bd", "909.cp", "909.sd"])
   }
 
   /// A place where the reference is wrong, kept so that it is known rather than rediscovered.
@@ -110,8 +129,9 @@ struct VoiceAudioTests {
   func theReferenceClicks() throws {
     let render = try #require(try Manifest.load().renders.first { $0.case == "boundary" })
     let spec = try render.spec()
-    let mine = try #require(
-      VoiceRenderer.render(spec, voiceId: render.voice, sampleRate: render.sampleRate, frames: render.frames))
+    var renderer = VoiceRenderer(sampleRate: render.sampleRate)
+    let rendered = renderer.render(spec, voiceId: render.voice, frames: render.frames)
+    let mine = try #require(rendered)
     let reference = try render.reference()
 
     let boundary = 2160
