@@ -396,6 +396,57 @@ try {
   }
   writeFileSync(join(out, 'master.json'), `${JSON.stringify(masterCases, null, 1)}\n`)
 
+  // The performance filter, through the reference's own `Kaoss`: a low-pass into a high-pass, both
+  // wide open when nobody is touching the pad. "Wide open" is not "absent" — two biquads at the
+  // edges of the band still turn the phase of the bass and shave the very top — and the idle filter
+  // is in every mix the reference renders, so the first case is the one that matters most. The
+  // gestures are made from a suspend, because the pad works in `currentTime`, not in song time.
+  mkdirSync(join(out, 'kaoss'), { recursive: true })
+  const GESTURES = [
+    { name: 'idle', moves: [] },
+    { name: 'swept down and let go', moves: [{ time: 0.5, x: 0.2, y: 0.7 }, { time: 1.0, x: 0.35, y: 0.3 }, { time: 1.2, x: 0.05, y: 1 }, { time: 1.6, release: true }] },
+    { name: 'swept up and let go', moves: [{ time: 0.3, x: 0.8, y: 0.5 }, { time: 0.9, x: 1, y: 1 }, { time: 1.4, x: 0.55, y: 0 }, { time: 2.2, release: true }] },
+    { name: 'crossed from one side to the other', moves: [{ time: 0.4, x: 0.1, y: 0.9 }, { time: 1.0, x: 0.9, y: 0.9 }, { time: 1.05, x: 0.5, y: 0.5 }, { time: 2.0, release: true }] },
+  ]
+  const kaossCases = []
+  for (const gesture of GESTURES) {
+    const [outL, outR] = await reference.evaluate(`(async () => {
+      const encode = ${FLOATS_TO_BASE64}
+      const decode = (text) => { const bytes = Uint8Array.from(atob(text), (c) => c.charCodeAt(0)); return new Float32Array(bytes.buffer) }
+      const { Kaoss } = await import('${reference.origin}/engine/src/kaoss.js')
+      const left = decode(${JSON.stringify(Buffer.from(readFileSync(join(out, compressorCases[0].inputLeft))).toString('base64'))})
+      const right = decode(${JSON.stringify(Buffer.from(readFileSync(join(out, compressorCases[0].inputRight))).toString('base64'))})
+      const rate = ${SAMPLE_RATE}
+      const ctx = new OfflineAudioContext(2, left.length, rate)
+      const buffer = ctx.createBuffer(2, left.length, rate)
+      buffer.copyToChannel(left, 0); buffer.copyToChannel(right, 1)
+      const player = ctx.createBufferSource()
+      player.buffer = buffer
+      const kaoss = new Kaoss(ctx)
+      player.connect(kaoss.input)
+      kaoss.output.connect(ctx.destination)
+      player.start(0)
+      const suspensions = ${JSON.stringify(gesture.moves)}.map((move) => {
+        const at = (Math.floor((move.time * rate) / 128) * 128) / rate
+        return ctx.suspend(at).then(async () => { if (move.release) kaoss.release(); else kaoss.set(move.x, move.y); await ctx.resume() })
+      })
+      const rendering = ctx.startRendering()
+      await Promise.all(suspensions)
+      const rendered = await rendering
+      return [encode(rendered.getChannelData(0)), encode(rendered.getChannelData(1))]
+    })()`)
+    const name = gesture.name.replaceAll(' ', '-')
+    writeFileSync(join(out, 'kaoss', `${name}.left.f32`), Buffer.from(floats(outL).buffer))
+    writeFileSync(join(out, 'kaoss', `${name}.right.f32`), Buffer.from(floats(outR).buffer))
+    kaossCases.push({
+      name: gesture.name, sampleRate: SAMPLE_RATE,
+      moves: gesture.moves.map((move) => ({ ...move, frame: Math.floor((move.time * SAMPLE_RATE) / 128) * 128 })),
+      inputLeft: compressorCases[0].inputLeft, inputRight: compressorCases[0].inputRight,
+      left: `kaoss/${name}.left.f32`, right: `kaoss/${name}.right.f32`,
+    })
+  }
+  writeFileSync(join(out, 'kaoss.json'), `${JSON.stringify(kaossCases, null, 1)}\n`)
+
   writeFileSync(join(out, 'voices.json'), `${JSON.stringify({ chromium: reference.product, renders: manifest }, null, 1)}\n`)
   const worst = Math.max(...manifest.map((render) => render.selfDifference))
   console.log(`${manifest.length} voice renders from ${reference.product}; Chromium differs from itself by at most ${worst}`)

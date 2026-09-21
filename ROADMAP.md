@@ -42,8 +42,9 @@ gone native at all.
    and the generated-room reverb — held to the reference's own `Sends`. The reverb is a whole-signal
    convolution for now; the real-time form, a partitioned one, comes with the host. And the master
    inserts — drive, the pattern-controlled filter, and the browser's compressor — held to the
-   reference's own `MasterEffects`. Next: the performance filter, and then the offline song render
-   that puts all of it together, and with it something to listen to.
+   reference's own `MasterEffects`. And the performance filter, which is in every mix even when
+   nobody touches it. Next: the offline song render that puts all of it together — and with it,
+   something to listen to.
    What was planned: Done when whole songs match
    `renderMix` by spectral fingerprint.
 4. **A real-time host on the Mac.** `AUAudioUnit` from the start, sequencing sample-accurately
