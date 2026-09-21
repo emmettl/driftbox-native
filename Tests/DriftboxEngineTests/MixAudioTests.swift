@@ -106,18 +106,25 @@ struct MixAudioTests {
       differing * 10 <= blocks * 3,
       "\(mix.song): \(differing) of \(blocks) stretches differ by more than -60dB")
 
-    // And sample for sample, where it can. Four of these eight measure -80 to -98dB whole: every
-    // voice, both 303s, the sends, the compressor and the idle pad, together. The bound leaves
-    // room for an x64 Chrome, which is -76dB from an arm64 one on the idle pad alone.
+    // And sample for sample, where it can. Against the arm64 Chrome this was developed on, four
+    // of these eight measure -80 to -98dB whole: every voice, both 303s, the sends, the compressor
+    // and the idle pad, together.
     //
-    // The other four differ in a few short stretches each (3 to 17 tenths of a second out of 65),
+    // Against an x64 Chrome they measure what the two browsers measure against *each other*, which
+    // for a whole mix is a good deal looser than for any one part of it: -81dB on orrery, -80 on
+    // smallhours, -73 on hothouse, -56 on garage. Each bound is that, with a little room.
+    //
+    // The other four differ in a few short stretches each (3 to 17 tenths of a second out of 64),
     // and what happens there is the reference's doing, not understood yet. Bisected in the browser:
     // give a song a voice that is both panned and sending to the delay, and the *reference's own*
     // render of the 303 changes — before that voice has played a note — for the length of one bass
     // note after the first note scheduled from a suspend, and then goes back. This renderer gives
-    // the same 303 either way. It is a channel-count effect inside Chromium's delay loop, and until
-    // it is pinned down these four are held to level and coverage only.
-    let understood = !["acid", "chillwave", "saturn", "timevortex"].contains(mix.song) && mix.document == nil
-    if understood { #expect(decibels <= -66, "\(mix.song) is \(decibels)dB from the reference") }
+    // the same 303 either way. It is a channel-count effect inside Chromium's delay loop, and it
+    // is not stable there either: these are the songs on which the two browsers disagree with each
+    // other most, by -30 to -37dB. Until it is pinned down they are held to level and coverage.
+    let bounds = ["orrery": -72.0, "smallhours": -72.0, "hothouse": -66.0, "garage": -50.0]
+    if mix.document == nil, let bound = bounds[mix.song] {
+      #expect(decibels <= bound, "\(mix.song) is \(decibels)dB from the reference")
+    }
   }
 }

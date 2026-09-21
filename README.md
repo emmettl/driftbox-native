@@ -181,8 +181,10 @@ there. Things learned by measuring rather than reading:
   browser: give a song a voice that is both panned and sending to the delay, and the *reference's
   own* render of the 303 changes, before that voice has played a note, for the length of one bass
   note after the first thing scheduled from a suspend — and then goes back. This renderer gives the
-  same 303 either way. It is a channel-count effect inside Chromium's delay loop; the test holds
-  those four to level and coverage until it is pinned down.
+  same 303 either way. It is a channel-count effect inside Chromium's delay loop, and it is not
+  stable there either: those four are the songs on which an x64 and an arm64 Chrome disagree with
+  *each other* most, by -30 to -37dB, where they agree on the other four to -56 to -81dB. The test
+  holds the four to level and coverage until it is pinned down.
 - **An idle filter is not an absent one.** The performance pad is a low-pass into a high-pass,
   both "wide open" when nobody is touching it, and the reference calls that a true bypass. Sample
   for sample its output differs from its input by nearly the whole signal: a 20Hz high-pass turns
