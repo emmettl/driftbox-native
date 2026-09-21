@@ -52,3 +52,6 @@ public func panGains(_ pan: Double) -> (left: Double, right: Double) {
   let x = (max(-1, min(1, pan)) + 1) / 2
   return (dbCos(x * Double.pi / 2), dbSin(x * Double.pi / 2))
 }
+
+/// `pow`, for the targets above this one.
+public func powDSP(_ base: Double, _ exponent: Double) -> Double { dbPow(base, exponent) }

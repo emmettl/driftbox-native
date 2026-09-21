@@ -119,6 +119,8 @@ any difference in the *sound* belongs to the one renderer and not to 22 voices.
 | squares and sawtooths | -78 to -116dB |
 | through drive (the 909 kick, snare and clap) | -98 to -131dB |
 | 303 lines from the catalogue: slides, accents, ties | -94 and -116dB sawtooth, -85dB square |
+| the delay send: settled, gliding, and retimed mid-tail | -139 to -142dB |
+| the reverb send, three rooms | -112 to -131dB |
 | the oversampler alone, against its measured impulse response | under 1e-6 |
 | Chromium against itself | up to 5e-7 between two renders of one graph |
 
@@ -151,6 +153,28 @@ there. Things learned by measuring rather than reading:
   127 frames before a note; a sequencer that schedules to the sample, as this one will, has no
   such window. (Scheduled all up front, as the reference's *stem* export does, every overlapped
   sweep is cancelled before it plays at all — a bug there, reported.)
+- **A delay in a loop is 128 frames longer than it says, every time round.** The browser computes
+  a feedback loop a render quantum at a time, and the way it breaks the cycle hands the filter the
+  delay's output from the quantum before. So the second repeat of the reference's delay lands 128
+  frames late, the third 256: a dotted-eighth echo drifts 2.7ms further off the grid with each
+  repeat, and always has. Kept.
+- **A delay line is read in single precision, which is coarse.** The read position is a 32-bit
+  float of magnitude a hundred thousand or so, which resolves to a sixty-fourth of a frame. A delay
+  of 17142.857 frames is read at 17142.859, and an impulse comes back as exactly 9/64 and 55/64 of
+  itself. Doing the arithmetic properly, in double precision, matched to -53dB; doing it the
+  browser's way, -142dB. (For a while this looked like the delay time being read once per quantum,
+  because two neighbouring frames kept rounding to the same fraction. It is read every frame.)
+- **The reference does not agree with itself across processors, and that sets the bounds.** An
+  x64 Chrome and an arm64 Chrome render most of this to within -100dB of each other — but x64
+  steps `setTargetAtTime` four frames at a time with differently rounded arithmetic, so while a
+  delay time is gliding the two browsers differ by **-19dB** on a click through the delay. This
+  renderer matches the arm64 one to -140dB. Nothing can be held to a reference more tightly than
+  the reference holds to itself, so those cases carry the browsers' own disagreement as their
+  bound, and a second check — the level of every stretch of the tail, which both browsers agree
+  on to 0.3dB — holds the shape of the glide instead.
+- **`setTargetAtTime` is stepped, not solved.** A single-precision value moved towards its target
+  once per frame, which after seventeen thousand steps is a sixteenth of a sample from the closed
+  form — and that is where the echo lands while a delay time is gliding.
 - **The waveshaper delays by 128 frames, and that is kept.** The browser oversamples drive with
   two windowed-sinc filters, and they are audible: they ring a little either side of a transient
   and they hold the signal back 2.7ms. A 909 kick in the reference has always landed that far
