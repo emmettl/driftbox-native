@@ -9,9 +9,8 @@ submodule in `driftbox/`, and nothing in this repository changes it.
 **Where this is:** phase 2 of [ROADMAP.md](ROADMAP.md) is under way. There is no app yet. There is
 a harness that holds Swift to the web engine's behaviour, and behind it: a song model, a codec that
 reads and writes the web app's documents to the byte, a sequencer that plans every catalogue song
-exactly as the reference does, all 22 drum voices as data, and a renderer that so far turns 19 of
-them into sound within -100dB of the browser's (-75dB where there are square waves, for a reason
-given below).
+exactly as the reference does, and all 22 drum voices: as data, exactly, and as sound, within
+-100dB of the browser's (looser where there are square waves or drive, for reasons given below).
 
 ## Layout
 
@@ -84,7 +83,7 @@ Three levels, in rising cost:
 | Documents | every catalogue song as the web app saves it; 19 damaged and legacy documents with what the reference makes of each | exactly |
 | Events | `planSong` for every song — each hit, its time, its resolved knobs and sends; three deliberately awkward songs; the PRNG as raw bits | exactly |
 | Voices | what each of the 22 voices *describes* — its `VoiceSpec` — over nine panels and both velocities | exactly |
-| Audio | each voice rendered in Chromium, over four panels; nine probes of one node type each | within -100dB of the peak; -75dB with square or sawtooth oscillators |
+| Audio | each voice rendered in Chromium, over four panels, and again panned in stereo; nine probes of one node type each; the waveshaper alone | within -100dB of the peak; -90dB through drive; -75dB with square or sawtooth oscillators |
 
 **Documents** go both ways: a catalogue song decodes and encodes back to the same bytes, which
 needs object keys kept in document order and numbers printed as JavaScript prints them —
@@ -117,6 +116,8 @@ any difference in the *sound* belongs to the one renderer and not to 22 voices.
 | noise through filters, resampled or not | -120 to -142dB — a step or two of a 32-bit float |
 | sines and triangles | -104 to -125dB |
 | squares and sawtooths | -78 to -116dB |
+| through drive (the 909 kick, snare and clap) | -98 to -131dB |
+| the oversampler alone, against its measured impulse response | under 1e-6 |
 | Chromium against itself | up to 5e-7 between two renders of one graph |
 
 `probes.json` holds one kind of node at a time, outside any voice — a bare square, a swept filter —
@@ -139,15 +140,20 @@ there. Things learned by measuring rather than reading:
   hundred-thousandth of a sample in where the table is read, which a waveform with edges spreads
   evenly over every harmonic. That is the browser's arithmetic, a nanosecond, and not chased
   further.
-- **The reference clicks, rarely.** See `theReferenceClicks` in `VoiceAudioTests`: at one knob
-  setting the 808 clap's tail is due 5e-13 of a frame after a frame boundary, Chromium starts the
-  source on that frame, and the gain envelope's first event is still in the future — so the
-  `GainNode` is at its default of 1 for one frame. This renderer does not reproduce it.
-
-The renderer is being built one kind of node at a time, each measured before the next. It says
-what it cannot render yet (`VoiceRenderer.unsupported`) rather than rendering something close:
-today that is the oversampled waveshaper — the 909's kick, snare and clap — and pan. The test lists
-the voices still waiting, so one can only leave that list by being compared.
+- **The waveshaper delays by 128 frames, and that is kept.** The browser oversamples drive with
+  two windowed-sinc filters, and they are audible: they ring a little either side of a transient
+  and they hold the signal back 2.7ms. A 909 kick in the reference has always landed that far
+  behind an 808 kick on the same step. `WaveShaper` has the same filters, checked against the
+  browser's impulse response measured through a curve that does nothing.
+- **A voice gets quieter the moment its pan knob leaves centre.** The reference builds a panner only
+  when the pan is not exactly centre, so a centred voice goes to both sides at full level where a
+  panner at centre would put it 3dB down. The songs were mixed that way, so it is kept.
+- **The reference clicked, and no longer does.** At some knob settings a source is due a sliver of
+  a frame after a frame boundary; Chromium starts it on that frame, and the gain envelope's first
+  event was still in the future, so the `GainNode` sat at its default of 1 for one frame. It was
+  found here on the 808 clap at one setting — and then on the 909 clap at its *default* panel, all
+  four retriggers. Fixed in driftbox#297; this renderer never reproduced it, and the case that
+  found it is now an ordinary one that matches at -141dB.
 
 ### Exactness
 

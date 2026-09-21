@@ -29,8 +29,10 @@ const CASES = [
   // Colour sets a clap's retrigger spacing, and this value puts every retrigger between two sample
   // frames — which is where a renderer has to agree with the browser about rounding.
   { name: 'offgrid', params: { ...DEFAULTS, colour: 0.37 }, accent: 1 },
-  // One voice, one panel, kept because the reference gets it wrong — see `theReferenceClicks` in
-  // VoiceAudioTests. At colour 0.9 the 808 clap's tail is due 5e-13 of a frame after frame 2160.
+  // One voice, one panel, kept because the reference used to get it wrong. At colour 0.9 the 808
+  // clap's tail is due 5e-13 of a frame after frame 2160; Chromium starts the source on that frame,
+  // and until driftbox#297 the gain node was still at its default of 1 there — a one-frame click.
+  // The 909 clap did the same on all four retriggers at its *default* panel.
   { name: 'boundary', params: { ...DEFAULTS, colour: 0.9 }, accent: 1, only: '808.cp' },
 ]
 
@@ -103,6 +105,69 @@ try {
     probes.push({ name, spec, sampleRate: SAMPLE_RATE, frames, peak: samples.reduce((peak, value) => Math.max(peak, Math.abs(value)), 0), file })
   }
   writeFileSync(join(out, 'probes.json'), `${JSON.stringify(probes, null, 1)}\n`)
+
+  // The waveshaper on its own, with a curve that does nothing: a straight line from -1 to 1. What
+  // comes out is then the oversampler and nothing else — its two filters and its delay, measured
+  // rather than remembered. An impulse gives the response itself; the sine checks it under load.
+  // The third is a real drive curve, through the reference's own `driveCurve` by way of a voice.
+  const SHAPER_INPUTS = {
+    impulse: `const data = new Float32Array(1024); data[10] = 0.5`,
+    sine: `const data = Float32Array.from({ length: 1024 }, (_, i) => 0.8 * Math.sin(i * 0.37))`,
+  }
+  mkdirSync(join(out, 'shaper'), { recursive: true })
+  const shaper = []
+  for (const [input, source] of Object.entries(SHAPER_INPUTS)) {
+    for (const oversample of ['none', '2x']) {
+      const [sent, got] = await reference.evaluate(`(async () => {
+        const encode = ${FLOATS_TO_BASE64}
+        ${source}
+        const ctx = new OfflineAudioContext(1, data.length, ${SAMPLE_RATE})
+        const buffer = ctx.createBuffer(1, data.length, ${SAMPLE_RATE})
+        buffer.copyToChannel(data, 0)
+        const player = ctx.createBufferSource()
+        player.buffer = buffer
+        const shaper = ctx.createWaveShaper()
+        shaper.curve = new Float32Array([-1, 1])
+        shaper.oversample = ${JSON.stringify(oversample)}
+        player.connect(shaper).connect(ctx.destination)
+        player.start(0)
+        return [encode(data), encode((await ctx.startRendering()).getChannelData(0))]
+      })()`)
+      const name = `${input}-${oversample}`
+      writeFileSync(join(out, 'shaper', `${name}.in.f32`), Buffer.from(floats(sent).buffer))
+      writeFileSync(join(out, 'shaper', `${name}.out.f32`), Buffer.from(floats(got).buffer))
+      shaper.push({ name, oversample: oversample === '2x', curve: [-1, 1], input: `shaper/${name}.in.f32`, output: `shaper/${name}.out.f32` })
+    }
+  }
+  writeFileSync(join(out, 'shaper.json'), `${JSON.stringify(shaper, null, 1)}\n`)
+
+  // Every voice again, panned, into a stereo context — the mono renders above cannot tell left
+  // from right. Interleaved. The panel is off centre on purpose: at exactly centre the reference
+  // builds no panner at all, which is 3dB louder than a panner at centre would be, and the
+  // 'default' case above already covers that path.
+  mkdirSync(join(out, 'stereo'), { recursive: true })
+  const stereo = []
+  for (const id of voices) {
+    const params = { ...DEFAULTS, pan: 0.2 }
+    const encoded = await reference.evaluate(`(async () => {
+      const encode = ${FLOATS_TO_BASE64}
+      const voice = [...engine.TR808_VOICES, ...engine.TR909_VOICES].find((voice) => voice.id === ${JSON.stringify(id)})
+      const spec = { ...voice.build(${JSON.stringify(params)}, 1), ...(voice.trim === undefined ? {} : { trim: voice.trim }) }
+      const frames = Math.max(1, Math.ceil((spec.duration + 0.05) * ${SAMPLE_RATE}))
+      const ctx = new OfflineAudioContext(2, frames, ${SAMPLE_RATE})
+      engine.renderVoice(ctx, spec, ctx.destination, 0, voice.id)
+      const buffer = await ctx.startRendering()
+      const left = buffer.getChannelData(0), right = buffer.getChannelData(1)
+      const interleaved = new Float32Array(frames * 2)
+      for (let i = 0; i < frames; i++) { interleaved[i * 2] = left[i]; interleaved[i * 2 + 1] = right[i] }
+      return encode(interleaved)
+    })()`)
+    const samples = floats(encoded)
+    const file = `stereo/${id}.f32`
+    writeFileSync(join(out, file), Buffer.from(samples.buffer))
+    stereo.push({ voice: id, case: 'panned', params, accent: 1, sampleRate: SAMPLE_RATE, frames: samples.length / 2, peak: samples.reduce((peak, value) => Math.max(peak, Math.abs(value)), 0), file })
+  }
+  writeFileSync(join(out, 'stereo.json'), `${JSON.stringify({ renders: stereo }, null, 1)}\n`)
 
   writeFileSync(join(out, 'voices.json'), `${JSON.stringify({ chromium: reference.product, renders: manifest }, null, 1)}\n`)
   const worst = Math.max(...manifest.map((render) => render.selfDifference))

@@ -18,26 +18,30 @@ public struct VoiceRenderer {
     self.sampleRate = sampleRate
   }
 
-  /// Why a spec cannot be rendered yet, or nil if it can. The renderer is being built node type
-  /// by node type, each measured against the browser before the next, and says so rather than
-  /// rendering something close.
-  public static func unsupported(_ spec: VoiceSpec) -> String? {
-    if let drive = spec.drive, drive > 0 { return "drive (an oversampled waveshaper)" }
-    if let pan = spec.pan, pan != 0 { return "pan" }
-    for source in spec.sources {
-      switch source.generator {
-      case .oscillator:
-        break
-      case .noise:
-        break
-      }
-    }
-    return nil
+  /// A hit in stereo, as it leaves the voice.
+  public struct Stereo: Sendable {
+    public var left: [Float]
+    public var right: [Float]
   }
 
-  /// One hit starting at time zero, mono. Nil if `unsupported`.
-  public mutating func render(_ spec: VoiceSpec, voiceId: String, frames: Int) -> [Float]? {
-    guard Self.unsupported(spec) == nil else { return nil }
+  /// One hit starting at time zero, as a mono context would hear it: a panned voice mixed back
+  /// down, which is half the sum of its two sides.
+  public mutating func render(_ spec: VoiceSpec, voiceId: String, frames: Int) -> [Float] {
+    let stereo = renderStereo(spec, voiceId: voiceId, frames: frames)
+    guard Self.isPanned(spec) else { return stereo.left }
+    return zip(stereo.left, stereo.right).map { 0.5 * ($0 + $1) }
+  }
+
+  /// The reference builds a panner only when the pan is not exactly centre. A voice at centre is
+  /// therefore the same signal on both sides at full level, where a panner at centre would have
+  /// put it 3dB down on each — so a voice gets quieter the moment its pan knob leaves the middle.
+  /// That is how the songs were mixed, so it is kept.
+  static func isPanned(_ spec: VoiceSpec) -> Bool {
+    if let pan = spec.pan, pan != 0 { true } else { false }
+  }
+
+  /// One hit starting at time zero.
+  public mutating func renderStereo(_ spec: VoiceSpec, voiceId: String, frames: Int) -> Stereo {
     let sampleRate = sampleRate
 
     var sources = spec.sources.enumerated().map { index, source in
@@ -45,6 +49,11 @@ public struct VoiceRenderer {
     }
     var filter = spec.filter.map { RenderedFilter($0, start: 0, sampleRate: sampleRate) }
     let trim = spec.trim ?? 1
+    // Drive, then the voice's filter, then pan, then trim: the reference's order.
+    let driven = (spec.drive ?? 0) > 0
+    var shaper = WaveShaper(
+      curve: driven ? WaveShaper.driveCurve(amount: spec.drive ?? 0) : [], oversamples: driven)
+    let pan = Self.isPanned(spec) ? panGains(spec.pan ?? 0) : (left: 1.0, right: 1.0)
 
     // One table per oscillator, in source order, lent for the length of the render.
     let tables = spec.sources.compactMap { source -> WaveTable? in
@@ -63,7 +72,8 @@ public struct VoiceRenderer {
     }
 
     return Self.borrowing(tables[...], []) { readers in
-      var out = [Float](repeating: 0, count: frames)
+      var left = [Float](repeating: 0, count: frames)
+      var right = [Float](repeating: 0, count: frames)
       for frame in 0..<frames {
         let time = Double(frame) / sampleRate
         var sum = 0.0
@@ -77,10 +87,12 @@ public struct VoiceRenderer {
           }
         }
         var sample = sum * spec.gain
+        if driven { sample = Double(shaper.process(Float(sample))) }
         if filter != nil { sample = filter!.process(sample, time: time) }
-        out[frame] = Float(sample * trim)
+        left[frame] = Float(sample * pan.left * trim)
+        right[frame] = Float(sample * pan.right * trim)
       }
-      return out
+      return Stereo(left: left, right: right)
     }
   }
 

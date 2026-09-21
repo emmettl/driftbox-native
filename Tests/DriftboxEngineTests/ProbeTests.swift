@@ -29,8 +29,7 @@ struct ProbeTests {
       let file = try #require(probe["file"]?.string)
       let spec = try voiceSpec(try #require(probe["spec"]?.object))
 
-      let rendered = renderer.render(spec, voiceId: "probe", frames: frames)
-      let mine = try #require(rendered, "\(name): \(VoiceRenderer.unsupported(spec) ?? "")")
+      let mine = renderer.render(spec, voiceId: "probe", frames: frames)
       let reference = try Data(contentsOf: generated.appendingPathComponent(file)).withUnsafeBytes { raw in
         (0..<raw.count / 4).map { raw.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
       }

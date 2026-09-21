@@ -45,3 +45,10 @@ func dbPow(_ x: Double, _ y: Double) -> Double { pow(x, y) }
 
 /// The sine of `turns` whole cycles. Public because an oscillator lives a target away.
 public func sin2pi(_ turns: Double) -> Double { dbSin(2 * Double.pi * turns) }
+
+/// The equal-power gains for a pan position, -1 hard left to 1 hard right: the Web Audio
+/// `StereoPannerNode`'s law for a mono input.
+public func panGains(_ pan: Double) -> (left: Double, right: Double) {
+  let x = (max(-1, min(1, pan)) + 1) / 2
+  return (dbCos(x * Double.pi / 2), dbSin(x * Double.pi / 2))
+}
