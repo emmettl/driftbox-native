@@ -164,6 +164,14 @@ there. Things learned by measuring rather than reading:
   itself. Doing the arithmetic properly, in double precision, matched to -53dB; doing it the
   browser's way, -142dB. (For a while this looked like the delay time being read once per quantum,
   because two neighbouring frames kept rounding to the same fraction. It is read every frame.)
+- **The reference does not agree with itself across processors, and that sets the bounds.** An
+  x64 Chrome and an arm64 Chrome render most of this to within -100dB of each other — but x64
+  steps `setTargetAtTime` four frames at a time with differently rounded arithmetic, so while a
+  delay time is gliding the two browsers differ by **-19dB** on a click through the delay. This
+  renderer matches the arm64 one to -140dB. Nothing can be held to a reference more tightly than
+  the reference holds to itself, so those cases carry the browsers' own disagreement as their
+  bound, and a second check — the level of every stretch of the tail, which both browsers agree
+  on to 0.3dB — holds the shape of the glide instead.
 - **`setTargetAtTime` is stepped, not solved.** A single-precision value moved towards its target
   once per frame, which after seventeen thousand steps is a sixteenth of a sample from the closed
   form — and that is where the echo lands while a delay time is gliding.

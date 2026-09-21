@@ -71,8 +71,33 @@ struct SendAudioTests {
       }
       let decibels = worst > 0 ? 20 * log10(worst / peak) : -Double.infinity
       report += "\(name): \(String(format: "%.1f", decibels))dB, worst at frame \(worstAt)\n"
-      // Measured at -139 to -142dB: settled, gliding, and retimed by a tempo change mid-tail.
-      #expect(decibels <= -125, "\(name) is \(decibels)dB from the reference")
+      // Against the Chrome these were developed on — arm64 — every case measures -139 to -142dB.
+      // Against an x64 Chrome only the settled delay does, because **the two Chromes do not agree
+      // with each other** while a delay time is gliding: x64 steps `setTargetAtTime` four frames
+      // at a time with differently rounded arithmetic, the delay time comes out a hundredth of a
+      // sample different, and a click through a delay line is the most sensitive thing there is
+      // to that. Measured between the two browsers on these same cases: -139, -119, -67, -19dB.
+      // Nothing can be held to the reference more tightly than it holds to itself, so each bound
+      // is that figure with a little room.
+      let gliding = name.contains("gliding")
+      let bound =
+        gliding ? -15.0 : name.contains("retimed") ? -60.0 : name.contains("regenerating") ? -110.0 : -125.0
+      #expect(decibels <= bound, "\(name) is \(decibels)dB from the reference")
+
+      // What the two browsers do agree on, to within 0.3dB even mid-glide, is where the energy
+      // is: the level of every stretch of the tail. That holds the shape of the glide, the loop
+      // gain and the filter without caring about a hundredth of a sample.
+      let block = 1024
+      var energyGap = 0.0
+      for start in stride(from: 0, to: frames - block, by: block) {
+        let a = (mine[start..<start + block].reduce(0.0) { $0 + Double($1) * Double($1) } / Double(block))
+          .squareRoot()
+        let b =
+          (reference[start..<start + block].reduce(0.0) { $0 + Double($1) * Double($1) } / Double(block))
+          .squareRoot()
+        if max(a, b) > peak * 1e-3 { energyGap = max(energyGap, abs(20 * log10(a / b))) }
+      }
+      #expect(energyGap <= 0.5, "\(name): a stretch of the tail is \(energyGap)dB out")
     }
     if ProcessInfo.processInfo.environment["DRIFTBOX_REPORT"] != nil { print(report) }
   }
@@ -105,9 +130,11 @@ struct SendAudioTests {
       }
       let decibels = worst > 0 ? 20 * log10(worst / peak) : -Double.infinity
       report += "\(name): \(String(format: "%.1f", decibels))dB\n"
-      // Measured at -112 to -131dB. The browser convolves in single precision, in stages; this is
-      // one double-precision transform, and the longest room is where the two differ most.
-      #expect(decibels <= -100, "\(name) is \(decibels)dB from the reference")
+      // Measured at -112 to -131dB against an arm64 Chrome and -97dB against an x64 one; the two
+      // differ from each other by -99dB on the longest room. The browser convolves in single
+      // precision, in stages, with whatever transform the platform has; this is one
+      // double-precision transform.
+      #expect(decibels <= -95, "\(name) is \(decibels)dB from the reference")
     }
     if ProcessInfo.processInfo.environment["DRIFTBOX_REPORT"] != nil { print(report) }
   }
