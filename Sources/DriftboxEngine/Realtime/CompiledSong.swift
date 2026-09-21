@@ -56,10 +56,11 @@ public struct CompiledSong: ~Copyable {
       for hit in step.drums {
         guard let voice = voice(id: hit.voiceId) else { continue }
         let group = voice.choke.flatMap { Self.chokeGroups.firstIndex(of: $0) }.map { UInt8($0 + 1) } ?? 0
-        prepared.append(
-          preparer.prepare(
-            voice.build(hit.params, accent: hit.accent), voiceId: voice.id, at: hit.time, sends: hit.sends,
-            chokeGroup: group))
+        var fixed = preparer.prepare(
+          voice.build(hit.params, accent: hit.accent), voiceId: voice.id, at: hit.time, sends: hit.sends,
+          chokeGroup: group)
+        fixed.accent = Float(hit.accent)
+        prepared.append(fixed)
       }
     }
     // By frame, and in plan order within a frame: two hats on one step choke each other in the

@@ -60,6 +60,10 @@ public struct FixedVoiceSpec {
   public var chokeGroup: UInt8 = 0
   public var sendDelay: Float = 0
   public var sendReverb: Float = 0
+  /// Which voice this is, as its index in `allVoices`, and how hard it was struck: for the
+  /// events ring, which tells the interface what was played.
+  public var voiceIndex = 0
+  public var accent: Float = 1
 
   /// The same hit `frames` frames later. A song is prepared once against its own clock, from
   /// zero; every pass through it is placed on the engine's clock with this.

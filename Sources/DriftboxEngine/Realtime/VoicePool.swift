@@ -316,6 +316,7 @@ public struct HitPreparer: Sendable {
     fixed.chokeGroup = chokeGroup
     fixed.sendDelay = Float(sends.delay)
     fixed.sendReverb = Float(sends.reverb)
+    fixed.voiceIndex = allVoices.firstIndex { $0.id == voiceId } ?? 0
 
     fixed.gain = spec.gain
     if let drive = spec.drive, drive > 0 { fixed.driveCurve = Int(jsRound(drive * 20)) }

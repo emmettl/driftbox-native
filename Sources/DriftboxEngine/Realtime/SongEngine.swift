@@ -20,6 +20,8 @@ public struct SongEngine: ~Copyable {
   var delayRight: DelaySend
   var inserts: MasterInserts
   public var pad: Kaoss
+  /// What was played, for the interface. Read it with `events.receive()` from one thread only.
+  public var events = EventRing()
 
   /// Bus and sends for one chunk, stereo each.
   let scratch: UnsafeMutablePointer<Float>
@@ -132,6 +134,7 @@ public struct SongEngine: ~Copyable {
         passStart += song.pointee.passFrames
         hitCursor = 0
         bassCursor = 0
+        events.send(EngineEvent(kind: .pass, frame: passStart, voice: 0, level: 0, frequency: 0, flag: 0))
       }
       // Hits due in this chunk are started now; the pool renders each from its own first frame.
       let songEnd = frame - passStart + count
@@ -139,6 +142,10 @@ public struct SongEngine: ~Copyable {
         var hit = song.pointee.hits[hitCursor]
         hit.shift(byFrames: passStart, sampleRate: sampleRate)
         voices.start(hit)
+        events.send(
+          EngineEvent(
+            kind: .hit, frame: hit.firstFrame, voice: hit.voiceIndex, level: hit.accent, frequency: 0,
+            flag: hit.chokeGroup))
         hitCursor += 1
       }
     }
@@ -156,6 +163,10 @@ public struct SongEngine: ~Copyable {
         while bassCursor < song.pointee.bassCount, song.pointee.bass[bassCursor].frame <= songAt {
           let event = song.pointee.bass[bassCursor]
           let when = event.time + Double(passStart) / sampleRate
+          events.send(
+            EngineEvent(
+              kind: .note, frame: at, voice: event.line, level: Float(event.note.gain),
+              frequency: Float(event.note.frequency), flag: event.note.glide > 0 ? 1 : 0))
           if event.line == 0 {
             bassA.play(event.note, at: when)
             bassA.sendDelay = event.sendDelay
