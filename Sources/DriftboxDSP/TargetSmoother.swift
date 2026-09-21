@@ -58,7 +58,11 @@ public struct TargetSmoother {
         let close =
           target == 0
           ? abs(value) < Self.closeEnoughToZero : abs(target - value) < Self.closeEnough * abs(value)
-        if close || elapsed > Self.timeConstantsToArrive * timeConstant {
+        // At ten time constants, not after them. A glide of 0.02s started on a quantum boundary
+        // is ten time constants old on another one exactly, and the browser arrives there — a
+        // quantum sooner than "after" would have it, which on a resonant filter is a click's
+        // worth of difference. Half a frame of slack, for the subtraction.
+        if close || elapsed >= Self.timeConstantsToArrive * timeConstant - 0.5 / sampleRate {
           value = target
           arrived = true
         }

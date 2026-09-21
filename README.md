@@ -123,6 +123,7 @@ any difference in the *sound* belongs to the one renderer and not to 22 voices.
 | the reverb send, three rooms | -112 to -131dB |
 | the browser's compressor alone, three settings | -125 to -138dB |
 | the master inserts whole: drive, struck filter, compressor | -94 to -136dB; -63dB after one kind of strike |
+| the performance filter: idle, and through three gestures | -141dB idle; -78 to -98dB moving |
 | the oversampler alone, against its measured impulse response | under 1e-6 |
 | Chromium against itself | up to 5e-7 between two renders of one graph |
 
@@ -155,6 +156,16 @@ there. Things learned by measuring rather than reading:
   127 frames before a note; a sequencer that schedules to the sample, as this one will, has no
   such window. (Scheduled all up front, as the reference's *stem* export does, every overlapped
   sweep is cancelled before it plays at all — a bug there, reported.)
+- **An idle filter is not an absent one.** The performance pad is a low-pass into a high-pass,
+  both "wide open" when nobody is touching it, and the reference calls that a true bypass. Sample
+  for sample its output differs from its input by nearly the whole signal: a 20Hz high-pass turns
+  the phase of the bass, and a 20kHz low-pass shaves the top. Nobody hears it, and every mix the
+  reference has ever rendered went through it — so `Kaoss` is in the chain here too, idle, and
+  matches at -141dB.
+- **A glide arrives at ten time constants, not after them.** `setTargetAtTime` never finishes on its
+  own, so the browser declares it finished — and a glide of 0.02s begun on a render quantum is ten
+  time constants old on another one exactly. "After" is a quantum late, which on a resonant filter
+  was the difference between -56 and -78dB.
 - **The compressor has no specification, only an implementation.** The standard names the
   `DynamicsCompressorNode`'s knobs and says nothing of how it behaves, so "the compressor" in the
   reference is Chromium's, inherited from WebKit, and the songs were mixed through it. `Compressor`
