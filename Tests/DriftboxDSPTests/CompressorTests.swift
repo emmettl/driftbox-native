@@ -62,9 +62,13 @@ struct CompressorTests {
       }
       let decibels = worst > 0 ? 20 * log10(Double(worst / peak)) : -Double.infinity
       report += "\(test.name): \(String(format: "%.1f", decibels))dB, worst at frame \(worstAt)\n"
-      // Measured at -125 to -138dB. What is left is single-precision `log`, `pow` and `sin` from
-      // two different maths libraries.
-      #expect(decibels <= -110, "\(test.name) is \(decibels)dB from the reference")
+      // Measured at -125 to -138dB against the arm64 Chrome this was developed on. Against an x64
+      // Chrome the harder settings are looser, because the two browsers are: they differ from
+      // each other by -136, -114 and -86dB on these three cases, the compressor being single
+      // precision throughout and built on `log`, `pow` and `sin` from whichever maths library the
+      // platform has. Each bound is the browsers' own disagreement with a little room.
+      let bound = test.name == "assertive" ? -82.0 : test.name == "gentle" ? -105.0 : -125.0
+      #expect(decibels <= bound, "\(test.name) is \(decibels)dB from the reference")
     }
     if ProcessInfo.processInfo.environment["DRIFTBOX_REPORT"] != nil { print(report) }
   }

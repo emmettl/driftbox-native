@@ -80,7 +80,9 @@ struct MasterAudioTests {
       report += "\(name): \(String(format: "%.1f", decibels))dB, worst at frame \(worstAt)\n"
 
       // Measured: -136dB at the defaults, where the chain is the compressor alone; -109dB driven;
-      // -94dB with everything on and knobs moving.
+      // -94dB with everything on and knobs moving. That last one is -86dB against an x64 Chrome,
+      // and the two browsers differ from each other by -88dB on it — the compressor at a hard
+      // setting, in single precision, on two maths libraries — so its bound is theirs.
       //
       // And -63dB with the filter struck on the steps, which is one strike out of six. A strike
       // that arrives while the sweep before it is still running cancels that sweep, and for a
@@ -91,7 +93,7 @@ struct MasterAudioTests {
       // left is not understood. No catalogue song strikes the filter at all.
       let bound =
         name.contains("struck")
-        ? -58.0 : name.contains("everything") ? -88.0 : name.contains("driven") ? -100.0 : -125.0
+        ? -58.0 : name.contains("everything") ? -82.0 : name.contains("driven") ? -100.0 : -125.0
       #expect(decibels <= bound, "\(name) is \(decibels)dB from the reference")
     }
     if ProcessInfo.processInfo.environment["DRIFTBOX_REPORT"] != nil { print(report) }
