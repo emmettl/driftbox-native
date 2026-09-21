@@ -62,8 +62,12 @@ struct NoiseBuffer {
 }
 
 /// `Math.round`: halves towards positive infinity.
+@_noAllocation
 func jsRound(_ value: Double) -> Double {
-  let floor = value.rounded(.down)
+  // `rounded(.down)` names an enum the checker will not allow; the integer conversion is the same
+  // thing for the magnitudes here.
+  var floor = Double(Int(value))
+  if floor > value { floor -= 1 }
   return value - floor >= 0.5 ? floor + 1 : floor
 }
 

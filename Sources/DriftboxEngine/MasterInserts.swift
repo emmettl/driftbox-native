@@ -12,13 +12,20 @@ public struct MasterInserts: ~Copyable {
   /// No curve at all when the drive is zero, and then the browser's waveshaper passes the signal
   /// straight through: no oversampling, and none of its 128 frames of delay. So turning the drive
   /// knob up from zero moves the whole mix 2.7ms later. Measured, and kept.
-  var driveLeft: WaveShaper
-  var driveRight: WaveShaper
+  /// Sixty-five curves, from clean to full, made once; the two shapers run over them and over
+  /// history of their own, so a change of drive allocates nothing.
+  static var curveShapes: Int { 65 }
+  static var curveSamples: Int { 2048 }
+  let curves: UnsafeMutablePointer<Float>
+  let kernels: UnsafeMutablePointer<Float>
+  let shaperState: UnsafeMutablePointer<Float>
+  var driveLeft: WaveShaper.Core
+  var driveRight: WaveShaper.Core
   var curveShape = -1
 
   var filterLeft: Biquad
   var filterRight: Biquad
-  var cutoff: ParamTimeline
+  var cutoff: FixedTimeline
   var resonance: TargetSmoother
   var dry: TargetSmoother
   var wet: TargetSmoother
@@ -32,13 +39,26 @@ public struct MasterInserts: ~Copyable {
 
   public init(sampleRate: Double) {
     self.sampleRate = sampleRate
-    driveLeft = WaveShaper(curve: [], oversamples: false)
-    driveRight = WaveShaper(curve: [], oversamples: false)
+    curves = .allocate(capacity: Self.curveShapes * Self.curveSamples)
+    curves.initialize(repeating: 0, count: Self.curveShapes * Self.curveSamples)
+    for shape in 1..<Self.curveShapes {
+      for (index, value) in (Self.driveCurve(Double(shape) / 64) ?? []).enumerated() {
+        curves[shape * Self.curveSamples + index] = value
+      }
+    }
+    kernels = .allocate(capacity: WaveShaper.Core.kernelFloats)
+    WaveShaper.Core.fillKernels(kernels)
+    shaperState = .allocate(capacity: 2 * WaveShaper.Core.stateFloats)
+    driveLeft = WaveShaper.Core(
+      curve: curves, curveCount: 0, oversamples: false, kernels: kernels, state: shaperState)
+    driveRight = WaveShaper.Core(
+      curve: curves, curveCount: 0, oversamples: false, kernels: kernels,
+      state: shaperState + WaveShaper.Core.stateFloats)
     filterLeft = Biquad(response: .lowpass, sampleRate: sampleRate)
     filterRight = Biquad(response: .lowpass, sampleRate: sampleRate)
 
     let defaults = FxParams()
-    cutoff = ParamTimeline(defaultValue: Self.filterFrequency(defaults.pcfCutoff))
+    cutoff = FixedTimeline(defaultValue: Self.filterFrequency(defaults.pcfCutoff))
     resonance = TargetSmoother(value: Float(defaults.pcfResonance * 24), sampleRate: sampleRate)
     dry = TargetSmoother(value: 1, sampleRate: sampleRate)
     wet = TargetSmoother(value: 0, sampleRate: sampleRate)
@@ -55,7 +75,15 @@ public struct MasterInserts: ~Copyable {
     update(defaults, atFrame: 0)
   }
 
+  deinit {
+    curves.deallocate()
+    kernels.deallocate()
+    shaperState.deallocate()
+  }
+
+  @_noAllocation
   public static func filterFrequency(_ knob: Double) -> Double { 60 * powDSP(200, max(0, min(1, knob))) }
+  @_noAllocation
   public static func filterDecaySeconds(_ knob: Double) -> Double { 0.025 + max(0, min(1, knob)) * 0.775 }
 
   /// `tanh`, steeper with the knob, scaled to pass ±1 through. Nil at zero: no curve, no shaper.
@@ -76,6 +104,7 @@ public struct MasterInserts: ~Copyable {
   /// `scheduledAtFrame` is when the call is being made, and defaults to `frame`. A strike cancels
   /// the sweep of the one before it, and a sweep cancelled part-way keeps what had played — see
   /// `ParamTimeline.cancel`. The reference makes these calls from the start of a render quantum.
+  @_noAllocation
   public mutating func update(
     _ fx: FxParams, atFrame frame: Int, strike: StepValue = .off, scheduledAtFrame: Int? = nil
   ) {
@@ -87,9 +116,14 @@ public struct MasterInserts: ~Copyable {
     let shape = Int(jsRound(max(0, min(1, fx.drive)) * 64))
     if shape != curveShape {
       curveShape = shape
-      let curve = Self.driveCurve(Double(shape) / 64)
-      driveLeft = WaveShaper(curve: curve ?? [], oversamples: curve != nil)
-      driveRight = WaveShaper(curve: curve ?? [], oversamples: curve != nil)
+      let samples = 2048
+      let curve = curves + shape * samples
+      driveLeft = WaveShaper.Core(
+        curve: curve, curveCount: shape == 0 ? 0 : samples, oversamples: shape != 0, kernels: kernels,
+        state: shaperState)
+      driveRight = WaveShaper.Core(
+        curve: curve, curveCount: shape == 0 ? 0 : samples, oversamples: shape != 0, kernels: kernels,
+        state: shaperState + 384)
     }
 
     let amount = max(0, min(1, fx.pcfAmount))
@@ -99,12 +133,25 @@ public struct MasterInserts: ~Copyable {
 
     let base = Self.filterFrequency(fx.pcfCutoff)
     cutoff.cancel(from: time, lastRendered: scheduled > 0 ? Double(scheduled - 1) / sampleRate : nil)
-    cutoff.setValue(base, at: time)
-    if strike != .off, amount > 0 {
-      let octaves = max(0, min(1, fx.pcfEnv)) * 5 * (strike == .accent ? 1.25 : 1)
+    cutoff.append(.set, value: base, at: time)
+    let struck: Bool
+    let accented: Bool
+    switch strike {
+    case .off:
+      struck = false
+      accented = false
+    case .on:
+      struck = true
+      accented = false
+    case .accent:
+      struck = true
+      accented = true
+    }
+    if struck, amount > 0 {
+      let octaves = max(0, min(1, fx.pcfEnv)) * 5 * (accented ? 1.25 : 1)
       let peak = min(sampleRate * 0.45, base * powDSP(2, octaves))
-      cutoff.exponentialRamp(to: max(base, peak), at: time + 0.008)
-      cutoff.exponentialRamp(to: base, at: time + Self.filterDecaySeconds(fx.pcfDecay))
+      cutoff.append(.exponentialRamp, value: max(base, peak), at: time + 0.008)
+      cutoff.append(.exponentialRamp, value: base, at: time + Self.filterDecaySeconds(fx.pcfDecay))
     }
 
     // 0.5 is the original compressor. The ends run from transparent to assertive without a second
@@ -118,6 +165,7 @@ public struct MasterInserts: ~Copyable {
   }
 
   /// One stereo frame through the inserts. Call once per frame, in order.
+  @_noAllocation
   public mutating func process(left: Float, right: Float, frame: Int) -> (left: Float, right: Float) {
     let drivenLeft = driveLeft.process(left)
     let drivenRight = driveRight.process(right)
@@ -136,7 +184,7 @@ public struct MasterInserts: ~Copyable {
     let settings = Compressor.Settings(
       threshold: threshold.next(frame: frame), knee: knee.next(frame: frame), ratio: ratio.next(frame: frame),
       attack: attack.next(frame: frame), release: release.next(frame: frame))
-    if frame % TargetSmoother.quantum == 0 { compressor.set(settings) }
+    if frame % 128 == 0 { compressor.set(settings) }
     return compressor.process(left: mixedLeft, right: mixedRight)
   }
 }

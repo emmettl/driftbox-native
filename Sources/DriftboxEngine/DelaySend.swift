@@ -6,8 +6,15 @@ import DriftboxSeq
 /// default because its repeats land between the beats rather than on them.
 public let delayDivisions = [2, 3, 4, 6, 8]
 
+@_noAllocation
 public func delayDivision(_ knob: Double) -> Int {
-  delayDivisions[Int(jsRound(max(0, min(1, knob)) * Double(delayDivisions.count - 1)))]
+  switch Int(jsRound(max(0, min(1, knob)) * 4)) {
+  case 0: 2
+  case 1: 3
+  case 2: 4
+  case 3: 6
+  default: 8
+  }
 }
 
 /// The delay send: a tempo-synced delay with a low-pass **inside** its feedback loop, so each
@@ -31,11 +38,14 @@ public struct DelaySend: ~Copyable {
   /// delay time says. Measured: the second repeat lands 128 frames late, the third 256. So a
   /// dotted-eighth delay in the reference drifts 2.7ms further off the grid with each repeat, and
   /// always has — it is part of how the songs sound, and is kept.
-  var returning = [Float](repeating: 0, count: TargetSmoother.quantum)
+  let returning: UnsafeMutablePointer<Float>
+  let quantum = TargetSmoother.quantum
 
   public init(sampleRate: Double) {
     self.sampleRate = sampleRate
     line = DelayLine(maximumSeconds: 2, sampleRate: sampleRate)
+    returning = .allocate(capacity: TargetSmoother.quantum)
+    returning.initialize(repeating: 0, count: TargetSmoother.quantum)
     damp = Biquad(response: .lowpass, sampleRate: sampleRate)
     // Where the browser's nodes start before anything is asked of them: no delay, a loop gain of
     // one, and a filter at 350Hz. The approaches below begin from these, audibly or not.
@@ -45,7 +55,12 @@ public struct DelaySend: ~Copyable {
     update(FxParams(), bpm: 120, atFrame: 0)
   }
 
+  deinit {
+    returning.deallocate()
+  }
+
   /// Apply the song's settings from `frame` on. Safe to call as often as a knob moves.
+  @_noAllocation
   public mutating func update(_ fx: FxParams, bpm: Double, atFrame frame: Int) {
     let seconds = secondsPerStep(bpm: bpm) * Double(delayDivision(fx.delayTime))
     time.setTarget(Float(min(2, seconds)), at: frame, timeConstant: 0.05)
@@ -59,12 +74,13 @@ public struct DelaySend: ~Copyable {
   ///
   /// The delay's length is read every frame, so a tempo change bends the pitch of what is already
   /// in the line rather than stepping it.
+  @_noAllocation
   public mutating func process(_ input: Float, frame: Int) -> Float {
     let output = line.read(secondsAgo: time.next(frame: frame), inALoop: true)
     damp.set(frequency: Double(tone.next(frame: frame)), q: 1)
     let regenerated = Float(damp.process(Double(output))) * feedback.next(frame: frame)
 
-    let slot = frame % TargetSmoother.quantum
+    let slot = frame % quantum
     line.write(input + returning[slot])
     returning[slot] = regenerated
     return output

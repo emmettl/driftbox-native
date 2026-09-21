@@ -69,6 +69,15 @@ public struct FixedTimeline {
   /// `lastRendered` and the parameter then snaps back to where the ramp started.
   @_noAllocation
   public mutating func cancel(from time: Double, lastRendered: Double?) {
+    // Nothing before an event that has already played will be read again — a cancellation
+    // promises that no frame before `lastRendered` is still to come — so it can go, and the room
+    // is needed for what comes next.
+    if let lastRendered {
+      while count >= 2, event(1).time <= lastRendered {
+        for index in 1..<count { store(event(index), at: index - 1) }
+        count -= 1
+      }
+    }
     var first = 0
     while first < count, event(first).time < time { first += 1 }
     guard first < count else { return }
@@ -150,6 +159,18 @@ public struct FixedTimeline {
       return value * dbPow(endValue / value, (time - previousTime) / span)
     case .set:
       return value
+    }
+  }
+
+  /// The same timeline `seconds` later: how a hit prepared against a song's own clock is placed
+  /// on the engine's when the song loops round.
+  @_noAllocation
+  public mutating func shift(by seconds: Double) {
+    for index in 0..<count {
+      var moved = event(index)
+      moved.time += seconds
+      if moved.hasHeading { moved.headingTime += seconds }
+      store(moved, at: index)
     }
   }
 }

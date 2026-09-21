@@ -33,6 +33,7 @@ public struct Compressor: ~Copyable {
     public var attack: Float
     public var release: Float
 
+    @_noAllocation
     public init(threshold: Float, knee: Float, ratio: Float, attack: Float, release: Float) {
       self.threshold = threshold
       self.knee = knee
@@ -42,10 +43,10 @@ public struct Compressor: ~Copyable {
     }
   }
 
-  static let divisionFrames = 32
-  static let maximumDelayFrames = 1024
-  static let lookaheadSeconds = 0.006
-  static let detectorReleaseSeconds: Float = 0.0025
+  static var divisionFrames: Int { 32 }
+  static var maximumDelayFrames: Int { 1024 }
+  static var lookaheadSeconds: Double { 0.006 }
+  static var detectorReleaseSeconds: Float { 0.0025 }
 
   public let sampleRate: Float
   /// How many frames late the output is.
@@ -92,6 +93,7 @@ public struct Compressor: ~Copyable {
     delayRight.deallocate()
   }
 
+  @_noAllocation
   public mutating func set(_ new: Settings) {
     guard new != settings else { return }
     let curveChanged =
@@ -103,22 +105,26 @@ public struct Compressor: ~Copyable {
   // MARK: - The static curve
 
   /// Linear to the threshold; above it, an exponential approach whose steepness is `k`.
+  @_noAllocation
   func kneeCurve(_ x: Float, _ k: Float) -> Float {
     x < linearThreshold ? x : linearThreshold + (1 - expf(-k * (x - linearThreshold))) / k
   }
 
   /// The whole curve: the knee, and the ratio above where the knee ends.
+  @_noAllocation
   func saturate(_ x: Float, _ k: Float) -> Float {
     if x < kneeThreshold { return kneeCurve(x, k) }
     return fromDecibels(kneeOutputDecibels + slope * (toDecibels(x) - kneeThresholdDecibels))
   }
 
+  @_noAllocation
   func slopeAt(_ x: Float, _ k: Float) -> Float {
     if x < linearThreshold { return 1 }
     let x2 = x * 1.001
     return (toDecibels(kneeCurve(x2, k)) - toDecibels(kneeCurve(x, k))) / (toDecibels(x2) - toDecibels(x))
   }
 
+  @_noAllocation
   mutating func updateCurve() {
     linearThreshold = fromDecibels(settings.threshold)
     slope = 1 / settings.ratio
@@ -130,7 +136,7 @@ public struct Compressor: ~Copyable {
     var candidate: Float = 5
     for _ in 0..<15 {
       if slopeAt(kneeEnd, candidate) < slope { high = candidate } else { low = candidate }
-      candidate = (low * high).squareRoot()
+      candidate = Float(dbPow(Double(low * high), 0.5))
     }
     k = candidate
 
@@ -145,6 +151,7 @@ public struct Compressor: ~Copyable {
   // MARK: - Processing
 
   /// One stereo frame. The output is `latency` frames behind the input.
+  @_noAllocation
   public mutating func process(left: Float, right: Float) -> (left: Float, right: Float) {
     if frameInDivision == 0 { beginDivision() }
     frameInDivision = (frameInDivision + 1) % Self.divisionFrames
@@ -179,6 +186,7 @@ public struct Compressor: ~Copyable {
   }
 
   /// Every 32 frames: where the gain is heading, and how fast.
+  @_noAllocation
   mutating func beginDivision() {
     // Warped to undo the sine on the way out.
     desiredGain = asinf(detectorAverage) / (0.5 * Float.pi)
@@ -225,9 +233,15 @@ public struct Compressor: ~Copyable {
 
 // Single-precision maths, by way of the double-precision functions already vouched for.
 
+@_noAllocation
 func toDecibels(_ linear: Float) -> Float { 20 * Float(dbLog(Double(linear)) / 2.302585092994045684) }
+@_noAllocation
 func fromDecibels(_ decibels: Float) -> Float { powf(10, 0.05 * decibels) }
+@_noAllocation
 func powf(_ base: Float, _ exponent: Float) -> Float { Float(dbPow(Double(base), Double(exponent))) }
+@_noAllocation
 func expf(_ x: Float) -> Float { Float(dbExp(Double(x))) }
+@_noAllocation
 func sinf(_ x: Float) -> Float { Float(dbSin(Double(x))) }
+@_noAllocation
 func asinf(_ x: Float) -> Float { Float(dbAsin(Double(x))) }

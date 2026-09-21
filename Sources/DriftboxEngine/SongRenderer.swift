@@ -25,6 +25,10 @@ public struct SongRenderer {
     public var tail = 4.0
     /// See `VoiceRenderer.emulatesBrowserSourceStart`. Off, except when being compared.
     public var emulatesBrowserSourceStart = false
+    /// Schedule each 303 note from the start of the render quantum it falls in, as the reference
+    /// does, rather than from its own frame, as the real-time engine does. On, except when the
+    /// real-time engine is being compared with this.
+    public var schedulesBassFromQuantum = true
 
     public init(sampleRate: Double = 44100, start: Double = 0, duration: Double? = nil, tail: Double = 4) {
       self.sampleRate = sampleRate
@@ -125,9 +129,12 @@ public struct SongRenderer {
         for hit in step.bass where hit.voiceId == voiceId {
           let time = hit.time - start
           guard time >= 0, time < duration else { continue }
-          // Scheduled from the start of the render quantum the note falls in, as the reference does.
+          // Scheduled from the start of the render quantum the note falls in, as the reference
+          // does — or from the note's own frame, as the real-time engine does.
           let scheduled =
-            Double(max(0, Int((time * sampleRate / Double(quantum)).rounded(.down))) * quantum) / sampleRate
+            options.schedulesBassFromQuantum
+            ? Double(max(0, Int((time * sampleRate / Double(quantum)).rounded(.down))) * quantum) / sampleRate
+            : (time * sampleRate).rounded(.up) / sampleRate
           toDelay.setValue(hit.sends.delay, at: time)
           toReverb.setValue(hit.sends.reverb, at: time)
           line.play(hit.note, at: time, scheduledAt: scheduled)

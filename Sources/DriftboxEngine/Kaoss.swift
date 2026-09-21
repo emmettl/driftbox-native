@@ -15,17 +15,17 @@ import DriftboxSeq
 /// almost the whole signal. Nobody hears that — it is phase — but every mix the reference renders
 /// has been through it, so every mix here goes through it too.
 public struct Kaoss {
-  static let neutral = 0.5
+  static var neutral: Double { 0.5 }
   /// Below about 80Hz there is nothing left to hear and the pad's corner is dead travel.
-  static let lowFloor = 90.0
-  static let lowCeiling = 20000.0
-  static let highFloor = 20.0
+  static var lowFloor: Double { 90.0 }
+  static var lowCeiling: Double { 20000.0 }
+  static var highFloor: Double { 20.0 }
   /// Past about 6kHz only cymbals survive, which is the point; further is just silence.
-  static let highCeiling = 6000.0
+  static var highCeiling: Double { 6000.0 }
   /// Enough to whistle on a sweep, short of what clips the master on its own.
-  static let maximumQ = 12.0
+  static var maximumQ: Double { 12.0 }
   /// A floor rather than zero, so the idle filter is damped rather than undefined.
-  static let minimumQ = 0.0001
+  static var minimumQ: Double { 0.0001 }
 
   public let sampleRate: Double
   /// Whether the pad is being held. An interface wants to know, to draw itself.
@@ -54,6 +54,7 @@ public struct Kaoss {
 
   /// Where a horizontal position puts each filter. Exponential either side of centre, because
   /// cutoff is heard as a ratio and a linear sweep spends most of its travel doing nothing.
+  @_noAllocation
   public static func cutoffs(x: Double) -> (low: Double, high: Double) {
     let x = max(0, min(1, x))
     return (
@@ -62,6 +63,7 @@ public struct Kaoss {
     )
   }
 
+  @_noAllocation
   public static func resonance(y: Double) -> Double {
     minimumQ + max(0, min(1, y)) * (maximumQ - minimumQ)
   }
@@ -71,6 +73,7 @@ public struct Kaoss {
   /// Everything glides rather than jumps. A pointer reports sixty times a second, and stepping a
   /// resonant filter's cutoff that often is a zipper — the one artefact that would make this feel
   /// cheap rather than expensive.
+  @_noAllocation
   public mutating func set(x: Double, y: Double, glide: Double = 0.02, atFrame frame: Int) {
     let x = max(0, min(1, x))
     let (low, high) = Self.cutoffs(x: x)
@@ -86,6 +89,7 @@ public struct Kaoss {
 
   /// Let go. Momentary rather than latching, deliberately: a filter left half-shut after a finger
   /// lifts sounds like something is broken.
+  @_noAllocation
   public mutating func release(glide: Double = 0.12, atFrame frame: Int) {
     lowFrequency.setTarget(Float(Self.lowCeiling), at: frame, timeConstant: glide)
     highFrequency.setTarget(Float(Self.highFloor), at: frame, timeConstant: glide)
@@ -95,6 +99,7 @@ public struct Kaoss {
   }
 
   /// One stereo frame through the pad. Call once per frame, in order.
+  @_noAllocation
   public mutating func process(left: Float, right: Float, frame: Int) -> (left: Float, right: Float) {
     let lowHertz = Double(lowFrequency.next(frame: frame))
     let lowResonance = Double(lowQ.next(frame: frame))

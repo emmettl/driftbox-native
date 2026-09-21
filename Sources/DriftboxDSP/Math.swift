@@ -52,13 +52,16 @@ public func sin2pi(_ turns: Double) -> Double { dbSin(2 * Double.pi * turns) }
 
 /// The equal-power gains for a pan position, -1 hard left to 1 hard right: the Web Audio
 /// `StereoPannerNode`'s law for a mono input.
+@_noAllocation
 public func panGains(_ pan: Double) -> (left: Double, right: Double) {
   let x = (max(-1, min(1, pan)) + 1) / 2
   return (dbCos(x * Double.pi / 2), dbSin(x * Double.pi / 2))
 }
 
 /// `pow`, for the targets above this one.
+@_noAllocation
 public func powDSP(_ base: Double, _ exponent: Double) -> Double { dbPow(base, exponent) }
 
 /// `tanh`, for the targets above this one.
+@_noAllocation
 public func tanhDSP(_ x: Double) -> Double { dbTanh(x) }

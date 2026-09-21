@@ -11,13 +11,13 @@
 /// a sample out is a different waveform. The closed form was tried, and was that far out.
 public struct TargetSmoother {
   /// Frames per render quantum.
-  public static let quantum = 128
+  public static var quantum: Int { 128 }
   /// Arrived, if this close to a target, relative to the value …
-  static let closeEnough: Float = 4.5e-5
+  static var closeEnough: Float { 4.5e-5 }
   /// … or this close to a target of zero …
-  static let closeEnoughToZero: Float = 1.5e-13
+  static var closeEnoughToZero: Float { 1.5e-13 }
   /// … or after this many time constants whatever the value.
-  static let timeConstantsToArrive = 10.0
+  static var timeConstantsToArrive: Double { 10.0 }
 
   public let sampleRate: Double
   public private(set) var value: Float
@@ -87,7 +87,7 @@ public struct TargetSmoother {
       if arrived { value = target }
     }
 
-    if frame % Self.quantum == 0 || frame == startFrame {
+    if frame % 128 == 0 || frame == startFrame {
       if !arrived {
         let elapsed = Double(frame - startFrame) / sampleRate
         let close =
