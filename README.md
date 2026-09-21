@@ -54,7 +54,7 @@ The one thing the DSP takes from outside is `exp` and `tanh` from the C library
 ```bash
 node conformance/emit/emit.mjs          # rewrite the checked-in fixtures
 node conformance/emit/emit.mjs --full   # also whole-song plans, into conformance/generated
-scripts/check-fixtures.sh               # fail if the fixtures are stale against the submodule
+scripts/check-fixtures.sh               # fail if the fixtures are stale against the submodule (emit --check)
 swift test
 ```
 
@@ -84,8 +84,16 @@ The Swift ladder is the reference's arithmetic line for line, with `Double` stat
 JavaScript computes in doubles whatever it stores. Against the fixture it differs by **1.8e-15**
 at double precision — not zero, because `exp` and `tanh` come from two different maths libraries
 (V8's and the platform's), and a resonant loop feeds a last-bit disagreement back. The test
-allows 1e-12. Writing those two functions in Swift would make every render bit-exact on every
-platform; that is worth doing when a second one needs to agree.
+allows 1e-12. On Linux, against glibc, it passes inside the same bound.
+
+**The reference does not agree with itself, either.** The same TypeScript rendering the same
+ladder gives different last bits under Node on an arm64 Mac and on an x64 Linux runner — found
+when the first CI run called a freshly generated fixture stale. Documents, events and PRNG bits
+did come out byte-identical across the two, so `--check` holds text fixtures to the byte and audio
+fixtures to the same 1e-12.
+
+Writing `exp` and `tanh` in Swift would make every native render bit-exact on every platform;
+that is worth doing when a second one needs to agree.
 
 ## Conventions
 

@@ -3,21 +3,27 @@
 //
 //   node conformance/emit/emit.mjs          checked-in fixtures (small, exact, text where possible)
 //   node conformance/emit/emit.mjs --full   also whole-song plans, into conformance/generated (ignored)
+//   node conformance/emit/emit.mjs --check  write nothing; fail if the checked-in fixtures are stale
 //
 // Three levels, in rising cost. Documents and events compare exactly. Audio compares within a
 // tolerance, and the fixtures that need a browser to render are not produced here yet.
 import './ts-resolve.mjs'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..')
 const engine = join(root, 'driftbox', 'packages', 'engine', 'src')
-const fixtures = join(root, 'conformance', 'fixtures')
+const checkedIn = join(root, 'conformance', 'fixtures')
 const generated = join(root, 'conformance', 'generated')
 const full = process.argv.includes('--full')
+const check = process.argv.includes('--check')
+// Checking writes a second copy beside the first and compares them, so the comparison can be
+// something other than "the bytes are the same" — see AUDIO_TOLERANCE.
+const fixtures = check ? mkdtempSync(join(tmpdir(), 'driftbox-fixtures-')) : checkedIn
 
 const { SONGS } = await import(join(engine, 'songs', 'index.ts'))
 const { encodeSong, decodeSong, SONG_FORMAT } = await import(join(engine, 'song-io.ts'))
@@ -93,5 +99,56 @@ write(join(fixtures, 'prng'), 'xorshift32.json', json(SEEDS.map((seed) => {
 // Which reference produced all this.
 const git = (...args) => execFileSync('git', ['-C', join(root, 'driftbox'), ...args], { encoding: 'utf8' }).trim()
 write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), describe: git('log', '-1', '--format=%cs %s') }))
+
+// ── --check ──────────────────────────────────────────────────────────────────────────────
+// Text fixtures must match to the byte: documents, events and PRNG bits came out identical on an
+// arm64 Mac and an x64 Linux runner, so a difference there is a real one.
+//
+// Audio fixtures cannot be held to that. The same ladder render from the same TypeScript differs
+// in its last bits between those two machines — V8's `exp` and `tanh` are the same source compiled
+// for different hardware — so the reference is not bit-reproducible with itself at double
+// precision, and a byte comparison would fail on every machine but the one that last ran the
+// emitter. They are compared within the tolerance the Swift tests use.
+const AUDIO_TOLERANCE = 1e-12
+
+function filesUnder(dir, base = dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? filesUnder(join(dir, entry.name), base) : [relative(base, join(dir, entry.name))],
+  )
+}
+
+if (check) {
+  const fresh = filesUnder(fixtures).sort()
+  const stale = []
+  for (const name of new Set([...fresh, ...filesUnder(checkedIn)])) {
+    let a, b
+    try {
+      a = readFileSync(join(fixtures, name))
+      b = readFileSync(join(checkedIn, name))
+    } catch {
+      stale.push(`${name}: only on one side`)
+      continue
+    }
+    if (name.endsWith('.f64')) {
+      // Copied out, because a Buffer may sit at any offset in its pool and a Float64Array may not.
+      const doubles = (buffer) => new Float64Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
+      const x = doubles(a)
+      const y = doubles(b)
+      let worst = x.length === y.length ? 0 : Infinity
+      for (let i = 0; i < x.length && worst !== Infinity; i++) worst = Math.max(worst, Math.abs(x[i] - y[i]))
+      console.log(`  ${name}: differs from the checked-in render by at most ${worst}`)
+      if (!(worst <= AUDIO_TOLERANCE)) stale.push(`${name}: ${worst} exceeds ${AUDIO_TOLERANCE}`)
+    } else if (!a.equals(b)) {
+      stale.push(`${name}: differs`)
+    }
+  }
+  rmSync(fixtures, { recursive: true, force: true })
+  if (stale.length) {
+    console.error(`conformance/fixtures is out of date with the driftbox submodule:\n  ${stale.join('\n  ')}`)
+    process.exit(1)
+  }
+  console.log(`fixtures are current with driftbox ${git('rev-parse', '--short', 'HEAD')}`)
+  process.exit(0)
+}
 
 console.log(`fixtures written from driftbox ${git('rev-parse', '--short', 'HEAD')}: ${SONGS.length} songs${full ? ', with whole-song plans' : ''}`)
