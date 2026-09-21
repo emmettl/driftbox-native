@@ -158,18 +158,18 @@ there. Things learned by measuring rather than reading:
   127 frames before a note; a sequencer that schedules to the sample, as this one will, has no
   such window. (Scheduled all up front, as the reference's *stem* export does, every overlapped
   sweep is cancelled before it plays at all — a bug there, reported.)
-- **The reference starts every oscillator at the wrong pitch, and this does not.** A hit almost
+- **The reference started every oscillator at the wrong pitch, and no longer does.** A hit almost
   never starts on the first frame of a render quantum, and when it does not, Chromium — for the
   rest of that quantum — reads the oscillator's pitch from the *start of the quantum* instead of
-  from where the oscillator started. One that begins 36 frames into a quantum plays 36 frames at
-  440Hz, an `OscillatorNode`'s default, then its pitch envelope 36 frames early, and is right again
-  at the next quantum. Measured on a bare sine at six start times, and exact. (A buffer's playback
-  rate is read once per quantum, so the 909's cymbals start at the wrong speed for the same
-  stretch.) It is why the reference's own notes record a closed hat's peak moving between 0.67 and
-  3.97 "purely with where the hit falls inside a quantum". The delays and phase shifts elsewhere
-  are kept because they are the same every time; this is different on every hit and no two plays
-  agree, so the engine does not do it. `emulatesBrowserSourceStart` turns it on for the
-  comparisons, which without it are at 0dB.
+  from where the oscillator started. The reference only scheduled a pitch, so what got read was
+  the node's default: a hit 36 frames into a quantum played 36 frames of 440Hz, and the 909's
+  cymbals began at the wrong speed. Measured on a bare sine at six start times, and exact; it is
+  what the reference's notes had recorded, unexplained, as a closed hat's peak moving between 0.67
+  and 3.97 "purely with where the hit falls inside a quantum". Found here, fixed there in
+  driftbox#299 by setting the node's value as well. What is left is small: a pitch *envelope* is
+  still read early for that one quantum, so a kick's drop arrives up to 2.6ms ahead. The engine
+  does not do that either — it differs on every hit, and no two plays agree — and
+  `emulatesBrowserSourceStart` turns it on for the comparisons.
 - **Two single-precision details in how noise is read.** An oscillator starts at the top of its
   cycle on its first frame however late that frame is, where a buffer starts a fraction of a frame
   in. And a buffer's start offset goes through single precision before it is rounded to a frame:
