@@ -47,7 +47,7 @@ public struct FilterSpec: Equatable, Sendable {
   }
 }
 
-public enum Waveform: Equatable, Sendable {
+public enum Waveform: Hashable, Sendable {
   case sine, triangle, square, sawtooth
 }
 

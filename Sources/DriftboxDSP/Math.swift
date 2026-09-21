@@ -18,6 +18,7 @@
   @_extern(c, "sin") func sin(_ x: Double) -> Double
   @_extern(c, "cos") func cos(_ x: Double) -> Double
   @_extern(c, "pow") func pow(_ x: Double, _ y: Double) -> Double
+  @_extern(c, "log") func log(_ x: Double) -> Double
 #endif
 
 // `@_noAllocation` refuses a call it cannot see into, and a C library is exactly that. These
@@ -35,6 +36,9 @@ func dbSin(_ x: Double) -> Double { sin(x) }
 
 @_semantics("no_performance_analysis") @inline(never)
 func dbCos(_ x: Double) -> Double { cos(x) }
+
+@_semantics("no_performance_analysis") @inline(never)
+func dbLog(_ x: Double) -> Double { log(x) }
 
 @_semantics("no_performance_analysis") @inline(never)
 func dbPow(_ x: Double, _ y: Double) -> Double { pow(x, y) }

@@ -71,6 +71,39 @@ try {
     }
   }
 
+  // Probes: one kind of node at a time, outside any voice, so that when a voice differs from the
+  // browser there is somewhere smaller to look. Each is a hand-written spec put through the
+  // reference's own `renderVoice`.
+  const ramp = (decay) => [{ to: 1, at: 0.001, curve: 'lin' }, { to: 0, at: decay }]
+  const osc = (type, frequency, extra = {}) => ({ kind: 'osc', type, frequency, gain: 1, amp: ramp(0.3), ...extra })
+  const PROBES = {
+    'square 80Hz': { duration: 0.35, gain: 0.5, sources: [osc('square', 80)] },
+    'square 328Hz': { duration: 0.35, gain: 0.5, sources: [osc('square', 328.4)] },
+    'square 1313Hz': { duration: 0.35, gain: 0.5, sources: [osc('square', 1313.13)] },
+    'triangle 5100Hz': { duration: 0.35, gain: 0.5, sources: [osc('triangle', 5100)] },
+    'sawtooth 220Hz': { duration: 0.35, gain: 0.5, sources: [osc('sawtooth', 220)] },
+    'sine 440Hz': { duration: 0.35, gain: 0.5, sources: [osc('sine', 440)] },
+    'square 80Hz through a band-pass': { duration: 0.35, gain: 0.5, sources: [osc('square', 80)], filter: { type: 'bandpass', frequency: 9400, Q: 1.4 } },
+    'square swept 2000 to 400Hz': { duration: 0.35, gain: 0.5, sources: [osc('square', 2000, { pitch: [{ to: 400, at: 0.1 }] })] },
+    'noise through a swept low-pass': { duration: 0.35, gain: 0.5, sources: [{ kind: 'noise', gain: 1, amp: ramp(0.3), filter: { type: 'lowpass', frequency: 8000, Q: 6, envelope: [{ to: 200, at: 0.25 }] } }] },
+  }
+  mkdirSync(join(out, 'probes'), { recursive: true })
+  const probes = []
+  for (const [name, spec] of Object.entries(PROBES)) {
+    const frames = Math.ceil((spec.duration + 0.05) * SAMPLE_RATE)
+    const encoded = await reference.evaluate(`(async () => {
+      const encode = ${FLOATS_TO_BASE64}
+      const ctx = new OfflineAudioContext(1, ${frames}, ${SAMPLE_RATE})
+      engine.renderVoice(ctx, ${JSON.stringify(spec)}, ctx.destination, 0, 'probe')
+      return encode((await ctx.startRendering()).getChannelData(0))
+    })()`)
+    const samples = floats(encoded)
+    const file = `probes/${name.replaceAll(' ', '-')}.f32`
+    writeFileSync(join(out, file), Buffer.from(samples.buffer))
+    probes.push({ name, spec, sampleRate: SAMPLE_RATE, frames, peak: samples.reduce((peak, value) => Math.max(peak, Math.abs(value)), 0), file })
+  }
+  writeFileSync(join(out, 'probes.json'), `${JSON.stringify(probes, null, 1)}\n`)
+
   writeFileSync(join(out, 'voices.json'), `${JSON.stringify({ chromium: reference.product, renders: manifest }, null, 1)}\n`)
   const worst = Math.max(...manifest.map((render) => render.selfDifference))
   console.log(`${manifest.length} voice renders from ${reference.product}; Chromium differs from itself by at most ${worst}`)
