@@ -40,9 +40,8 @@ private struct Manifest: Decodable {
   }
   let renders: [Render]
 
-  static func load() throws -> Manifest {
-    try JSONDecoder().decode(
-      Manifest.self, from: Data(contentsOf: generated.appendingPathComponent("voices.json")))
+  static func load(_ name: String) throws -> Manifest {
+    try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: generated.appendingPathComponent(name)))
   }
 }
 
@@ -66,7 +65,11 @@ struct VoiceAudioTests {
       }
       return false
     }
-    return hasEdges ? -75 : -100
+    if hasEdges { return -75 }
+    // Drive is a steep curve — a slope of 13 at the 909 kick's default — so whatever small
+    // difference reaches it leaves some 22dB larger. Measured at -98dB on that kick.
+    if let drive = spec.drive, drive > 0 { return -90 }
+    return -100
   }
 
   @Test func theAudioFixturesAreThereWhenTheyMustBe() {
@@ -76,19 +79,13 @@ struct VoiceAudioTests {
   /// Each voice, rendered here and in Chromium, and subtracted.
   @Test(.enabled(if: isGenerated))
   func voicesSoundLikeTheReference() throws {
-    var compared = 0
-    var waiting: [String: String] = [:]
+    var compared = Set<String>()
     var report = ""
     var renderer = VoiceRenderer(sampleRate: 48000)
-    for render in try Manifest.load().renders where render.case != "boundary" {
+    for render in try Manifest.load("voices.json").renders {
+      #expect(render.sampleRate == renderer.sampleRate)
       let spec = try render.spec()
-      guard
-        render.sampleRate == renderer.sampleRate,
-        let mine = renderer.render(spec, voiceId: render.voice, frames: render.frames)
-      else {
-        waiting[render.voice] = VoiceRenderer.unsupported(spec)
-        continue
-      }
+      let mine = renderer.render(spec, voiceId: render.voice, frames: render.frames)
       let reference = try render.reference()
       #expect(reference.count == mine.count)
       if let directory = ProcessInfo.processInfo.environment["DRIFTBOX_WRITE"] {
@@ -102,43 +99,40 @@ struct VoiceAudioTests {
       #expect(
         decibels <= Self.toleranceDecibels(for: spec),
         "\(render.voice) \(render.case) is \(decibels)dB from the reference")
-      compared += 1
+      compared.insert(render.voice)
       report += "\(render.voice) \(render.case): \(String(format: "%.1f", decibels))dB\n"
     }
     if ProcessInfo.processInfo.environment["DRIFTBOX_REPORT"] != nil { print(report) }
-
-    // The renderer is being built one kind of node at a time. This is the list of what it renders
-    // today; a voice leaves `waiting` by being compared, never by being skipped quietly.
-    #expect(compared == 19 * 4)
-    #expect(
-      waiting.keys.sorted() == ["909.bd", "909.cp", "909.sd"])
+    #expect(compared.count == 22)
   }
 
-  /// A place where the reference is wrong, kept so that it is known rather than rediscovered.
-  ///
-  /// At colour 0.9 the 808 clap's tail is due to start 5e-13 of a frame after frame 2160. Chromium
-  /// rounds the *source* onto frame 2160, but the gain envelope's first event is still that sliver
-  /// in the future — and before its first event a `GainNode` sits at its default of 1. So one frame
-  /// of noise goes out at full level: a click, some 40 times louder than anything around it, that
-  /// the band-pass then rings on. It depends on the knob, the sample rate and the hit's start time
-  /// all lining up, which is why it has gone unheard.
-  ///
-  /// This renderer starts the tail silent, as the envelope says. If this test ever fails because
-  /// the two agree, the reference has been fixed and the test should go.
+  /// Every voice again with its pan knob off centre, into a stereo context: the mono renders
+  /// cannot tell left from right.
   @Test(.enabled(if: isGenerated))
-  func theReferenceClicks() throws {
-    let render = try #require(try Manifest.load().renders.first { $0.case == "boundary" })
-    let spec = try render.spec()
-    var renderer = VoiceRenderer(sampleRate: render.sampleRate)
-    let rendered = renderer.render(spec, voiceId: render.voice, frames: render.frames)
-    let mine = try #require(rendered)
-    let reference = try render.reference()
+  func pannedVoicesSoundLikeTheReference() throws {
+    var renderer = VoiceRenderer(sampleRate: 48000)
+    let renders = try Manifest.load("stereo.json").renders
+    #expect(renders.count == 22)
+    for render in renders {
+      let spec = try render.spec()
+      let mine = renderer.renderStereo(spec, voiceId: render.voice, frames: render.frames)
+      let reference = try render.reference()
+      #expect(reference.count == render.frames * 2)
 
-    let boundary = 2160
-    let before =
-      zip(mine[..<boundary], reference[..<boundary]).map { abs(Double($0) - Double($1)) }.max() ?? 1
-    #expect(before < 1e-6, "identical until the tail is due")
-    #expect(abs(mine[boundary]) < 1e-5, "silent on the frame before the tail starts")
-    #expect(abs(reference[boundary]) > 0.01, "the reference lets a frame through at full level")
+      var worst = 0.0
+      for frame in 0..<render.frames {
+        worst = max(worst, abs(Double(mine.left[frame]) - Double(reference[frame * 2])))
+        worst = max(worst, abs(Double(mine.right[frame]) - Double(reference[frame * 2 + 1])))
+      }
+      let decibels = worst > 0 ? 20 * log10(worst / render.peak) : -Double.infinity
+      #expect(
+        decibels <= Self.toleranceDecibels(for: spec),
+        "\(render.voice) panned is \(decibels)dB from the reference")
+
+      // Left of centre, so the left side is the louder one.
+      let left = mine.left.map(abs).max() ?? 0
+      let right = mine.right.map(abs).max() ?? 0
+      #expect(left > right)
+    }
   }
 }

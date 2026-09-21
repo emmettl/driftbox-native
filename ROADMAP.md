@@ -29,11 +29,10 @@ gone native at all.
    faithful form and builds arrays as it goes, so it is not what the render thread will call —
    phase 4 plans from a song compiled ahead of time into indices and fixed storage, and checks
    that against this. The editing half of `pattern.ts` arrives with the editor.
-2. **DSP and the drum voices.** ← *here.* Done so far: the browser-rendered reference, the
-   parameter timeline, the biquad, all 22 voices as data (exact), and a renderer for wavetable
-   oscillators, noise (resampled too), envelopes and filters — 19 voices, within -100dB of
-   Chromium, or -75dB where there are squares. Still to come: the 2x-oversampled waveshaper, which
-   is the 909's kick, snare and clap, and pan. Then a listening pass.
+2. **DSP and the drum voices.** ← *here.* All 22 voices render, in stereo, within tolerance of
+   Chromium: the parameter timeline, the biquad, wavetable oscillators, noise (resampled too),
+   the 2x-oversampled waveshaper and pan. What is left is the listening pass — which needs
+   something to listen with, so it comes with the offline song render in phase 3.
    What was planned: `ParamTimeline` — the Web Audio automation calls, per sample —
    then biquad, oscillator, noise, and the `VoiceSpec` interpreter. The 22 voices are data handed
    to one interpreter, so this is one interpreter and a set of small functions rather than 22
