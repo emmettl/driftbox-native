@@ -47,17 +47,18 @@ gone native at all.
    catalogue uses and which the renderer refuses rather than ignores.
    What was planned: Done when whole songs match
    `renderMix` by spectral fingerprint.
-4. **A real-time host on the Mac.** ← *here.* In slices, each real-time form held to its offline
-   one rather than to the browser again. Done so far: `VoicePool`, the drum voices for a render
-   thread — fixed slots, everything allocated up front, `render` marked `@_noAllocation` — which
-   is `VoiceRenderer` **to the bit**, chokes included. Next: the 303, a compiled song and a
-   sequencer that runs inside the render call, the partitioned convolver the reverb needs, and
-   then the `AUAudioUnit` and its rings.
+4. ~~**A real-time host on the Mac.**~~ Done, bar two things. Every real-time form is held to
+   its offline one rather than to the browser again: the drum voices and the 303 to the bit,
+   the reverb within single precision, the whole engine within -90dB. `driftbox-play` hosts the
+   engine as an `AUAudioUnit` in an `AVAudioEngine` and plays the catalogue. Carried forward: the
+   ring back to the interface carries position and a playing flag but not yet *events* (which
+   voice, accents, slides, sections) for scenes to react to; and the reverb wants a non-uniform
+   partitioning before it is cheap.
    What was planned: `AUAudioUnit` from the start, sequencing sample-accurately
    inside the render block, lock-free rings both ways. The ring back to the interface carries
    *events* — which voice, accents, slides, sections — not only levels, so scenes can react to
    what was played rather than to a spectrum. Done when a bare player plays the catalogue.
-5. **The editor.** Sequencer, voice and bass panels, pattern tools, arrangement, effects, the
+5. **The editor.** ← *next.* Sequencer, voice and bass panels, pattern tools, arrangement, effects, the
    pad, the library, keys. Document-based, undo, CoreMIDI including clock follow, stems.
 6. **Visuals.** A thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not

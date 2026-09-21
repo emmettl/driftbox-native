@@ -28,6 +28,9 @@ let package = Package(
 
     // A song document in, a WAV file out: something to listen to.
     .executableTarget(name: "driftbox-render", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
+    // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine.
+    .executableTarget(
+      name: "driftbox-play", dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument"]),
 
     // Finds and reads `conformance/fixtures` for every test target.
     .target(name: "ConformanceSupport", dependencies: ["DriftboxDocument"], path: "Tests/ConformanceSupport"),
@@ -38,6 +41,9 @@ let package = Package(
     .testTarget(
       name: "DriftboxEngineTests",
       dependencies: ["DriftboxEngine", "DriftboxSeq", "DriftboxDocument", "ConformanceSupport"]),
+    .testTarget(
+      name: "DriftboxHostTests",
+      dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "ConformanceSupport"]),
     .testTarget(
       name: "DriftboxDocumentTests",
       dependencies: ["DriftboxDocument", "DriftboxSeq", "ConformanceSupport"]),

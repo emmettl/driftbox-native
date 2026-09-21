@@ -25,7 +25,7 @@ public struct SongEngine: ~Copyable {
   let scratch: UnsafeMutablePointer<Float>
 
   /// The song being played, owned by whoever loaded it. Nil plays silence.
-  var song: UnsafeMutablePointer<CompiledSong>?
+  public private(set) var song: UnsafeMutablePointer<CompiledSong>?
   /// The engine's clock, in frames since it was made. Never stops, playing or not.
   public private(set) var frame = 0
   public private(set) var isPlaying = false
@@ -94,8 +94,9 @@ public struct SongEngine: ~Copyable {
     }
   }
 
-  /// Where the song is, in frames from its start, or nil when nothing is loaded.
-  public var songFrame: Int? { song == nil ? nil : frame - passStart }
+  /// Where the song is, in frames from its start, or -1 when nothing is loaded.
+  @_noAllocation
+  public func songFrame() -> Int { song == nil ? -1 : frame - passStart }
 
   // MARK: - Rendering
 

@@ -38,7 +38,8 @@ public struct CompiledSong: ~Copyable {
   /// Choke groups by name, so a hat can be told which other hats to silence.
   static let chokeGroups = ["808.hats", "909.hats"]
 
-  public init(_ song: Song, sampleRate: Double, pool: borrowing VoicePool) {
+  public init(_ song: Song, preparer: HitPreparer) {
+    let sampleRate = preparer.sampleRate
     self.sampleRate = sampleRate
     let plan = song.plan(bars: song.chain.isEmpty ? 1 : song.bars)
     let seconds = plan.last.map { $0.time + $0.stepSeconds } ?? 0
@@ -56,7 +57,7 @@ public struct CompiledSong: ~Copyable {
         guard let voice = voice(id: hit.voiceId) else { continue }
         let group = voice.choke.flatMap { Self.chokeGroups.firstIndex(of: $0) }.map { UInt8($0 + 1) } ?? 0
         prepared.append(
-          pool.prepare(
+          preparer.prepare(
             voice.build(hit.params, accent: hit.accent), voiceId: voice.id, at: hit.time, sends: hit.sends,
             chokeGroup: group))
       }

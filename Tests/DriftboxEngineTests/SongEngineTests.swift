@@ -19,7 +19,7 @@ struct SongEngineTests {
   static func render(_ song: Song, seconds: Double, block: Int) -> (left: [Float], right: [Float]) {
     var engine = SongEngine(sampleRate: sampleRate, voiceCapacity: 32)
     let compiled = UnsafeMutablePointer<CompiledSong>.allocate(capacity: 1)
-    compiled.initialize(to: CompiledSong(song, sampleRate: sampleRate, pool: engine.voices))
+    compiled.initialize(to: CompiledSong(song, preparer: engine.voices.preparer))
     defer {
       compiled.deinitialize(count: 1)
       compiled.deallocate()
