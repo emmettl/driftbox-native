@@ -70,8 +70,22 @@
     /// Whether the visuals pane is showing.
     var showsVisuals = true
     /// Where the song came from, if a file; where Save goes.
-    var fileURL: URL?
-    var undoManager: UndoManager?
+    private(set) var fileURL: URL?
+    /// Whether the song has changed since it was opened or last saved: the window's edited dot,
+    /// and what makes closing over the work ask first.
+    private(set) var isEdited = false
+    /// What to call the song: the catalogue entry's name, or the file's. A window with no song in
+    /// it is not an untitled document, it is the application waiting to be given one.
+    var documentName: String { current?.name ?? "Driftbox" }
+    var undoManager: UndoManager? {
+      didSet { refreshUndo() }
+    }
+    /// The manager's own state, mirrored here. A menu built straight from `UndoManager` would be
+    /// as stale as whenever something else happened to redraw it: `canUndo` is not observable.
+    private(set) var canUndo = false
+    private(set) var canRedo = false
+    private(set) var undoTitle = "Undo"
+    private(set) var redoTitle = "Redo"
 
     private let audio = AVAudioEngine()
     private var unit: DriftboxAudioUnit?
@@ -80,6 +94,11 @@
     // MARK: MIDI
 
     private var midi: MIDIInput?
+    /// Whether anything arriving on a MIDI cable is played at all. The input listens to every
+    /// source there is and cannot be told to listen to fewer, so this is the whole of the choice:
+    /// a machine that streams notes at a sequencer it was not meant to be driving can be silenced
+    /// without unplugging it.
+    var listensToMIDI = true
     /// Follow an external MIDI clock: tempo, start, stop and position. Off unless asked for,
     /// because plenty of gear streams clock the moment it is plugged in, and a sequencer that
     /// handed its transport to whatever is on the cable would be taking an instrument away.
@@ -198,7 +217,7 @@
     /// The web app's keys: notes from 33 (A1) play 303 A across two octaves; below that, the drum
     /// voices the grid shows, from note 21 up. A note's velocity past 0.8 is an accent.
     private func midiNote(_ note: Int, velocity: Double) {
-      guard velocity > 0 else { return }
+      guard listensToMIDI, velocity > 0 else { return }
       let accent = velocity >= 0.8
       if note >= 33 {
         playNote(semitone: note - 33 - 12, accent: accent)
@@ -208,7 +227,7 @@
     }
 
     private func midiClock(_ message: ClockMessage, at time: Double) {
-      guard followsClock, song != nil else { return }
+      guard listensToMIDI, followsClock, song != nil else { return }
       let local = LocalClockState(
         bpm: followedBPM ?? songBPM,
         ticks: Double(songFrame) / sampleRate * (followedBPM ?? songBPM) * 24 / 60,
@@ -389,11 +408,7 @@
 
     func open(_ entry: CatalogueEntry) {
       guard let loaded = Catalogue.song(entry.id) else { return }
-      current = entry
-      fileURL = nil
-      undoManager?.removeAllActions()
-      song = loaded
-      unit?.load(loaded)
+      take(loaded, as: entry, from: nil)
       startEngine()
     }
 
@@ -405,14 +420,44 @@
         error = "\(url.lastPathComponent) is not a song"
         return
       }
-      current = CatalogueEntry(
-        id: url.path, name: url.deletingPathExtension().lastPathComponent, blurb: "",
-        visual: loaded.visual ?? "")
+      // A document's name is its file's, stripped of both halves of `.song.json`.
+      var name = url.deletingPathExtension().lastPathComponent
+      if name.hasSuffix(".song") { name.removeLast(5) }
+      let entry = CatalogueEntry(id: url.path, name: name, blurb: "", visual: loaded.visual ?? "")
+      take(loaded, as: entry, from: url)
+      startEngine()
+    }
+
+    /// An empty song to start from. It arrives with the 909's core voices and a 303 line already
+    /// laid out, because the grid draws the lanes a pattern has and a song with none is a wall.
+    func new() {
+      var pattern = DriftboxSeq.Pattern(id: "pattern-1", name: "Pattern 1", length: 16)
+      for voiceId in ["909.bd", "909.sd", "909.cp", "909.ch", "909.oh"] {
+        pattern.tracks[voiceId] = [StepValue](repeating: .off, count: 16)
+      }
+      pattern.bass["303.a"] = [BassStep](repeating: .rest, count: 16)
+      var fresh = Song(patterns: [pattern])
+      fresh.chain = [ChainStep(pattern: pattern.id)]
+      let entry = CatalogueEntry(id: "", name: "Untitled", blurb: "", visual: "")
+      take(fresh, as: entry, from: nil)
+    }
+
+    /// Everything that puts a different song in the window: the undo history is the old song's and
+    /// goes with it, and what arrives is unedited whatever the thing it replaced was.
+    private func take(_ loaded: Song, as entry: CatalogueEntry, from url: URL?) {
+      current = entry
       fileURL = url
       undoManager?.removeAllActions()
+      refreshUndo()
       song = loaded
+      isEdited = false
       unit?.load(loaded)
-      startEngine()
+    }
+
+    /// Write the song back where it came from. Nothing without a file: that is Save As's question.
+    func save() {
+      guard let fileURL else { return }
+      save(to: fileURL)
     }
 
     func save(to url: URL) {
@@ -420,6 +465,13 @@
       do {
         try Data(SongCodec.encode(song).utf8).write(to: url)
         fileURL = url
+        isEdited = false
+        // Saving under a new name renames the window with it, as a document's title follows its
+        // file rather than whatever it was called when it was opened.
+        var name = url.deletingPathExtension().lastPathComponent
+        if name.hasSuffix(".song") { name.removeLast(5) }
+        current = CatalogueEntry(
+          id: url.path, name: name, blurb: current?.blurb ?? "", visual: current?.visual ?? "")
       } catch {
         self.error = "\(error)"
       }
@@ -429,6 +481,27 @@
     func seek(toBar bar: Int) {
       guard song != nil else { return }
       unit?.send(.seek(songFrame: Int(timeline.start(ofBar: bar) * sampleRate)))
+    }
+
+    /// Where each entry of the chain begins, in bars. A song with no chain is one pattern playing
+    /// for ever, which is a single section.
+    var sectionBars: [Int] {
+      guard let song, !song.chain.isEmpty else { return [0] }
+      var bar = 0
+      return song.chain.map { entry in
+        defer { bar += max(1, entry.repeat) }
+        return bar
+      }
+    }
+
+    /// Move the transport a chain entry at a time, wrapping at both ends because the chain does.
+    func skip(sections delta: Int) {
+      let starts = sectionBars
+      guard song != nil, !starts.isEmpty else { return }
+      let bar = position?.bar ?? 0
+      let here = starts.lastIndex { $0 <= bar } ?? 0
+      let next = (here + delta % starts.count + starts.count) % starts.count
+      seek(toBar: starts[next])
     }
 
     func play() {
@@ -551,19 +624,48 @@
       return position?.pattern ?? song?.patterns.first
     }
 
-    /// Change the song and have the engine take it up where it is, without stopping. Undoable.
-    func edit(_ change: (inout Song) -> Void) {
+    /// Change the song and have the engine take it up where it is, without stopping. Undoable
+    /// under `name`, which is what the Edit menu offers to undo — "Undo Set Step", not "Undo".
+    func edit(_ name: String = "Edit", _ change: (inout Song) -> Void) {
       guard let before = song else { return }
       var edited = before
       change(&edited)
-      replace(with: edited, undoing: before)
+      replace(with: edited, undoing: before, name: name)
     }
 
-    private func replace(with edited: Song, undoing before: Song) {
+    /// Undo and redo go through here rather than straight at the manager, so that what the menu
+    /// shows is read back afterwards: the manager says nothing when its stack moves.
+    func undo() {
+      undoManager?.undo()
+      refreshUndo()
+    }
+
+    func redo() {
+      undoManager?.redo()
+      refreshUndo()
+    }
+
+    private func refreshUndo() {
+      let undoable = undoManager?.canUndo ?? false
+      let redoable = undoManager?.canRedo ?? false
+      if canUndo != undoable { canUndo = undoable }
+      if canRedo != redoable { canRedo = redoable }
+      let undone = undoManager?.undoActionName ?? ""
+      let redone = undoManager?.redoActionName ?? ""
+      let undo = undone.isEmpty ? "Undo" : "Undo \(undone)"
+      let redo = redone.isEmpty ? "Redo" : "Redo \(redone)"
+      if undoTitle != undo { undoTitle = undo }
+      if redoTitle != redo { redoTitle = redo }
+    }
+
+    private func replace(with edited: Song, undoing before: Song, name: String) {
       song = edited
+      isEdited = true
       undoManager?.registerUndo(withTarget: self) { player in
-        MainActor.assumeIsolated { player.replace(with: before, undoing: edited) }
+        MainActor.assumeIsolated { player.replace(with: before, undoing: edited, name: name) }
       }
+      undoManager?.setActionName(name)
+      refreshUndo()
       let position = songFrame
       unit?.load(edited)
       unit?.send(.seek(songFrame: position))

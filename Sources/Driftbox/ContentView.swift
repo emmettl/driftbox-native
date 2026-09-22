@@ -10,12 +10,16 @@
   struct ContentView: View {
     @Bindable var player: Player
     @Environment(\.undoManager) private var undoManager
+    @AppStorage(Defaults.visuals) private var showsVisuals = true
+
+    /// The File menu's own actions, which the toolbar shares rather than repeats.
+    var files: SongFiles { SongFiles(player: player) }
 
     var body: some View {
       NavigationSplitView {
         List(
           player.entries,
-          selection: Binding(get: { player.current }, set: { if let entry = $0 { player.open(entry) } })
+          selection: Binding(get: { player.current }, set: { if let entry = $0 { files.open(entry) } })
         ) { entry in
           VStack(alignment: .leading, spacing: 2) {
             Text(entry.name).font(.headline)
@@ -59,15 +63,26 @@
       }
       .onChange(of: undoManager, initial: true) { _, manager in player.undoManager = manager }
       .modifier(Keys(player: player))
+      .modifier(Preferences(player: player))
       .focusable()
+      // The window's title is the song's, and the rest of what a document window says about
+      // itself — its file, its proxy icon, its edited dot — is AppKit's to say.
+      .navigationTitle(player.documentName)
+      .background(WindowIdentity(player: player, files: files))
+      // A song dropped on the window opens, as it would on any Mac application that holds one.
+      .dropDestination(for: URL.self) { urls, _ in
+        guard let url = urls.first(where: \.isFileURL) else { return false }
+        files.open(url)
+        return true
+      }
       .toolbar {
+        // No key equivalents here: every one of these is a menu item, and the menu holds the key.
         ToolbarItemGroup {
-          Button("Open…") { openFile() }.keyboardShortcut("o")
-          Button("Save…") { saveFile() }.keyboardShortcut("s").disabled(player.song == nil)
-          Button("Export Mix…") { exportMix() }.keyboardShortcut("e").disabled(player.song == nil)
-          Button("Export Stems…") { exportStems() }.disabled(player.song == nil)
-          Toggle("Visuals", isOn: Binding(get: { player.showsVisuals }, set: { player.showsVisuals = $0 }))
-            .keyboardShortcut("v")
+          Button("Open…") { files.openPanel() }
+          Button("Save") { files.save() }.disabled(player.song == nil)
+          Button("Export Mix…") { files.exportMix() }.disabled(player.song == nil)
+          Button("Export Stems…") { files.exportStems() }.disabled(player.song == nil)
+          Toggle("Visuals", isOn: $showsVisuals)
         }
       }
       .overlay(alignment: .bottom) {
@@ -79,60 +94,12 @@
     }
   }
 
-  extension ContentView {
-    func openFile() {
-      let panel = NSOpenPanel()
-      panel.allowedContentTypes = [.json]
-      panel.allowsMultipleSelection = false
-      if panel.runModal() == .OK, let url = panel.url { player.open(file: url) }
-    }
-
-    /// The whole song, offline, to a WAV file: the same render `driftbox-render` makes.
-    func exportMix() {
-      guard let song = player.song else { return }
-      let panel = NSSavePanel()
-      panel.allowedContentTypes = [.wav]
-      panel.nameFieldStringValue = (player.current?.name ?? "song") + ".wav"
-      guard panel.runModal() == .OK, let url = panel.url else { return }
-      let sampleRate = player.sampleRate
-      Task.detached {
-        let audio = SongRenderer.render(song, options: .init(sampleRate: sampleRate))
-        try? WAV.data(audio, sampleRate: sampleRate).write(to: url)
-      }
-    }
-
-    /// One WAV per voice the song uses, into a folder: each voice alone with its sends.
-    func exportStems() {
-      guard let song = player.song else { return }
-      let panel = NSOpenPanel()
-      panel.canChooseDirectories = true
-      panel.canChooseFiles = false
-      panel.canCreateDirectories = true
-      panel.prompt = "Export Here"
-      guard panel.runModal() == .OK, let folder = panel.url else { return }
-      let sampleRate = player.sampleRate
-      let name = player.current?.name ?? "song"
-      Task.detached {
-        for voiceId in SongRenderer.voicesUsed(song) {
-          var options = SongRenderer.Options(sampleRate: sampleRate)
-          options.only = [voiceId]
-          let audio = SongRenderer.render(song, options: options)
-          let file = folder.appendingPathComponent("\(name) - \(voiceId).wav")
-          try? WAV.data(audio, sampleRate: sampleRate).write(to: file)
-        }
-      }
-    }
-
-    func saveFile() {
-      let panel = NSSavePanel()
-      panel.allowedContentTypes = [.json]
-      panel.nameFieldStringValue = (player.current?.name ?? "song") + ".song.json"
-      if panel.runModal() == .OK, let url = panel.url { player.save(to: url) }
-    }
-  }
-
   struct TransportBar: View {
     let player: Player
+    // The clock is remembered between launches, so these write the preference and the window
+    // mirrors it onto the player; the menu's own switches write the same one.
+    @AppStorage(Defaults.sendsClock) private var sendsClock = false
+    @AppStorage(Defaults.clockDestination) private var destination = ""
 
     var body: some View {
       HStack(spacing: 16) {
@@ -157,18 +124,13 @@
         if let bpm = player.followedBPM {
           Text(String(format: "← %.1f", bpm)).font(.caption.monospacedDigit()).foregroundStyle(.orange)
         }
-        Toggle("clock", isOn: Binding(get: { player.sendsClock }, set: { player.sendsClock = $0 }))
+        Toggle("clock", isOn: $sendsClock)
           .toggleStyle(.button).font(.caption)
           .help("Send MIDI clock out: start, six ticks a sixteenth, stop")
-        Picker(
-          "Clock out",
-          selection: Binding(get: { player.clockDestination }, set: { player.clockDestination = $0 })
-        ) {
+        Picker("Clock out", selection: $destination) {
           // Driftbox's own port is always there, whether or not anything is plugged in.
-          Text("virtual").tag(MIDIOutput.Destination.virtual)
-          ForEach(player.clockDestinations, id: \.self) { name in
-            Text(name).tag(MIDIOutput.Destination.port(name))
-          }
+          Text("virtual").tag("")
+          ForEach(player.clockDestinations, id: \.self) { name in Text(name).tag(name) }
         }
         .labelsHidden().frame(width: 120).font(.caption)
         if let song = player.song {
@@ -303,7 +265,7 @@
     }
 
     func cycle() {
-      player.edit { song in
+      player.edit("Set Step") { song in
         guard let at = song.patterns.firstIndex(where: { $0.id == patternId }) else { return }
         song.patterns[at] = song.patterns[at].cyclingStep(voiceId, at: index)
       }

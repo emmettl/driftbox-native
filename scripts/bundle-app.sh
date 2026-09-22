@@ -23,6 +23,31 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>0.1</string>
   <key>LSMinimumSystemVersion</key><string>15.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <!-- A song is JSON, and claiming every .json file on the machine would be rude, so songs get a
+       type of their own under the bundle identifier which conforms to JSON, so that whatever
+       could read one still can. Declaring it is what lets a double-click in the Finder and a drop
+       on the dock icon reach the app at all. -->
+  <key>UTExportedTypeDeclarations</key>
+  <array><dict>
+    <key>UTTypeIdentifier</key><string>app.driftbox.native.song</string>
+    <key>UTTypeDescription</key><string>Driftbox Song</string>
+    <key>UTTypeConformsTo</key><array><string>public.json</string></array>
+    <key>UTTypeTagSpecification</key><dict>
+      <key>public.filename-extension</key><array><string>song.json</string></array>
+    </dict>
+  </dict></array>
+  <key>CFBundleDocumentTypes</key>
+  <array><dict>
+    <key>CFBundleTypeName</key><string>Driftbox Song</string>
+    <key>CFBundleTypeRole</key><string>Editor</string>
+    <key>LSHandlerRank</key><string>Owner</string>
+    <key>LSItemContentTypes</key><array><string>app.driftbox.native.song</string></array>
+  </dict></array>
 </dict></plist>
 PLIST
+# An unsigned bundle sitting in a build directory is not something the system goes looking for, so
+# the type it has just declared is announced by hand. Nothing is installed; it is registered where
+# it stands, which is what a local build wants.
+lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+[ -x "$lsregister" ] && "$lsregister" -f "$app"
 echo "built $app"

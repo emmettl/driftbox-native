@@ -46,7 +46,7 @@
         Text(voice.name).font(.headline)
         ForEach(Array(VoiceParams.names.enumerated()), id: \.offset) { knob, name in
           Knob(name: name, value: params[knob]) { value in
-            player.edit { song in
+            player.edit("Set \(name)") { song in
               var edited = song.kit.params[voice.id] ?? VoiceParams()
               edited[knob] = value
               song.kit.params[voice.id] = edited
@@ -56,7 +56,7 @@
         Divider()
         ForEach(Array(SendLevels.names.enumerated()), id: \.offset) { knob, name in
           Knob(name: name, value: sends[knob]) { value in
-            player.edit { song in
+            player.edit("Set \(name)") { song in
               var edited = song.kit.sends[voice.id] ?? SendLevels()
               edited[knob] = value
               song.kit.sends[voice.id] = edited
@@ -102,7 +102,7 @@
         Text("Effects").font(.headline)
         ForEach(Array(FxParams.names.enumerated()), id: \.offset) { knob, name in
           Knob(name: name, value: fx[knob]) { value in
-            player.edit { song in song.fx[knob] = value }
+            player.edit("Set \(name)") { song in song.fx[knob] = value }
           }
         }
       }
