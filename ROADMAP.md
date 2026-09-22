@@ -59,8 +59,12 @@ gone native at all.
    inside the render block, lock-free rings both ways. The ring back to the interface carries
    *events* — which voice, accents, slides, sections — not only levels, so scenes can react to
    what was played rather than to a spectrum. Done when a bare player plays the catalogue.
-5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable for now, and
-   never yet looked at — every slice was run and stayed up, and nobody has seen it. In so far:
+5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable wrapped into a
+   bundle by `scripts/bundle-app.sh` (which the resource bundle needs, or `Bundle.module`
+   asserts). Looked at, once: the first sight was a transport pushed above the window and a
+   grid centred in its scroll view, both fixed — the visuals pane at a fixed height, the panel
+   column scrolling, the grid pinned top-left — and now it plays the catalogue with the scene
+   running and the voice names flashing. In so far:
    the catalogue as a library; open and save of the web app's documents; a transport with the
    bar, step and pattern it is on, and the chain as a strip to jump around; the step grid of the
    pattern playing, live and editable; the 303 grids, with pitch, accent and slide; a panel of
@@ -79,7 +83,8 @@ gone native at all.
    flash on a snare, a horizon that sparkles on hats, a 303 note as a line at its pitch, the
    pad's cursor. Driven from the events ring, the block peaks and the pad, at the display's rate,
    in a pane above the grid. Tested offscreen — dark when quiet, brighter on a kick, fading,
-   different on a note — and, like the rest of the app, not yet seen by anyone. What was planned:
+   different on a note — and seen running above the grid: the ring on each kick, the horizon's
+   sparkle on the hats. What was planned:
    a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.

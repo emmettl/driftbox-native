@@ -15,7 +15,7 @@
     var body: some Scene {
       WindowGroup("Driftbox") {
         ContentView(player: player)
-          .frame(minWidth: 900, minHeight: 560)
+          .frame(minWidth: 1100, minHeight: 720)
       }
     }
   }
