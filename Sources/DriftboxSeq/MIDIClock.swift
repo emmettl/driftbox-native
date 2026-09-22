@@ -44,6 +44,34 @@ public enum ClockMessage: Equatable, Sendable {
   }
 }
 
+/// One outgoing clock message placed on the host's own timeline.
+public struct ScheduledClock: Equatable, Sendable {
+  public var message: ClockMessage
+  public var time: Double
+
+  public init(_ message: ClockMessage, at time: Double) {
+    self.message = message
+    self.time = time
+  }
+}
+
+/// Start from the top, or locate and continue when playback begins elsewhere in the song.
+/// Starting anywhere but the first step has to say where before it says go, or everything
+/// following the clock plays the right tempo from the wrong bar.
+public func scheduleClockStart(step: Int, at time: Double) -> [ScheduledClock] {
+  let position = max(0, step)
+  if position == 0 { return [ScheduledClock(.start, at: time)] }
+  return [ScheduledClock(.position(step: position), at: time), ScheduledClock(.continue, at: time)]
+}
+
+/// Six MIDI clock pulses across one sixteenth-note step, which is what twenty-four to the
+/// quarter comes to.
+public func scheduleClockStep(at time: Double, stepSeconds: Double) -> [ScheduledClock] {
+  guard time.isFinite, stepSeconds.isFinite, stepSeconds > 0 else { return [] }
+  let tickSeconds = stepSeconds / Double(ticksPerStep)
+  return (0..<ticksPerStep).map { ScheduledClock(.tick, at: time + Double($0) * tickSeconds) }
+}
+
 public struct ClockState: Equatable, Sendable {
   /// Nil until enough ticks have arrived to say.
   public var bpm: Double?
