@@ -122,7 +122,14 @@ gone native at all.
    removable — laid flat by the rotation alone the triangles face down and a front-side
    material draws nothing, so it is doing double duty as a winding fix — which makes following
    it with the outline the safe direction. Fixed in the web as emmettl/driftbox#300 and here
-   at the same time, so the two do not disagree while that waits. The other sixteen are three.js
+   at the same time, so the two do not disagree while that waits.
+
+   The Jumpman port found a second one, not yet fixed anywhere. Monsters and pick-ups are
+   drawn at `m.x - scroll - across / 2 - 4` but spawn their shards at `m.x - scroll + c.x - 4`,
+   missing the `- across / 2`, so every stomp and every collect throws its pieces half the
+   visible width to the right of the thing they came from — off the edge, in practice, which
+   is why nobody has seen the effect. The runner's own death shards use his draw origin and
+   are right, which is presumably why it went unnoticed. The port reproduces it. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
