@@ -155,8 +155,18 @@ gone native at all.
    main window is an honest preview of the output rather than a second scene that looks
    similar. And both the song and the visuals window back where they were at the next launch.
 
-   Left: settings for the audio output device and sample rate, which the engine does not offer
-   a choice of yet; the pattern being edited, which restoration does not put back; and more
+   The output device is chosen in Settings too, and kept to: an interface that is unplugged
+   plays through the system's device until it is back, and says so rather than going quiet.
+   Doing it turned up two older faults. `AVAudioEngine` stops itself whenever its device
+   changes and nothing started it again, so the sound went at the first change of output and
+   stayed gone. And stopping the engine deallocates every unit in it, which threw away the
+   engine host and the song with it; the unit now keeps its host across a stop and a start, and
+   makes a new one only if the sample rate really has changed, carrying the song over at the
+   same time rather than the same frame. There is no sample rate setting, on purpose: the engine
+   runs at 48 kHz whatever the device does, the output converts, and a choice there would
+   change nothing anyone could hear.
+
+   Left: the pattern being edited, which restoration does not put back; and more
    than one song open at once, which is deliberately not done. It is not a scene change: the
    player owns the audio engine, the MIDI ports and the clock, and two of them would be two
    engines fighting over one output and two sources both called Driftbox Clock. The honest
