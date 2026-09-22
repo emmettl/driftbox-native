@@ -7,7 +7,9 @@
 
   /// The MIDI ends, which nothing else reaches: the encoding on its own, and then the whole way
   /// round — out through the virtual source and back in through the input, which is the only
-  /// honest way to test either without a cable.
+  /// honest way to test either without a cable. One at a time, because every test here talks to
+  /// the one MIDI server on the machine and publishes a source under the same name.
+  @Suite(.serialized)
   struct MIDITests {
     @Test func everyClockMessageBecomesTheRightPacket() throws {
       // One 32-bit word: the message type in the top nibble, then the status byte and its two
@@ -80,6 +82,75 @@
           return
         }
         remaining = remaining[(at + 1)...]
+      }
+    }
+
+    /// A source that has been ignored delivers nothing, and the same source heard again
+    /// delivers. By name, which is how it is stored, through the real server, which is the
+    /// only place the tag that says where a message came from is ever written.
+    @Test func anIgnoredSourceIsNotHeard() async throws {
+      let input = MIDIInput()
+      let announced = Announced()
+      input.onSourcesChange = { names in announced.set(names) }
+      // Made after the input, so it arrives as a change rather than as part of the first list.
+      let output = MIDIOutput()
+      let received = Received()
+      input.onClock = { message, _ in received.add(message) }
+      try await Task.sleep(for: .milliseconds(400))
+      let name = try #require(announced.names?.first { $0.contains("Driftbox Clock") })
+      #expect(input.sources.contains(name))
+
+      input.ignoring = [name]
+      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: MIDIOutput.now()))
+      try await Task.sleep(for: .milliseconds(300))
+      #expect(!received.all().contains(.stop), "ignored, so nothing")
+
+      input.ignoring = []
+      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: MIDIOutput.now()))
+      try await Task.sleep(for: .milliseconds(300))
+      #expect(received.all().contains(.stop), "heard again")
+    }
+
+    /// A hidden source is not there at all: not listed, and not heard. This is how the app's
+    /// own output is kept out of its own input, by ID rather than by name, because another copy
+    /// of Driftbox has a source with the same name and is a perfectly good thing to follow.
+    @Test func aHiddenSourceIsNeitherListedNorHeard() async throws {
+      let output = MIDIOutput()
+      let input = MIDIInput()
+      let received = Received()
+      input.onClock = { message, _ in received.add(message) }
+      try await Task.sleep(for: .milliseconds(300))
+      let id = try #require(output.sourceID)
+      let before = input.sources.filter { $0.contains("Driftbox Clock") }.count
+      #expect(before >= 1)
+
+      input.hiding = [id]
+      #expect(input.sources.filter { $0.contains("Driftbox Clock") }.count == before - 1)
+      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: MIDIOutput.now()))
+      try await Task.sleep(for: .milliseconds(300))
+      #expect(!received.all().contains(.stop))
+
+      input.hiding = []
+      #expect(input.sources.filter { $0.contains("Driftbox Clock") }.count == before)
+      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: MIDIOutput.now()))
+      try await Task.sleep(for: .milliseconds(300))
+      #expect(received.all().contains(.stop))
+    }
+
+    final class Announced: @unchecked Sendable {
+      private var latest: [String]?
+      private let lock = NSLock()
+
+      func set(_ names: [String]) {
+        lock.lock()
+        defer { lock.unlock() }
+        latest = names
+      }
+
+      var names: [String]? {
+        lock.lock()
+        defer { lock.unlock() }
+        return latest
       }
     }
 

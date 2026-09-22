@@ -100,18 +100,28 @@
     // MARK: MIDI
 
     private var midi: MIDIInput?
-    /// Whether anything arriving on a MIDI cable is played at all. The input listens to every
-    /// source there is and cannot be told to listen to fewer, so this is the whole of the choice:
-    /// a machine that streams notes at a sequencer it was not meant to be driving can be silenced
-    /// without unplugging it.
+    /// Whether anything arriving on a MIDI cable is played at all — the switch over the whole of
+    /// it, above the choice of sources below.
     var listensToMIDI = true
+    /// Sources to hear nothing from, by name: a machine that streams notes at a sequencer it was
+    /// not meant to be driving can be silenced without unplugging it, and without silencing the
+    /// keyboard that is meant to.
+    var ignoredMIDISources: Set<String> = [] {
+      didSet { midi?.ignoring = ignoredMIDISources }
+    }
+    /// Every source there is, kept up to date as devices come and go, so a list of them in
+    /// Settings changes while it is open rather than the next time it is.
+    private(set) var midiSources: [String] = []
     /// Follow an external MIDI clock: tempo, start, stop and position. Off unless asked for,
     /// because plenty of gear streams clock the moment it is plugged in, and a sequencer that
     /// handed its transport to whatever is on the cable would be taking an instrument away.
     var followsClock = false {
       didSet {
-        // Following and sending at once is a ring: the virtual source is a source like any other,
-        // so our own ticks come straight back in and the two ends chase each other's tempo.
+        // Following and sending are kept apart. The loop that first made them exclusive — our
+        // own ticks coming back in through our own source — cannot happen any more, because the
+        // input no longer hears that source. What is left is a loop through somebody's MIDI thru,
+        // which is rarer, and relaying a master clock on to other gear, which would be worth
+        // having; which of those wins is a decision about the instrument and has not been made.
         if followsClock, sendsClock { sendsClock = false }
         // Letting go of the clock means the song's own tempo again, in the engine as well as here.
         guard !followsClock, followedBPM != nil else { return }
@@ -125,7 +135,6 @@
     private(set) var followedBPM: Double? {
       didSet { retime() }
     }
-    var midiSources: [String] { midi?.sources ?? [] }
     private var follower = ClockFollower()
     /// The song's own tempo, which following leaves alone: the followed tempo is not written in.
     private var songBPM: Double { song?.bpm ?? 120 }
@@ -187,14 +196,23 @@
         Task { @MainActor in self?.tick() }
       }
       let midi = MIDIInput()
+      midi.ignoring = ignoredMIDISources
       midi.onNote = { [weak self] note, velocity in
         Task { @MainActor in self?.midiNote(note, velocity: velocity) }
       }
       midi.onClock = { [weak self] message, time in
         Task { @MainActor in self?.midiClock(message, at: time) }
       }
+      midi.onSourcesChange = { [weak self] names in
+        Task { @MainActor in self?.midiSources = names }
+      }
+      midiSources = midi.sources
       self.midi = midi
-      clockOut = MIDIOutput()
+      let clockOut = MIDIOutput()
+      // The input never hears the app's own output: it would only ever be the app's own clock
+      // coming back round.
+      midi.hiding = clockOut.sourceID.map { [$0] } ?? []
+      self.clockOut = clockOut
     }
 
     /// A player on an engine of its own: no audio device, no MIDI ports and no timer behind the

@@ -7,6 +7,10 @@
   enum Defaults {
     static let visuals = "visuals.run"
     static let listensToMIDI = "midi.listens"
+    /// The sources not listened to, one name to a line. Stored as what is ignored rather than
+    /// what is heard, so a device plugged in for the first time is heard, as every source was
+    /// before there was a choice.
+    static let ignoredMIDI = "midi.ignored"
     static let sendsClock = "clock.sends"
     static let clockDestination = "clock.destination"
     static let outputOpen = "visuals.window.open"
@@ -34,6 +38,7 @@
     let player: Player
     @AppStorage(Defaults.visuals) private var visuals = true
     @AppStorage(Defaults.listensToMIDI) private var listens = true
+    @AppStorage(Defaults.ignoredMIDI) private var ignored = ""
     @AppStorage(Defaults.sendsClock) private var sends = false
     @AppStorage(Defaults.clockDestination) private var destination = ""
 
@@ -41,6 +46,9 @@
       content
         .onChange(of: visuals, initial: true) { _, on in player.showsVisuals = on }
         .onChange(of: listens, initial: true) { _, on in player.listensToMIDI = on }
+        .onChange(of: ignored, initial: true) { _, names in
+          player.ignoredMIDISources = Set(names.split(separator: "\n").map(String.init))
+        }
         .onChange(of: destination, initial: true) { _, name in
           player.clockDestination = MIDIOutput.Destination(stored: name)
         }
@@ -55,6 +63,7 @@
     let player: Player
     @AppStorage(Defaults.visuals) private var visuals = true
     @AppStorage(Defaults.listensToMIDI) private var listens = true
+    @AppStorage(Defaults.ignoredMIDI) private var ignored = ""
     @AppStorage(Defaults.sendsClock) private var sends = false
     @AppStorage(Defaults.clockDestination) private var destination = ""
 
@@ -66,12 +75,13 @@
       Form {
         Section("MIDI In") {
           Toggle("Play notes and follow clock from MIDI", isOn: $listens)
-          // Every source there is, and not a choice among them: the input connects to all of
-          // them, which is one switch and not a list of them.
-          let sources = player.midiSources
-          LabeledContent("Listening to") {
-            Text(sources.isEmpty ? "nothing connected" : sources.joined(separator: ", "))
-              .foregroundStyle(.secondary)
+          // One switch per source, under the one over all of them. A source that is gone keeps
+          // its choice, so plugging it back in does not undo it.
+          if player.midiSources.isEmpty {
+            Text("Nothing connected").foregroundStyle(.secondary)
+          }
+          ForEach(player.midiSources, id: \.self) { name in
+            Toggle(name, isOn: hearing(name)).disabled(!listens)
           }
         }
         Section("Clock Out") {
@@ -88,6 +98,17 @@
       .formStyle(.grouped)
       .frame(width: 440)
       .fixedSize()
+    }
+
+    /// Whether `name` is heard, as a switch that writes the stored list of what is not.
+    private func hearing(_ name: String) -> Binding<Bool> {
+      Binding(
+        get: { !ignored.split(separator: "\n").contains { $0 == name } },
+        set: { heard in
+          var names = ignored.split(separator: "\n").map(String.init).filter { $0 != name }
+          if !heard { names.append(name) }
+          ignored = names.sorted().joined(separator: "\n")
+        })
     }
   }
 #endif
