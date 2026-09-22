@@ -89,9 +89,15 @@ gone native at all.
    `AnalyserNode` on a mono tap of the mix, and a score position read from the engine at the
    display's rate. Every scene is drawn offscreen by a test and, with an environment variable,
    written out as PNGs; the eight were checked against the web's by eye that way, and Small
-   Hours and Paper Cities seen live in the app. Ten of twenty-seven; the other seventeen are
-   three.js geometry and cameras (a corridor, mannequins, a wireframe station) and need a small
-   mesh layer first. What was planned:
+   Hours and Paper Cities seen live in the app. Ten of twenty-seven. The other seventeen are three.js scenes with a perspective camera, and
+   what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
+   Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
+   Longhand, Machine, Cycles, Clouds, Convoy); a shader over an icosahedron or a sphere
+   (Lifeforms, Clouds); boxes, cylinders and a torus under lights (Machine, the only lit one);
+   a 2D canvas drawn each frame and shown as a texture (GraphicLab); and fog (Sunset, Lifeforms,
+   Cubik, Machine, Longhand). So the mesh layer is: a camera, a line pipeline, a point pipeline,
+   an indexed-mesh pipeline with per-scene shaders, fog in the fragment, and one texture. The
+   Frost/Hothouse card layer is the start of it. What was planned:
    a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.
