@@ -200,7 +200,13 @@ gone native at all.
    click matches to six places, so the ratio the comment was after holds and the numbers in it
    do not.
 
-   Left: the 303's step entry from the keyboard; performance mode; automation recording; and more
+   Then vibes, the web's performance mode: the visuals at full strength, the sidebar, the toolbar
+   and the editor put away, the whole window a pad for the filter, a scope and what is playing,
+   with play, the scene and the way back to the editor in the corners (⇧⌘P, or Esc to leave). And
+   the scene can be chosen at last, from View ▸ Scene or by cycling through them, where before
+   the app only ever showed the one the song named.
+
+   Left: the 303's step entry from the keyboard; automation recording; and more
    than one song open at once, which is deliberately not done. It is not a scene change: the
    player owns the audio engine, the MIDI ports and the clock, and two of them would be two
    engines fighting over one output and two sources both called Driftbox Clock. The honest

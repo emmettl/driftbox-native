@@ -12,6 +12,7 @@
     let stage: Stage
     @Environment(\.undoManager) private var undoManager
     @AppStorage(Defaults.visuals) private var showsVisuals = true
+    @State private var columns = NavigationSplitViewVisibility.all
 
     public init(player: Player, stage: Stage) {
       self.player = player
@@ -22,12 +23,13 @@
     var files: SongFiles { SongFiles(player: player) }
 
     public var body: some View {
-      NavigationSplitView {
+      NavigationSplitView(columnVisibility: $columns) {
         SongList(player: player, files: files)
           .navigationSplitViewColumnWidth(min: 210, ideal: 250, max: 320)
       } detail: {
         ZStack {
-          Backdrop(stage: stage, running: player.showsVisuals)
+          Backdrop(
+            stage: stage, running: player.showsVisuals || stage.performing, performing: stage.performing)
           if let song = player.song {
             VStack(spacing: 12) {
               SongStrip(player: player, song: song)
@@ -43,15 +45,30 @@
               }
             }
             .padding(14)
+            // Put away, not taken out: coming back to the editor finds it where it was.
+            .opacity(stage.performing ? 0 : 1)
+            .scaleEffect(stage.performing ? 0.97 : 1)
+            .allowsHitTesting(!stage.performing)
+            if stage.performing {
+              VibesStage(player: player, stage: stage)
+                .transition(.opacity)
+            }
           } else {
             EmptyWindow(player: player, files: files)
           }
         }
+        .animation(.easeInOut(duration: 0.45), value: stage.performing)
         .frame(minWidth: 820, minHeight: 560)
         .toolbar { TransportToolbar(player: player, files: files, showsVisuals: $showsVisuals) }
         // No grey band: the indigo, and the visuals, run up under the transport.
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        .toolbar(stage.performing ? .hidden : .visible, for: .windowToolbar)
       }
+      .onChange(of: stage.performing) { _, performing in
+        withAnimation(.easeInOut(duration: 0.45)) { columns = performing ? .detailOnly : .all }
+      }
+      // A different song names its own scene.
+      .onChange(of: player.current?.id) { _, _ in stage.sceneChoice = nil }
       .preferredColorScheme(.dark)
       .tint(Theme.nine)
       // The window's own ground is the indigo, so the sidebar's glass is tinted by it rather
@@ -95,21 +112,26 @@
   struct Backdrop: View {
     let stage: Stage
     let running: Bool
+    /// Full strength, with nothing over it to keep readable.
+    var performing = false
 
     var body: some View {
       ZStack {
         Theme.ground
         if running {
           StageView(stage: stage, role: .preview)
-            .opacity(0.42)
+            .opacity(performing ? 1 : 0.42)
             .transition(.opacity)
         }
         // Darker toward the foot, where the grid is densest.
         LinearGradient(
-          colors: [Theme.ground.opacity(0), Theme.ground.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+          colors: [Theme.ground.opacity(0), Theme.ground.opacity(0.55)], startPoint: .top, endPoint: .bottom
+        )
+        .opacity(performing ? 0 : 1)
       }
       .ignoresSafeArea()
       .animation(.easeInOut(duration: 0.5), value: running)
+      .animation(.easeInOut(duration: 0.6), value: performing)
     }
   }
 
