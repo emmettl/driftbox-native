@@ -84,13 +84,14 @@
     static let geometry: [GeometryScene.Type] = [
       Wireframe.self, Sunset.self, Web.self, Saturn.self, Lifeforms.self, Cubik.self, Stillwater.self,
       Cycles.self, Clouds.self, Longhand.self, Defcon.self, Dancers.self, Convoy.self, Machine.self,
+      Jumpman.self, Trench.self, GraphicLab.self,
     ]
     static var geometrySources: String {
       GeometryScene.preamble
         + [
           Wireframe.source, Sunset.source, Web.source, Saturn.source, Lifeforms.source, Cubik.source,
           Stillwater.source, Cycles.source, Clouds.source, Longhand.source, Defcon.source, Dancers.source,
-          Convoy.source, Machine.source,
+          Convoy.source, Machine.source, Jumpman.source, Trench.source, GraphicLab.source,
         ]
         .joined()
     }

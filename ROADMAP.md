@@ -80,7 +80,7 @@ gone native at all.
    from any source play the keys, and a **sync** button follows an external clock's tempo,
    start, stop and position, the estimator held to the reference's on a synthetic stream of
    464 messages. Still to come: a proper document model, and MIDI clock *out*.
-6. **Visuals.** ← *here.* `DriftboxScenes`: a `Scene` protocol keeping the web scenes' ids
+6. ~~**Visuals.**~~ Done. `DriftboxScenes`: a `Scene` protocol keeping the web scenes' ids
    and accents, a `SceneRenderer` over one compiled shader library, and Pulse, the fallback: a
    dark field that breathes with the level, a bloom and a ring on every kick, a flash on a
    snare, a horizon that sparkles on hats, a 303 note as a line at its pitch, the pad's cursor.
@@ -106,9 +106,7 @@ gone native at all.
    by its own angles. Then Light Cycles, whose walls are rewritten
    every frame and whose bikes turn on the beat. Then Clouds and Longhand. Then Defcon and Dancers. Then Convoy and Machine — the last being the only lit
    scene, with three's standard material approximated under an ambient, a directional and a
-   point light, and the one place three's fog is actually applied. Twenty-five of twenty-seven,
-   and the snapshot test now draws with a finger as well — Longhand is a blank page until
-   something is drawn on it, so a scene given no touch had nothing to show and nothing to move.
+   point light, and the one place three's fog is actually applied. All twenty-seven.
    One thing Longhand wants that the native side does not have yet: the web samples the pointer
    at its own rate, 120Hz on a ProMotion screen, so a flick that begins and ends between two
    frames is still drawn. `SceneInput` carries one touch a frame, so a fast hand draws a
@@ -122,7 +120,19 @@ gone native at all.
    removable — laid flat by the rotation alone the triangles face down and a front-side
    material draws nothing, so it is doing double duty as a winding fix — which makes following
    it with the outline the safe direction. Fixed in the web as emmettl/driftbox#300 and here
-   at the same time, so the two do not disagree while that waits. The other sixteen are three.js
+   at the same time, so the two do not disagree while that waits.
+
+   The Jumpman port found a second one, not yet fixed anywhere. Monsters and pick-ups are
+   drawn at `m.x - scroll - across / 2 - 4` but spawn their shards at `m.x - scroll + c.x - 4`,
+   missing the `- across / 2`, so every stomp and every collect throws its pieces half the
+   visible width to the right of the thing they came from — off the edge, in practice, which
+   is why nobody has seen the effect. The runner's own death shards use his draw origin and
+   are right, which is presumably why it went unnoticed. The port reproduces it.
+
+   And a third, smaller: in portrait GraphicLab draws its section name at a size taken from the
+   page height and never fits it to a width, unlike every other piece of display type on the
+   sheet, so "TYPE PRESS" collides with the stereo line and "XEROX NIGHT" overruns its slab.
+   Visible on the web at the same aspect. The port reproduces it; a fitted width would fix both. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
@@ -134,7 +144,7 @@ gone native at all.
    a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.
-7. **iOS.** Audio session, background audio, a layout that opens into the visuals, haptics,
+7. **iOS.** ← *here.* Audio session, background audio, a layout that opens into the visuals, haptics,
    Now Playing, and the AUv3 extension the phase 4 audio unit already is.
 
 ## Milestone 2 — the rack
