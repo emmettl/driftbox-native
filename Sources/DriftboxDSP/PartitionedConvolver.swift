@@ -23,6 +23,8 @@ public struct PartitionedConvolver: ~Copyable {
   let scratch: UnsafeMutablePointer<Float>
   /// The first partition's taps, and the last `block` inputs, for the direct part.
   let direct: UnsafeMutablePointer<Float>
+  /// False when the first partition is all zeros — a later stage of a room — so it is not run.
+  let hasDirect: Bool
   let recent: UnsafeMutablePointer<Float>
   var recentIndex = 0
   /// What the transformed partitions contribute to the current block and the one after it.
@@ -45,12 +47,15 @@ public struct PartitionedConvolver: ~Copyable {
     reversal = .allocate(capacity: size)
     scratch = .allocate(capacity: size * 2)
     direct = .allocate(capacity: block)
-    recent = .allocate(capacity: block)
+    recent = .allocate(capacity: block * 2)
     current = .allocate(capacity: block)
     carry = .allocate(capacity: block)
     input = .allocate(capacity: block)
     for index in 0..<block { direct[index] = index < taps.count ? taps[index] : 0 }
-    recent.initialize(repeating: 0, count: block)
+    var anyDirect = false
+    for index in 0..<block where taps.count > index && taps[index] != 0 { anyDirect = true }
+    hasDirect = anyDirect
+    recent.initialize(repeating: 0, count: block * 2)
     current.initialize(repeating: 0, count: block)
     carry.initialize(repeating: 0, count: block)
     input.initialize(repeating: 0, count: block)
@@ -144,11 +149,18 @@ public struct PartitionedConvolver: ~Copyable {
   /// One frame in, one frame out.
   @_noAllocation
   public mutating func process(_ sample: Float) -> Float {
-    // The first partition, directly.
-    recent[recentIndex] = sample
+    // The first partition, directly. The history is kept twice over, back to back, so the last
+    // `block` inputs are always contiguous and the loop has no wrap in it: a division per tap
+    // per frame was a fifth of a core.
     var out: Float = 0
-    for tap in 0..<block { out += direct[tap] * recent[(recentIndex - tap + block) % block] }
-    recentIndex = (recentIndex + 1) % block
+    if hasDirect {
+      recent[recentIndex] = sample
+      recent[recentIndex + block] = sample
+      let newest = recent + recentIndex + block
+      for tap in 0..<block { out += direct[tap] * newest[-tap] }
+      recentIndex += 1
+      if recentIndex == block { recentIndex = 0 }
+    }
 
     // The rest, worked out at the end of the block before.
     out += current[filled]

@@ -51,8 +51,9 @@ gone native at all.
    its offline one rather than to the browser again: the drum voices and the 303 to the bit,
    the reverb within single precision, the whole engine within -90dB. `driftbox-play` hosts the
    engine as an `AUAudioUnit` in an `AVAudioEngine` and plays the catalogue. Carried forward: the
-   reverb wants a non-uniform partitioning before it is cheap. (The events ring — which voice,
-   accents, notes, passes — landed with phase 5.)
+   engine costs 3.3% of real time in a loop and about a fifth of a core on the live IO thread,
+   and the six-fold gap between the two is not understood. (The events ring — which voice,
+   accents, notes, passes — and the reverb's second stage landed with phase 5.)
    What was planned: `AUAudioUnit` from the start, sequencing sample-accurately
    inside the render block, lock-free rings both ways. The ring back to the interface carries
    *events* — which voice, accents, slides, sections — not only levels, so scenes can react to

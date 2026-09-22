@@ -40,6 +40,8 @@
       }
       let seconds = option("--seconds")
       let startBar = option("--start-bar") ?? 0
+      // --bench: no audio device; run the engine as fast as it goes and say how fast that is.
+      let bench = arguments.firstIndex(of: "--bench").map { arguments.remove(at: $0) } != nil
       guard arguments.count == 1 else {
         FileHandle.standardError.write(
           Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n]\n".utf8))
@@ -49,6 +51,20 @@
       guard let song = SongCodec.decode(text) else {
         FileHandle.standardError.write(Data("\(arguments[0]) is not a song\n".utf8))
         exit(65)
+      }
+
+      if bench {
+        let host = EngineHost(sampleRate: 48000)
+        host.load(song)
+        host.send(.play)
+        let frames = 48000 * 20
+        let left = UnsafeMutablePointer<Float>.allocate(capacity: 512)
+        let right = UnsafeMutablePointer<Float>.allocate(capacity: 512)
+        let began = Date()
+        for _ in 0..<(frames / 512) { host.render(frames: 512, left: left, right: right) }
+        let took = Date().timeIntervalSince(began)
+        print(String(format: "20s of %@ in %.2fs: %.1f%% of real time", arguments[0], took, took / 20 * 100))
+        return
       }
 
       AUAudioUnit.registerSubclass(

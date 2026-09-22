@@ -300,9 +300,12 @@ swift run -c release driftbox-play conformance/fixtures/documents/acid.song.json
 ```
 
 The engine as an Audio Unit in an `AVAudioEngine`, through the speakers, printing what reaches
-the output once a second. About a fifth of a core, most of it the reverb: a three-second room is
-a thousand partitions a block, and a non-uniform partitioning would cut that by an order of
-magnitude when it matters.
+the output once a second. `--bench` runs the same engine with no device, as fast as it goes:
+**3.3% of real time** on this machine, of which the reverb — now in two stages, the tail in
+partitions eight blocks long — is about a third. Live, the IO thread shows about a fifth of a
+core for the same work, and that gap is not understood: the same binary, the same song, six
+times the cost when woken every few milliseconds rather than run in a loop. A cold cache and a
+core clocking up from idle for each callback are the suspects.
 
 ### Listening
 

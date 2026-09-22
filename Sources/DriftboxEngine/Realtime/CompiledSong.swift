@@ -32,8 +32,8 @@ public struct CompiledSong: ~Copyable {
   public let fx: FxParams
   public let bpm: Double
   /// The room, as the reverb send's convolvers, one per side.
-  public var reverbLeft: PartitionedConvolver
-  public var reverbRight: PartitionedConvolver
+  public var reverbLeft: Reverb
+  public var reverbRight: Reverb
 
   /// Choke groups by name, so a hat can be told which other hats to silence.
   static let chokeGroups = ["808.hats", "909.hats"]
@@ -91,8 +91,8 @@ public struct CompiledSong: ~Copyable {
 
     let room = ReverbSend.impulseResponse(for: fx, sampleRate: sampleRate)
     let scale = Float(ReverbSend.normalisation(room, sampleRate: sampleRate))
-    reverbLeft = PartitionedConvolver(response: room[0], gain: scale)
-    reverbRight = PartitionedConvolver(response: room[1], gain: scale)
+    reverbLeft = Reverb(response: room[0], gain: scale)
+    reverbRight = Reverb(response: room[1], gain: scale)
   }
 
   deinit {
