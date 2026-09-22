@@ -33,9 +33,13 @@
     private var source = MIDIEndpointRef()
 
     public init() {
-      var status = MIDIClientCreateWithBlock("Driftbox" as CFString, &client) { [weak self] _ in
-        self?.refresh()
+      // Made on the MIDI thread, so the destinations stay current whoever makes this — see
+      // `MIDIRunLoop` for why that is not a given.
+      var made = MIDIClientRef()
+      var status = MIDIRunLoop.shared.sync {
+        MIDIClientCreateWithBlock("Driftbox" as CFString, &made) { [weak self] _ in self?.refresh() }
       }
+      client = made
       guard status == noErr else { return }
       status = MIDIOutputPortCreate(client, "Out" as CFString, &port)
       guard status == noErr else { return }
@@ -43,6 +47,15 @@
       // machine can be given the clock without a cable and without a loopback driver.
       MIDISourceCreateWithProtocol(client, "Driftbox Clock" as CFString, ._1_0, &source)
       refresh()
+    }
+
+    /// The unique ID of Driftbox's own source, so an input can tell it apart from everything
+    /// else — including another copy of Driftbox, whose source has the same name and is a
+    /// perfectly good thing to follow.
+    public var sourceID: MIDIUniqueID? {
+      guard source != 0 else { return nil }
+      var id: MIDIUniqueID = 0
+      return MIDIObjectGetIntegerProperty(source, kMIDIPropertyUniqueID, &id) == noErr ? id : nil
     }
 
     deinit {

@@ -81,6 +81,10 @@ public final class EngineHost: @unchecked Sendable {
     engine.pointee.events.receive()
   }
 
+  /// How many frames of the mix have ever been written, so a reader can tell whether anything
+  /// has arrived since it last looked.
+  public var mixWritten: Int { monitorWritten.load(ordering: .acquiring) }
+
   /// The most recent `count` frames of the mix, oldest first, into `out`. At most
   /// `monitorFrames`.
   public func recentMix(_ count: Int, into out: UnsafeMutablePointer<Float>) {

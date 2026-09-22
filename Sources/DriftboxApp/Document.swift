@@ -242,12 +242,16 @@
     /// anything to open it into. It waits here for the window.
     private var waiting: [URL] = []
 
-    public func attach(_ files: SongFiles) {
-      guard self.files == nil else { return }
+    /// Given somewhere to open files, it opens any that arrived first — and says so, because a
+    /// song opened from the Finder is the one wanted, not whichever was open last time.
+    @discardableResult
+    public func attach(_ files: SongFiles) -> Bool {
+      guard self.files == nil else { return false }
       self.files = files
       let queued = waiting
       waiting = []
       for url in queued { files.open(url) }
+      return !queued.isEmpty
     }
 
     public func application(_ application: NSApplication, open urls: [URL]) {

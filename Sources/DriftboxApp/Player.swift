@@ -100,18 +100,28 @@
     // MARK: MIDI
 
     private var midi: MIDIInput?
-    /// Whether anything arriving on a MIDI cable is played at all. The input listens to every
-    /// source there is and cannot be told to listen to fewer, so this is the whole of the choice:
-    /// a machine that streams notes at a sequencer it was not meant to be driving can be silenced
-    /// without unplugging it.
+    /// Whether anything arriving on a MIDI cable is played at all — the switch over the whole of
+    /// it, above the choice of sources below.
     var listensToMIDI = true
+    /// Sources to hear nothing from, by name: a machine that streams notes at a sequencer it was
+    /// not meant to be driving can be silenced without unplugging it, and without silencing the
+    /// keyboard that is meant to.
+    var ignoredMIDISources: Set<String> = [] {
+      didSet { midi?.ignoring = ignoredMIDISources }
+    }
+    /// Every source there is, kept up to date as devices come and go, so a list of them in
+    /// Settings changes while it is open rather than the next time it is.
+    private(set) var midiSources: [String] = []
     /// Follow an external MIDI clock: tempo, start, stop and position. Off unless asked for,
     /// because plenty of gear streams clock the moment it is plugged in, and a sequencer that
     /// handed its transport to whatever is on the cable would be taking an instrument away.
     var followsClock = false {
       didSet {
-        // Following and sending at once is a ring: the virtual source is a source like any other,
-        // so our own ticks come straight back in and the two ends chase each other's tempo.
+        // Following and sending are kept apart. The loop that first made them exclusive — our
+        // own ticks coming back in through our own source — cannot happen any more, because the
+        // input no longer hears that source. What is left is a loop through somebody's MIDI thru,
+        // which is rarer, and relaying a master clock on to other gear, which would be worth
+        // having; which of those wins is a decision about the instrument and has not been made.
         if followsClock, sendsClock { sendsClock = false }
         // Letting go of the clock means the song's own tempo again, in the engine as well as here.
         guard !followsClock, followedBPM != nil else { return }
@@ -125,7 +135,6 @@
     private(set) var followedBPM: Double? {
       didSet { retime() }
     }
-    var midiSources: [String] { midi?.sources ?? [] }
     private var follower = ClockFollower()
     /// The song's own tempo, which following leaves alone: the followed tempo is not written in.
     private var songBPM: Double { song?.bpm ?? 120 }
@@ -161,7 +170,13 @@
     /// Which step's ticks go out next, and when.
     private var cursor = ClockCursor()
 
+    /// Where the song that is open is written down, so the next launch can open it again. The
+    /// application's own preferences; nothing at all for a player built without a device, so a
+    /// test that opens files by the dozen does not rewrite what the app will open next.
+    var memory: UserDefaults?
+
     public init() {
+      memory = .standard
       AUAudioUnit.registerSubclass(
         DriftboxAudioUnit.self, as: DriftboxAudioUnit.componentDescription, name: "Driftbox", version: 1)
       AVAudioUnit.instantiate(with: DriftboxAudioUnit.componentDescription, options: []) {
@@ -187,14 +202,23 @@
         Task { @MainActor in self?.tick() }
       }
       let midi = MIDIInput()
+      midi.ignoring = ignoredMIDISources
       midi.onNote = { [weak self] note, velocity in
         Task { @MainActor in self?.midiNote(note, velocity: velocity) }
       }
       midi.onClock = { [weak self] message, time in
         Task { @MainActor in self?.midiClock(message, at: time) }
       }
+      midi.onSourcesChange = { [weak self] names in
+        Task { @MainActor in self?.midiSources = names }
+      }
+      midiSources = midi.sources
       self.midi = midi
-      clockOut = MIDIOutput()
+      let clockOut = MIDIOutput()
+      // The input never hears the app's own output: it would only ever be the app's own clock
+      // coming back round.
+      midi.hiding = clockOut.sourceID.map { [$0] } ?? []
+      self.clockOut = clockOut
     }
 
     /// A player on an engine of its own: no audio device, no MIDI ports and no timer behind the
@@ -342,18 +366,64 @@
 
     /// A song document from disk, in the web app's format.
     func open(file url: URL) {
-      guard let data = try? Data(contentsOf: url),
-        let loaded = SongCodec.decode(String(decoding: data, as: UTF8.self))
-      else {
+      guard take(file: url) else {
         error = "\(url.lastPathComponent) is not a song"
         return
       }
+      startEngine()
+    }
+
+    /// Read a document and make it the song, without starting anything. False if it is not one.
+    @discardableResult
+    private func take(file url: URL) -> Bool {
+      guard let data = try? Data(contentsOf: url),
+        let loaded = SongCodec.decode(String(decoding: data, as: UTF8.self))
+      else { return false }
       // A document's name is its file's, stripped of both halves of `.song.json`.
       var name = url.deletingPathExtension().lastPathComponent
       if name.hasSuffix(".song") { name.removeLast(5) }
       let entry = CatalogueEntry(id: url.path, name: name, blurb: "", visual: loaded.visual ?? "")
       take(loaded, as: entry, from: url)
-      startEngine()
+      return true
+    }
+
+    // MARK: - Remembered between launches
+
+    /// The song that was open when the app last quit, as it was last saved — and stopped at the
+    /// top, because sound nobody asked for is the one thing not worth restoring. A document comes
+    /// back through a bookmark rather than a path, so one renamed or moved in the Finder since is
+    /// still found; one that has gone is forgotten rather than reported.
+    public func restore() {
+      guard let memory else { return }
+      if let bookmark = memory.data(forKey: Defaults.lastFile) {
+        var stale = false
+        if let url = try? URL(
+          resolvingBookmarkData: bookmark, options: [.withoutUI], relativeTo: nil, bookmarkDataIsStale: &stale
+        ),
+          take(file: url)
+        {
+          return
+        }
+        memory.removeObject(forKey: Defaults.lastFile)
+      } else if let id = memory.string(forKey: Defaults.lastSong),
+        let entry = entries.first(where: { $0.id == id }), let loaded = Catalogue.song(id)
+      {
+        take(loaded, as: entry, from: nil)
+      }
+    }
+
+    /// Write down what is open. A catalogue song by its id, a document by a bookmark, and a new
+    /// song not at all: it has nowhere to come back from, and quitting has already asked whether
+    /// to save it.
+    private func remember(_ entry: CatalogueEntry, at url: URL?) {
+      guard let memory else { return }
+      memory.removeObject(forKey: Defaults.lastSong)
+      memory.removeObject(forKey: Defaults.lastFile)
+      if let url {
+        memory.set(try? url.bookmarkData(), forKey: Defaults.lastFile)
+      } else if !entry.id.isEmpty {
+        memory.set(entry.id, forKey: Defaults.lastSong)
+      }
     }
 
     /// An empty song to start from. It arrives with the 909's core voices and a 303 line already
@@ -375,6 +445,7 @@
     private func take(_ loaded: Song, as entry: CatalogueEntry, from url: URL?) {
       current = entry
       fileURL = url
+      remember(entry, at: url)
       undoManager?.removeAllActions()
       refreshUndo()
       song = loaded
@@ -400,6 +471,8 @@
         if name.hasSuffix(".song") { name.removeLast(5) }
         current = CatalogueEntry(
           id: url.path, name: name, blurb: current?.blurb ?? "", visual: current?.visual ?? "")
+        // Saved somewhere new, it comes back from there.
+        if let current { remember(current, at: url) }
       } catch {
         self.error = "\(error)"
       }
@@ -522,14 +595,23 @@
     private let analyser = Analyser()
     private var monitor = [Float](repeating: 0, count: Analyser.size)
 
+    /// The spectrum is only worked out again when new audio has arrived. That is what Web
+    /// Audio's analyser does — two reads inside one render quantum get the same answer — and it
+    /// matters because the smoothing is applied per analysis: a display faster than the audio
+    /// blocks, or two views asking in one frame, would otherwise make the bands fall faster
+    /// than they do on the web.
     func analyse() -> Analyser? {
       guard let host else { return nil }
+      let written = host.mixWritten
+      if written == analysedAt { return analyser }
+      analysedAt = written
       monitor.withUnsafeMutableBufferPointer { buffer in
         host.recentMix(Analyser.size, into: buffer.baseAddress!)
         analyser.update(UnsafeBufferPointer(buffer))
       }
       return analyser
     }
+    private var analysedAt = -1
 
     /// The loudest sample of the last audio block, each side.
     var peaks: (left: Float, right: Float) {

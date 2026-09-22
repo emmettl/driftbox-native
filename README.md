@@ -6,13 +6,14 @@ of TB-303s, synthesised from scratch — for the Mac first, then iOS. Swift thro
 The web app is the reference implementation and is treated as finished. It is here as a pinned
 submodule in `driftbox/`, and nothing in this repository changes it.
 
-**Where this is:** phase 4 of [ROADMAP.md](ROADMAP.md) — the engine plays, on a Mac, through an
-Audio Unit — and phase 5, the editor, is next. There is no app yet. There is
-a harness that holds Swift to the web engine's behaviour, and behind it: a song model, a codec that
-reads and writes the web app's documents to the byte, a sequencer that plans every catalogue song
-exactly as the reference does, and the instruments: all 22 drum voices — as data, exactly, and as
+**Where this is:** phase 7 of [ROADMAP.md](ROADMAP.md), making the Mac app a proper Mac app. The
+groovebox is there: a harness that holds Swift to the web engine's behaviour, and behind it a song
+model, a codec that reads and writes the web app's documents to the byte, a sequencer that plans
+every catalogue song exactly as the reference does, all 22 drum voices — as data, exactly, and as
 sound, within -100dB of the browser's — and the 303 (looser where there are square waves, drive or
-a resonant ladder, for reasons given below).
+a resonant ladder, for reasons given below); a real-time engine hosted as an Audio Unit; an editor
+for everything a song is; MIDI in and clock out; and all twenty-seven of the web's scenes in
+Metal. Next after this is the rack.
 
 ## Layout
 
@@ -26,6 +27,9 @@ a resonant ladder, for reasons given below).
 | `Sources/DriftboxEngine` | The instruments, mixer and effects behind one `render`. **Constrained.** |
 | `Sources/DriftboxDocument` | The song codec, migrations, shareable URLs, the catalogue. |
 | `Sources/DriftboxHost` | The audio unit, the rings to and from the render thread, MIDI. |
+| `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |
+| `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
+| `Sources/Driftbox` | The executable, which is nothing but `@main`. |
 
 ## The constrained targets
 
@@ -289,9 +293,12 @@ includes reading a `static let`, because that is initialised on first use, behin
 scripts/bundle-app.sh && open .build-release/Driftbox.app
 ```
 
-The Mac app, as far as it goes: the catalogue as a library, a transport, the step and 303 grids
-of the pattern the transport is in, live and editable, the voice and effects panels, the pad,
-the visuals, and open, save and export. A SwiftPM executable rather than an Xcode project for
+The Mac app: the catalogue as a library, a transport, the step and 303 grids of the pattern the
+transport is in, live and editable, the voice and effects panels, the pad, open, save and export,
+MIDI in from the sources chosen in Settings and clock out, and the visuals — in a pane, and in a
+window of their own (⌘2) that goes full screen on a named display from View ▸ Visuals Full Screen
+On. One renderer draws each frame once and every view shows it, so the pane previews exactly what
+the window is showing. The song and the visuals window come back at the next launch. A SwiftPM executable rather than an Xcode project for
 now, which is why it announces itself to the system by hand on launch, and why a script has to
 wrap it into a bundle: `swift run Driftbox` also works, but the catalogue lives in a resource
 bundle that `Bundle.module` looks for beside the executable and in `Contents/Resources`, and the

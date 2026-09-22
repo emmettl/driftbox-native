@@ -59,7 +59,7 @@ gone native at all.
    inside the render block, lock-free rings both ways. The ring back to the interface carries
    *events* — which voice, accents, slides, sections — not only levels, so scenes can react to
    what was played rather than to a spectrum. Done when a bare player plays the catalogue.
-5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable wrapped into a
+5. ~~**The editor.**~~ Done. Begun as the Mac app itself, a SwiftPM executable wrapped into a
    bundle by `scripts/bundle-app.sh` (which the resource bundle needs, or `Bundle.module`
    asserts). Looked at, once, and three things came of it: a transport pushed above the window
    and a grid centred in its scroll view (layout, fixed); a main thread that re-planned the
@@ -79,7 +79,8 @@ gone native at all.
    the drums and the home row playing 303 A; stems, one WAV per voice; and CoreMIDI — notes
    from any source play the keys, and a **sync** button follows an external clock's tempo,
    start, stop and position, the estimator held to the reference's on a synthetic stream of
-   464 messages. Still to come: a proper document model, and MIDI clock *out*.
+   464 messages. Then MIDI clock *out*, held to the reference the same way, and the document
+   model, which turned out to be the same job as making the app a Mac app and went into phase 7.
 6. ~~**Visuals.**~~ Done. `DriftboxScenes`: a `Scene` protocol keeping the web scenes' ids
    and accents, a `SceneRenderer` over one compiled shader library, and Pulse, the fallback: a
    dark field that breathes with the level, a bloom and a ring on every kick, a flash on a
@@ -144,22 +145,35 @@ gone native at all.
    a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.
-7. **The Mac app proper.** ← *here.* The engine and the scenes are done; what is missing is
-   everything that makes a thing a Mac app rather than a window with controls in it. Today
-   there is no menu bar at all, which is not a cosmetic gap: `UndoManager` is wired up and
-   works, and with no Edit menu nobody can see that it exists. In rough order of what a
-   desktop user notices first: menus and their shortcuts, with Open and Save belonging to the
-   File menu rather than being toolbar buttons that happen to have key equivalents; a document
-   model, so a window knows which song it holds — title and proxy icon, the edited dot, Save
-   against Save As, recent documents, a prompt before closing unsaved work, more than one
-   window at a time, which is also the "proper document model" phase 5 left open; settings
-   behind the usual key, for the audio device and rate, which MIDI ports to listen and send
-   on, and whether the visuals run; opening songs the Mac way, by dropping one on the window
-   or the dock icon and by double-clicking one in the Finder, with the file type declared so
-   both work; state restoration, so reopening puts back the song, the window and the pattern;
-   and the visuals full screen or on a second display, which is what the pane is a preview of.
-   Built so iOS stays possible — the split between `Player` and the views is already the line
-   it would fall along — but not built for iOS yet.
+7. **The Mac app proper.** ← *here.* The engine and the scenes were done; what was missing was
+   everything that makes a thing a Mac app rather than a window with controls in it. Most of it
+   is in now. A menu bar, which there had not been at all — and whose absence was not cosmetic:
+   `UndoManager` was wired up and working, and with no Edit menu nobody could see that it
+   existed. A window that knows its song: title and proxy icon, the edited dot, Save against
+   Save As, recent documents, a prompt before replacing unsaved work. Songs opened by dropping
+   them on the window or from the Finder, with the type declared. Settings behind ⌘, for which
+   MIDI sources to hear — per source now, and live as devices come and go — where the clock
+   goes, and whether the visuals run. The visuals in a window of their own, full screen on a
+   named display from the View menu, drawn once a frame by one renderer so that the pane in the
+   main window is an honest preview of the output rather than a second scene that looks
+   similar. And both the song and the visuals window back where they were at the next launch.
+
+   Left: settings for the audio output device and sample rate, which the engine does not offer
+   a choice of yet; the pattern being edited, which restoration does not put back; and more
+   than one song open at once, which is deliberately not done. It is not a scene change: the
+   player owns the audio engine, the MIDI ports and the clock, and two of them would be two
+   engines fighting over one output and two sources both called Driftbox Clock. The honest
+   shape is one shared host with a song per window attached to it, and it is worth building
+   when a second window earns its keep — comparing two songs — and not before.
+
+   Also open, and not mine to decide: following an external clock and sending one are still
+   kept apart. The loop that first made them exclusive, the app hearing its own clock come
+   back, is gone — the input no longer hears the app's own source — and what is left is a
+   choice between guarding against a loop through somebody's MIDI thru and allowing a master
+   clock to be relayed on to other gear.
+
+   Built so iOS stays possible — the split between `Player` and the views is the line it would
+   fall along, and everything AppKit is in the app target — but not built for iOS yet.
 8. **iOS.** Deferred until the Mac app is done. Audio session, background audio, a layout that
    opens into the visuals, haptics, Now Playing, and the AUv3 extension the phase 4 audio unit
    already is.

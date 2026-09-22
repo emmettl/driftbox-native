@@ -8,14 +8,16 @@
   public struct AppMenus: Commands {
     let player: Player
     let files: SongFiles
+    let stage: Stage
     // Both are remembered between launches, so the menu writes the preference and the window
     // mirrors it onto the player, rather than the two of them setting it from opposite ends.
     @AppStorage(Defaults.visuals) private var showsVisuals = true
     @AppStorage(Defaults.sendsClock) private var sendsClock = false
 
-    public init(player: Player, files: SongFiles) {
+    public init(player: Player, files: SongFiles, stage: Stage) {
       self.player = player
       self.files = files
+      self.stage = stage
     }
 
     public var body: some Commands {
@@ -64,8 +66,25 @@
       }
 
       CommandGroup(after: .toolbar) {
-        Toggle("Visuals", isOn: $showsVisuals)
+        Toggle("Visuals Pane", isOn: $showsVisuals)
           .keyboardShortcut("v", modifiers: [.command, .control])
+        // Straight to full screen on a named display, which is the thing a projector wants and
+        // otherwise takes opening, dragging across and then going full screen by hand.
+        Menu("Visuals Full Screen On") {
+          ForEach(stage.screens, id: \.self) { name in
+            Button(name) { stage.output.show(on: name, fullScreen: true) }
+          }
+        }
+        Divider()
+      }
+
+      // A second window is shown from the Window menu, by number, the way Logic opens its mixer
+      // with ⌘2 — and closed like any other window. ⌥⌘V was the first choice and the wrong one:
+      // it is a paste shortcut in the Finder.
+      CommandGroup(before: .windowList) {
+        Button("Visuals") { stage.output.show() }
+          .keyboardShortcut("2")
+        Divider()
       }
 
       CommandMenu("Transport") {

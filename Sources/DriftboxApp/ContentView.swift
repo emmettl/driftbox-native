@@ -9,11 +9,13 @@
 
   public struct ContentView: View {
     @Bindable var player: Player
+    let stage: Stage
     @Environment(\.undoManager) private var undoManager
     @AppStorage(Defaults.visuals) private var showsVisuals = true
 
-    public init(player: Player) {
+    public init(player: Player, stage: Stage) {
       self.player = player
+      self.stage = stage
     }
 
     /// The File menu's own actions, which the toolbar shares rather than repeats.
@@ -38,7 +40,19 @@
           Divider()
           if let song = player.song {
             if player.showsVisuals {
-              Visuals(player: player).frame(height: 200)
+              StageView(stage: stage, role: .preview)
+                .frame(height: 200)
+                // Said plainly, because a letterboxed picture with nothing to explain it looks
+                // like a pane that has been drawn at the wrong size.
+                .overlay(alignment: .topTrailing) {
+                  if stage.outputOpen {
+                    Text("Preview of the visuals window")
+                      .font(.caption2).foregroundStyle(.white.opacity(0.7))
+                      .padding(.horizontal, 6).padding(.vertical, 3)
+                      .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
+                      .padding(8)
+                  }
+                }
               Divider()
             }
             PatternBar(player: player, song: song)
@@ -103,7 +117,6 @@
     // The clock is remembered between launches, so these write the preference and the window
     // mirrors it onto the player; the menu's own switches write the same one.
     @AppStorage(Defaults.sendsClock) private var sendsClock = false
-    @AppStorage(Defaults.clockDestination) private var destination = ""
 
     var body: some View {
       HStack(spacing: 16) {
@@ -114,32 +127,32 @@
         }
         .keyboardShortcut(.space, modifiers: [])
         .disabled(player.song == nil)
+        // The name comes before the chain when there is not room for both: which song this is
+        // matters more than seeing every entry of it at once, and the chain scrolls anyway.
         VStack(alignment: .leading) {
-          Text(player.current?.name ?? "—").font(.headline)
+          Text(player.current?.name ?? "—").font(.headline).lineLimit(1)
           if let position = player.position {
             Text("bar \(position.bar + 1) · step \(position.step + 1) · \(position.pattern?.name ?? "")")
-              .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+              .font(.caption.monospacedDigit()).foregroundStyle(.secondary).lineLimit(1)
           }
         }
-        Spacer()
+        .layoutPriority(1)
+        Spacer(minLength: 8)
         Toggle("sync", isOn: Binding(get: { player.followsClock }, set: { player.followsClock = $0 }))
-          .toggleStyle(.button).font(.caption)
+          .toggleStyle(.button).font(.caption).fixedSize()
           .help("Follow an external MIDI clock: tempo, start, stop and position")
         if let bpm = player.followedBPM {
           Text(String(format: "← %.1f", bpm)).font(.caption.monospacedDigit()).foregroundStyle(.orange)
         }
+        // Where the clock goes is a setting, made once; whether it is going is a performance
+        // decision, made often, and that is the only part the transport has room for.
         Toggle("clock", isOn: $sendsClock)
-          .toggleStyle(.button).font(.caption)
-          .help("Send MIDI clock out: start, six ticks a sixteenth, stop")
-        Picker("Clock out", selection: $destination) {
-          // Driftbox's own port is always there, whether or not anything is plugged in.
-          Text("virtual").tag("")
-          ForEach(player.clockDestinations, id: \.self) { name in Text(name).tag(name) }
-        }
-        .labelsHidden().frame(width: 120).font(.caption)
+          .toggleStyle(.button).font(.caption).fixedSize()
+          .help("Send MIDI clock out: start, six ticks a sixteenth, stop. Where it goes is in Settings.")
         if let song = player.song {
           Arrangement(player: player, song: song)
           Text("\(Int(song.bpm)) bpm").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            .fixedSize()
         }
       }
       .padding(12)
@@ -171,7 +184,8 @@
           }
         }
       }
-      .frame(width: 420)
+      // It gives way before the song's name does, down to enough for a few entries.
+      .frame(minWidth: 160, idealWidth: 420, maxWidth: 420)
     }
   }
 
