@@ -106,7 +106,12 @@ gone native at all.
    by its own angles. Then Light Cycles, whose walls are rewritten
    every frame and whose bikes turn on the beat. Then Clouds and Longhand. Twenty of twenty-seven,
    and the snapshot test now draws with a finger as well — Longhand is a blank page until
-   something is drawn on it, so a scene given no touch had nothing to show and nothing to move. The other sixteen are three.js
+   something is drawn on it, so a scene given no touch had nothing to show and nothing to move.
+   One thing Longhand wants that the native side does not have yet: the web samples the pointer
+   at its own rate, 120Hz on a ProMotion screen, so a flick that begins and ends between two
+   frames is still drawn. `SceneInput` carries one touch a frame, so a fast hand draws a
+   coarser line here. It needs a touch history on the input, which is a change to make when a
+   second scene wants one. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,

@@ -313,8 +313,11 @@
       encoder.setCullMode(.back)
 
       // three's own order, opaque before transparent: the page, then the ink and its nibs, then
-      // the dust and everything additive. Nothing writes depth but the grid, which sits behind
-      // the lot, so what is on top of what is decided here rather than by the depth buffer.
+      // the dust and everything additive. Every material in the web scene has its depth writing
+      // turned off but the grid's, and the grid is behind all of it — so nothing here is ever
+      // hidden by anything, and this order alone decides what lands on top of what. The halo
+      // going on last over its own core adds to it rather than covering it, which is the point
+      // of it being additive.
       encoder.setRenderPipelineState(gridPipeline)
       encoder.setVertexBytes(&page, length: MemoryLayout<PageUniforms>.stride, index: 0)
       encoder.setVertexBuffer(grid, offset: 0, index: 1)
