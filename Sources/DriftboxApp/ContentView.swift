@@ -454,10 +454,21 @@
       let step = player.position?.step ?? 0
       let length = player.position?.pattern?.length ?? 16
       VStack(alignment: .leading, spacing: 7) {
-        HStack {
+        HStack(spacing: 8) {
           FieldLabel("Song")
           Spacer()
           Text("\(total) bars").font(Theme.mono(9)).foregroundStyle(Theme.dim)
+          Menu {
+            ForEach(song.patterns, id: \.id) { pattern in
+              Button(pattern.name) { player.edit("Add to Song") { $0 = $0.appendingToChain(pattern.id) } }
+            }
+          } label: {
+            Image(systemName: "plus").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.dim)
+          }
+          .menuStyle(.borderlessButton)
+          .menuIndicator(.hidden)
+          .fixedSize()
+          .help("Add a pattern to the end of the song")
         }
         GeometryReader { geometry in
           let gap = 3.0
@@ -470,9 +481,21 @@
                 ? (Double(bar - block.start) + Double(step) / Double(max(1, length))) / Double(block.bars) : 0
               ChainBlock(
                 name: block.name, bars: block.bars, tint: Theme.patternColor(block.colour), current: playing,
-                running: player.isPlaying, progress: progress
+                running: player.isPlaying, progress: progress, clips: block.clips
               ) { player.seek(toBar: block.start) }
               .frame(width: max(4, room * Double(block.bars) / Double(max(1, total))))
+              .contextMenu { ChainMenu(player: player, song: song, index: block.index, start: block.start) }
+              // Dragged onto another section, a section takes that one's place.
+              .draggable("driftbox.chain.\(block.index)")
+              .dropDestination(for: String.self) { items, _ in
+                guard let item = items.first, item.hasPrefix("driftbox.chain."),
+                  let from = Int(item.dropFirst("driftbox.chain.".count)), from != block.index
+                else { return false }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                  player.edit("Move Section") { $0 = $0.movingChainEntry(at: from, by: block.index - from) }
+                }
+                return true
+              }
             }
           }
         }
@@ -491,6 +514,8 @@
       /// Which colour: patterns in order of first appearance, so the same pattern is always
       /// the same colour within a song.
       let colour: Int
+      /// The machines playing a pattern of their own in this section.
+      var clips: [ClipSlot] = []
     }
 
     static func blocks(_ song: Song) -> [Block] {
@@ -503,7 +528,7 @@
         defer { start += bars }
         return Block(
           index: index, name: song.pattern(id: entry.pattern)?.name ?? "?", start: start, bars: bars,
-          colour: colour)
+          colour: colour, clips: ClipSlot.allCases.filter { entry.clips[$0] != nil })
       }
     }
   }
@@ -517,6 +542,7 @@
     /// And whether it is moving: stopped, the block is only marked, not lit.
     let running: Bool
     let progress: Double
+    var clips: [ClipSlot] = []
     let action: () -> Void
     @State private var hovering = false
 
@@ -544,6 +570,17 @@
             }
           }
           .clipShape(shape)
+          // A dot per machine playing its own pattern here, in that machine's colour.
+          .overlay(alignment: .topTrailing) {
+            if !clips.isEmpty, geometry.size.width > 20 {
+              HStack(spacing: 2) {
+                ForEach(clips, id: \.self) { slot in
+                  Circle().fill(slot.color).frame(width: 4, height: 4)
+                }
+              }
+              .padding(4)
+            }
+          }
           .overlay(shape.strokeBorder(tint.opacity(playing ? 0.95 : current || hovering ? 0.6 : 0.3)))
           .shadow(color: playing ? tint.opacity(0.55) : .clear, radius: 8)
         }
@@ -552,6 +589,87 @@
       .onHover { hovering = $0 }
       .help("\(name), \(bars) bar\(bars == 1 ? "" : "s") — click to play from here")
       .animation(.easeOut(duration: 0.15), value: hovering)
+    }
+  }
+
+  extension ClipSlot {
+    var title: String {
+      switch self {
+      case .tr808: "TR-808"
+      case .tr909: "TR-909"
+      case .bassA: "303 A"
+      case .bassB: "303 B"
+      }
+    }
+
+    var color: Color {
+      switch self {
+      case .tr808: Theme.eight
+      case .tr909: Theme.nine
+      case .bassA, .bassB: Theme.three
+      }
+    }
+  }
+
+  /// What can be done to one section of the song, as its context menu.
+  struct ChainMenu: View {
+    let player: Player
+    let song: Song
+    let index: Int
+    let start: Int
+
+    var body: some View {
+      let entry = song.chain[index]
+      Button("Play from Here") { player.seek(toBar: start) }
+      Divider()
+      Menu("Pattern") {
+        ForEach(song.patterns, id: \.id) { pattern in
+          Toggle(
+            pattern.name,
+            isOn: Binding(
+              get: { entry.pattern == pattern.id },
+              set: { _ in
+                player.edit("Set Section Pattern") { $0 = $0.settingChainPattern(at: index, to: pattern.id) }
+              }))
+        }
+      }
+      // One machine playing something else for a section — the 303 carrying on while the drums
+      // change underneath it.
+      Menu("Machines") {
+        ForEach(ClipSlot.allCases, id: \.self) { slot in
+          Menu(slot.title) {
+            let chosen = entry.clips[slot] ?? entry.pattern
+            ForEach(song.patterns, id: \.id) { pattern in
+              Toggle(
+                pattern.id == entry.pattern ? "\(pattern.name) (the section's)" : pattern.name,
+                isOn: Binding(
+                  get: { chosen == pattern.id },
+                  set: { _ in
+                    player.edit("Set \(slot.title) Pattern") {
+                      $0 = $0.settingChainClip(at: index, slot: slot, to: pattern.id)
+                    }
+                  }))
+            }
+          }
+        }
+      }
+      Menu("Repeat") {
+        ForEach([1, 2, 3, 4, 6, 8, 12, 16, 24, 32], id: \.self) { bars in
+          Toggle(
+            "\(bars) bar\(bars == 1 ? "" : "s")",
+            isOn: Binding(
+              get: { max(1, entry.repeat) == bars },
+              set: { _ in player.edit("Set Repeat") { $0 = $0.settingChainRepeat(at: index, to: bars) } }))
+        }
+      }
+      Divider()
+      Button("Move Earlier") { player.edit("Move Section") { $0 = $0.movingChainEntry(at: index, by: -1) } }
+        .disabled(index == 0)
+      Button("Move Later") { player.edit("Move Section") { $0 = $0.movingChainEntry(at: index, by: 1) } }
+        .disabled(index == song.chain.count - 1)
+      Divider()
+      Button("Remove from Song") { player.edit("Remove Section") { $0 = $0.removingFromChain(at: index) } }
+        .disabled(song.chain.count < 2)
     }
   }
 

@@ -119,6 +119,106 @@
       }
     }
 
+    /// Copy a lane, paste it into another; a lane will not paste into a line, nor a line into a
+    /// lane; cutting leaves the lane empty and undo brings it back.
+    @Test func lanesCopyCutAndPaste() throws {
+      try withTemporaryDirectory { directory in
+        let (player, manager) = try opened(directory)
+        #expect(!player.canPasteLane(into: "909.sd"))
+        player.copyLane("909.bd")
+        #expect(player.canPasteLane(into: "909.sd"))
+        #expect(!player.canPasteLane(into: "303.a"))
+        inOneTurn(manager) { player.pasteLane(into: "909.sd") }
+        let pasted = try pattern(player)
+        #expect(pasted.tracks["909.sd"] == pasted.tracks["909.bd"])
+        #expect(player.undoTitle == "Undo Paste Lane")
+
+        inOneTurn(manager) { player.cutLane("909.bd") }
+        #expect(try pattern(player).tracks["909.bd"] == nil)
+        player.undo()
+        #expect(try pattern(player).tracks["909.bd"] != nil)
+
+        // A line goes into a line.
+        inOneTurn(manager) {
+          player.editShown("Set Note") { $0.settingBassStep("303.a", at: 4, to: BassStep(note: 9)) }
+        }
+        player.copyLane("303.a")
+        #expect(player.canPasteLane(into: "303.b"))
+        #expect(!player.canPasteLane(into: "909.sd"))
+        inOneTurn(manager) { player.pasteLane(into: "303.b") }
+        #expect(try pattern(player).bassStep("303.b", at: 4).note == 9)
+      }
+    }
+
+    /// In flam mode a click on a 909 step marks a flam; on an 808 lane it still cycles, because
+    /// the 808 has no flams.
+    @Test func flamModeMarksFlamsOnlyOnThe909() throws {
+      try withTemporaryDirectory { directory in
+        let (player, manager) = try opened(directory)
+        player.flamMode = true
+        let pattern = try pattern(player)
+        inOneTurn(manager) {
+          StepButton(
+            player: player, patternId: pattern.id, voiceId: "909.bd", index: 2, value: .on, playing: false
+          )
+          .cycle()
+        }
+        #expect(try self.pattern(player).flam("909.bd", at: 2))
+        #expect(try self.pattern(player).step("909.bd", at: 2) == .on)
+        #expect(player.undoTitle == "Undo Set Flam")
+
+        inOneTurn(manager) {
+          player.editShown("Add Lane") {
+            var p = $0
+            p.tracks["808.cp"] = [StepValue](repeating: .off, count: 16)
+            return p
+          }
+        }
+        inOneTurn(manager) {
+          StepButton(
+            player: player, patternId: pattern.id, voiceId: "808.cp", index: 2, value: .off, playing: false
+          )
+          .cycle()
+        }
+        #expect(try self.pattern(player).step("808.cp", at: 2) == .on)
+      }
+    }
+
+    /// The song's sections, edited from the strip's menus.
+    @Test func sectionsAreAddedRepeatedMovedAndRemoved() throws {
+      try withTemporaryDirectory { directory in
+        let (player, manager) = try opened(directory)
+        let first = try #require(player.song?.patterns.first?.id)
+        var added: String?
+        inOneTurn(manager) {
+          player.edit("Add Pattern") { song in
+            let result = song.addingPattern()
+            song = result.song
+            added = result.id
+          }
+        }
+        let second = try #require(added)
+        inOneTurn(manager) { player.edit("Add to Song") { $0 = $0.appendingToChain(second) } }
+        inOneTurn(manager) { player.edit("Set Repeat") { $0 = $0.settingChainRepeat(at: 1, to: 4) } }
+        inOneTurn(manager) { player.edit("Move Section") { $0 = $0.movingChainEntry(at: 1, by: -1) } }
+        var chain = try #require(player.song?.chain)
+        #expect(chain.map(\.pattern) == [second, first])
+        #expect(chain[0].repeat == 4)
+        // The transport's arrangement follows: the second pattern is where the song starts.
+        #expect(player.song?.pattern(forBar: 0)?.id == second)
+
+        inOneTurn(manager) {
+          player.edit("Set TR-909 Pattern") { $0 = $0.settingChainClip(at: 0, slot: .tr909, to: first) }
+        }
+        #expect(player.song?.pattern(forBar: 0, slot: .tr909)?.id == first)
+        #expect(SongStrip.blocks(try #require(player.song))[0].clips == [.tr909])
+
+        inOneTurn(manager) { player.edit("Remove Section") { $0 = $0.removingFromChain(at: 0) } }
+        chain = try #require(player.song?.chain)
+        #expect(chain.map(\.pattern) == [first])
+      }
+    }
+
     /// A note goes on where it is clicked, and clicking the note that is already there pauses it
     /// rather than moving it.
     @Test func aBassNoteIsSetAndPausedFromTheGrid() throws {

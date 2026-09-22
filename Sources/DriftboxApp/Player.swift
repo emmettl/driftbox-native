@@ -420,6 +420,13 @@
     /// back through a bookmark rather than a path, so one renamed or moved in the Finder since is
     /// still found; one that has gone is forgotten rather than reported.
     public func restore() {
+      // Read before the song is opened, since opening one forgets it.
+      let pattern = memory?.string(forKey: Defaults.lastPattern)
+      restoreSong()
+      if let pattern, song?.pattern(id: pattern) != nil { editing = pattern }
+    }
+
+    private func restoreSong() {
       guard let memory else { return }
       if let bookmark = memory.data(forKey: Defaults.lastFile) {
         var stale = false
@@ -471,6 +478,7 @@
     private func take(_ loaded: Song, as entry: CatalogueEntry, from url: URL?) {
       current = entry
       fileURL = url
+      editing = nil
       remember(entry, at: url)
       undoManager?.removeAllActions()
       refreshUndo()
@@ -652,8 +660,77 @@
 
     /// Which voice's panel is showing.
     var selectedVoice: String?
-    /// A pattern chosen to edit, or nil to follow the transport.
-    var editing: String?
+    /// A pattern chosen to edit, or nil to follow the transport. Remembered with the song, so the
+    /// next launch opens on the pattern that was being worked on rather than the first one.
+    var editing: String? {
+      didSet {
+        guard editing != oldValue, let memory else { return }
+        if let editing {
+          memory.set(editing, forKey: Defaults.lastPattern)
+        } else {
+          memory.removeObject(forKey: Defaults.lastPattern)
+        }
+      }
+    }
+
+    /// Clicking a 909 step marks a flam rather than cycling the step.
+    var flamMode = false
+
+    /// A lane or line copied, to paste into another. The app's own, not the pasteboard's: nothing
+    /// outside Driftbox could do anything with it.
+    enum LaneClipboard {
+      case drum(DrumLaneClipboard)
+      case bass(BassLineClipboard)
+    }
+    private(set) var laneClipboard: LaneClipboard?
+
+    /// Change the pattern the grid shows, undoably, under `name`.
+    func editShown(_ name: String, _ change: (DriftboxSeq.Pattern) -> DriftboxSeq.Pattern) {
+      guard let id = shownPattern?.id else { return }
+      editPattern(id, name, change)
+    }
+
+    func editPattern(_ id: String, _ name: String, _ change: (DriftboxSeq.Pattern) -> DriftboxSeq.Pattern) {
+      edit(name) { song in
+        guard let at = song.patterns.firstIndex(where: { $0.id == id }) else { return }
+        song.patterns[at] = change(song.patterns[at])
+      }
+    }
+
+    func copyLane(_ voiceId: String) {
+      guard let pattern = shownPattern else { return }
+      laneClipboard =
+        voiceId.hasPrefix("303.")
+        ? .bass(pattern.copyingBassLine(voiceId)) : .drum(pattern.copyingDrumLane(voiceId))
+    }
+
+    func cutLane(_ voiceId: String) {
+      copyLane(voiceId)
+      editShown(voiceId.hasPrefix("303.") ? "Cut Line" : "Cut Lane") {
+        voiceId.hasPrefix("303.") ? $0.clearingBassLine(voiceId) : $0.clearingTrack(voiceId)
+      }
+    }
+
+    /// Whether what is on the clipboard can go into `voiceId`: a drum lane into a drum lane, a
+    /// line into a line.
+    func canPasteLane(into voiceId: String) -> Bool {
+      switch laneClipboard {
+      case .drum: !voiceId.hasPrefix("303.")
+      case .bass: voiceId.hasPrefix("303.")
+      case nil: false
+      }
+    }
+
+    func pasteLane(into voiceId: String) {
+      switch laneClipboard {
+      case .drum(let lane) where !voiceId.hasPrefix("303."):
+        editShown("Paste Lane") { $0.pastingDrumLane(voiceId, lane) }
+      case .bass(let line) where voiceId.hasPrefix("303."):
+        editShown("Paste Line") { $0.pastingBassLine(voiceId, line) }
+      default:
+        break
+      }
+    }
 
     /// The pattern the grid shows.
     var shownPattern: DriftboxSeq.Pattern? {
