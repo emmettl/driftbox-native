@@ -8,6 +8,7 @@ public enum RackModules {
   public static let all: [ModuleDef] =
     [out, vco, noise, vca, mixer, ladder, svf, adsr, lfo, offset, sampleHold, delay]
     + shapingDefs + spaceDefs + controlDefs + sourceDefs + sequencingDefs + playerDefs
+    + filterDefs
 
   public static let registry: [String: ModuleDef] = {
     var byType: [String: ModuleDef] = [:]
@@ -40,6 +41,7 @@ public enum RackModules {
         ?? makeSource(type, sampleRate: sampleRate, id: id, voice: voice).map { .sources($0) }
         ?? makeSequencing(type, sampleRate: sampleRate, id: id, voice: voice).map { .sequencing($0) }
         ?? makePlayer(type, sampleRate: sampleRate, id: id, voice: voice).map { .players($0) }
+        ?? makeFilter(type, sampleRate: sampleRate, id: id, voice: voice).map { .filters($0) }
     }
   }
 
