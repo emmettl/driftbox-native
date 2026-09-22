@@ -66,7 +66,7 @@
       }
 
       CommandGroup(after: .toolbar) {
-        Toggle("Visuals Pane", isOn: $showsVisuals)
+        Toggle("Visuals Backdrop", isOn: $showsVisuals)
           .keyboardShortcut("v", modifiers: [.command, .control])
         // Straight to full screen on a named display, which is the thing a projector wants and
         // otherwise takes opening, dragging across and then going full screen by hand.

@@ -76,6 +76,9 @@
     /// Whether the song has changed since it was opened or last saved: the window's edited dot,
     /// and what makes closing over the work ask first.
     private(set) var isEdited = false
+    /// The song as it was opened or last saved, which is what edited is measured against: undoing
+    /// back to it is not an edit, however many steps it took to get there.
+    private var saved: Song?
     /// What to call the song: the catalogue entry's name, or the file's. A window with no song in
     /// it is not an untitled document, it is the application waiting to be given one.
     var documentName: String { current?.name ?? "Driftbox" }
@@ -472,6 +475,7 @@
       undoManager?.removeAllActions()
       refreshUndo()
       song = loaded
+      saved = loaded
       isEdited = false
       load(loaded)
     }
@@ -487,6 +491,7 @@
       do {
         try Data(SongCodec.encode(song).utf8).write(to: url)
         fileURL = url
+        saved = song
         isEdited = false
         // Saving under a new name renames the window with it, as a document's title follows its
         // file rather than whatever it was called when it was opened.
@@ -692,7 +697,7 @@
 
     private func replace(with edited: Song, undoing before: Song, name: String) {
       song = edited
-      isEdited = true
+      isEdited = edited != saved
       undoManager?.registerUndo(withTarget: self) { player in
         MainActor.assumeIsolated { player.replace(with: before, undoing: edited, name: name) }
       }

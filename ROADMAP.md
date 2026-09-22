@@ -166,6 +166,15 @@ gone native at all.
    runs at 48 kHz whatever the device does, the output converts, and a choice there would
    change nothing anyone could hear.
 
+   Then a pass over how it looks, because working was not the same as being the instrument. The
+   web app's identity came across whole — its night indigo, smoked-glass panels, monospaced
+   labels, one colour per machine, glowing steps and a teal playhead column — laid out as a Mac
+   window: the transport in the toolbar, with tempo and swing dragged like knobs; the song as a
+   strip drawn to scale and coloured by pattern; the grid stretching with the window, the 303
+   lines on the drums' columns; knobs rather than sliders, in real units, one undo a turn; a 303
+   strip, which the native app had not had at all; and the visuals as a dimmed backdrop behind
+   everything, as on the web, instead of a letterboxed pane.
+
    Left: the pattern being edited, which restoration does not put back; and more
    than one song open at once, which is deliberately not done. It is not a scene change: the
    player owns the audio engine, the MIDI ports and the clock, and two of them would be two

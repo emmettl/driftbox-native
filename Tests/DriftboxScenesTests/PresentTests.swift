@@ -18,6 +18,15 @@
       #expect(SceneRenderer.fit(SIMD2(1920, 1080), in: SIMD2(800, 0)) == .zero)
     }
 
+    @Test func aFrameCoversByCroppingTheOverhang() {
+      #expect(SceneRenderer.cover(SIMD2(1920, 1080), in: SIMD2(960, 540)) == SIMD2(1, 1))
+      // Wider than the target: full height, the sides cut off.
+      #expect(SceneRenderer.cover(SIMD2(1600, 900), in: SIMD2(400, 400)) == SIMD2(1600.0 / 900, 1))
+      // Taller than the target: full width, top and bottom cut off.
+      #expect(SceneRenderer.cover(SIMD2(400, 800), in: SIMD2(800, 400)) == SIMD2(1, 4))
+      #expect(SceneRenderer.cover(SIMD2(0, 1080), in: SIMD2(800, 400)) == .zero)
+    }
+
     /// A widescreen frame into a square view: black above and below, the picture between.
     @Test func aWideFrameIsLetterboxedInASquare() throws {
       guard let device = MTLCreateSystemDefaultDevice() else { return }
@@ -52,6 +61,17 @@
       #expect(brightness(row: 194) == 0, "the bottom bar is black")
       #expect(brightness(row: 100) > 0.3, "the picture is between them")
       #expect(brightness(row: 60) > 0.3, "and reaches toward the bars")
+
+      // Filling instead, the same frame reaches every edge.
+      renderer.present(frame, into: view, filling: true)
+      renderer.queue.makeCommandBuffer().map { buffer in
+        buffer.commit()
+        buffer.waitUntilCompleted()
+      }
+      let filled = SceneTests.readBack(view)
+      let top = (0..<200).reduce(0) { $0 + Int(filled[$1 * 4]) }
+      let bottom = (0..<200).reduce(0) { $0 + Int(filled[(199 * 200 + $1) * 4]) }
+      #expect(top > 0 && bottom > 0, "no bars when filling")
     }
   }
 #endif

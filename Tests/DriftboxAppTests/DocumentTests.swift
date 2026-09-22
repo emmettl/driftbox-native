@@ -68,9 +68,13 @@
         player.edit("Set Tempo") { $0.bpm = 128 }
         #expect(player.isEdited)
 
-        // Undoing does not put the document back to saved: the file on disk is still the other one.
+        // Undoing back to what is on disk is back to saved, as it is in any Mac document: there
+        // is nothing left to save. (This used to stay marked, which made quitting ask about
+        // changes that were no longer there.)
         player.undo()
         #expect(player.song?.bpm == 120)
+        #expect(!player.isEdited)
+        player.redo()
         #expect(player.isEdited)
 
         let elsewhere = directory.appendingPathComponent("Elsewhere.song.json")
@@ -80,7 +84,7 @@
         #expect(player.documentName == "Elsewhere")
         #expect(player.fileURL == elsewhere)
 
-        player.edit("Set Tempo") { $0.bpm = 128 }
+        player.edit("Set Tempo") { $0.bpm = 140 }
         #expect(player.isEdited)
         player.open(file: directory.appendingPathComponent("Test.song.json"))
         #expect(!player.isEdited)
