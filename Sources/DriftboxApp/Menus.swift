@@ -5,7 +5,7 @@
   /// where a Mac user looks to find out what an application can do — and, for undo, to find out
   /// that it can be undone at all. The toolbar's buttons call the same methods and carry no key
   /// equivalents of their own, so nothing is bound twice.
-  struct AppMenus: Commands {
+  public struct AppMenus: Commands {
     let player: Player
     let files: SongFiles
     // Both are remembered between launches, so the menu writes the preference and the window
@@ -13,7 +13,12 @@
     @AppStorage(Defaults.visuals) private var showsVisuals = true
     @AppStorage(Defaults.sendsClock) private var sendsClock = false
 
-    var body: some Commands {
+    public init(player: Player, files: SongFiles) {
+      self.player = player
+      self.files = files
+    }
+
+    public var body: some Commands {
       CommandGroup(replacing: .newItem) {
         Button("New") { files.new() }
           .keyboardShortcut("n")

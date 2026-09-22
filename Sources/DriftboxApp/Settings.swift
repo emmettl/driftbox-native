@@ -48,14 +48,18 @@
 
   /// The settings window: the MIDI the app listens to, the clock it sends, and whether the
   /// visuals run. Everything here is something the engine actually reads.
-  struct SettingsView: View {
+  public struct SettingsView: View {
     let player: Player
     @AppStorage(Defaults.visuals) private var visuals = true
     @AppStorage(Defaults.listensToMIDI) private var listens = true
     @AppStorage(Defaults.sendsClock) private var sends = false
     @AppStorage(Defaults.clockDestination) private var destination = ""
 
-    var body: some View {
+    public init(player: Player) {
+      self.player = player
+    }
+
+    public var body: some View {
       Form {
         Section("MIDI In") {
           Toggle("Play notes and follow clock from MIDI", isOn: $listens)

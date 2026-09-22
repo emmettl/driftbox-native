@@ -7,15 +7,19 @@
   import SwiftUI
   import UniformTypeIdentifiers
 
-  struct ContentView: View {
+  public struct ContentView: View {
     @Bindable var player: Player
     @Environment(\.undoManager) private var undoManager
     @AppStorage(Defaults.visuals) private var showsVisuals = true
 
+    public init(player: Player) {
+      self.player = player
+    }
+
     /// The File menu's own actions, which the toolbar shares rather than repeats.
     var files: SongFiles { SongFiles(player: player) }
 
-    var body: some View {
+    public var body: some View {
       NavigationSplitView {
         List(
           player.entries,
