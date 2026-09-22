@@ -35,6 +35,7 @@ public enum RackProcessor {
   case sources(SourceProcessor)
   case sequencing(SequencingProcessor)
   case players(PlayerProcessor)
+  case filters(FilterProcessor)
 
   @_noAllocation
   mutating func process(inlets: Slots, outlets: Slots, params: Slots, context: ProcessContext) {
@@ -85,6 +86,9 @@ public enum RackProcessor {
     case .players(var family):
       family.process(inlets, outlets, params, context)
       self = .players(family)
+    case .filters(var family):
+      family.process(inlets, outlets, params, context)
+      self = .filters(family)
     }
   }
 
@@ -97,6 +101,7 @@ public enum RackProcessor {
     case .sources(let family): family.meter()
     case .sequencing(let family): family.meter()
     case .players(let family): family.meter()
+    case .filters(let family): family.meter()
     default: nil
     }
   }
@@ -111,6 +116,7 @@ public enum RackProcessor {
     case .sources(var family): family.release()
     case .sequencing(var family): family.release()
     case .players(var family): family.release()
+    case .filters(var family): family.release()
     default: break
     }
   }
