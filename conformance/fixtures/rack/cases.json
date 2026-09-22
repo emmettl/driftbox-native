@@ -5103,5 +5103,9617 @@
    ],
    "notes": []
   }
+ },
+ {
+  "name": "sequencing-transport-divisions",
+  "patch": {
+   "modules": [
+    {
+     "id": "tx",
+     "type": "transport",
+     "params": {
+      "beatsPerBar": 3
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.5,
+      "level2": 0.2,
+      "level3": 0.2,
+      "level4": 0.3
+     }
+    },
+    {
+     "id": "ticks",
+     "type": "mixer",
+     "params": {
+      "level1": 0.1,
+      "level2": 0.15,
+      "level3": 0.2,
+      "level4": 0.05
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.001,
+      "decay": 0.02,
+      "sustain": 0,
+      "release": 0.03
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "tx",
+      "sixteenth"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "bar"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "bar"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "beat"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "quarter"
+     ],
+     "to": [
+      "ticks",
+      "in1"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "eighth"
+     ],
+     "to": [
+      "ticks",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "sixteenth"
+     ],
+     "to": [
+      "ticks",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "run"
+     ],
+     "to": [
+      "ticks",
+      "in4"
+     ]
+    },
+    {
+     "from": [
+      "ticks",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in4"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 160,
+  "events": [
+   [
+    0,
+    "transport",
+    300,
+    1,
+    0
+   ],
+   [
+    90,
+    "param",
+    "tx",
+    "beatsPerBar",
+    7
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 14,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "tx",
+     "type": "transport",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+     ],
+     "params": [
+      0
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "ticks",
+     "type": "mixer",
+     "inlets": [
+      4,
+      5,
+      6,
+      1,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      8
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      5,
+      6,
+      7,
+      8
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      2,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      11
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      13,
+      14,
+      15
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      6,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      12
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      16,
+      17,
+      18,
+      19
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      11,
+      12
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      13
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      20,
+      21
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      13,
+      2,
+      3,
+      8,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      7
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      1,
+      2,
+      3,
+      4
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      7,
+      7
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      9,
+      10
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      9,
+      10,
+      11,
+      12
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 9,
+     "right": 10,
+     "pan": 10,
+     "mute": 11,
+     "solo": 12
+    }
+   ],
+   "params": [
+    {
+     "value": 3,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 0.1,
+     "stepped": false
+    },
+    {
+     "value": 0.15,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.05,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.001,
+     "stepped": false
+    },
+    {
+     "value": 0.02,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-transport-tempo-stop",
+  "patch": {
+   "modules": [
+    {
+     "id": "tx",
+     "type": "transport"
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.5,
+      "level2": 0.25,
+      "level3": 0.25,
+      "level4": 0.2
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.03,
+      "sustain": 0.2,
+      "release": 0.03
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "tx",
+      "eighth"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "beat"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "bar"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "beat"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "quarter"
+     ],
+     "to": [
+      "mix",
+      "in4"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 200,
+  "events": [
+   [
+    0,
+    "transport",
+    180,
+    0,
+    0
+   ],
+   [
+    6,
+    "transport",
+    240,
+    1,
+    0.5
+   ],
+   [
+    50,
+    "transport",
+    397,
+    1,
+    0.5
+   ],
+   [
+    100,
+    "transport",
+    397,
+    0,
+    0
+   ],
+   [
+    130,
+    "transport",
+    133,
+    1,
+    0.25
+   ],
+   [
+    170,
+    "transport",
+    400,
+    1,
+    1
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 13,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "tx",
+     "type": "transport",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "outletConnected": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+     ],
+     "params": [
+      0
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      3,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      10
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      9,
+      10,
+      11
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      5,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      11
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      12,
+      13,
+      14,
+      15
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      10,
+      11
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      12
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      16,
+      17
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      12,
+      2,
+      3,
+      4,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      7
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      1,
+      2,
+      3,
+      4
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      7,
+      7
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      8,
+      9
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      5,
+      6,
+      7,
+      8
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 8,
+     "right": 9,
+     "pan": 6,
+     "mute": 7,
+     "solo": 8
+    }
+   ],
+   "params": [
+    {
+     "value": 4,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.25,
+     "stepped": false
+    },
+    {
+     "value": 0.25,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-clock-rate-width",
+  "patch": {
+   "modules": [
+    {
+     "id": "clk",
+     "type": "clock",
+     "params": {
+      "rate": 37,
+      "width": 0.3
+     }
+    },
+    {
+     "id": "sweep",
+     "type": "lfo",
+     "params": {
+      "rate": 3,
+      "shape": 1
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.6,
+      "level2": 0.2,
+      "level3": 0.3
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.04,
+      "sustain": 0.4,
+      "release": 0.03
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "sweep",
+      "bi"
+     ],
+     "to": [
+      "clk",
+      "rate"
+     ]
+    },
+    {
+     "from": [
+      "clk",
+      "gate"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "clk",
+      "phase"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "clk",
+      "trig"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "clk",
+      "phase"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 120,
+  "events": [
+   [
+    40,
+    "param",
+    "clk",
+    "width",
+    0.85
+   ],
+   [
+    80,
+    "param",
+    "clk",
+    "rate",
+    90
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 12,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "sweep",
+     "type": "lfo",
+     "inlets": [
+      0,
+      0
+     ],
+     "inletConnected": [
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      4,
+      5
+     ],
+     "outletConnected": [
+      true,
+      false
+     ],
+     "params": [
+      2,
+      3
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "clk",
+     "type": "clock",
+     "inlets": [
+      4,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      1,
+      2,
+      3
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true
+     ],
+     "params": [
+      0,
+      1
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      3,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      9
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      12,
+      13,
+      14
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      1,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      10
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      15,
+      16,
+      17,
+      18
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      9,
+      10
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      11
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      19,
+      20
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      11,
+      2,
+      3,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      6
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      4,
+      5,
+      6,
+      7
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      6,
+      6
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      7,
+      8
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 7,
+     "right": 8,
+     "pan": 9,
+     "mute": 10,
+     "solo": 11
+    }
+   ],
+   "params": [
+    {
+     "value": 37,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 3,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.04,
+     "stepped": false
+    },
+    {
+     "value": 0.4,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-clock-reset",
+  "patch": {
+   "modules": [
+    {
+     "id": "tx",
+     "type": "transport"
+    },
+    {
+     "id": "clk",
+     "type": "clock",
+     "params": {
+      "rate": 11,
+      "width": 0.5
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.6,
+      "level2": 0.3,
+      "level3": 0.3
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.02,
+      "sustain": 0,
+      "release": 0.03
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "tx",
+      "quarter"
+     ],
+     "to": [
+      "clk",
+      "reset"
+     ]
+    },
+    {
+     "from": [
+      "clk",
+      "trig"
+     ],
+     "to": [
+      "env",
+      "trig"
+     ]
+    },
+    {
+     "from": [
+      "clk",
+      "phase"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "clk",
+      "gate"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "clk",
+      "phase"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 160,
+  "events": [
+   [
+    0,
+    "transport",
+    410,
+    1,
+    0
+   ],
+   [
+    70,
+    "param",
+    "clk",
+    "rate",
+    23
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 16,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "tx",
+     "type": "transport",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "outletConnected": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+     ],
+     "params": [
+      0
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "clk",
+     "type": "clock",
+     "inlets": [
+      0,
+      4
+     ],
+     "inletConnected": [
+      false,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      7,
+      8,
+      9
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true
+     ],
+     "params": [
+      1,
+      2
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      9,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      13
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      11,
+      12,
+      13
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      0,
+      8
+     ],
+     "inletConnected": [
+      false,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      14
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      14,
+      15,
+      16,
+      17
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      13,
+      14
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      15
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      18,
+      19
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      15,
+      7,
+      9,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      10
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      3,
+      4,
+      5,
+      6
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      10,
+      10
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      11,
+      12
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      7,
+      8,
+      9,
+      10
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 11,
+     "right": 12,
+     "pan": 8,
+     "mute": 9,
+     "solo": 10
+    }
+   ],
+   "params": [
+    {
+     "value": 4,
+     "stepped": true
+    },
+    {
+     "value": 11,
+     "stepped": false
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.02,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-seq-transport",
+  "patch": {
+   "modules": [
+    {
+     "id": "tx",
+     "type": "transport"
+    },
+    {
+     "id": "seq",
+     "type": "seq",
+     "params": {
+      "length": 5,
+      "glide": 0.01,
+      "pitch1": 0,
+      "pitch2": 7,
+      "pitch3": 12,
+      "pitch4": -5,
+      "pitch5": 3,
+      "pitch6": 24,
+      "gate2": 0,
+      "gate4": 1,
+      "gate5": 0
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.6,
+      "level2": 0.2,
+      "level3": 0.3
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.03,
+      "sustain": 0,
+      "release": 0.03
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "tx",
+      "eighth"
+     ],
+     "to": [
+      "seq",
+      "clock"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "pitch"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "trig"
+     ],
+     "to": [
+      "env",
+      "trig"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "pitch"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "gate"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 200,
+  "events": [
+   [
+    0,
+    "transport",
+    360,
+    1,
+    0
+   ],
+   [
+    120,
+    "param",
+    "seq",
+    "length",
+    8
+   ],
+   [
+    120,
+    "param",
+    "seq",
+    "glide",
+    0
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 16,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "tx",
+     "type": "transport",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "outletConnected": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+     ],
+     "params": [
+      0
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "seq",
+     "type": "seq",
+     "inlets": [
+      5,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      7,
+      8,
+      9
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true
+     ],
+     "params": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      7,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      13
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      27,
+      28,
+      29
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      0,
+      9
+     ],
+     "inletConnected": [
+      false,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      14
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      30,
+      31,
+      32,
+      33
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      13,
+      14
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      15
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      34,
+      35
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      15,
+      7,
+      8,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      10
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      19,
+      20,
+      21,
+      22
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      10,
+      10
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      11,
+      12
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      23,
+      24,
+      25,
+      26
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 11,
+     "right": 12,
+     "pan": 24,
+     "mute": 25,
+     "solo": 26
+    }
+   ],
+   "params": [
+    {
+     "value": 4,
+     "stepped": true
+    },
+    {
+     "value": 5,
+     "stepped": true
+    },
+    {
+     "value": 0.01,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 7,
+     "stepped": false
+    },
+    {
+     "value": 12,
+     "stepped": false
+    },
+    {
+     "value": -5,
+     "stepped": false
+    },
+    {
+     "value": 3,
+     "stepped": false
+    },
+    {
+     "value": 24,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-seq-clock-reset",
+  "patch": {
+   "modules": [
+    {
+     "id": "clk",
+     "type": "clock",
+     "params": {
+      "rate": 60,
+      "width": 0.6
+     }
+    },
+    {
+     "id": "rst",
+     "type": "lfo",
+     "params": {
+      "rate": 2.3,
+      "shape": 3
+     }
+    },
+    {
+     "id": "seq",
+     "type": "seq",
+     "params": {
+      "length": 8,
+      "glide": 0.004,
+      "pitch1": -12,
+      "pitch2": -7,
+      "pitch3": -3,
+      "pitch4": 0,
+      "pitch5": 2,
+      "pitch6": 5,
+      "pitch7": 9,
+      "pitch8": 14,
+      "gate3": 0,
+      "gate7": 0
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.6,
+      "level2": 0.2,
+      "level3": 0.2,
+      "level4": 0.2
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.04,
+      "sustain": 0.4,
+      "release": 0.03
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "clk",
+      "gate"
+     ],
+     "to": [
+      "seq",
+      "clock"
+     ]
+    },
+    {
+     "from": [
+      "rst",
+      "uni"
+     ],
+     "to": [
+      "seq",
+      "reset"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "pitch"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "gate"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "pitch"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "gate"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "trig"
+     ],
+     "to": [
+      "mix",
+      "in4"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 180,
+  "events": [
+   [
+    60,
+    "param",
+    "seq",
+    "length",
+    3
+   ],
+   [
+    100,
+    "param",
+    "seq",
+    "pitch2",
+    19
+   ],
+   [
+    140,
+    "param",
+    "seq",
+    "length",
+    6
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 15,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "clk",
+     "type": "clock",
+     "inlets": [
+      0,
+      0
+     ],
+     "inletConnected": [
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      1,
+      2,
+      3
+     ],
+     "outletConnected": [
+      true,
+      false,
+      false
+     ],
+     "params": [
+      0,
+      1
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "rst",
+     "type": "lfo",
+     "inlets": [
+      0,
+      0
+     ],
+     "inletConnected": [
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      4,
+      5
+     ],
+     "outletConnected": [
+      false,
+      true
+     ],
+     "params": [
+      2,
+      3
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "seq",
+     "type": "seq",
+     "inlets": [
+      1,
+      5
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      6,
+      7,
+      8
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true
+     ],
+     "params": [
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      6,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      12
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      30,
+      31,
+      32
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      7,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      13
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      33,
+      34,
+      35,
+      36
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      12,
+      13
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      14
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      37,
+      38
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      14,
+      6,
+      7,
+      8,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      9
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      22,
+      23,
+      24,
+      25
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      9,
+      9
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      10,
+      11
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      26,
+      27,
+      28,
+      29
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 10,
+     "right": 11,
+     "pan": 27,
+     "mute": 28,
+     "solo": 29
+    }
+   ],
+   "params": [
+    {
+     "value": 60,
+     "stepped": false
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 2.3,
+     "stepped": false
+    },
+    {
+     "value": 3,
+     "stepped": true
+    },
+    {
+     "value": 8,
+     "stepped": true
+    },
+    {
+     "value": 0.004,
+     "stepped": false
+    },
+    {
+     "value": -12,
+     "stepped": false
+    },
+    {
+     "value": -7,
+     "stepped": false
+    },
+    {
+     "value": -3,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 2,
+     "stepped": false
+    },
+    {
+     "value": 5,
+     "stepped": false
+    },
+    {
+     "value": 9,
+     "stepped": false
+    },
+    {
+     "value": 14,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.04,
+     "stepped": false
+    },
+    {
+     "value": 0.4,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-tracker-lanes",
+  "patch": {
+   "modules": [
+    {
+     "id": "tx",
+     "type": "transport"
+    },
+    {
+     "id": "trk",
+     "type": "tracker",
+     "params": {
+      "length": 12,
+      "unit2": 1,
+      "unit3": 2,
+      "mute4": 1
+     },
+     "data": {
+      "lane1": [
+       0,
+       0,
+       7,
+       0,
+       12,
+       5,
+       0,
+       -5,
+       3,
+       0,
+       10,
+       2
+      ],
+      "lane2": [
+       1,
+       0,
+       2,
+       0,
+       3,
+       0,
+       4,
+       0,
+       5,
+       0,
+       6,
+       0
+      ],
+      "lane3": [
+       8,
+       4,
+       0,
+       -4,
+       -8,
+       0,
+       16,
+       12,
+       0,
+       2,
+       -2,
+       0
+      ],
+      "lane4": [
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    },
+    {
+     "id": "lanes",
+     "type": "mixer",
+     "params": {
+      "level1": 0.3,
+      "level2": 0.3,
+      "level3": 0.3,
+      "level4": 0.3
+     }
+    },
+    {
+     "id": "trigs",
+     "type": "mixer",
+     "params": {
+      "level1": 0.2,
+      "level2": 0.2,
+      "level3": 0.2,
+      "level4": 0.2
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.6,
+      "level2": 0.4,
+      "level3": 0.4
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.02,
+      "sustain": 0.5,
+      "release": 0.01
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "tx",
+      "sixteenth"
+     ],
+     "to": [
+      "trk",
+      "clock"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "cv1"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "gate1"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "cv2"
+     ],
+     "to": [
+      "lanes",
+      "in1"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "cv3"
+     ],
+     "to": [
+      "lanes",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "cv4"
+     ],
+     "to": [
+      "lanes",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "gate2"
+     ],
+     "to": [
+      "lanes",
+      "in4"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "trig1"
+     ],
+     "to": [
+      "trigs",
+      "in1"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "trig2"
+     ],
+     "to": [
+      "trigs",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "trig3"
+     ],
+     "to": [
+      "trigs",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "gate4"
+     ],
+     "to": [
+      "trigs",
+      "in4"
+     ]
+    },
+    {
+     "from": [
+      "lanes",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "trigs",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 220,
+  "events": [
+   [
+    0,
+    "transport",
+    400,
+    1,
+    0
+   ],
+   [
+    60,
+    "param",
+    "trk",
+    "mute3",
+    1
+   ],
+   [
+    100,
+    "param",
+    "trk",
+    "mute3",
+    0
+   ],
+   [
+    100,
+    "param",
+    "trk",
+    "mute4",
+    0
+   ],
+   [
+    150,
+    "param",
+    "trk",
+    "unit2",
+    2
+   ],
+   [
+    180,
+    "param",
+    "trk",
+    "unit3",
+    0
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 27,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "tx",
+     "type": "transport",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "outletConnected": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+     ],
+     "params": [
+      0
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "trk",
+     "type": "tracker",
+     "inlets": [
+      6,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false
+     ],
+     "params": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "lanes",
+     "type": "mixer",
+     "inlets": [
+      10,
+      13,
+      16,
+      11,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      19
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      11,
+      12,
+      13,
+      14
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "trigs",
+     "type": "mixer",
+     "inlets": [
+      9,
+      12,
+      15,
+      17,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      20
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      15,
+      16,
+      17,
+      18
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      7,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      24
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      27,
+      28,
+      29
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      8,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      25
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      30,
+      31,
+      32,
+      33
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      24,
+      25
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      26
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      34,
+      35
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      26,
+      19,
+      20,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      21
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      19,
+      20,
+      21,
+      22
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      21,
+      21
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      22,
+      23
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      23,
+      24,
+      25,
+      26
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 22,
+     "right": 23,
+     "pan": 24,
+     "mute": 25,
+     "solo": 26
+    }
+   ],
+   "params": [
+    {
+     "value": 4,
+     "stepped": true
+    },
+    {
+     "value": 12,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 2,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 0.4,
+     "stepped": false
+    },
+    {
+     "value": 0.4,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.02,
+     "stepped": false
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.01,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-tracker-patterns",
+  "patch": {
+   "modules": [
+    {
+     "id": "clk",
+     "type": "clock",
+     "params": {
+      "rate": 45,
+      "width": 0.5
+     }
+    },
+    {
+     "id": "rst",
+     "type": "lfo",
+     "params": {
+      "rate": 1.7,
+      "shape": 3
+     }
+    },
+    {
+     "id": "sel",
+     "type": "offset",
+     "params": {
+      "gain": 0,
+      "offset": 0
+     }
+    },
+    {
+     "id": "trk",
+     "type": "tracker",
+     "params": {
+      "length": 6,
+      "pattern": 1
+     },
+     "data": {
+      "lane1": [
+       0,
+       3,
+       0,
+       7,
+       0,
+       10,
+       12,
+       0,
+       15,
+       0,
+       19,
+       24,
+       -12,
+       -12,
+       0,
+       -7,
+       0,
+       -5
+      ],
+      "lane2": [
+       1,
+       1,
+       0,
+       1,
+       0,
+       0,
+       0,
+       1,
+       1,
+       0,
+       1,
+       1
+      ]
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.6,
+      "level2": 0.3,
+      "level3": 0.2,
+      "level4": 0.2
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.03,
+      "sustain": 0.3,
+      "release": 0.03
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "clk",
+      "gate"
+     ],
+     "to": [
+      "trk",
+      "clock"
+     ]
+    },
+    {
+     "from": [
+      "rst",
+      "uni"
+     ],
+     "to": [
+      "trk",
+      "reset"
+     ]
+    },
+    {
+     "from": [
+      "sel",
+      "out"
+     ],
+     "to": [
+      "trk",
+      "pattern"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "cv1"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "trig1"
+     ],
+     "to": [
+      "env",
+      "trig"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "gate2"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "cv1"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "gate1"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "trig2"
+     ],
+     "to": [
+      "mix",
+      "in4"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 220,
+  "events": [
+   [
+    50,
+    "param",
+    "trk",
+    "pattern",
+    0
+   ],
+   [
+    80,
+    "param",
+    "sel",
+    "offset",
+    0.125
+   ],
+   [
+    110,
+    "data",
+    "trk",
+    "lane1",
+    [
+     5,
+     0,
+     8,
+     0,
+     12,
+     0,
+     -3,
+     0,
+     2,
+     0,
+     9,
+     0,
+     14,
+     0,
+     0,
+     0,
+     1,
+     2
+    ]
+   ],
+   [
+    140,
+    "param",
+    "trk",
+    "length",
+    9
+   ],
+   [
+    170,
+    "param",
+    "sel",
+    "offset",
+    -0.2
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 25,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "clk",
+     "type": "clock",
+     "inlets": [
+      0,
+      0
+     ],
+     "inletConnected": [
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      1,
+      2,
+      3
+     ],
+     "outletConnected": [
+      true,
+      false,
+      false
+     ],
+     "params": [
+      0,
+      1
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "rst",
+     "type": "lfo",
+     "inlets": [
+      0,
+      0
+     ],
+     "inletConnected": [
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      4,
+      5
+     ],
+     "outletConnected": [
+      false,
+      true
+     ],
+     "params": [
+      2,
+      3
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "sel",
+     "type": "offset",
+     "inlets": [
+      0
+     ],
+     "inletConnected": [
+      false
+     ],
+     "inletTrims": [
+      null
+     ],
+     "outlets": [
+      6
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      4,
+      5
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "trk",
+     "type": "tracker",
+     "inlets": [
+      1,
+      5,
+      6
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "params": [
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      7,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      22
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      24,
+      25,
+      26
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      11,
+      9
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      23
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      27,
+      28,
+      29,
+      30
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      22,
+      23
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      24
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      31,
+      32
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      24,
+      7,
+      8,
+      12,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      19
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      16,
+      17,
+      18,
+      19
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      19,
+      19
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      20,
+      21
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      20,
+      21,
+      22,
+      23
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 20,
+     "right": 21,
+     "pan": 21,
+     "mute": 22,
+     "solo": 23
+    }
+   ],
+   "params": [
+    {
+     "value": 45,
+     "stepped": false
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 1.7,
+     "stepped": false
+    },
+    {
+     "value": 3,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 6,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-arranger-song",
+  "patch": {
+   "modules": [
+    {
+     "id": "bars",
+     "type": "clock",
+     "params": {
+      "rate": 16,
+      "width": 0.5
+     }
+    },
+    {
+     "id": "steps",
+     "type": "clock",
+     "params": {
+      "rate": 72,
+      "width": 0.5
+     }
+    },
+    {
+     "id": "song",
+     "type": "arranger",
+     "params": {
+      "length": 4
+     },
+     "data": {
+      "patterns": [
+       0,
+       2,
+       1,
+       3
+      ],
+      "repeats": [
+       2,
+       1,
+       3,
+       0
+      ]
+     }
+    },
+    {
+     "id": "trk",
+     "type": "tracker",
+     "params": {
+      "length": 4
+     },
+     "data": {
+      "lane1": [
+       0,
+       12,
+       0,
+       7,
+       3,
+       0,
+       5,
+       0,
+       -5,
+       -5,
+       0,
+       2,
+       10,
+       0,
+       17,
+       19
+      ]
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.6,
+      "level2": 1,
+      "level3": 0.3
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.025,
+      "sustain": 0,
+      "release": 0.03
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "bars",
+      "gate"
+     ],
+     "to": [
+      "song",
+      "clock"
+     ]
+    },
+    {
+     "from": [
+      "steps",
+      "gate"
+     ],
+     "to": [
+      "trk",
+      "clock"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "pattern"
+     ],
+     "to": [
+      "trk",
+      "pattern"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "trig"
+     ],
+     "to": [
+      "trk",
+      "reset"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "cv1"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "trk",
+      "trig1"
+     ],
+     "to": [
+      "env",
+      "trig"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "pattern"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "trig"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 260,
+  "events": [],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 27,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "bars",
+     "type": "clock",
+     "inlets": [
+      0,
+      0
+     ],
+     "inletConnected": [
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      1,
+      2,
+      3
+     ],
+     "outletConnected": [
+      true,
+      false,
+      false
+     ],
+     "params": [
+      0,
+      1
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "steps",
+     "type": "clock",
+     "inlets": [
+      0,
+      0
+     ],
+     "inletConnected": [
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      4,
+      5,
+      6
+     ],
+     "outletConnected": [
+      true,
+      false,
+      false
+     ],
+     "params": [
+      2,
+      3
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "song",
+     "type": "arranger",
+     "inlets": [
+      1,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      7,
+      8
+     ],
+     "outletConnected": [
+      true,
+      true
+     ],
+     "params": [
+      4
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "trk",
+     "type": "tracker",
+     "inlets": [
+      4,
+      8,
+      7
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "outletConnected": [
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "params": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      9,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      24
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      23,
+      24,
+      25
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      0,
+      11
+     ],
+     "inletConnected": [
+      false,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      25
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      26,
+      27,
+      28,
+      29
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      24,
+      25
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      26
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      30,
+      31
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      26,
+      7,
+      8,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      21
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      15,
+      16,
+      17,
+      18
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      21,
+      21
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      22,
+      23
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      19,
+      20,
+      21,
+      22
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 22,
+     "right": 23,
+     "pan": 20,
+     "mute": 21,
+     "solo": 22
+    }
+   ],
+   "params": [
+    {
+     "value": 16,
+     "stepped": false
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 72,
+     "stepped": false
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 4,
+     "stepped": true
+    },
+    {
+     "value": 4,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.025,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-arranger-edits",
+  "patch": {
+   "modules": [
+    {
+     "id": "tx",
+     "type": "transport",
+     "params": {
+      "beatsPerBar": 1
+     }
+    },
+    {
+     "id": "rst",
+     "type": "lfo",
+     "params": {
+      "rate": 2.5,
+      "shape": 3
+     }
+    },
+    {
+     "id": "song",
+     "type": "arranger",
+     "params": {
+      "length": 3
+     },
+     "data": {
+      "patterns": [
+       1,
+       4,
+       9,
+       -2
+      ]
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.6,
+      "level2": 1,
+      "level3": 0.3
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.02,
+      "sustain": 0.1,
+      "release": 0.03
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "tx",
+      "sixteenth"
+     ],
+     "to": [
+      "song",
+      "clock"
+     ]
+    },
+    {
+     "from": [
+      "rst",
+      "uni"
+     ],
+     "to": [
+      "song",
+      "reset"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "pattern"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "tx",
+      "eighth"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "pattern"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "trig"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 300,
+  "events": [
+   [
+    0,
+    "transport",
+    400,
+    1,
+    0
+   ],
+   [
+    60,
+    "data",
+    "song",
+    "patterns",
+    [
+     6,
+     2,
+     5.5,
+     0
+    ]
+   ],
+   [
+    120,
+    "param",
+    "song",
+    "length",
+    1
+   ],
+   [
+    160,
+    "param",
+    "song",
+    "length",
+    4
+   ],
+   [
+    180,
+    "data",
+    "song",
+    "repeats",
+    [
+     1,
+     2,
+     1,
+     3
+    ]
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 17,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "tx",
+     "type": "transport",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "outletConnected": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+     ],
+     "params": [
+      0
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "rst",
+     "type": "lfo",
+     "inlets": [
+      0,
+      0
+     ],
+     "inletConnected": [
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      7,
+      8
+     ],
+     "outletConnected": [
+      false,
+      true
+     ],
+     "params": [
+      1,
+      2
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "song",
+     "type": "arranger",
+     "inlets": [
+      6,
+      8
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      9,
+      10
+     ],
+     "outletConnected": [
+      true,
+      true
+     ],
+     "params": [
+      3
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      9,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      14
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      12,
+      13,
+      14
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      5,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      15
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      15,
+      16,
+      17,
+      18
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      14,
+      15
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      16
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      19,
+      20
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      16,
+      9,
+      10,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      11
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      4,
+      5,
+      6,
+      7
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      11,
+      11
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      12,
+      13
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 12,
+     "right": 13,
+     "pan": 9,
+     "mute": 10,
+     "solo": 11
+    }
+   ],
+   "params": [
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 2.5,
+     "stepped": false
+    },
+    {
+     "value": 3,
+     "stepped": true
+    },
+    {
+     "value": 3,
+     "stepped": true
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.02,
+     "stepped": false
+    },
+    {
+     "value": 0.1,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-midi-poly",
+  "patch": {
+   "voices": 3,
+   "modules": [
+    {
+     "id": "keys",
+     "type": "midi"
+    },
+    {
+     "id": "vel",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.5,
+      "level2": 0.1
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 0
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.004,
+      "decay": 0.05,
+      "sustain": 0.6,
+      "release": 0.04
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "keys",
+      "pitch"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "gate"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "vel",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "vel"
+     ],
+     "to": [
+      "vel",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "vel",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "pitch"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    }
+   ]
+  },
+  "blocks": 180,
+  "events": [
+   [
+    2,
+    "voice",
+    "keys",
+    "note",
+    48,
+    0
+   ],
+   [
+    2,
+    "voice",
+    "keys",
+    "velocity",
+    1,
+    0
+   ],
+   [
+    2,
+    "voice",
+    "keys",
+    "gate",
+    1,
+    0
+   ],
+   [
+    10,
+    "voice",
+    "keys",
+    "note",
+    52,
+    1
+   ],
+   [
+    10,
+    "voice",
+    "keys",
+    "velocity",
+    0.5,
+    1
+   ],
+   [
+    10,
+    "voice",
+    "keys",
+    "gate",
+    1,
+    1
+   ],
+   [
+    18,
+    "voice",
+    "keys",
+    "note",
+    55,
+    2
+   ],
+   [
+    18,
+    "voice",
+    "keys",
+    "velocity",
+    0.7,
+    2
+   ],
+   [
+    18,
+    "voice",
+    "keys",
+    "gate",
+    1,
+    2
+   ],
+   [
+    60,
+    "param",
+    "keys",
+    "transpose",
+    5
+   ],
+   [
+    90,
+    "voice",
+    "keys",
+    "gate",
+    0,
+    1
+   ],
+   [
+    100,
+    "voice",
+    "keys",
+    "gate",
+    0,
+    0
+   ],
+   [
+    110,
+    "voice",
+    "keys",
+    "gate",
+    0,
+    2
+   ],
+   [
+    130,
+    "voice",
+    "keys",
+    "note",
+    60,
+    1
+   ],
+   [
+    130,
+    "voice",
+    "keys",
+    "gate",
+    1,
+    1
+   ],
+   [
+    160,
+    "voice",
+    "keys",
+    "gate",
+    0,
+    1
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 17,
+   "voices": 3,
+   "voiceWidths": [
+    1,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    1,
+    1,
+    3,
+    3,
+    3
+   ],
+   "nodes": [
+    {
+     "id": "keys",
+     "type": "midi",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "params": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ],
+     "poly": true,
+     "voices": 3,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      1,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      14
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      22,
+      23,
+      24
+     ],
+     "poly": true,
+     "voices": 3,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      2,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      15
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      25,
+      26,
+      27,
+      28
+     ],
+     "poly": true,
+     "voices": 3,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      14,
+      15
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      16
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      29,
+      30
+     ],
+     "poly": true,
+     "voices": 3,
+     "voiceLanes": 1
+    },
+    {
+     "id": "vel",
+     "type": "vca",
+     "inlets": [
+      16,
+      3
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      10
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      12,
+      13
+     ],
+     "poly": true,
+     "voices": 3,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      10,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      11
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      14,
+      15,
+      16,
+      17
+     ],
+     "poly": true,
+     "voices": 3,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      11,
+      11
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      12,
+      13
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      18,
+      19,
+      20,
+      21
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 12,
+     "right": 13,
+     "pan": 19,
+     "mute": 20,
+     "solo": 21
+    }
+   ],
+   "params": [
+    {
+     "value": 36,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.8,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.1,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.004,
+     "stepped": false
+    },
+    {
+     "value": 0.05,
+     "stepped": false
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 0.04,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-midi-glide-expression",
+  "patch": {
+   "modules": [
+    {
+     "id": "keys",
+     "type": "midi",
+     "params": {
+      "glide": 0.05,
+      "transpose": -12
+     }
+    },
+    {
+     "id": "ctl",
+     "type": "mixer",
+     "params": {
+      "level1": 0.2,
+      "level2": 0.2,
+      "level3": 0.2,
+      "level4": 0.2
+     }
+    },
+    {
+     "id": "ctl2",
+     "type": "mixer",
+     "params": {
+      "level1": 0.2,
+      "level2": 0.2,
+      "level3": 0.2
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.6,
+      "level2": 0.5,
+      "level3": 0.5,
+      "level4": 0.2
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.04,
+      "sustain": 0.7,
+      "release": 0.03
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "keys",
+      "pitch"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "gate"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "mod"
+     ],
+     "to": [
+      "osc",
+      "fm"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "bend"
+     ],
+     "to": [
+      "ctl",
+      "in1"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "aftertouch"
+     ],
+     "to": [
+      "ctl",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "expression"
+     ],
+     "to": [
+      "ctl",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "breath"
+     ],
+     "to": [
+      "ctl",
+      "in4"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "sustain"
+     ],
+     "to": [
+      "ctl2",
+      "in1"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "vel"
+     ],
+     "to": [
+      "ctl2",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "pitch"
+     ],
+     "to": [
+      "ctl2",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "ctl",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "ctl2",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    }
+   ]
+  },
+  "blocks": 160,
+  "events": [
+   [
+    1,
+    "param",
+    "keys",
+    "note",
+    60
+   ],
+   [
+    1,
+    "param",
+    "keys",
+    "gate",
+    1
+   ],
+   [
+    30,
+    "param",
+    "keys",
+    "note",
+    67
+   ],
+   [
+    45,
+    "param",
+    "keys",
+    "bend",
+    -0.5
+   ],
+   [
+    50,
+    "param",
+    "keys",
+    "mod",
+    0.1
+   ],
+   [
+    60,
+    "param",
+    "keys",
+    "aftertouch",
+    0.7
+   ],
+   [
+    70,
+    "param",
+    "keys",
+    "expression",
+    0.4
+   ],
+   [
+    80,
+    "param",
+    "keys",
+    "breath",
+    0.9
+   ],
+   [
+    85,
+    "param",
+    "keys",
+    "sustain",
+    1
+   ],
+   [
+    90,
+    "param",
+    "keys",
+    "glide",
+    0
+   ],
+   [
+    95,
+    "param",
+    "keys",
+    "note",
+    43
+   ],
+   [
+    120,
+    "param",
+    "keys",
+    "gate",
+    0
+   ],
+   [
+    125,
+    "param",
+    "keys",
+    "sustain",
+    0
+   ],
+   [
+    140,
+    "param",
+    "keys",
+    "velocity",
+    0.3
+   ],
+   [
+    140,
+    "param",
+    "keys",
+    "gate",
+    1
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 18,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "keys",
+     "type": "midi",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+     ],
+     "params": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "ctl",
+     "type": "mixer",
+     "inlets": [
+      5,
+      6,
+      7,
+      8,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      10
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      12,
+      13,
+      14,
+      15
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "ctl2",
+     "type": "mixer",
+     "inlets": [
+      9,
+      3,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      11
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      16,
+      17,
+      18,
+      19
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      1,
+      4
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      15
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      28,
+      29,
+      30
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      2,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      16
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      31,
+      32,
+      33,
+      34
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      15,
+      16
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      17
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      35,
+      36
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      17,
+      10,
+      11,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      12
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      20,
+      21,
+      22,
+      23
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      12,
+      12
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      13,
+      14
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      24,
+      25,
+      26,
+      27
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 13,
+     "right": 14,
+     "pan": 25,
+     "mute": 26,
+     "solo": 27
+    }
+   ],
+   "params": [
+    {
+     "value": 36,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.8,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": -12,
+     "stepped": false
+    },
+    {
+     "value": 0.05,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.04,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-note-echo-sync",
+  "patch": {
+   "modules": [
+    {
+     "id": "tx",
+     "type": "transport"
+    },
+    {
+     "id": "seq",
+     "type": "seq",
+     "params": {
+      "length": 2,
+      "pitch1": 0,
+      "pitch2": -5
+     }
+    },
+    {
+     "id": "echo",
+     "type": "note-echo",
+     "params": {
+      "sync": 1,
+      "division": 4,
+      "repeats": 4,
+      "pitch": 7,
+      "velocity": 0.8,
+      "gate": 0.4
+     }
+    },
+    {
+     "id": "vel",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.7,
+      "level2": 0.2,
+      "level3": 0.2
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 1
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.002,
+      "decay": 0.03,
+      "sustain": 0.5,
+      "release": 0.01
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "tx",
+      "bar"
+     ],
+     "to": [
+      "seq",
+      "clock"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "pitch"
+     ],
+     "to": [
+      "echo",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "seq",
+      "gate"
+     ],
+     "to": [
+      "echo",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "echo",
+      "pitch"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "echo",
+      "gate"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "vel",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "echo",
+      "velocity"
+     ],
+     "to": [
+      "vel",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "vel",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    },
+    {
+     "from": [
+      "echo",
+      "gate"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "echo",
+      "velocity"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    }
+   ]
+  },
+  "blocks": 300,
+  "events": [
+   [
+    0,
+    "transport",
+    400,
+    1,
+    0
+   ],
+   [
+    150,
+    "transport",
+    250,
+    1,
+    0
+   ],
+   [
+    200,
+    "param",
+    "echo",
+    "division",
+    2
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 20,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "tx",
+     "type": "transport",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "outletConnected": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+     ],
+     "params": [
+      0
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "seq",
+     "type": "seq",
+     "inlets": [
+      2,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      7,
+      8,
+      9
+     ],
+     "outletConnected": [
+      true,
+      true,
+      false
+     ],
+     "params": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "echo",
+     "type": "note-echo",
+     "inlets": [
+      7,
+      8,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      10,
+      11,
+      12
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true
+     ],
+     "params": [
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      10,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      17
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      37,
+      38,
+      39
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      11,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      18
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      40,
+      41,
+      42,
+      43
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      17,
+      18
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      19
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      44,
+      45
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "vel",
+     "type": "vca",
+     "inlets": [
+      19,
+      12
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      13
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      27,
+      28
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      13,
+      11,
+      12,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      14
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      29,
+      30,
+      31,
+      32
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      14,
+      14
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      15,
+      16
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      33,
+      34,
+      35,
+      36
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 15,
+     "right": 16,
+     "pan": 34,
+     "mute": 35,
+     "solo": 36
+    }
+   ],
+   "params": [
+    {
+     "value": 4,
+     "stepped": true
+    },
+    {
+     "value": 2,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": -5,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 250,
+     "stepped": false
+    },
+    {
+     "value": 4,
+     "stepped": true
+    },
+    {
+     "value": 4,
+     "stepped": true
+    },
+    {
+     "value": 7,
+     "stepped": true
+    },
+    {
+     "value": 0.8,
+     "stepped": false
+    },
+    {
+     "value": 0.4,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 0.2,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.002,
+     "stepped": false
+    },
+    {
+     "value": 0.03,
+     "stepped": false
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.01,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sequencing-note-echo-free-steps",
+  "patch": {
+   "voices": 2,
+   "modules": [
+    {
+     "id": "keys",
+     "type": "midi"
+    },
+    {
+     "id": "echo",
+     "type": "note-echo",
+     "params": {
+      "sync": 0,
+      "time": 21,
+      "repeats": 6,
+      "pitch": -2,
+      "velocity": 1.3,
+      "gate": 0.3,
+      "dry": 0
+     },
+     "data": {
+      "steps": [
+       1,
+       1,
+       0,
+       1,
+       1,
+       0,
+       1
+      ]
+     }
+    },
+    {
+     "id": "vel",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.6,
+      "level2": 0.15,
+      "level3": 0.15
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "params": {
+      "shape": 2
+     }
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "params": {
+      "attack": 0.001,
+      "decay": 0.02,
+      "sustain": 0.6,
+      "release": 0.005
+     }
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "keys",
+      "pitch"
+     ],
+     "to": [
+      "echo",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "gate"
+     ],
+     "to": [
+      "echo",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "keys",
+      "vel"
+     ],
+     "to": [
+      "echo",
+      "velocity"
+     ]
+    },
+    {
+     "from": [
+      "echo",
+      "pitch"
+     ],
+     "to": [
+      "osc",
+      "pitch"
+     ]
+    },
+    {
+     "from": [
+      "echo",
+      "gate"
+     ],
+     "to": [
+      "env",
+      "gate"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "vel",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "echo",
+      "velocity"
+     ],
+     "to": [
+      "vel",
+      "cv"
+     ]
+    },
+    {
+     "from": [
+      "vel",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    },
+    {
+     "from": [
+      "echo",
+      "gate"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "echo",
+      "pitch"
+     ],
+     "to": [
+      "mix",
+      "in3"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "env",
+      "out"
+     ],
+     "to": [
+      "amp",
+      "cv"
+     ]
+    }
+   ]
+  },
+  "blocks": 260,
+  "events": [
+   [
+    2,
+    "voice",
+    "keys",
+    "note",
+    60,
+    0
+   ],
+   [
+    2,
+    "voice",
+    "keys",
+    "velocity",
+    0.4,
+    0
+   ],
+   [
+    2,
+    "voice",
+    "keys",
+    "gate",
+    1,
+    0
+   ],
+   [
+    9,
+    "voice",
+    "keys",
+    "note",
+    64,
+    1
+   ],
+   [
+    9,
+    "voice",
+    "keys",
+    "velocity",
+    0.6,
+    1
+   ],
+   [
+    9,
+    "voice",
+    "keys",
+    "gate",
+    1,
+    1
+   ],
+   [
+    60,
+    "voice",
+    "keys",
+    "gate",
+    0,
+    0
+   ],
+   [
+    70,
+    "voice",
+    "keys",
+    "gate",
+    0,
+    1
+   ],
+   [
+    90,
+    "data",
+    "echo",
+    "steps",
+    [
+     0,
+     1,
+     1,
+     0,
+     1
+    ]
+   ],
+   [
+    90,
+    "param",
+    "echo",
+    "dry",
+    1
+   ],
+   [
+    100,
+    "voice",
+    "keys",
+    "note",
+    55,
+    0
+   ],
+   [
+    100,
+    "voice",
+    "keys",
+    "gate",
+    1,
+    0
+   ],
+   [
+    180,
+    "voice",
+    "keys",
+    "gate",
+    0,
+    0
+   ],
+   [
+    180,
+    "param",
+    "echo",
+    "time",
+    7
+   ],
+   [
+    185,
+    "voice",
+    "keys",
+    "gate",
+    1,
+    1
+   ],
+   [
+    230,
+    "voice",
+    "keys",
+    "gate",
+    0,
+    1
+   ]
+  ],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 20,
+   "voices": 2,
+   "voiceWidths": [
+    1,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    1,
+    1,
+    2,
+    2,
+    2
+   ],
+   "nodes": [
+    {
+     "id": "keys",
+     "type": "midi",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "params": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ],
+     "poly": true,
+     "voices": 2,
+     "voiceLanes": 1
+    },
+    {
+     "id": "echo",
+     "type": "note-echo",
+     "inlets": [
+      1,
+      2,
+      3
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      10,
+      11,
+      12
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true
+     ],
+     "params": [
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+     ],
+     "poly": true,
+     "voices": 2,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      10,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      17
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      30,
+      31,
+      32
+     ],
+     "poly": true,
+     "voices": 2,
+     "voiceLanes": 1
+    },
+    {
+     "id": "env",
+     "type": "adsr",
+     "inlets": [
+      11,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      18
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      33,
+      34,
+      35,
+      36
+     ],
+     "poly": true,
+     "voices": 2,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      17,
+      18
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      19
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      37,
+      38
+     ],
+     "poly": true,
+     "voices": 2,
+     "voiceLanes": 1
+    },
+    {
+     "id": "vel",
+     "type": "vca",
+     "inlets": [
+      19,
+      12
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      13
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      20,
+      21
+     ],
+     "poly": true,
+     "voices": 2,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      13,
+      11,
+      10,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      14
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      22,
+      23,
+      24,
+      25
+     ],
+     "poly": true,
+     "voices": 2,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      14,
+      14
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      15,
+      16
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      26,
+      27,
+      28,
+      29
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 15,
+     "right": 16,
+     "pan": 27,
+     "mute": 28,
+     "solo": 29
+    }
+   ],
+   "params": [
+    {
+     "value": 36,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.8,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 21,
+     "stepped": false
+    },
+    {
+     "value": 3,
+     "stepped": true
+    },
+    {
+     "value": 6,
+     "stepped": true
+    },
+    {
+     "value": -2,
+     "stepped": true
+    },
+    {
+     "value": 1.3,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 0.15,
+     "stepped": false
+    },
+    {
+     "value": 0.15,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 2,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.001,
+     "stepped": false
+    },
+    {
+     "value": 0.02,
+     "stepped": false
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 0.005,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
  }
 ]
