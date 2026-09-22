@@ -61,10 +61,13 @@ gone native at all.
    what was played rather than to a spectrum. Done when a bare player plays the catalogue.
 5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable wrapped into a
    bundle by `scripts/bundle-app.sh` (which the resource bundle needs, or `Bundle.module`
-   asserts). Looked at, once: the first sight was a transport pushed above the window and a
-   grid centred in its scroll view, both fixed — the visuals pane at a fixed height, the panel
-   column scrolling, the grid pinned top-left — and now it plays the catalogue with the scene
-   running and the voice names flashing. In so far:
+   asserts). Looked at, once, and three things came of it: a transport pushed above the window
+   and a grid centred in its scroll view (layout, fixed); a main thread that re-planned the
+   whole song every frame and then spent what was left re-diffing four hundred grid cells (the
+   step times are planned once, the tick writes only what changed, the 303 grid is a canvas);
+   and a stopped song that drifted with the engine's clock, thirteen bars in twenty-five
+   seconds (held in place, tested). It now plays the catalogue with the scene running and the
+   voice names flashing. In so far:
    the catalogue as a library; open and save of the web app's documents; a transport with the
    bar, step and pattern it is on, and the chain as a strip to jump around; the step grid of the
    pattern playing, live and editable; the 303 grids, with pitch, accent and slide; a panel of
