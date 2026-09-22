@@ -51,8 +51,9 @@ gone native at all.
    its offline one rather than to the browser again: the drum voices and the 303 to the bit,
    the reverb within single precision, the whole engine within -90dB. `driftbox-play` hosts the
    engine as an `AUAudioUnit` in an `AVAudioEngine` and plays the catalogue. Carried forward: the
-   engine costs 3.3% of real time in a loop and about a fifth of a core on the live IO thread,
-   and the six-fold gap between the two is not understood. (The events ring — which voice,
+   engine costs 3.3% of real time in a loop and a fifth of the audio's time on the live IO
+   thread — the difference being what waking a core every ten milliseconds costs, measured by
+   pacing the loop the same way, and not the code. (The events ring — which voice,
    accents, notes, passes — and the reverb's second stage landed with phase 5.)
    What was planned: `AUAudioUnit` from the start, sequencing sample-accurately
    inside the render block, lock-free rings both ways. The ring back to the interface carries

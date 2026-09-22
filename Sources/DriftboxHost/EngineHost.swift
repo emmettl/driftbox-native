@@ -3,6 +3,12 @@ import DriftboxEngine
 import DriftboxSeq
 import Synchronization
 
+#if canImport(Darwin)
+  import Darwin
+#else
+  import Glibc
+#endif
+
 /// The engine, its command ring, and the rule for who owns what: everything a render callback
 /// needs, behind one pointer, with nothing for the callback to retain.
 ///
@@ -17,6 +23,13 @@ public final class EngineHost: @unchecked Sendable {
   /// Songs handed to the engine and not yet handed back.
   private var owned: [UnsafeMutablePointer<CompiledSong>] = []
   private let lock = Mutex<Void>(())
+
+  /// How long the last second's render calls took, in nanoseconds of the render thread's own
+  /// time: the sum, the longest, and how many. Reset by whoever reads them with `takeLoad`.
+  let renderNanoseconds = Atomic<Int>(0)
+  let longestNanoseconds = Atomic<Int>(0)
+  let renderCalls = Atomic<Int>(0)
+  let renderedFrames = Atomic<Int>(0)
 
   /// What the render thread last reported: where the song is, and whether it is playing.
   public let songFrame = Atomic<Int>(-1)
@@ -77,11 +90,42 @@ public final class EngineHost: @unchecked Sendable {
     }
   }
 
+  /// The render thread's load since last asked: what fraction of the audio it rendered it spent
+  /// rendering, and the longest single call in milliseconds.
+  public func takeLoad() -> (fraction: Double, longestMilliseconds: Double, calls: Int) {
+    let nanoseconds = renderNanoseconds.exchange(0, ordering: .relaxed)
+    let frames = renderedFrames.exchange(0, ordering: .relaxed)
+    let calls = renderCalls.exchange(0, ordering: .relaxed)
+    let longest = longestNanoseconds.exchange(0, ordering: .relaxed)
+    let audioSeconds = Double(frames) / sampleRate
+    return (audioSeconds > 0 ? Double(nanoseconds) / 1e9 / audioSeconds : 0, Double(longest) / 1e6, calls)
+  }
+
   // MARK: - From the render thread
+
+  /// The calling thread's own CPU time. Vouched for by hand: a system call the checker cannot see into.
+  @_semantics("no_performance_analysis") @inline(never)
+  private func threadNanoseconds() -> UInt64 {
+    #if canImport(Darwin)
+      return clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+    #else
+      var spec = timespec()
+      clock_gettime(CLOCK_THREAD_CPUTIME_ID, &spec)
+      return UInt64(spec.tv_sec) * 1_000_000_000 + UInt64(spec.tv_nsec)
+    #endif
+  }
 
   /// Everything the render callback does: take what the interface asked for, then render.
   @_noAllocation
   public func render(frames: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>) {
+    let began = threadNanoseconds()
+    defer {
+      let took = Int(threadNanoseconds() &- began)
+      renderNanoseconds.add(took, ordering: .relaxed)
+      renderCalls.add(1, ordering: .relaxed)
+      renderedFrames.add(frames, ordering: .relaxed)
+      longestNanoseconds.max(took, ordering: .relaxed)
+    }
     while let command = commands.pointee.receive() {
       switch command {
       case .play: engine.pointee.play()

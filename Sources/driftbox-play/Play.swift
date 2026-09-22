@@ -63,7 +63,21 @@
         let began = Date()
         for _ in 0..<(frames / 512) { host.render(frames: 512, left: left, right: right) }
         let took = Date().timeIntervalSince(began)
-        print(String(format: "20s of %@ in %.2fs: %.1f%% of real time", arguments[0], took, took / 20 * 100))
+        let load = host.takeLoad()
+        print(
+          String(
+            format: "20s of %@ in %.2fs: %.1f%% of real time (%.1f%% by the thread's clock)", arguments[0],
+            took, took / 20 * 100, load.fraction * 100))
+        // And paced as a device would pace it, sleeping between calls, to see what waking costs.
+        for _ in 0..<(48000 * 5 / 512) {
+          Thread.sleep(forTimeInterval: 512.0 / 48000)
+          host.render(frames: 512, left: left, right: right)
+        }
+        let paced = host.takeLoad()
+        print(
+          String(
+            format: "paced, one call every 10.7ms: %.1f%% by the thread's clock, longest %.2fms",
+            paced.fraction * 100, paced.longestMilliseconds))
         return
       }
 
@@ -116,10 +130,13 @@
       if until == nil { print("ctrl-c to stop") }
       while until.map({ Date() < $0 }) ?? true {
         Thread.sleep(forTimeInterval: 1)
+        let load = driftbox.host?.takeLoad() ?? (fraction: 0, longestMilliseconds: 0, calls: 0)
         print(
           String(
-            format: "  peak %.3f  song frame %d", peak.take(),
-            driftbox.host?.songFrame.load(ordering: .relaxed) ?? -1))
+            format:
+              "  peak %.3f  song frame %d  render %.1f%% of the audio's time, longest call %.2fms, %d calls",
+            peak.take(), driftbox.host?.songFrame.load(ordering: .relaxed) ?? -1, load.fraction * 100,
+            load.longestMilliseconds, load.calls))
       }
       audio.stop()
     }
