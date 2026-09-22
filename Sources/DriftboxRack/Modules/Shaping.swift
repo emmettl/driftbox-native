@@ -57,12 +57,6 @@ private func jsMax(_ a: Double, _ b: Double) -> Double {
   return a > b ? a : b
 }
 
-/// `Math.sqrt`, which is exact. A debug build does not inline the standard library's square root,
-/// and `@_noAllocation` refuses a call it cannot see into, so it is vouched for here the way
-/// `DriftboxDSP/Math.swift` vouches for libm.
-@_semantics("no_performance_analysis") @inline(never)
-private func squareRoot(_ x: Double) -> Double { x.squareRoot() }
-
 /// A one-pole lowpass's exact discrete-time coefficient, `1 - exp(-2πf / sr)`, as every module
 /// here writes it.
 @_noAllocation
@@ -367,7 +361,7 @@ public struct EQModule {
       } else {
         // `Math.SQRT2`.
         let alpha = (sin / 2) * 1.4142135623730951
-        let twoRootA = 2 * squareRoot(A) * alpha
+        let twoRootA = 2 * sqrtDSP(A) * alpha
         let plus = A + 1
         let minus = A - 1
         if band == 0 {

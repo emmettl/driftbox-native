@@ -141,3 +141,10 @@ public func jsRound(_ x: Double) -> Double { jsFloor(x + 0.5) }
 /// `Math.trunc`.
 @_noAllocation
 public func jsTrunc(_ x: Double) -> Double { x < 0 ? jsCeil(x) : jsFloor(x) }
+
+/// `Math.sqrt`. Exact everywhere — IEEE 754 requires it — but a call the no-allocation check
+/// cannot see into in a debug build, so it is vouched for here like the rest.
+@_semantics("no_performance_analysis") @inline(never)
+func dbSqrt(_ x: Double) -> Double { x.squareRoot() }
+
+@_noAllocation public func sqrtDSP(_ x: Double) -> Double { dbSqrt(x) }
