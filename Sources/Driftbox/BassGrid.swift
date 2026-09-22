@@ -17,7 +17,7 @@
 
     var body: some View {
       VStack(alignment: .leading, spacing: 2) {
-        Text(voiceId == "303.a" ? "303 A" : "303 B").font(.headline)
+        BassMenu(player: player, pattern: pattern, voiceId: voiceId)
         Grid(alignment: .leading, horizontalSpacing: 2, verticalSpacing: 1) {
           ForEach(Self.notes, id: \.self) { note in
             GridRow {

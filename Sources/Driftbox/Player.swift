@@ -171,6 +171,14 @@
 
     /// Which voice's panel is showing.
     var selectedVoice: String?
+    /// A pattern chosen to edit, or nil to follow the transport.
+    var editing: String?
+
+    /// The pattern the grid shows.
+    var shownPattern: DriftboxSeq.Pattern? {
+      if let editing, let chosen = song?.pattern(id: editing) { return chosen }
+      return position?.pattern ?? song?.patterns.first
+    }
 
     /// Change the song and have the engine take it up where it is, without stopping. Undoable.
     func edit(_ change: (inout Song) -> Void) {

@@ -41,7 +41,8 @@ let package = Package(
 
     .testTarget(name: "DriftboxDSPTests", dependencies: ["DriftboxDSP", "ConformanceSupport"]),
     .testTarget(
-      name: "DriftboxSeqTests", dependencies: ["DriftboxSeq", "DriftboxDocument", "ConformanceSupport"]),
+      name: "DriftboxSeqTests",
+      dependencies: ["DriftboxSeq", "DriftboxDSP", "DriftboxDocument", "ConformanceSupport"]),
     .testTarget(
       name: "DriftboxEngineTests",
       dependencies: ["DriftboxEngine", "DriftboxSeq", "DriftboxDocument", "ConformanceSupport"]),

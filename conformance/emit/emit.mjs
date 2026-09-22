@@ -29,7 +29,8 @@ const { SONGS } = await import(join(engine, 'songs', 'index.ts'))
 const { encodeSong, decodeSong, SONG_FORMAT } = await import(join(engine, 'song-io.ts'))
 const { planSong, planStep, barLengthForSelection } = await import(join(engine, 'schedule.ts'))
 const { bpmAt } = await import(join(engine, 'automation.ts'))
-const { songBars } = await import(join(engine, 'pattern.ts'))
+const pattern = await import(join(engine, 'pattern.ts'))
+const { songBars } = pattern
 const { seededRandom } = await import(join(engine, 'render.ts'))
 const { Ladder } = await import(join(engine, 'dsp', 'ladder.ts'))
 const { ALL_VOICES, buildVoice } = await import(join(engine, 'kit.ts'))
@@ -268,6 +269,53 @@ for (const preset of SONGS) {
     return `${head.slice(0, -1)},"steps":[\n${planned.map((step) => JSON.stringify(step)).join(',\n')}\n]}`
   })
   write(join(fixtures, 'events'), 'synthetic.json', `[\n${planned.join(',\n')}\n]\n`)
+}
+
+// The edits: every pure transform in pattern.ts, applied to a catalogue song, with the result
+// the reference gives. The Swift edits are held to these exactly. Where an edit wants chance it
+// is given the reference's own PRNG at a fixed seed, so the answer is one answer.
+{
+  const song = decodeSong(encodeSong(SONGS.find((preset) => preset.id === 'garage').build()))
+  const first = song.patterns[0]
+  const drum = Object.keys(first.tracks)[0]
+  const drumWithFlams = { ...first, flams: { [drum]: first.tracks[drum].map((_, i) => i % 5 === 0) }, trackLengths: { [drum]: 10 } }
+  const bassId = Object.keys(first.bass ?? {})[0] ?? '303.a'
+  const withSong = (patterns) => ({ ...song, patterns })
+  const edits = [
+    ['addPattern', () => pattern.addPattern(song).song],
+    ['addPattern twice', () => pattern.addPattern(pattern.addPattern(song).song).song],
+    ['duplicatePattern', () => pattern.duplicatePattern(song, first.id).song],
+    ['duplicatePattern twice', () => { const once = pattern.duplicatePattern(song, first.id).song; return pattern.duplicatePattern(once, first.id).song }],
+    ['renamePattern', () => pattern.renamePattern(song, first.id, '  Renamed  ')],
+    ['renamePattern to blank is refused', () => pattern.renamePattern(song, first.id, '   ')],
+    ['removePattern', () => pattern.removePattern(song, song.patterns[1].id)],
+    ['chainAppend', () => ({ ...song, chain: pattern.chainAppend(song, first.id) })],
+    ['chainRemove', () => ({ ...song, chain: pattern.chainRemove(song, 1) })],
+    ['chainSetRepeat', () => ({ ...song, chain: pattern.chainSetRepeat(song, 0, 99) })],
+    ['chainSetPattern', () => ({ ...song, chain: pattern.chainSetPattern(song, 2, first.id) })],
+    ['chainMove', () => ({ ...song, chain: pattern.chainMove(song, 0, 2) })],
+    ['chainMove out of range', () => ({ ...song, chain: pattern.chainMove(song, 0, -1) })],
+    ['rotateTrack', () => withSong([pattern.rotateTrack(drumWithFlams, drum, 3)])],
+    ['rotateTrack backwards', () => withSong([pattern.rotateTrack(drumWithFlams, drum, -7)])],
+    ['rotateBassLine', () => withSong([pattern.rotateBassLine(first, bassId, 5)])],
+    ['transposeBassLine', () => withSong([pattern.transposeBassLine(first, bassId, 7)])],
+    ['transposeBassLine down past the floor', () => withSong([pattern.transposeBassLine(first, bassId, -30)])],
+    ['randomizeTrack', () => withSong([pattern.randomizeTrack(drumWithFlams, drum, seededRandom(0x1234))])],
+    ['randomizeBassLine', () => withSong([pattern.randomizeBassLine(first, bassId, seededRandom(0x1234))])],
+    ['alterTrack', () => withSong([pattern.alterTrack(drumWithFlams, drum, seededRandom(0x4321))])],
+    ['alterBassLine', () => withSong([pattern.alterBassLine(first, bassId, seededRandom(0x4321))])],
+    ['clearTrack', () => withSong([pattern.clearTrack(drumWithFlams, drum)])],
+    ['clearBassLine', () => withSong([pattern.clearBassLine(first, bassId)])],
+    ['setTrackLength', () => withSong([pattern.setTrackLength(first, drum, 6)])],
+    ['setTrackLength to full clears it', () => withSong([pattern.setTrackLength(drumWithFlams, drum, 16)])],
+    ['toggleFlam on a rest', () => withSong([pattern.toggleFlam(first, drum, 1)])],
+    ['toggleFlam off again', () => withSong([pattern.toggleFlam(pattern.toggleFlam(first, drum, 1), drum, 1)])],
+  ]
+  write(fixtures, 'edits.json', json({
+    song: encodeSong(song),
+    drum, bass: bassId, flams: drumWithFlams.flams[drum], trackLength: 10,
+    edits: edits.map(([name, apply]) => ({ name, output: encodeSong(decodeSong(encodeSong(apply()))) })),
+  }))
 }
 
 // The noise generator, as the integers behind the floats so no decimal printing is involved.

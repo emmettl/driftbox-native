@@ -63,9 +63,11 @@ gone native at all.
    bar, step and pattern it is on, and the chain as a strip to jump around; the step grid of the
    pattern playing, live and editable; the 303 grids, with pitch, accent and slide; a panel of
    knobs and sends per voice, and the effects; the pad; undo of every edit; export of the mix to
-   WAV; and voice names that flash from the engine's events ring. Still to come: pattern tools
-   (add, copy, rotate, randomise), editing the chain, tempo and swing, per-voice loop lengths
-   and flams, keys, stems, CoreMIDI including clock follow, and a proper document model.
+   WAV; voice names that flash from the engine's events ring; and every edit in `pattern.ts` —
+   the pattern list, rotate, transpose, randomise, alter, clear, loop lengths, flams, the chain —
+   ported and held to the reference's own results on 28 edits, with a pattern picker, lane and
+   line menus, chain menus, tempo and swing on the interface. Still to come: keys, stems,
+   CoreMIDI including clock follow, and a proper document model.
 6. **Visuals.** A thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.

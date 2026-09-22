@@ -28,6 +28,8 @@
           TransportBar(player: player)
           Divider()
           if let song = player.song {
+            PatternBar(player: player, song: song)
+            Divider()
             HStack(alignment: .top, spacing: 0) {
               Sequencer(player: player, song: song)
               Divider()
@@ -155,12 +157,14 @@
     let player: Player
     let song: Song
 
-    var pattern: DriftboxSeq.Pattern? { player.position?.pattern ?? song.patterns.first }
+    var pattern: DriftboxSeq.Pattern? { player.shownPattern }
     var steps: [Int] { (0..<(pattern?.length ?? 0)).map { $0 } }
 
     var body: some View {
       if let pattern {
-        let playhead = player.position?.step ?? -1
+        // The playhead only means something on the pattern that is playing.
+        let playing = player.position?.pattern?.id == pattern.id
+        let playhead = playing ? (player.position?.step ?? -1) : -1
         let voices = allVoices.filter { pattern.tracks[$0.id] != nil }
         ScrollView {
           Grid(alignment: .leading, horizontalSpacing: 4, verticalSpacing: 4) {
@@ -168,13 +172,18 @@
               GridRow {
                 let index = allVoices.firstIndex { $0.id == voice.id } ?? -1
                 let struck = player.lastHits[index].map { player.engineFrame - $0 < 4800 } ?? false
-                Button(voice.name) {
-                  player.selectedVoice = player.selectedVoice == voice.id ? nil : voice.id
+                HStack(spacing: 2) {
+                  Button(voice.name) {
+                    player.selectedVoice = player.selectedVoice == voice.id ? nil : voice.id
+                  }
+                  .buttonStyle(.plain)
+                  .font(.caption.weight(player.selectedVoice == voice.id ? .bold : .regular))
+                  .foregroundStyle(struck ? Color.orange : Color.primary)
+                  LaneMenu(player: player, pattern: pattern, voiceId: voice.id) {
+                    AnyView(Image(systemName: "ellipsis.circle").font(.caption).foregroundStyle(.secondary))
+                  }
                 }
-                .buttonStyle(.plain)
-                .font(.caption.weight(player.selectedVoice == voice.id ? .bold : .regular))
-                .foregroundStyle(struck ? Color.orange : Color.primary)
-                .frame(width: 90, alignment: .leading)
+                .frame(width: 110, alignment: .leading)
                 ForEach(steps, id: \.self) { index in
                   StepButton(
                     value: pattern.step(voice.id, at: index), playing: index == playhead,
