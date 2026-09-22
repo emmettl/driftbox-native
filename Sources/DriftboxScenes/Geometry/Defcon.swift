@@ -441,7 +441,10 @@
           land.append(contentsOf: [
             SIMD3(centre.x, 0, -centre.y), SIMD3(a.x, 0, -a.y), SIMD3(b.x, 0, -b.y),
           ])
-          coast.append(contentsOf: [SIMD3(a.x, 0.02, a.y), SIMD3(b.x, 0.02, b.y)])
+          // Negated to follow the fill, which the scale below mirrors across z. The web
+          // pushed these straight through, which left every coastline across the board from
+          // its landmass; emmettl/driftbox#300 fixes it there.
+          coast.append(contentsOf: [SIMD3(a.x, 0.02, -a.y), SIMD3(b.x, 0.02, -b.y)])
         }
       }
 

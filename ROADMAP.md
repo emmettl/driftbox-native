@@ -118,9 +118,11 @@ gone native at all.
    One thing the porting found in the web, not in the port: Defcon builds its land fill with
    `rotateX(PI/2)` and then `scale(1, 1, -1)`, which puts it at z = -y, while the coastline
    outline is pushed straight through at z = +y. The outlines are mirrored across z from the
-   landmasses they belong to, and since the blobs are not symmetric it shows. The port keeps
-   the fault, because the point is to look like the web; fixing it is a one-line change in
-   `Defcon.tsx` worth making there first. The other sixteen are three.js
+   landmasses they belong to, and since the blobs are not symmetric it shows. The scale is not
+   removable — laid flat by the rotation alone the triangles face down and a front-side
+   material draws nothing, so it is doing double duty as a winding fix — which makes following
+   it with the outline the safe direction. Fixed in the web as emmettl/driftbox#300 and here
+   at the same time, so the two do not disagree while that waits. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
