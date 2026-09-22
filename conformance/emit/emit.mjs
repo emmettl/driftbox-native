@@ -33,7 +33,9 @@ const pattern = await import(join(engine, 'pattern.ts'))
 const { songBars } = pattern
 const { seededRandom } = await import(join(engine, 'render.ts'))
 const { Ladder } = await import(join(engine, 'dsp', 'ladder.ts'))
-const { ClockFollower, parseClock } = await import(join(engine, 'midi-clock.ts'))
+const { ClockFollower, parseClock, clockBytes, scheduleClockStart, scheduleClockStep } = await import(
+  join(engine, 'midi-clock.ts'),
+)
 const { followClock } = await import(join(root, 'driftbox', 'packages', 'app', 'src', 'clock-follow.ts'))
 const { ALL_VOICES, buildVoice } = await import(join(engine, 'kit.ts'))
 
@@ -360,6 +362,27 @@ for (const preset of SONGS) {
     return { time, bytes, command, state: { bpm: state.bpm, running: state.running, ticks: state.ticks }, step: follower.step }
   })
   write(fixtures, 'midi-clock.json', `[\n${trace.map((entry) => JSON.stringify(entry)).join(',\n')}\n]\n`)
+
+  // And the other direction: what Driftbox SENDS when it is the clock. Starting anywhere but
+  // the top has to say where before it says go, and a step is six pulses — the awkward cases
+  // are a fractional step, a negative one, and a step length that is not a number.
+  const out = []
+  for (const step of [0, 1, 4, 15, 16, 63, 0.4, 7.9, -1, 16383, 16384, 20000]) {
+    out.push({ call: 'start', step, result: scheduleClockStart(step, 12.5) })
+  }
+  for (const [time, seconds] of [[0, 0.125], [1.5, 0.11904761904761904], [3, 0.5], [0, 0], [0, -1]]) {
+    out.push({ call: 'step', time, seconds, result: scheduleClockStep(time, seconds) })
+  }
+  for (const message of [
+    { message: 'tick' }, { message: 'start' }, { message: 'continue' }, { message: 'stop' },
+    { message: 'position', step: 0 }, { message: 'position', step: 1 },
+    { message: 'position', step: 129 }, { message: 'position', step: 16383 },
+    { message: 'position', step: 16384 }, { message: 'position', step: -3 },
+    { message: 'position', step: 7.9 },
+  ]) {
+    out.push({ call: 'bytes', message, result: clockBytes(message) })
+  }
+  write(fixtures, 'midi-clock-out.json', `[\n${out.map((entry) => JSON.stringify(entry)).join(',\n')}\n]\n`)
 }
 
 // The noise generator, as the integers behind the floats so no decimal printing is involved.

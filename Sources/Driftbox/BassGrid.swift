@@ -87,9 +87,9 @@
         guard row < Self.notes.count else { return }
         setNote(Self.notes[row], at: index)
       } else if point.y < Self.notesHeight + Self.flagStride {
-        edit(index) { $0.accent.toggle() }
+        edit(index, "Set Accent") { $0.accent.toggle() }
       } else {
-        edit(index) { $0 = $0.settingSlide(!$0.slide) }
+        edit(index, "Set Slide") { $0 = $0.settingSlide(!$0.slide) }
       }
     }
 
@@ -99,7 +99,7 @@
     }
 
     func setNote(_ note: Int, at index: Int) {
-      edit(index) { step in
+      edit(index, "Set Note") { step in
         if Int(step.note ?? -1) == note, step.sounds {
           step = step.settingGate(false)
         } else {
@@ -109,8 +109,8 @@
       }
     }
 
-    func edit(_ index: Int, _ change: @escaping (inout BassStep) -> Void) {
-      player.edit { song in
+    func edit(_ index: Int, _ name: String, _ change: @escaping (inout BassStep) -> Void) {
+      player.edit(name) { song in
         guard let at = song.patterns.firstIndex(where: { $0.id == pattern.id }) else { return }
         var step = song.patterns[at].bassStep(voiceId, at: index)
         change(&step)

@@ -144,8 +144,25 @@ gone native at all.
    a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.
-7. **iOS.** ← *here.* Audio session, background audio, a layout that opens into the visuals, haptics,
-   Now Playing, and the AUv3 extension the phase 4 audio unit already is.
+7. **The Mac app proper.** ← *here.* The engine and the scenes are done; what is missing is
+   everything that makes a thing a Mac app rather than a window with controls in it. Today
+   there is no menu bar at all, which is not a cosmetic gap: `UndoManager` is wired up and
+   works, and with no Edit menu nobody can see that it exists. In rough order of what a
+   desktop user notices first: menus and their shortcuts, with Open and Save belonging to the
+   File menu rather than being toolbar buttons that happen to have key equivalents; a document
+   model, so a window knows which song it holds — title and proxy icon, the edited dot, Save
+   against Save As, recent documents, a prompt before closing unsaved work, more than one
+   window at a time, which is also the "proper document model" phase 5 left open; settings
+   behind the usual key, for the audio device and rate, which MIDI ports to listen and send
+   on, and whether the visuals run; opening songs the Mac way, by dropping one on the window
+   or the dock icon and by double-clicking one in the Finder, with the file type declared so
+   both work; state restoration, so reopening puts back the song, the window and the pattern;
+   and the visuals full screen or on a second display, which is what the pane is a preview of.
+   Built so iOS stays possible — the split between `Player` and the views is already the line
+   it would fall along — but not built for iOS yet.
+8. **iOS.** Deferred until the Mac app is done. Audio session, background audio, a layout that
+   opens into the visuals, haptics, Now Playing, and the AUv3 extension the phase 4 audio unit
+   already is.
 
 ## Milestone 2 — the rack
 
