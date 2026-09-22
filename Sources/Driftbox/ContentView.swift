@@ -52,6 +52,8 @@
         }
       }
       .onChange(of: undoManager, initial: true) { _, manager in player.undoManager = manager }
+      .modifier(Keys(player: player))
+      .focusable()
       .toolbar {
         ToolbarItemGroup {
           Button("Open…") { openFile() }.keyboardShortcut("o")

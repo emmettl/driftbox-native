@@ -161,6 +161,37 @@
       isPlaying ? stop() : play()
     }
 
+    /// The voices the song uses, in the order the grid shows them.
+    var usedVoices: [Voice] {
+      guard let pattern = shownPattern else { return [] }
+      return allVoices.filter { pattern.tracks[$0.id] != nil }
+    }
+
+    /// Strike the `index`th voice of the grid, now, with the song's knobs for it.
+    func strike(index: Int, accent: Bool) {
+      guard let host = unit?.host, let song, usedVoices.indices.contains(index) else { return }
+      let voice = usedVoices[index]
+      let group =
+        voice.choke.flatMap { ["808.hats", "909.hats"].firstIndex(of: $0) }.map { UInt8($0 + 1) } ?? 0
+      let hit = host.preparer.prepare(
+        voice.build(song.kit.params[voice.id] ?? VoiceParams(), accent: accent ? 1 : 0.55), voiceId: voice.id,
+        at: 0,
+        sends: song.kit.sends[voice.id] ?? SendLevels(), chokeGroup: group)
+      unit?.send(.strike(hit))
+    }
+
+    /// Play a note on 303 A, now, with the song's panel for it.
+    func playNote(semitone: Int, accent: Bool) {
+      guard let song else { return }
+      let params = song.kit.bass["303.a"] ?? BassParams()
+      let step = BassStep(note: Double(max(0, min(24, semitone + 12))), accent: accent)
+      guard
+        let note = bassNote(
+          params: params, step: step, previous: .rest, stepSeconds: secondsPerStep(bpm: song.bpm))
+      else { return }
+      unit?.send(.note(line: 0, note))
+    }
+
     func pad(x: Double, y: Double) {
       unit?.send(.pad(x: x, y: y))
     }

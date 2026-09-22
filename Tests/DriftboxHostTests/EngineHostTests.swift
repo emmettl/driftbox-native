@@ -76,6 +76,31 @@ struct EngineHostTests {
     #expect(!playing)
   }
 
+  /// A strike from the keys sounds on the next frame rendered, and the engine reports it.
+  @Test func aStrikeSoundsAtOnce() throws {
+    let host = EngineHost(sampleRate: 48000)
+    let kick = try #require(voice(id: "909.bd"))
+    let hit = host.preparer.prepare(kick.build(accent: 1), voiceId: kick.id, at: 0)
+    var left = [Float](repeating: 0, count: 512)
+    var right = [Float](repeating: 0, count: 512)
+    func render() {
+      left.withUnsafeMutableBufferPointer { l in
+        right.withUnsafeMutableBufferPointer { r in
+          host.render(frames: 512, left: l.baseAddress!, right: r.baseAddress!)
+        }
+      }
+    }
+    render()
+    #expect(left.allSatisfy { $0 == 0 })
+    host.send(.strike(hit))
+    render()
+    // The compressor looks ahead 288 frames, so the kick shows from there.
+    #expect(left[0..<288].allSatisfy { $0 == 0 })
+    #expect(left[288...].contains { $0 != 0 })
+    let event = host.nextEvent()
+    #expect(event?.kind == .hit && event?.frame == 512)
+  }
+
   @Test func aFullRingDropsTheNewest() {
     let ring = CommandRing()
     for _ in 0..<CommandRing.capacity {

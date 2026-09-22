@@ -96,6 +96,30 @@ public struct SongEngine: ~Copyable {
     }
   }
 
+  /// Strike a voice on the next frame rendered, outside the song: `hit` was prepared against time
+  /// zero and is placed on the engine's clock here.
+  @_noAllocation
+  public mutating func strike(_ hit: FixedVoiceSpec) {
+    var placed = hit
+    placed.shift(byFrames: frame, sampleRate: sampleRate)
+    voices.start(placed)
+    events.send(
+      EngineEvent(
+        kind: .hit, frame: placed.firstFrame, voice: placed.voiceIndex, level: placed.accent, frequency: 0,
+        flag: placed.chokeGroup))
+  }
+
+  /// Play a 303 note on the next frame rendered, outside the song.
+  @_noAllocation
+  public mutating func play(_ note: BassNote, line: Int) {
+    let when = Double(frame) / sampleRate
+    if line == 0 { bassA.play(note, at: when) } else { bassB.play(note, at: when) }
+    events.send(
+      EngineEvent(
+        kind: .note, frame: frame, voice: line, level: Float(note.gain), frequency: Float(note.frequency),
+        flag: note.glide > 0 ? 1 : 0))
+  }
+
   /// Where the song is, in frames from its start, or -1 when nothing is loaded.
   @_noAllocation
   public func songFrame() -> Int { song == nil ? -1 : frame - passStart }

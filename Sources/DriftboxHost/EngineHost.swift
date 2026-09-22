@@ -93,6 +93,8 @@ public final class EngineHost: @unchecked Sendable {
         if let previous { released.pointee.send(previous) }
       case .pad(let x, let y): engine.pointee.pad.set(x: x, y: y, atFrame: engine.pointee.frame)
       case .padRelease: engine.pointee.pad.release(atFrame: engine.pointee.frame)
+      case .strike(let hit): engine.pointee.strike(hit)
+      case .note(let line, let note): engine.pointee.play(note, line: line)
       }
     }
     engine.pointee.render(frames: frames, left: left, right: right)

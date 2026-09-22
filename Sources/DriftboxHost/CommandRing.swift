@@ -12,6 +12,11 @@ public enum Command {
   case load(UnsafeMutablePointer<CompiledSong>?)
   case pad(x: Double, y: Double)
   case padRelease
+  /// Strike a voice now, outside the song: the keys. Prepared against time zero; the engine
+  /// places it on the next frame it renders.
+  case strike(FixedVoiceSpec)
+  /// Play a 303 note now, on line 0 or 1.
+  case note(line: Int, BassNote)
 }
 
 /// A single-producer, single-consumer ring of commands: the interface writes, the render thread
