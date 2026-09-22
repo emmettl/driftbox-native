@@ -104,7 +104,9 @@ gone native at all.
    instancing with it. Then Stillwater, the one that reads events
    rather than levels: rings dropped on black water by an onset detector, and a camera aimed
    by its own angles. Then Light Cycles, whose walls are rewritten
-   every frame and whose bikes turn on the beat. Eighteen of twenty-seven. The other sixteen are three.js
+   every frame and whose bikes turn on the beat. Then Clouds and Longhand. Twenty of twenty-seven,
+   and the snapshot test now draws with a finger as well — Longhand is a blank page until
+   something is drawn on it, so a scene given no touch had nothing to show and nothing to move. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,

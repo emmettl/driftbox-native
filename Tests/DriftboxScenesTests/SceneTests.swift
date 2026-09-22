@@ -87,12 +87,19 @@
           let bands: (bass: Float, mid: Float, high: Float) = (onBeat ? 0.8 : 0.2, onBeat ? 0.5 : 0.15, 0.3)
           let struck = beat - beat.rounded(.down) < 1.0 / 60 * 126 / 60
           let kick = allVoices.firstIndex { $0.id == "909.bd" }!
+          // A finger drawing a circle through the middle second. Every scene reacts to a
+          // touch, and one of them — Longhand — is a blank page until something is drawn on
+          // it, so a scene given no touch at all has nothing to show and nothing to move.
+          let touch: SIMD2<Float>? =
+            (2..<4).contains(time)
+            ? SIMD2(0.5 + 0.3 * Float(cos(time * 3)), 0.5 + 0.3 * Float(sin(time * 3))) : nil
           renderer.draw(
             SceneInput(
               time: time, peakLeft: onBeat ? 0.8 : 0.2, peakRight: onBeat ? 0.8 : 0.2,
               events: struck
                 ? [EngineEvent(kind: .hit, frame: 0, voice: kick, level: 1, frequency: 0, flag: 0)] : [],
-              running: true, bpm: 126, scoreBeat: beat, levels: bands, wideLevels: (bands.bass, bands.high),
+              touch: touch, running: true, bpm: 126, scoreBeat: beat, levels: bands,
+              wideLevels: (bands.bass, bands.high),
               bands: (0..<16).map { onBeat && $0 < 4 ? 0.7 : Float($0) / 40 }),
             into: texture)
           time += 1.0 / 60
