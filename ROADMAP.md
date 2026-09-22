@@ -111,7 +111,14 @@ gone native at all.
    at its own rate, 120Hz on a ProMotion screen, so a flick that begins and ends between two
    frames is still drawn. `SceneInput` carries one touch a frame, so a fast hand draws a
    coarser line here. It needs a touch history on the input, which is a change to make when a
-   second scene wants one. The other sixteen are three.js
+   second scene wants one.
+
+   One thing the porting found in the web, not in the port: Defcon builds its land fill with
+   `rotateX(PI/2)` and then `scale(1, 1, -1)`, which puts it at z = -y, while the coastline
+   outline is pushed straight through at z = +y. The outlines are mirrored across z from the
+   landmasses they belong to, and since the blobs are not symmetric it shows. The port keeps
+   the fault, because the point is to look like the web; fixing it is a one-line change in
+   `Defcon.tsx` worth making there first. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
