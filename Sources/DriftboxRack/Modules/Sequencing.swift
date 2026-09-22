@@ -695,18 +695,18 @@ extension RackModules {
     ],
     params: [
       // Hidden in the reference: the host writes these from incoming MIDI, never a knob.
-      ParamDef("note", "Note", min: 0, max: 127, default: 36),
-      ParamDef("gate", "Gate", min: 0, max: 1, default: 0, stepped: true),
-      ParamDef("velocity", "Velocity", min: 0, max: 1, default: 0.8),
-      ParamDef("mod", "Mod", min: 0, max: 1, default: 0),
+      ParamDef("note", "Note", min: 0, max: 127, default: 36, hidden: true),
+      ParamDef("gate", "Gate", min: 0, max: 1, default: 0, stepped: true, hidden: true),
+      ParamDef("velocity", "Velocity", min: 0, max: 1, default: 0.8, hidden: true),
+      ParamDef("mod", "Mod", min: 0, max: 1, default: 0, hidden: true),
       ParamDef("transpose", "Transpose", min: -24, max: 24, default: 0),
       ParamDef("glide", "Glide", min: 0, max: 1, default: 0),
       ParamDef("channel", "Ch", min: 0, max: 16, default: 0, stepped: true),
-      ParamDef("bend", "Pitch Bend", min: -1, max: 1, default: 0),
-      ParamDef("aftertouch", "Aftertouch", min: 0, max: 1, default: 0),
-      ParamDef("expression", "Expression", min: 0, max: 1, default: 0),
-      ParamDef("breath", "Breath", min: 0, max: 1, default: 0),
-      ParamDef("sustain", "Sustain", min: 0, max: 1, default: 0, stepped: true),
+      ParamDef("bend", "Pitch Bend", min: -1, max: 1, default: 0, hidden: true),
+      ParamDef("aftertouch", "Aftertouch", min: 0, max: 1, default: 0, hidden: true),
+      ParamDef("expression", "Expression", min: 0, max: 1, default: 0, hidden: true),
+      ParamDef("breath", "Breath", min: 0, max: 1, default: 0, hidden: true),
+      ParamDef("sustain", "Sustain", min: 0, max: 1, default: 0, stepped: true, hidden: true),
     ])
 
   static let noteEchoDef: ModuleDef = {

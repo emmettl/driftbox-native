@@ -447,7 +447,7 @@ extension RackModules {
         ParamDef("feedback", "Feedback", min: 0, max: 1, default: 0.85),
         ParamDef("dry", "Dry", min: 0, max: 1, default: 1),
         ParamDef("loop", "Loop", min: 0, max: 1, default: 1),
-        ParamDef("clear", "Clear", min: 0, max: 1, default: 0, stepped: true),
+        ParamDef("clear", "Clear", min: 0, max: 1, default: 0, stepped: true, hidden: true),
       ])
     def.poly = false
     return def
