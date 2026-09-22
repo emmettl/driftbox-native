@@ -104,7 +104,9 @@ gone native at all.
    instancing with it. Then Stillwater, the one that reads events
    rather than levels: rings dropped on black water by an onset detector, and a camera aimed
    by its own angles. Then Light Cycles, whose walls are rewritten
-   every frame and whose bikes turn on the beat. Then Clouds and Longhand. Then Defcon and Dancers. Twenty-two of twenty-seven,
+   every frame and whose bikes turn on the beat. Then Clouds and Longhand. Then Defcon and Dancers. Then Convoy and Machine — the last being the only lit
+   scene, with three's standard material approximated under an ambient, a directional and a
+   point light, and the one place three's fog is actually applied. Twenty-five of twenty-seven,
    and the snapshot test now draws with a finger as well — Longhand is a blank page until
    something is drawn on it, so a scene given no touch had nothing to show and nothing to move.
    One thing Longhand wants that the native side does not have yet: the web samples the pointer
