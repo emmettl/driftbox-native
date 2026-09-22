@@ -10,9 +10,7 @@ struct RackDefinitionTests {
   /// The reference's modules this build does not have yet, each for a stated reason.
   static let notYet: Set<String> = [
     // The groovebox as a rack module: the engine behind a faceplate, which comes with the host.
-    "groovebox",
-    // The two filters, being ported.
-    "alligator", "vocoder",
+    "groovebox"
   ]
 
   @Test func everyDefinitionIsTheReferences() throws {
