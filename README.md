@@ -289,9 +289,12 @@ includes reading a `static let`, because that is initialised on first use, behin
 scripts/bundle-app.sh && open .build-release/Driftbox.app
 ```
 
-The Mac app, as far as it goes: the catalogue as a library, a transport, the step and 303 grids
-of the pattern the transport is in, live and editable, the voice and effects panels, the pad,
-the visuals, and open, save and export. A SwiftPM executable rather than an Xcode project for
+The Mac app: the catalogue as a library, a transport, the step and 303 grids of the pattern the
+transport is in, live and editable, the voice and effects panels, the pad, open, save and export,
+MIDI in from the sources chosen in Settings and clock out, and the visuals — in a pane, and in a
+window of their own (⌘2) that goes full screen on a named display from View ▸ Visuals Full Screen
+On. One renderer draws each frame once and every view shows it, so the pane previews exactly what
+the window is showing. The song and the visuals window come back at the next launch. A SwiftPM executable rather than an Xcode project for
 now, which is why it announces itself to the system by hand on launch, and why a script has to
 wrap it into a bundle: `swift run Driftbox` also works, but the catalogue lives in a resource
 bundle that `Bundle.module` looks for beside the executable and in `Contents/Resources`, and the
