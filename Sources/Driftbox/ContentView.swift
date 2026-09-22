@@ -2,6 +2,7 @@
   import AppKit
   import DriftboxDocument
   import DriftboxEngine
+  import DriftboxHost
   import DriftboxSeq
   import SwiftUI
   import UniformTypeIdentifiers
@@ -156,6 +157,20 @@
         if let bpm = player.followedBPM {
           Text(String(format: "← %.1f", bpm)).font(.caption.monospacedDigit()).foregroundStyle(.orange)
         }
+        Toggle("clock", isOn: Binding(get: { player.sendsClock }, set: { player.sendsClock = $0 }))
+          .toggleStyle(.button).font(.caption)
+          .help("Send MIDI clock out: start, six ticks a sixteenth, stop")
+        Picker(
+          "Clock out",
+          selection: Binding(get: { player.clockDestination }, set: { player.clockDestination = $0 })
+        ) {
+          // Driftbox's own port is always there, whether or not anything is plugged in.
+          Text("virtual").tag(MIDIOutput.Destination.virtual)
+          ForEach(player.clockDestinations, id: \.self) { name in
+            Text(name).tag(MIDIOutput.Destination.port(name))
+          }
+        }
+        .labelsHidden().frame(width: 120).font(.caption)
         if let song = player.song {
           Arrangement(player: player, song: song)
           Text("\(Int(song.bpm)) bpm").font(.caption.monospacedDigit()).foregroundStyle(.secondary)

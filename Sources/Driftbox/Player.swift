@@ -85,13 +85,16 @@
     /// handed its transport to whatever is on the cable would be taking an instrument away.
     var followsClock = false {
       didSet {
+        // Following and sending at once is a ring: the virtual source is a source like any other,
+        // so our own ticks come straight back in and the two ends chase each other's tempo.
+        if followsClock, sendsClock { sendsClock = false }
         // Letting go of the clock means the song's own tempo again, in the engine as well as here.
         guard !followsClock, followedBPM != nil else { return }
         let step = currentStep
         followedBPM = nil
         if let song { unit?.load(song) }
         seek(toStep: step)
-        if isPlaying { unit?.send(.play) }
+        if isPlaying { startEngine() }
       }
     }
     private(set) var followedBPM: Double? {
@@ -101,6 +104,60 @@
     private var follower = ClockFollower()
     /// The song's own tempo, which following leaves alone: the followed tempo is not written in.
     private var songBPM: Double { song?.bpm ?? 120 }
+
+    // MARK: Clock out
+
+    private var clockOut: MIDIOutput?
+    /// Send MIDI clock out: start, or position and continue when the transport is not at the top;
+    /// six ticks a sixteenth while it runs; stop. Off unless asked for, because a clock on the
+    /// cable puts everything listening to it under this machine's transport, which is a decision
+    /// about the studio and not one a sequencer should make on its own.
+    var sendsClock = false {
+      didSet {
+        guard sendsClock != oldValue else { return }
+        if sendsClock {
+          followsClock = false
+        } else {
+          stopClock()
+        }
+      }
+    }
+    /// Every destination there is, as of the last tick.
+    private(set) var clockDestinations: [String] = []
+    var clockDestination = MIDIOutput.Destination.virtual {
+      didSet {
+        guard clockDestination != oldValue else { return }
+        // Ticks queued at the destination being left would go on arriving after we had stopped
+        // talking to it, so it is stopped properly and the new one is located from scratch.
+        stopClock(on: oldValue)
+      }
+    }
+
+    /// The step whose ticks go out next, and when that step begins on the host clock. Held from
+    /// tick to tick rather than worked out afresh each time: `songFrame` only moves when a render
+    /// block runs, so a reading of it is anything up to a block old, and deriving every timestamp
+    /// from a fresh one would put that jitter into the clock — which is the thing stamping the
+    /// messages was for.
+    private struct ClockRun {
+      var step: Int
+      var time: UInt64
+    }
+    private var clockRun: ClockRun?
+    /// Stopped here, but the engine has not said so yet: it hears the stop on its next block and
+    /// the tick reads that later still, and without this the clock would take the interval for a
+    /// transport that is still running and start itself up again a moment after being stopped.
+    private var clockHalted = false
+    /// How far past the transport the ticks are written. Comfortably more than the thirtieth of a
+    /// second between ticks, so a tick that runs late still finds its steps unsent, and little
+    /// enough that a seek throws away only a step or two of what was already queued.
+    private static let clockLookahead = 0.2
+    /// A disagreement between the clock and the transport larger than this is a seek. Smaller than
+    /// the shortest step there can be, so a jump of even one step is noticed.
+    private static let clockTolerance = 0.03
+    /// And anything smaller is the two clocks parting — the audio device's and the host's are not
+    /// the same crystal — which is pulled back a hair at a time. Fifty microseconds a step is a
+    /// good half millisecond a second, far more than the drift, and far too little to hear.
+    private static let clockSlew = 0.00005
 
     init() {
       AUAudioUnit.registerSubclass(
@@ -135,6 +192,7 @@
         Task { @MainActor in self?.midiClock(message, at: time) }
       }
       self.midi = midi
+      clockOut = MIDIOutput()
     }
 
     /// The web app's keys: notes from 33 (A1) play 303 A across two octaves; below that, the drum
@@ -160,10 +218,10 @@
       switch command.transport {
       case .start:
         unit?.send(.seek(songFrame: 0))
-        unit?.send(.play)
+        startEngine()
       case .resume:
         if let step = command.step { seek(toStep: step) }
-        unit?.send(.play)
+        startEngine()
       case .stop:
         unit?.send(.stop)
       case nil:
@@ -181,7 +239,7 @@
       retimed.bpm = bpm
       unit?.load(retimed)
       seek(toStep: step)
-      if isPlaying { unit?.send(.play) }
+      if isPlaying { startEngine() }
     }
 
     /// The transport's position in sixteenths from the top.
@@ -213,6 +271,120 @@
       let lit = Set(lastHits.filter { engineFrame - $0.value < 4800 }.keys)
       if struck != lit { struck = lit }
       updatePosition()
+      driveClock()
+    }
+
+    /// Write the next fifth of a second of clock, and start or stop it with the transport.
+    ///
+    /// Called from the tick, after `songFrame` has been read, because everything here hangs off
+    /// it: the ticks are placed on the host clock ahead of the audio and played by the MIDI server
+    /// at the stamped moment, rather than sent thirty times a second in whatever bursts the main
+    /// thread allows. A cursor over the steps is what keeps that honest — it only moves forward,
+    /// so no step's ticks go out twice, and each pass fills it up to the horizon, so none is
+    /// missed however late the tick was.
+    private func driveClock() {
+      guard let out = clockOut else { return }
+      if clockDestinations != out.destinations { clockDestinations = out.destinations }
+      // Anything that leaves the transport without a song to run is a stop as much as the button
+      // is: what is listening should not be left ticking through a song nobody is playing.
+      guard sendsClock, song != nil, !timeline.times.isEmpty, isPlaying else {
+        if clockRun != nil { stopClock() }
+        // The engine has stopped where it was asked to, so a start may be believed again.
+        clockHalted = false
+        return
+      }
+      guard !clockHalted else { return }
+      let now = MIDIOutput.now()
+      // Where the song is at the speakers, not at the render block: the engine has rendered past
+      // what is being heard by the device's latency, and the clock belongs with the music.
+      let sounding = MIDIOutput.time(now, after: audio.outputNode.presentationLatency)
+      let songTime = Double(songFrame) / sampleRate
+      let step = timeline.step(at: songTime) ?? 0
+
+      var run: ClockRun
+      var correction = 0.0
+      if let held = clockRun, held.step < timeline.times.count,
+        let drift = clockDrift(held, songTime: songTime, sounding: sounding),
+        abs(drift) <= Self.clockTolerance
+      {
+        run = held
+        correction = drift
+      } else {
+        run = locateClock(step: step, songTime: songTime, sounding: sounding, out: out)
+      }
+
+      while MIDIOutput.seconds(from: now, to: run.time) < Self.clockLookahead {
+        // The drift is taken out a step at a time rather than all at once, so that no gap between
+        // two ticks is off by more than the slew however long the two clocks have been apart.
+        if correction != 0 {
+          let nudge = min(Self.clockSlew, abs(correction)) * (correction > 0 ? 1 : -1)
+          run.time = MIDIOutput.time(run.time, after: nudge)
+          correction -= nudge
+        }
+        let length = timeline.length(ofStep: run.step)
+        for scheduled in scheduleClockStep(at: 0, stepSeconds: length) {
+          out.send(
+            scheduled.message.bytes, to: clockDestination,
+            at: MIDIOutput.time(run.time, after: scheduled.time))
+        }
+        run.time = MIDIOutput.time(run.time, after: length)
+        run.step += 1
+        if run.step == timeline.times.count { run.step = 0 }
+      }
+      clockRun = run
+    }
+
+    /// How far ahead of the transport the clock has got, in seconds. The run says the song will be
+    /// at the top of `step` at `time`, which is a reading of where the song is; the difference
+    /// from where it actually is is nothing at all while the two run together. The song loops, so
+    /// a difference of nearly a whole pass is the two of them either side of the top rather than a
+    /// jump, and wraps to nothing.
+    private func clockDrift(_ run: ClockRun, songTime: Double, sounding: UInt64) -> Double? {
+      guard timeline.end > 0 else { return nil }
+      var drift = timeline.times[run.step] - MIDIOutput.seconds(from: sounding, to: run.time) - songTime
+      drift = drift.truncatingRemainder(dividingBy: timeline.end)
+      if drift > timeline.end / 2 { drift -= timeline.end }
+      if drift < -timeline.end / 2 { drift += timeline.end }
+      return drift
+    }
+
+    /// Say where the song is and start it there. Starting anywhere but the first step sends the
+    /// position before the continue, which is what a device needs to play the right bar and not
+    /// merely the right tempo. A clock that was already running is stopped first, and what it had
+    /// queued dropped: those ticks are for a bar that is no longer happening.
+    private func locateClock(step: Int, songTime: Double, sounding: UInt64, out: MIDIOutput) -> ClockRun {
+      if clockRun != nil {
+        out.flush(clockDestination)
+        out.send(ClockMessage.stop.bytes, to: clockDestination, at: sounding)
+      }
+      clockRun = nil
+      for scheduled in scheduleClockStart(step: step, at: 0) {
+        out.send(scheduled.message.bytes, to: clockDestination, at: sounding)
+      }
+      // Ticking picks up at the next step to begin: the one the transport is already inside has
+      // had some of its ticks go by, and sending them now would only bunch them at the start.
+      var next = step
+      if songTime - timeline.times[step] > 0.001 { next += 1 }
+      if next >= timeline.times.count { next = 0 }
+      return ClockRun(step: next, time: clockTime(ofStep: next, songTime: songTime, sounding: sounding))
+    }
+
+    /// When `step` begins on the host clock, given that the song is at `songTime` at `sounding`.
+    private func clockTime(ofStep step: Int, songTime: Double, sounding: UInt64) -> UInt64 {
+      var ahead = timeline.times[step] - songTime
+      // Behind the transport means the step is the one coming round on the next pass.
+      if ahead < 0 { ahead += timeline.end }
+      return MIDIOutput.time(sounding, after: ahead)
+    }
+
+    /// Stop, and drop whatever was written ahead of it, so that nothing is left ticking behind the
+    /// stop and running the other end on by itself.
+    private func stopClock(on destination: MIDIOutput.Destination? = nil) {
+      defer { clockRun = nil }
+      guard let out = clockOut, clockRun != nil else { return }
+      let target = destination ?? clockDestination
+      out.flush(target)
+      out.send(ClockMessage.stop.bytes, to: target, at: MIDIOutput.now())
     }
 
     func open(_ entry: CatalogueEntry) {
@@ -222,7 +394,7 @@
       undoManager?.removeAllActions()
       song = loaded
       unit?.load(loaded)
-      unit?.send(.play)
+      startEngine()
     }
 
     /// A song document from disk, in the web app's format.
@@ -240,7 +412,7 @@
       undoManager?.removeAllActions()
       song = loaded
       unit?.load(loaded)
-      unit?.send(.play)
+      startEngine()
     }
 
     func save(to url: URL) {
@@ -260,11 +432,22 @@
     }
 
     func play() {
-      unit?.send(.play)
+      startEngine()
     }
 
     func stop() {
       unit?.send(.stop)
+      // Here rather than at the next tick: a stop a thirtieth of a second late is a stop that
+      // arrives behind ticks the engine is never going to play.
+      clockHalted = true
+      stopClock()
+    }
+
+    /// Everything that starts the engine goes through here, so that a stop the transport has not
+    /// caught up with yet cannot leave the clock out held down.
+    private func startEngine() {
+      clockHalted = false
+      unit?.send(.play)
     }
 
     func toggle() {
@@ -384,7 +567,7 @@
       let position = songFrame
       unit?.load(edited)
       unit?.send(.seek(songFrame: position))
-      if isPlaying { unit?.send(.play) }
+      if isPlaying { startEngine() }
     }
 
     // MARK: - Where the song is
@@ -461,6 +644,12 @@
           if times[middle] <= time { low = middle + 1 } else { high = middle }
         }
         return low == 0 ? nil : low - 1
+      }
+
+      /// How long `step` lasts; the last one runs to the end of the pass.
+      func length(ofStep step: Int) -> Double {
+        let start = times[step]
+        return max(0, (step + 1 < times.count ? times[step + 1] : end) - start)
       }
 
       /// Where `bar` begins; the end of the song for a bar past its last.
