@@ -186,6 +186,13 @@
         vertex: "defconTintVertex", fragment: "defconTintFragment", blend: .additive)
     }
 
+    /// One of the seven cities on a side. Clamped, unlike the web: `Noise` hands its value back
+    /// as a `Float`, and one a hair under one rounds up on the way in — which would index off the
+    /// end of the side it belongs to. The web's double-precision generator cannot get there.
+    private func pickCity() -> Int {
+      min(Self.citiesPerSide - 1, Int(roll.next() * Float(Self.citiesPerSide)))
+    }
+
     /// A plain parabola. Ballistic enough at this scale, and the alternative — a great circle on a
     /// globe — would need a globe.
     private func arcAt(_ missile: Missile, _ t: Float) -> SIMD3<Float> {
@@ -210,10 +217,8 @@
         let salvo = kick > 0.5 ? 2 : 1
         for _ in 0..<salvo {
           let west = roll.next() < 0.5
-          let from = cities[
-            (west ? 0 : Self.citiesPerSide) + Int(roll.next() * Float(Self.citiesPerSide))]
-          let to = cities[
-            (west ? Self.citiesPerSide : 0) + Int(roll.next() * Float(Self.citiesPerSide))]
+          let from = cities[(west ? 0 : Self.citiesPerSide) + pickCity()]
+          let to = cities[(west ? Self.citiesPerSide : 0) + pickCity()]
           flight[nextMissile].from = from
           flight[nextMissile].to = to
           flight[nextMissile].t = 0
