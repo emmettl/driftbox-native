@@ -57,6 +57,17 @@
         ? SIMD2(1, targetAspect / frameAspect) : SIMD2(frameAspect / targetAspect, 1)
     }
 
+    /// The scale that covers `target` with `frame`, cropping whichever way it overhangs, in
+    /// the same terms as `fit`. For a backdrop, where bars would look like a fault and the
+    /// edges of the picture are not missed.
+    public static func cover(_ frame: SIMD2<Float>, in target: SIMD2<Float>) -> SIMD2<Float> {
+      guard frame.x > 0, frame.y > 0, target.x > 0, target.y > 0 else { return .zero }
+      let frameAspect = frame.x / frame.y
+      let targetAspect = target.x / target.y
+      return frameAspect > targetAspect
+        ? SIMD2(frameAspect / targetAspect, 1) : SIMD2(1, targetAspect / frameAspect)
+    }
+
     private lazy var presentPipeline: MTLRenderPipelineState? = {
       let descriptor = MTLRenderPipelineDescriptor()
       descriptor.vertexFunction = library.makeFunction(name: "presentVertex")
@@ -68,7 +79,10 @@
     /// Show a frame `draw` has already finished in another target — a view's drawable —
     /// fitted and centred, black around it. On the same queue as the drawing, so it can never
     /// read a frame before that frame is written.
-    public func present(_ frame: MTLTexture, into target: MTLTexture, drawable: MTLDrawable? = nil) {
+    /// Show `frame` in `target`, whole and letterboxed, or `filling` it and cropped.
+    public func present(
+      _ frame: MTLTexture, into target: MTLTexture, drawable: MTLDrawable? = nil, filling: Bool = false
+    ) {
       guard let presentPipeline, let commandBuffer = queue.makeCommandBuffer() else { return }
       let pass = MTLRenderPassDescriptor()
       pass.colorAttachments[0].texture = target
@@ -76,9 +90,9 @@
       pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
       pass.colorAttachments[0].storeAction = .store
       if let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) {
-        var scale = Self.fit(
-          SIMD2(Float(frame.width), Float(frame.height)), in: SIMD2(Float(target.width), Float(target.height))
-        )
+        let shape = SIMD2(Float(frame.width), Float(frame.height))
+        let room = SIMD2(Float(target.width), Float(target.height))
+        var scale = filling ? Self.cover(shape, in: room) : Self.fit(shape, in: room)
         encoder.setRenderPipelineState(presentPipeline)
         encoder.setVertexBytes(&scale, length: MemoryLayout<SIMD2<Float>>.stride, index: 0)
         encoder.setFragmentTexture(frame, index: 0)

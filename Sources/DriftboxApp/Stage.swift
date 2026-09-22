@@ -11,9 +11,9 @@
   /// One renderer and one scene, whatever is watching. That is what makes a second view safe
   /// rather than merely possible: the engine's events are taken by whoever draws, so two
   /// renderers would each see half the hits, and the analyser smooths every time it is asked,
-  /// so two would make the bands fall twice as fast. It is also what makes the pane an honest
+  /// so two would make the bands fall twice as fast. It is also what makes the backdrop an honest
   /// preview — while a visuals window is open that window draws the frame at its own shape, and
-  /// the pane shows the same frame letterboxed, rather than a second scene of its own that
+  /// the backdrop shows the same frame, cropped to fill, rather than a second scene of its own that
   /// happens to look similar.
   @MainActor
   @Observable
@@ -22,7 +22,7 @@
     @ObservationIgnored let renderer: SceneRenderer?
     /// The window the visuals go out to.
     @ObservationIgnored public private(set) lazy var output = VisualsWindow(stage: self)
-    /// Whether that window is open. While it is, it draws and the pane previews.
+    /// Whether that window is open. While it is, it draws and the backdrop shows its frames.
     internal(set) public var outputOpen = false
     /// The displays attached, by name, for the menu that sends the visuals to one. Kept here
     /// rather than read from `NSScreen` in the menu, because a menu only redraws when something
@@ -94,7 +94,7 @@
     }
   }
 
-  /// A view onto the stage: the pane in the main window, or the whole of the visuals window.
+  /// A view onto the stage: the backdrop of the main window, or the whole of the visuals window.
   struct StageView: NSViewRepresentable {
     let stage: Stage
     let role: StageMTKView.Role
@@ -104,7 +104,7 @@
   }
 
   /// The Metal view both of those are. Whichever is the output draws the frame — the visuals
-  /// window when one is open, the pane when not — and both show it.
+  /// window when one is open, the backdrop when not — and both show it.
   final class StageMTKView: MTKView, MTKViewDelegate {
     enum Role { case preview, output }
     let stage: Stage
@@ -140,7 +140,8 @@
           pixelRatio: Float(window?.backingScaleFactor ?? 1))
       }
       guard let frame = stage.latest, let drawable = currentDrawable else { return }
-      stage.renderer?.present(frame, into: drawable.texture, drawable: drawable)
+      // The window's backdrop fills and crops; the visuals window shows the whole frame.
+      stage.renderer?.present(frame, into: drawable.texture, drawable: drawable, filling: role == .preview)
     }
 
     // MARK: - The output, as something a performer stands in front of

@@ -3,56 +3,85 @@
   import DriftboxSeq
   import SwiftUI
 
-  /// Which pattern the grid shows: the one playing, or one chosen to edit. And the pattern list's
-  /// tools, and the song's tempo and swing.
+  /// Which pattern the grid shows: the one playing, followed, or one chosen to edit, as a row
+  /// of chips with the playing one marked. And the pattern list's tools.
   struct PatternBar: View {
     let player: Player
     let song: Song
 
     var body: some View {
-      HStack(spacing: 10) {
-        Picker(
-          "Pattern",
-          selection: Binding(get: { player.editing ?? "" }, set: { player.editing = $0.isEmpty ? nil : $0 })
-        ) {
-          Text("follow").tag("")
-          ForEach(song.patterns, id: \.id) { pattern in Text(pattern.name).tag(pattern.id) }
-        }
-        .frame(width: 180)
-        Button("Add") { player.edit("Add Pattern") { song in song = song.addingPattern().song } }
-        Button("Duplicate") {
-          guard let id = player.editing ?? player.position?.pattern?.id else { return }
-          player.edit("Duplicate Pattern") { song in
-            let result = song.duplicatingPattern(id)
-            song = result.song
-            player.editing = result.id
-          }
-        }
-        Button("Remove") {
-          guard let id = player.editing ?? player.position?.pattern?.id else { return }
-          player.edit("Remove Pattern") { song in song = song.removingPattern(id) }
+      let shown = player.shownPattern?.id
+      let playing = player.isPlaying ? player.position?.pattern?.id : nil
+      HStack(spacing: 8) {
+        FieldLabel("Pattern")
+        Button {
           player.editing = nil
+        } label: {
+          Label("follow", systemImage: "arrow.triangle.2.circlepath").labelStyle(.titleAndIcon)
         }
-        .disabled(song.patterns.count < 2)
-        Spacer()
-        Stepper(
-          "\(Int(song.bpm)) bpm",
-          value: Binding(
-            get: { song.bpm },
-            set: { value in player.edit("Set Tempo") { $0.bpm = max(20, min(300, value)) } }), step: 1
-        )
-        .font(.caption.monospacedDigit())
+        .buttonStyle(.chip(on: player.editing == nil))
+        .help("Show whichever pattern is playing")
+        Rectangle().fill(Theme.edge).frame(width: 1, height: 18)
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 5) {
+            ForEach(song.patterns, id: \.id) { pattern in
+              Button {
+                player.editing = pattern.id
+              } label: {
+                HStack(spacing: 5) {
+                  if pattern.id == playing {
+                    Circle().fill(Theme.live).frame(width: 5, height: 5).shadow(color: Theme.live, radius: 3)
+                  }
+                  Text(pattern.name).lineLimit(1)
+                }
+              }
+              .buttonStyle(
+                .chip(on: pattern.id == shown, tint: player.editing == nil ? Theme.live : Theme.eight))
+            }
+          }
+          .padding(.vertical, 6)
+          .padding(.horizontal, 2)
+        }
+        // Chips that run off the end fade rather than being cut.
+        .mask(
+          HStack(spacing: 0) {
+            Color.black
+            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(
+              width: 24)
+          })
+        Spacer(minLength: 4)
         HStack(spacing: 4) {
-          Text("swing").font(.caption)
-          Slider(
-            value: Binding(
-              get: { song.swing }, set: { value in player.edit("Set Swing") { $0.swing = value } }), in: 0...1
-          )
-          .frame(width: 100)
+          Button {
+            player.edit("Add Pattern") { song in song = song.addingPattern().song }
+          } label: {
+            Image(systemName: "plus")
+          }
+          .help("Add a pattern")
+          Button {
+            guard let id = shown else { return }
+            player.edit("Duplicate Pattern") { song in
+              let result = song.duplicatingPattern(id)
+              song = result.song
+              player.editing = result.id
+            }
+          } label: {
+            Image(systemName: "plus.square.on.square")
+          }
+          .help("Duplicate this pattern")
+          Button {
+            guard let id = shown else { return }
+            player.edit("Remove Pattern") { song in song = song.removingPattern(id) }
+            player.editing = nil
+          } label: {
+            Image(systemName: "trash")
+          }
+          .help("Remove this pattern")
+          .disabled(song.patterns.count < 2)
         }
+        .buttonStyle(.chip)
       }
-      .padding(.horizontal, 12)
-      .padding(.vertical, 6)
+      .padding(.horizontal, 14)
+      .frame(height: 44)
     }
   }
 
@@ -112,7 +141,10 @@
         Button("Alter") { apply("Alter") { $0.alteringBassLine(voiceId, random: chance()) } }
         Button("Clear") { apply("Clear Line") { $0.clearingBassLine(voiceId) } }
       } label: {
-        Text(voiceId == "303.a" ? "303 A" : "303 B").font(.headline)
+        Image(systemName: "ellipsis").font(.system(size: 10, weight: .semibold))
+          .foregroundStyle(Theme.dim)
+          .frame(width: 20, height: 20)
+          .contentShape(Rectangle())
       }
       .menuStyle(.borderlessButton)
       .menuIndicator(.hidden)

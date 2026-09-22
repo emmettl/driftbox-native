@@ -95,6 +95,30 @@
       }
     }
 
+    /// Undoing back to the song as it was opened or saved takes the edited mark away again, as
+    /// it does in any Mac document: there is nothing to save, so quitting has nothing to ask.
+    @Test func undoingBackToTheSavedSongIsNotAnEdit() throws {
+      try withTemporaryDirectory { directory in
+        let (player, manager) = try opened(directory)
+        inOneTurn(manager) { player.edit("Set Tempo") { $0.bpm = 128 } }
+        inOneTurn(manager) { player.edit("Set Swing") { $0.swing = 0.3 } }
+        #expect(player.isEdited)
+        player.undo()
+        #expect(player.isEdited, "one edit is still there")
+        player.undo()
+        #expect(!player.isEdited)
+        player.redo()
+        #expect(player.isEdited)
+
+        // Saved, that is the new unedited song.
+        player.save(to: directory.appendingPathComponent("Saved.song.json"))
+        #expect(!player.isEdited)
+        inOneTurn(manager) { player.edit("Set Tempo") { $0.bpm = 90 } }
+        player.undo()
+        #expect(!player.isEdited)
+      }
+    }
+
     /// A note goes on where it is clicked, and clicking the note that is already there pauses it
     /// rather than moving it.
     @Test func aBassNoteIsSetAndPausedFromTheGrid() throws {
