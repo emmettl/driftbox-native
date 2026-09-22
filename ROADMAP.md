@@ -101,7 +101,9 @@ gone native at all.
    never sets one is relying on it. Then Lifeforms, seven noise-deformed
    icosahedra breathing on the low end, which brought three's icosahedron with it. Then Cubik, the first solid one:
    729 instanced cubes in a paper-white room, which brought a depth buffer, box geometry and
-   instancing with it. Sixteen of twenty-seven. The other sixteen are three.js
+   instancing with it. Then Stillwater, the one that reads events
+   rather than levels: rings dropped on black water by an onset detector, and a camera aimed
+   by its own angles. Seventeen of twenty-seven. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,

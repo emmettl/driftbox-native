@@ -14,6 +14,9 @@
     /// What the camera is pointed at, if it is pointed at anything; `roll` turns it about its
     /// own axis when it is not.
     public var target: SIMD3<Float>?
+    /// Or its Euler angles, for a scene that aims the camera rather than pointing it at
+    /// something. Takes precedence over both of the above.
+    public var rotation: SIMD3<Float>?
     public var fovDegrees: Float = 60
     public var near: Float = 0.1
     public var far: Float = 200
@@ -34,6 +37,12 @@
       let translate = simd_float4x4(
         SIMD4(1, 0, 0, 0), SIMD4(0, 1, 0, 0), SIMD4(0, 0, 1, 0),
         SIMD4(-position.x, -position.y, -position.z, 1))
+      if let rotation {
+        // The camera's own transform is `T · R`, so what the world is seen through is its
+        // inverse — and for an orthonormal rotation that is its transpose.
+        let turn = modelMatrix(position: .zero, rotation: rotation).transpose
+        return turn * translate
+      }
       guard let target else {
         let c = cos(-roll)
         let s = sin(-roll)
@@ -111,21 +120,27 @@
   public struct Onset {
     public var rise: Float
     public var refractory: Float
+    public var rates: SIMD2<Float>
+    public var floor: Float
     private var fast: Float = 0
     private var slow: Float = 0
     private var wait: Float = 0
 
-    public init(rise: Float, refractory: Float) {
+    public init(
+      rise: Float, refractory: Float, rates: SIMD2<Float> = SIMD2(28, 2.2), floor: Float = 0.07
+    ) {
       self.rise = rise
       self.refractory = refractory
+      self.rates = rates
+      self.floor = floor
     }
 
     /// How hard it was hit, or zero.
     public mutating func detect(_ value: Float, dt: Float) -> Float {
-      fast += (value - fast) * min(1, dt * 28)
-      slow += (value - slow) * min(1, dt * 2.2)
+      fast += (value - fast) * min(1, dt * rates.x)
+      slow += (value - slow) * min(1, dt * rates.y)
       wait -= dt
-      if wait > 0 || fast < 0.07 || fast < slow * rise { return 0 }
+      if wait > 0 || fast < floor || fast < slow * rise { return 0 }
       wait = refractory
       return min(1, fast)
     }
