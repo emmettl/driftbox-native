@@ -611,6 +611,16 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
     })
   }
   write(join(fixtures, 'rack'), 'cases.json', json(summary))
+  // Every module's definition, which is the file format: ids, ports, param ranges and defaults.
+  const port = ({ id, stereo }) => ({ id, stereo: stereo === true })
+  write(join(fixtures, 'rack'), 'modules.json', json(Object.values(MODULES).map((def) => ({
+    type: def.type, version: def.version, name: def.name,
+    inlets: def.inlets.map(port), outlets: def.outlets.map(port),
+    params: def.params.map(({ id, min, max, stepped, hidden, ...rest }) =>
+      ({ id, min, max, default: rest.default, stepped: stepped === true, hidden: hidden === true })),
+    poly: def.poly !== false, terminal: def.terminal === true, voiceExpansion: def.voiceExpansion ?? null,
+    voiceCollector: def.voiceCollector === true,
+  }))))
 }
 
 const AUDIO_TOLERANCE = 1e-12
