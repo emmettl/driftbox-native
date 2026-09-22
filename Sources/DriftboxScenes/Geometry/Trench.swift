@@ -236,8 +236,10 @@
         for strand in Self.beamStrands {
           let colour = Self.hsl(hue + strand * 0.045 + 1, strand == 0 ? 0.72 : 0.55)
           for segment in 0..<Self.beamSegments {
-            let ends = [Float(segment), Float(segment + 1)].map { $0 / Float(Self.beamSegments) }
-            for t in ends {
+            // Both ends of each segment, so the chain is drawn as separate lines rather than as
+            // a strip — which is what the web's `lineSegments` wants.
+            for end in 0...1 {
+              let t = Float(segment + end) / Float(Self.beamSegments)
               var at = muzzle + (target - muzzle) * t
               // Wobble and spread, both widest mid-flight and zero at either end, so the beam
               // still leaves the corner and still lands exactly on the finger.
