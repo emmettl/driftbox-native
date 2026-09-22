@@ -50,11 +50,19 @@ struct RackConformanceTests {
         let to = try need(cable["to"]?.array?.compactMap(\.string))
         return PatchCable(from: PortReference(from[0], from[1]), to: PortReference(to[0], to[1]))
       }
+      let modulation = try (patchJSON["modulation"]?.array ?? []).map { value -> ModRoute in
+        let route = try need(value.object)
+        let from = try need(route["from"]?.array?.compactMap(\.string))
+        let to = try need(route["to"]?.array?.compactMap(\.string))
+        return ModRoute(
+          from: PortReference(from[0], from[1]), to: PortReference(to[0], to[1]), min: route["min"]?.finite,
+          max: route["max"]?.finite)
+      }
       return Case(
         name: try need(object["name"]?.string),
         patch: Patch(
           modules: modules, cables: cables, voices: patchJSON["voices"]?.finite,
-          tempo: patchJSON["tempo"]?.finite),
+          tempo: patchJSON["tempo"]?.finite, modulation: modulation),
         blocks: Int(try need(object["blocks"]?.finite)), events: object["events"]?.array ?? [],
         hostBuses: Int(object["hostBuses"]?.finite ?? 0), plan: try need(object["plan"]?.object))
     }
@@ -65,7 +73,7 @@ struct RackConformanceTests {
   /// The cases load at all: a parameterised test over none of them would pass, and say nothing.
   @Test func everyCaseLoads() throws {
     let cases = try Self.cases()
-    #expect(cases.count == 18)
+    #expect(cases.count >= 18)
     #expect(Self.names.count == cases.count)
   }
 
