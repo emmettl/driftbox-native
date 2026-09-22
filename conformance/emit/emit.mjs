@@ -623,6 +623,86 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
   }))))
 }
 
+// Rack patches as documents: every factory patch, song patch and device patch the reference
+// ships, and a set of damaged ones, each with what the reference makes of it — decoded and
+// encoded again, or refused (null). The Swift codec is held to these byte for byte.
+{
+  const rack = join(root, 'driftbox', 'packages', 'rack', 'src')
+  const { encodePatch, decodePatch } = await import(join(rack, 'patch-io.ts'))
+  const { PATCHES } = await import(join(rack, 'patches', 'index.ts'))
+  const { SONG_PATCHES } = await import(join(rack, 'patches', 'songs.ts'))
+  const inputs = []
+  for (const preset of PATCHES) inputs.push([`factory-${preset.id}`, encodePatch(preset.build())])
+  for (const preset of SONG_PATCHES) inputs.push([`song-${preset.id}`, encodePatch(preset.build())])
+  const base = PATCHES[0].build()
+  const damaged = (change) => {
+    const copy = JSON.parse(JSON.stringify(base))
+    change(copy)
+    return JSON.stringify({ v: 2, patch: copy })
+  }
+  inputs.push(
+    ['not json', '{nope'],
+    ['not an object', '[1,2,3]'],
+    ['no modules', '{"v":2,"patch":{"cables":[]}}'],
+    ['a newer format', JSON.stringify({ v: 3, patch: base })],
+    ['bare, without an envelope', JSON.stringify(base)],
+    ['duplicate ids keep the first', damaged((p) => p.modules.push({ ...p.modules[0], params: { tune: 5 } }))],
+    ['modules without ids or types', damaged((p) => p.modules.push({ type: 'vco' }, { id: 'x' }, { id: '', type: 'vco' }, 7, null))],
+    ['cables to nowhere and repeated', damaged((p) => p.cables.push({ from: ['nobody', 'out'], to: [p.modules[0].id, 'in'] }, p.cables[0], { from: ['a'], to: 3 }))],
+    ['knobs that are not numbers', damaged((p) => { p.modules[0].params = { a: 'x', b: null, c: 1e999, d: 0.5 } })],
+    ['a knob list with nothing usable', damaged((p) => { p.modules[0].params = { a: 'x' } })],
+    ['data with a hole in it', damaged((p) => { p.modules[0].data = { good: [1, 2, 3], bad: [1, 'two', 3], worse: 'no' } })],
+    ['positions, versions and bypass', damaged((p) => { p.modules[0].pos = [10, 20, 30]; p.modules[0].version = 2; p.modules[0].bypassed = true; p.modules[1].version = 1.5; p.modules[1].bypassed = 'yes'; p.modules[1].pos = ['a', 2] })],
+    ['voices and tempo in and out of range', damaged((p) => { p.voices = 4; p.tempo = 97.5 })],
+    ['voices of one, and a fraction', damaged((p) => { p.voices = 1; p.tempo = 900 })],
+    ['voices not a whole number', damaged((p) => { p.voices = 2.5; p.tempo = 19 })],
+    ['a visual, trimmed and cut', damaged((p) => { p.visual = '   ' + 'x'.repeat(200) + '  '; p.break = 'amen'; p.groovebox = 'acid' })],
+    ['an empty visual and break', damaged((p) => { p.visual = '   '; p.break = ''; p.groovebox = '' })],
+    ['modulation routes', damaged((p) => { p.modulation = [{ from: [p.modules[0].id, 'a'], to: [p.modules[1].id, 'b'], min: 0.2, max: 'x' }, { from: ['ghost', 'a'], to: [p.modules[1].id, 'b'] }, 'junk'] })],
+    ['automation, sorted and rounded', damaged((p) => { p.automation = [{ target: [p.modules[0].id, 'tune'], points: [{ at: 96.6, value: 1 }, { at: 12, value: 2 }, { at: -1, value: 3 }, { at: 12, value: 4 }, { at: 'x', value: 5 }], curve: 'hold' }, { target: [p.modules[0].id, 'width'], points: [{ at: 1, value: 'no' }] }, { target: ['ghost', 'tune'], points: [{ at: 1, value: 1 }] }] })],
+  )
+  // Each factory patch played whole for a second, the transport running at its tempo: every
+  // module it uses working together, through the codec, as somebody opening it would hear it.
+  const { RackRenderer } = await import(join(rack, 'headless.ts'))
+  const { MODULES } = await import(join(rack, 'modules', 'index.ts'))
+  const blocks = 375
+  const played = []
+  for (const preset of PATCHES) {
+    const patch = decodePatch(encodePatch(preset.build()))
+    const renderer = new RackRenderer(MODULES, { sampleRate: 48000, frames: 128 })
+    renderer.patch = patch
+    renderer.setTransport(patch.tempo ?? 120, true)
+    // A patch played from a keyboard gets a note, and a fifth where it has the voices for one,
+    // held for two thirds of the render: without them it would be a second of silence, which
+    // proves nothing.
+    const keys = patch.modules.find((module) => module.type === 'midi')?.id
+    const both = new Float32Array(blocks * 256)
+    for (let block = 0; block < blocks; block++) {
+      if (keys && block === 0) {
+        renderer.setParam(keys, 'note', 48, 0)
+        renderer.setParam(keys, 'gate', 1, 0)
+        if ((patch.voices ?? 1) > 1) {
+          renderer.setParam(keys, 'note', 55, 1)
+          renderer.setParam(keys, 'gate', 1, 1)
+        }
+      }
+      if (keys && block === 250) renderer.setParam(keys, 'gate', 0)
+      const l = new Float32Array(128)
+      const r = new Float32Array(128)
+      renderer.process([l, r])
+      both.set(l, block * 128)
+      both.set(r, blocks * 128 + block * 128)
+    }
+    write(join(fixtures, 'rack', 'factory'), `${preset.id}.f32`, Buffer.from(both.buffer))
+    played.push({ id: preset.id, blocks, tempo: patch.tempo ?? 120 })
+  }
+  write(join(fixtures, 'rack', 'factory'), 'played.json', json(played))
+  write(join(fixtures, 'rack'), 'patches.json', json(inputs.map(([name, input]) => {
+    const decoded = decodePatch(input)
+    return { name, input, output: decoded ? encodePatch(decoded) : null }
+  })))
+}
+
 const AUDIO_TOLERANCE = 1e-12
 
 function filesUnder(dir, base = dir) {

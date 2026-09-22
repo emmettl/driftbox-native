@@ -3,6 +3,45 @@
 // module is a type, an id and its knob positions. Everything here is plain data, because a patch
 // arrives from outside the program — a file, a link — and has to survive being wrong.
 
+/// String-keyed values that remember the order their keys arrived in, as a JavaScript object
+/// does: a patch written back out lists its knobs in the order it read them, so a document
+/// survives a round trip byte for byte. Written with dictionary literals, read and written by
+/// key; setting nil takes a key away.
+public struct KeyedList<Value: Equatable & Sendable>: Equatable, Sendable, ExpressibleByDictionaryLiteral,
+  Sequence
+{
+  public private(set) var keys: [String] = []
+  public private(set) var values: [Value] = []
+
+  public init() {}
+
+  public init(dictionaryLiteral elements: (String, Value)...) {
+    for (key, value) in elements { self[key] = value }
+  }
+
+  public var count: Int { keys.count }
+  public var isEmpty: Bool { keys.isEmpty }
+
+  public subscript(key: String) -> Value? {
+    get { keys.firstIndex(of: key).map { values[$0] } }
+    set {
+      if let index = keys.firstIndex(of: key) {
+        if let newValue {
+          values[index] = newValue
+        } else {
+          keys.remove(at: index)
+          values.remove(at: index)
+        }
+      } else if let newValue {
+        keys.append(key)
+        values.append(newValue)
+      }
+    }
+  }
+
+  public func makeIterator() -> Zip2Sequence<[String], [Value]>.Iterator { zip(keys, values).makeIterator() }
+}
+
 /// A module in a patch: what it is, which one it is, and where its knobs are.
 public struct PatchModule: Equatable, Sendable {
   public var id: String
@@ -10,16 +49,19 @@ public struct PatchModule: Equatable, Sendable {
   public var type: String
   /// The module's own version when the patch was saved; nil means current.
   public var version: Int?
-  public var params: [String: Double]
+  public var params: KeyedList<Double>
   /// Per inlet, a gain between -1 and 1 applied before the module reads it. Unity is no trim.
-  public var inputTrims: [String: Double]
+  public var inputTrims: KeyedList<Double>
   public var bypassed: Bool
   /// Bulk data the patch carries for the module — a pattern, a table — by slot.
-  public var data: [String: [Double]]
+  public var data: KeyedList<[Double]>
+  /// Where it sits in the rack, for the panels; nothing in the sound reads it.
+  public var position: [Double]?
 
   public init(
-    id: String, type: String, version: Int? = nil, params: [String: Double] = [:],
-    inputTrims: [String: Double] = [:], bypassed: Bool = false, data: [String: [Double]] = [:]
+    id: String, type: String, version: Int? = nil, params: KeyedList<Double> = [:],
+    inputTrims: KeyedList<Double> = [:], bypassed: Bool = false, data: KeyedList<[Double]> = [:],
+    position: [Double]? = nil
   ) {
     self.id = id
     self.type = type
@@ -28,6 +70,7 @@ public struct PatchModule: Equatable, Sendable {
     self.inputTrims = inputTrims
     self.bypassed = bypassed
     self.data = data
+    self.position = position
   }
 }
 
@@ -67,6 +110,25 @@ public struct ModRoute: Equatable, Sendable {
   }
 }
 
+/// A recorded knob: a param's value at points in time, in frames of the transport.
+public struct AutomationLane: Equatable, Sendable {
+  public var target: PortReference
+  public var points: [(at: Int, value: Double)]
+  /// Hold each value until the next rather than ramping between them.
+  public var holds: Bool
+
+  public init(target: PortReference, points: [(at: Int, value: Double)], holds: Bool = false) {
+    self.target = target
+    self.points = points
+    self.holds = holds
+  }
+
+  public static func == (a: AutomationLane, b: AutomationLane) -> Bool {
+    a.target == b.target && a.holds == b.holds && a.points.count == b.points.count
+      && zip(a.points, b.points).allSatisfy { $0.at == $1.at && $0.value == $1.value }
+  }
+}
+
 public struct Patch: Equatable, Sendable {
   public var modules: [PatchModule]
   public var cables: [PatchCable]
@@ -74,16 +136,27 @@ public struct Patch: Equatable, Sendable {
   public var voices: Double?
   public var tempo: Double?
   public var modulation: [ModRoute]
+  public var automation: [AutomationLane]
+  /// The scene it is seen with, by id.
+  public var visual: String?
+  /// A break loaded into it, by id, and a groovebox song beside it.
+  public var breakId: String?
+  public var groovebox: String?
 
   public init(
     modules: [PatchModule], cables: [PatchCable], voices: Double? = nil, tempo: Double? = nil,
-    modulation: [ModRoute] = []
+    modulation: [ModRoute] = [], automation: [AutomationLane] = [], visual: String? = nil,
+    breakId: String? = nil, groovebox: String? = nil
   ) {
     self.modules = modules
     self.cables = cables
     self.voices = voices
     self.tempo = tempo
     self.modulation = modulation
+    self.automation = automation
+    self.visual = visual
+    self.breakId = breakId
+    self.groovebox = groovebox
   }
 }
 

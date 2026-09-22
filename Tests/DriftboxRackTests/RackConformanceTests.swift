@@ -31,11 +31,11 @@ struct RackConformanceTests {
       let patchJSON = try need(object["patch"]?.object)
       let modules = try (patchJSON["modules"]?.array ?? []).map { value -> PatchModule in
         let module = try need(value.object)
-        var params: [String: Double] = [:]
+        var params: KeyedList<Double> = [:]
         for (key, param) in module["params"]?.object?.members ?? [] { params[key] = param.finite }
-        var inputTrims: [String: Double] = [:]
+        var inputTrims: KeyedList<Double> = [:]
         for (key, trim) in module["inputTrims"]?.object?.members ?? [] { inputTrims[key] = trim.finite }
-        var data: [String: [Double]] = [:]
+        var data: KeyedList<[Double]> = [:]
         for (key, values) in module["data"]?.object?.members ?? [] {
           data[key] = (values.array ?? []).compactMap(\.finite)
         }

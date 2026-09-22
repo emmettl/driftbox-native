@@ -24,7 +24,7 @@ public struct PlanNode: Equatable, Sendable {
   public var voiceLanes: Int
   public var collectVoices: Bool
   /// The patch's own data for the module, carried through untouched.
-  public var data: [String: [Double]]
+  public var data: KeyedList<[Double]>
 }
 
 public struct PlanOutput: Equatable, Sendable {

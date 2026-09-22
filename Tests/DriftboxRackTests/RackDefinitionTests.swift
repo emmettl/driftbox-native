@@ -28,7 +28,9 @@ struct RackDefinitionTests {
       #expect(def.version == Int(module["version"]?.finite ?? -1), "\(type) version")
       #expect(def.name == module["name"]?.string, "\(type) name")
       func ports(_ key: String) -> [(String, Bool)] {
-        (module[key]?.array ?? []).compactMap(\.object).map { ($0["id"]?.string ?? "", $0["stereo"]?.bool ?? false) }
+        (module[key]?.array ?? []).compactMap(\.object).map {
+          ($0["id"]?.string ?? "", $0["stereo"]?.bool ?? false)
+        }
       }
       #expect(def.inlets.map(\.id) == ports("inlets").map(\.0), "\(type) inlets")
       #expect(def.inlets.map(\.stereo) == ports("inlets").map(\.1), "\(type) stereo inlets")
