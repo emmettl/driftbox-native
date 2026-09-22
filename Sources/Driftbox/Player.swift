@@ -339,13 +339,13 @@
     private let analyser = Analyser()
     private var monitor = [Float](repeating: 0, count: Analyser.size)
 
-    func levels() -> (bass: Float, mid: Float, high: Float) {
-      guard let host = unit?.host else { return (0, 0, 0) }
+    func analyse() -> Analyser? {
+      guard let host = unit?.host else { return nil }
       monitor.withUnsafeMutableBufferPointer { buffer in
         host.recentMix(Analyser.size, into: buffer.baseAddress!)
         analyser.update(UnsafeBufferPointer(buffer))
       }
-      return analyser.levels()
+      return analyser
     }
 
     /// The loudest sample of the last audio block, each side.

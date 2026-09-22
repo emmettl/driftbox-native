@@ -66,6 +66,18 @@ public final class Analyser {
     }
   }
 
+  /// The web's `readLevels`: roughly, the first few bins are the kick's fundamental and the
+  /// top half is hats and the noise in snares and claps.
+  public func wideLevels() -> (bass: Float, high: Float) {
+    let lowEnd = max(1, Int(Double(Self.bins) * 0.035))
+    var bass = 0
+    for k in 0..<lowEnd { bass += Int(bytes[k]) }
+    let highStart = Int(Double(Self.bins) * 0.55)
+    var high = 0
+    for k in highStart..<Self.bins { high += Int(bytes[k]) }
+    return (Float(bass) / Float(lowEnd * 255), Float(high) / Float((Self.bins - highStart) * 255))
+  }
+
   /// Bass, mid and high as the surface scenes take them: eight bands, three, three and two.
   public func levels() -> (bass: Float, mid: Float, high: Float) {
     let b = bands(8)
