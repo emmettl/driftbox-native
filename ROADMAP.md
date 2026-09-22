@@ -66,7 +66,8 @@ gone native at all.
    WAV; voice names that flash from the engine's events ring; and every edit in `pattern.ts` —
    the pattern list, rotate, transpose, randomise, alter, clear, loop lengths, flams, the chain —
    ported and held to the reference's own results on 28 edits, with a pattern picker, lane and
-   line menus, chain menus, tempo and swing on the interface. Still to come: keys, stems,
+   line menus, chain menus, tempo and swing on the interface; keys, the number row striking
+   the drums and the home row playing 303 A; and stems, one WAV per voice. Still to come:
    CoreMIDI including clock follow, and a proper document model.
 6. **Visuals.** A thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not

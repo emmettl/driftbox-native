@@ -59,6 +59,7 @@
           Button("Open…") { openFile() }.keyboardShortcut("o")
           Button("Save…") { saveFile() }.keyboardShortcut("s").disabled(player.song == nil)
           Button("Export Mix…") { exportMix() }.keyboardShortcut("e").disabled(player.song == nil)
+          Button("Export Stems…") { exportStems() }.disabled(player.song == nil)
         }
       }
       .overlay(alignment: .bottom) {
@@ -89,6 +90,28 @@
       Task.detached {
         let audio = SongRenderer.render(song, options: .init(sampleRate: sampleRate))
         try? WAV.data(audio, sampleRate: sampleRate).write(to: url)
+      }
+    }
+
+    /// One WAV per voice the song uses, into a folder: each voice alone with its sends.
+    func exportStems() {
+      guard let song = player.song else { return }
+      let panel = NSOpenPanel()
+      panel.canChooseDirectories = true
+      panel.canChooseFiles = false
+      panel.canCreateDirectories = true
+      panel.prompt = "Export Here"
+      guard panel.runModal() == .OK, let folder = panel.url else { return }
+      let sampleRate = player.sampleRate
+      let name = player.current?.name ?? "song"
+      Task.detached {
+        for voiceId in SongRenderer.voicesUsed(song) {
+          var options = SongRenderer.Options(sampleRate: sampleRate)
+          options.only = [voiceId]
+          let audio = SongRenderer.render(song, options: options)
+          let file = folder.appendingPathComponent("\(name) - \(voiceId).wav")
+          try? WAV.data(audio, sampleRate: sampleRate).write(to: file)
+        }
       }
     }
 

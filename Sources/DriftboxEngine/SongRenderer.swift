@@ -29,6 +29,9 @@ public struct SongRenderer {
     /// does, rather than from its own frame, as the real-time engine does. On, except when the
     /// real-time engine is being compared with this.
     public var schedulesBassFromQuantum = true
+    /// Render only these voices — a stem — or everything when nil. A stem is a voice alone with
+    /// its sends, through the master chain, as the reference's `renderStems` makes one.
+    public var only: Set<String>?
 
     public init(sampleRate: Double = 44100, start: Double = 0, duration: Double? = nil, tail: Double = 4) {
       self.sampleRate = sampleRate
@@ -36,6 +39,16 @@ public struct SongRenderer {
       self.duration = duration
       self.tail = tail
     }
+  }
+
+  /// The voices a song plays, in the order it first plays them.
+  public static func voicesUsed(_ song: Song) -> [String] {
+    var seen: [String] = []
+    for step in song.plan(bars: song.chain.isEmpty ? 1 : song.bars) {
+      for hit in step.drums where !seen.contains(hit.voiceId) { seen.append(hit.voiceId) }
+      for hit in step.bass where !seen.contains(hit.voiceId) { seen.append(hit.voiceId) }
+    }
+    return seen
   }
 
   /// The length of one pass through the arrangement, in seconds.
@@ -77,6 +90,7 @@ public struct SongRenderer {
       for hit in step.drums {
         let time = hit.time - start
         guard time >= 0, time < duration, let voice = voice(id: hit.voiceId) else { continue }
+        if let only = options.only, !only.contains(hit.voiceId) { continue }
         let spec = voice.build(hit.params, accent: hit.accent)
         if let group = voice.choke {
           if let previous = ringing[group], hits[previous].endsAt > time { hits[previous].chokeAt = time }
@@ -119,7 +133,10 @@ public struct SongRenderer {
 
     var bassIds: [String] = []
     for step in plan {
-      for hit in step.bass where !bassIds.contains(hit.voiceId) { bassIds.append(hit.voiceId) }
+      for hit in step.bass where !bassIds.contains(hit.voiceId) {
+        if let only = options.only, !only.contains(hit.voiceId) { continue }
+        bassIds.append(hit.voiceId)
+      }
     }
     for voiceId in bassIds {
       var line = Bassline(sampleRate: sampleRate)
