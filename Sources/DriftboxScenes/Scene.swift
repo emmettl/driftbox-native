@@ -81,9 +81,12 @@
       Hothouse.self, NightBus.self,
     ]
     /// The web's three.js scenes, reinterpreted over the geometry layer.
-    static let geometry: [GeometryScene.Type] = [Wireframe.self, Sunset.self, Web.self, Saturn.self]
+    static let geometry: [GeometryScene.Type] = [
+      Wireframe.self, Sunset.self, Web.self, Saturn.self, Lifeforms.self,
+    ]
     static var geometrySources: String {
-      GeometryScene.preamble + [Wireframe.source, Sunset.source, Web.source, Saturn.source].joined()
+      GeometryScene.preamble
+        + [Wireframe.source, Sunset.source, Web.source, Saturn.source, Lifeforms.source].joined()
     }
 
     static var surfaceSources: String {

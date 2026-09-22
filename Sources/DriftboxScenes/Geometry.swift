@@ -151,6 +151,60 @@
     }
   }
 
+  /// three's `IcosahedronGeometry`: the solid's twenty faces subdivided `detail` times and
+  /// pushed out to the sphere, in three's own order, and not indexed — as three leaves it.
+  public enum Icosahedron {
+    public static func build(radius: Float = 1, detail: Int = 0) -> [SIMD3<Float>] {
+      let t = (1 + Float(5).squareRoot()) / 2
+      let corners: [SIMD3<Float>] = [
+        SIMD3(-1, t, 0), SIMD3(1, t, 0), SIMD3(-1, -t, 0), SIMD3(1, -t, 0),
+        SIMD3(0, -1, t), SIMD3(0, 1, t), SIMD3(0, -1, -t), SIMD3(0, 1, -t),
+        SIMD3(t, 0, -1), SIMD3(t, 0, 1), SIMD3(-t, 0, -1), SIMD3(-t, 0, 1),
+      ]
+      let faces = [
+        0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11,
+        1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8,
+        3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9,
+        4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1,
+      ]
+      var out: [SIMD3<Float>] = []
+      let cols = detail + 1
+      for face in stride(from: 0, to: faces.count, by: 3) {
+        let a = corners[faces[face]]
+        let b = corners[faces[face + 1]]
+        let c = corners[faces[face + 2]]
+        // A triangular lattice across the face, row by row toward `c`.
+        var rowsOfPoints: [[SIMD3<Float>]] = []
+        for i in 0...cols {
+          let aj = simd_mix(a, c, SIMD3(repeating: Float(i) / Float(cols)))
+          let bj = simd_mix(b, c, SIMD3(repeating: Float(i) / Float(cols)))
+          let rows = cols - i
+          var points: [SIMD3<Float>] = []
+          for j in 0...rows {
+            if j == 0 && i == cols {
+              points.append(aj)
+            } else {
+              points.append(simd_mix(aj, bj, SIMD3(repeating: Float(j) / Float(rows))))
+            }
+          }
+          rowsOfPoints.append(points)
+        }
+        for i in 0..<cols {
+          for j in 0..<(2 * (cols - i) - 1) {
+            let k = j / 2
+            if j % 2 == 0 {
+              out.append(contentsOf: [rowsOfPoints[i][k + 1], rowsOfPoints[i + 1][k], rowsOfPoints[i][k]])
+            } else {
+              out.append(
+                contentsOf: [rowsOfPoints[i][k + 1], rowsOfPoints[i + 1][k + 1], rowsOfPoints[i + 1][k]])
+            }
+          }
+        }
+      }
+      return out.map { simd_normalize($0) * radius }
+    }
+  }
+
   /// three's `PlaneGeometry`: a grid in the xy plane, with uvs from the bottom left and two
   /// triangles per cell, in three's own vertex and index order.
   public enum Plane {
