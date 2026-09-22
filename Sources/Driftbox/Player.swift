@@ -65,6 +65,21 @@
     private var unit: DriftboxAudioUnit?
     private var clock: Timer?
 
+    // MARK: MIDI
+
+    private var midi: MIDIInput?
+    /// Follow an external MIDI clock: tempo, start, stop and position. Off unless asked for,
+    /// because plenty of gear streams clock the moment it is plugged in, and a sequencer that
+    /// handed its transport to whatever is on the cable would be taking an instrument away.
+    var followsClock = false {
+      didSet { if !followsClock { followedBPM = nil } }
+    }
+    private(set) var followedBPM: Double?
+    var midiSources: [String] { midi?.sources ?? [] }
+    private var follower = ClockFollower()
+    /// The song's own tempo, which following leaves alone: the followed tempo is not written in.
+    private var songBPM: Double { song?.bpm ?? 120 }
+
     init() {
       AUAudioUnit.registerSubclass(
         DriftboxAudioUnit.self, as: DriftboxAudioUnit.componentDescription, name: "Driftbox", version: 1)
@@ -90,6 +105,79 @@
       clock = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
         Task { @MainActor in self?.tick() }
       }
+      let midi = MIDIInput()
+      midi.onNote = { [weak self] note, velocity in
+        Task { @MainActor in self?.midiNote(note, velocity: velocity) }
+      }
+      midi.onClock = { [weak self] message, time in
+        Task { @MainActor in self?.midiClock(message, at: time) }
+      }
+      self.midi = midi
+    }
+
+    /// The web app's keys: notes from 33 (A1) play 303 A across two octaves; below that, the drum
+    /// voices the grid shows, from note 21 up. A note's velocity past 0.8 is an accent.
+    private func midiNote(_ note: Int, velocity: Double) {
+      guard velocity > 0 else { return }
+      let accent = velocity >= 0.8
+      if note >= 33 {
+        playNote(semitone: note - 33 - 12, accent: accent)
+      } else if note >= 21 {
+        strike(index: note - 21, accent: accent)
+      }
+    }
+
+    private func midiClock(_ message: ClockMessage, at time: Double) {
+      guard followsClock, let song else { return }
+      let local = LocalClockState(
+        bpm: followedBPM ?? songBPM,
+        ticks: Double(songFrame) / sampleRate * (followedBPM ?? songBPM) * 24 / 60,
+        time: time)
+      let command = followClock(message, at: time, follower: &follower, local: local)
+      if let bpm = command.bpm { follow(bpm: bpm) }
+      switch command.transport {
+      case .start:
+        unit?.send(.seek(songFrame: 0))
+        unit?.send(.play)
+      case .resume:
+        if let step = command.step { seek(toStep: step) }
+        unit?.send(.play)
+      case .stop:
+        unit?.send(.stop)
+      case nil:
+        break
+      }
+    }
+
+    /// Run the song at `bpm` without writing it in: the compiled song is remade at that tempo and
+    /// taken up at the same step.
+    private func follow(bpm: Double) {
+      guard let song, abs((followedBPM ?? songBPM) - bpm) >= 0.05 else { return }
+      let step = currentStep
+      followedBPM = bpm
+      var retimed = song
+      retimed.bpm = bpm
+      unit?.load(retimed)
+      seek(toStep: step)
+      if isPlaying { unit?.send(.play) }
+    }
+
+    /// The transport's position in sixteenths from the top.
+    var currentStep: Int {
+      guard let position, let song else { return 0 }
+      var steps = 0
+      for bar in 0..<position.bar { steps += song.barLength(forBar: bar) }
+      return steps + position.step
+    }
+
+    func seek(toStep step: Int) {
+      guard let song else { return }
+      var retimed = song
+      if let bpm = followedBPM { retimed.bpm = bpm }
+      let plan = retimed.plan(bars: retimed.chain.isEmpty ? 1 : retimed.bars)
+      guard !plan.isEmpty else { return }
+      let index = min(max(0, step), plan.count - 1)
+      unit?.send(.seek(songFrame: Int(plan[index].time * sampleRate)))
     }
 
     private func tick() {

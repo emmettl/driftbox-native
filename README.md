@@ -85,6 +85,7 @@ Three levels, in rising cost:
 | Documents | every catalogue song as the web app saves it; 19 damaged and legacy documents with what the reference makes of each | exactly |
 | Events | `planSong` for every song — each hit, its time, its resolved knobs and sends; three deliberately awkward songs; the PRNG as raw bits | exactly |
 | Edits | every transform in `pattern.ts`, applied by the reference to a catalogue song: 28 results | exactly |
+| MIDI clock | a synthetic clock stream — jitter, a tempo change, a lost tick, stop, position, continue, a stall — through the reference's follower: what each of 464 messages made of it | exactly |
 | Voices | what each of the 22 voices *describes* — its `VoiceSpec` — over nine panels and both velocities | exactly |
 | Audio | each voice rendered in Chromium, over four panels, and again panned in stereo; nine probes of one node type each; the waveshaper alone | within -100dB of the peak; -90dB through drive; -75dB with square or sawtooth oscillators |
 

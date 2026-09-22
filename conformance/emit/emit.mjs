@@ -33,6 +33,8 @@ const pattern = await import(join(engine, 'pattern.ts'))
 const { songBars } = pattern
 const { seededRandom } = await import(join(engine, 'render.ts'))
 const { Ladder } = await import(join(engine, 'dsp', 'ladder.ts'))
+const { ClockFollower, parseClock } = await import(join(engine, 'midi-clock.ts'))
+const { followClock } = await import(join(root, 'driftbox', 'packages', 'app', 'src', 'clock-follow.ts'))
 const { ALL_VOICES, buildVoice } = await import(join(engine, 'kit.ts'))
 
 /** How many bars of each song's plan are checked in. The whole song is `--full`. */
@@ -316,6 +318,48 @@ for (const preset of SONGS) {
     drum, bass: bassId, flams: drumWithFlams.flams[drum], trackLength: 10,
     edits: edits.map(([name, apply]) => ({ name, output: encodeSong(decodeSong(encodeSong(apply()))) })),
   }))
+}
+
+// A MIDI clock, followed. A synthetic stream — start, ticks at a tempo with jitter and a tempo
+// change, a dropped tick, a stop, a position and a continue — through the reference's estimator
+// and the app's follow rules, with what each message made of them. Times in milliseconds.
+{
+  const random = seededRandom(0xc10c)
+  const events = []
+  let time = 1000
+  const push = (bytes) => events.push({ time: Math.round(time * 1000) / 1000, bytes })
+  push([0xfa])
+  let bpm = 120
+  for (let tick = 0; tick < 400; tick++) {
+    if (tick === 200) bpm = 140
+    time += 60000 / (bpm * 24) + (random() - 0.5) * 1.5
+    if (tick === 150) continue  // lost on the wire
+    push([0xf8])
+  }
+  push([0xfc])
+  time += 300
+  push([0xf2, 32, 0])
+  push([0xfb])
+  for (let tick = 0; tick < 60; tick++) {
+    time += 60000 / (bpm * 24) + (random() - 0.5) * 1.5
+    push([0xf8])
+  }
+  time += 900
+  push([0xf8])
+
+  const follower = new ClockFollower()
+  let local = { bpm: 120, ticks: 0, time: 1000 }
+  const trace = events.map(({ time, bytes }) => {
+    const message = parseClock(bytes)
+    const command = followClock(message, time, follower, local)
+    if (command.bpm !== undefined) local = { ...local, bpm: command.bpm }
+    // The local transport runs at its tempo between messages: ticks advance in the ratio.
+    local.ticks = (local.ticks ?? 0) + (time - local.time) * local.bpm * 24 / 60000
+    local.time = time
+    const state = follower.state
+    return { time, bytes, command, state: { bpm: state.bpm, running: state.running, ticks: state.ticks }, step: follower.step }
+  })
+  write(fixtures, 'midi-clock.json', `[\n${trace.map((entry) => JSON.stringify(entry)).join(',\n')}\n]\n`)
 }
 
 // The noise generator, as the integers behind the floats so no decimal printing is involved.

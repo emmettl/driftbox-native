@@ -143,6 +143,12 @@
           }
         }
         Spacer()
+        Toggle("sync", isOn: Binding(get: { player.followsClock }, set: { player.followsClock = $0 }))
+          .toggleStyle(.button).font(.caption)
+          .help("Follow an external MIDI clock: tempo, start, stop and position")
+        if let bpm = player.followedBPM {
+          Text(String(format: "← %.1f", bpm)).font(.caption.monospacedDigit()).foregroundStyle(.orange)
+        }
         if let song = player.song {
           Arrangement(player: player, song: song)
           Text("\(Int(song.bpm)) bpm").font(.caption.monospacedDigit()).foregroundStyle(.secondary)

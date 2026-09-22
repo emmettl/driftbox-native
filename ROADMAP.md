@@ -67,8 +67,10 @@ gone native at all.
    the pattern list, rotate, transpose, randomise, alter, clear, loop lengths, flams, the chain —
    ported and held to the reference's own results on 28 edits, with a pattern picker, lane and
    line menus, chain menus, tempo and swing on the interface; keys, the number row striking
-   the drums and the home row playing 303 A; and stems, one WAV per voice. Still to come:
-   CoreMIDI including clock follow, and a proper document model.
+   the drums and the home row playing 303 A; stems, one WAV per voice; and CoreMIDI — notes
+   from any source play the keys, and a **sync** button follows an external clock's tempo,
+   start, stop and position, the estimator held to the reference's on a synthetic stream of
+   464 messages. Still to come: a proper document model, and MIDI clock *out*.
 6. **Visuals.** A thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.
