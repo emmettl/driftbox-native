@@ -103,7 +103,8 @@ gone native at all.
    729 instanced cubes in a paper-white room, which brought a depth buffer, box geometry and
    instancing with it. Then Stillwater, the one that reads events
    rather than levels: rings dropped on black water by an onset detector, and a camera aimed
-   by its own angles. Seventeen of twenty-seven. The other sixteen are three.js
+   by its own angles. Then Light Cycles, whose walls are rewritten
+   every frame and whose bikes turn on the beat. Eighteen of twenty-seven. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
