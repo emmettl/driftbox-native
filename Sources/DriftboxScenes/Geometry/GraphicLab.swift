@@ -506,13 +506,19 @@
 
         let sectionY = h * (portrait ? 0.63 : 0.605)
         rule(0, sectionY, w, h * 0.095, ink)
+        // The tempo first, because the section name gets whatever width it leaves. Sized from the
+        // page's height alone, the name ran straight into it on anything taller than it was wide
+        // — on the web as here, until emmettl/driftbox#302.
+        let tempo = "\(frame.bpm) BPM / STEREO"
         fill(paper)
-        setFont(h * 0.055)
-        fillText(frame.section.uppercased(), margin, sectionY + h * 0.066)
-        align = .right
         setFont(h * 0.023, 700, .text)
-        fillText("\(frame.bpm) BPM / STEREO", w - margin, sectionY + h * 0.058)
+        let tempoWidth = measure(tempo)
+        align = .right
+        fillText(tempo, w - margin, sectionY + h * 0.058)
         align = .left
+        fittedText(
+          frame.section.uppercased(), margin, sectionY + h * 0.066, w - margin * 2.6 - tempoWidth, h * 0.055,
+          paper)
 
         spectrum(frame.bands, margin, h * 0.745, w - margin * 2, h * 0.15, blue, 0.3)
         rule(margin, h * 0.925, w * 0.18, h * 0.012, red)
@@ -595,9 +601,8 @@
         context.translateBy(x: w * 0.12, y: h * 0.6)
         context.rotate(by: 0.025)
         rule(0, 0, w * 0.76, h * 0.115, black)
-        fill(cream)
-        setFont(h * 0.07)
-        fillText(frame.section.uppercased(), w * 0.025, h * 0.082)
+        // Kept on its slab: at a size taken from the height, in portrait the name ran off it.
+        fittedText(frame.section.uppercased(), w * 0.025, h * 0.082, w * 0.71, h * 0.07, cream)
         restore()
 
         // Photocopied repetition — the label becomes texture before it becomes information.
@@ -636,6 +641,8 @@
         let orange = Colour(0xff_4c1f)
         let black = Colour(0x0b_0b11)
         let margin = w * 0.045
+        // Narrow as the other two editions measure it, which this one alone never did.
+        let portrait = w < h * 0.72
         let phase = (frame.time * 0.12).truncatingRemainder(dividingBy: 1)
 
         fill(blue)
@@ -692,9 +699,7 @@
         restore()
 
         rule(0, h * 0.68, w, h * 0.12, orange)
-        fill(black)
-        setFont(h * 0.074)
-        fillText(frame.section.uppercased(), margin, h * 0.765)
+        fittedText(frame.section.uppercased(), margin, h * 0.765, w - margin * 2, h * 0.074, black)
 
         let seconds = Int(frame.time.rounded(.down))
         let timecode =
@@ -710,9 +715,11 @@
         spectrum(frame.bands, margin, h * 0.91, w - margin * 2, h * 0.045, white, 0.45)
         fill(white)
         setFont(h * 0.015, 700, .text)
-        fillText("C / BROADCAST ID / AUDIO-LOCKED TRANSMISSION", margin, h * 0.985)
+        // Shortened in portrait, as the other two editions' footers already were.
+        fillText(
+          portrait ? "C / BROADCAST" : "C / BROADCAST ID / AUDIO-LOCKED TRANSMISSION", margin, h * 0.985)
         align = .right
-        fillText("DRAG HORIZONTAL → A · B · C", w - margin, h * 0.985)
+        fillText(portrait ? "A · B · C" : "DRAG HORIZONTAL → A · B · C", w - margin, h * 0.985)
         align = .left
       }
     }
