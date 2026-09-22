@@ -8,8 +8,9 @@ app=.build-release/Driftbox.app
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp .build-release/release/Driftbox "$app/Contents/MacOS/Driftbox"
-# The resource bundle is looked for beside the executable, as Bundle.module expects.
-bundle=$(find .build-release -maxdepth 4 -name "DriftboxKit_Driftbox.bundle" | head -1)
+# The resource bundle is looked for beside the executable, as Bundle.module expects. It is the
+# library's rather than the executable's, because the catalogue is read by the code that moved.
+bundle=$(find .build-release -maxdepth 4 -name "DriftboxKit_DriftboxApp.bundle" | head -1)
 cp -R "$bundle" "$app/Contents/MacOS/"
 cp -R "$bundle" "$app/Contents/Resources/"
 cat > "$app/Contents/Info.plist" <<PLIST

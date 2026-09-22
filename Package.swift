@@ -31,11 +31,15 @@ let package = Package(
 
     // A song document in, a WAV file out: something to listen to.
     .executableTarget(name: "driftbox-render", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
-    // The Mac app.
-    .executableTarget(
-      name: "Driftbox",
+    // The Mac app, all of it but the entry point. A library rather than part of the executable
+    // because an executable target is the one kind a test target may not depend on, and the
+    // transport, the timeline, the clock out and the document rules all live here.
+    .target(
+      name: "DriftboxApp",
       dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq", "DriftboxScenes"],
       resources: [.copy("Resources/Songs"), .copy("Resources/catalogue.json")]),
+    // `@main` and nothing else, so that everything it starts can be reached from a test.
+    .executableTarget(name: "Driftbox", dependencies: ["DriftboxApp"]),
     // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine.
     .executableTarget(
       name: "driftbox-play", dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument"]),
@@ -57,5 +61,9 @@ let package = Package(
     .testTarget(
       name: "DriftboxDocumentTests",
       dependencies: ["DriftboxDocument", "DriftboxSeq", "ConformanceSupport"]),
+    .testTarget(
+      name: "DriftboxAppTests",
+      dependencies: ["DriftboxApp", "DriftboxHost", "DriftboxSeq", "DriftboxDocument", "ConformanceSupport"]
+    ),
   ]
 )

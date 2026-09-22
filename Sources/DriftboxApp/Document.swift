@@ -19,8 +19,21 @@
   /// AppKit, and deliberately not on `Player`: a panel is a Mac, and `Player` is meant to survive
   /// the move to a platform that has none.
   @MainActor
-  struct SongFiles {
+  public struct SongFiles {
     let player: Player
+    /// What Save As asks, and the one part of saving that needs somebody at the machine. Held as a
+    /// function rather than written into `saveAs`, so that the rule about when Save has to ask at
+    /// all can be exercised where there is nobody there to answer.
+    let askWhereToSave: @MainActor (String) -> URL?
+
+    public init(player: Player) {
+      self.init(player: player, askWhereToSave: Self.savePanel)
+    }
+
+    init(player: Player, askWhereToSave: @escaping @MainActor (String) -> URL?) {
+      self.player = player
+      self.askWhereToSave = askWhereToSave
+    }
 
     // MARK: Opening
 
@@ -84,13 +97,18 @@
     @discardableResult
     func saveAs() -> Bool {
       guard player.song != nil else { return true }
-      let panel = NSSavePanel()
-      panel.allowedContentTypes = [.json]
-      panel.nameFieldStringValue = player.documentName + ".song.json"
-      guard panel.runModal() == .OK, let url = panel.url else { return false }
+      guard let url = askWhereToSave(player.documentName + ".song.json") else { return false }
       player.save(to: url)
       NSDocumentController.shared.noteNewRecentDocumentURL(url)
       return !player.isEdited
+    }
+
+    private static func savePanel(named name: String) -> URL? {
+      let panel = NSSavePanel()
+      panel.allowedContentTypes = [.json]
+      panel.nameFieldStringValue = name
+      guard panel.runModal() == .OK else { return nil }
+      return panel.url
     }
 
     /// Ask before unsaved work is closed over. True when the caller may go ahead, which is at once
@@ -218,13 +236,13 @@
   /// What only an application object hears: songs opened from the Finder or dropped on the dock,
   /// and a quit that would take unsaved work with it.
   @MainActor
-  final class AppDelegate: NSObject, NSApplicationDelegate {
+  public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var files: SongFiles?
     /// Opening a song in the Finder starts the app, so the first file can arrive before there is
     /// anything to open it into. It waits here for the window.
     private var waiting: [URL] = []
 
-    func attach(_ files: SongFiles) {
+    public func attach(_ files: SongFiles) {
       guard self.files == nil else { return }
       self.files = files
       let queued = waiting
@@ -232,7 +250,7 @@
       for url in queued { files.open(url) }
     }
 
-    func application(_ application: NSApplication, open urls: [URL]) {
+    public func application(_ application: NSApplication, open urls: [URL]) {
       guard let files else {
         waiting.append(contentsOf: urls)
         return
@@ -242,9 +260,9 @@
     }
 
     /// One window holding one song, so closing it is what quitting means.
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
       (files?.confirmDiscard() ?? true) ? .terminateNow : .terminateCancel
     }
   }

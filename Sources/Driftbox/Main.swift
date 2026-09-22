@@ -1,9 +1,10 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import AppKit
+  import DriftboxApp
   import SwiftUI
 
   @main
-  struct DriftboxApp: App {
+  struct Driftbox: App {
     @State private var player = Player()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
@@ -36,7 +37,7 @@
   }
 #else
   @main
-  struct DriftboxApp {
+  struct Driftbox {
     static func main() { print("Driftbox needs SwiftUI") }
   }
 #endif

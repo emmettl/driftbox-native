@@ -44,7 +44,7 @@
   /// What the interface holds: the song being edited, the engine playing it, and where it is.
   @MainActor
   @Observable
-  final class Player {
+  public final class Player {
     private(set) var entries = Catalogue.entries()
     private(set) var current: CatalogueEntry?
     var song: Song? {
@@ -89,7 +89,13 @@
 
     private let audio = AVAudioEngine()
     private var unit: DriftboxAudioUnit?
+    /// An engine of the player's own, for a player made without an audio unit to hold one.
+    private var standalone: EngineHost?
     private var clock: Timer?
+
+    /// The engine behind the transport, whichever way the player was made. Everything the
+    /// interface reads comes from here, and nothing it reads is the audio device's.
+    private var host: EngineHost? { unit?.host ?? standalone }
 
     // MARK: MIDI
 
@@ -111,7 +117,7 @@
         guard !followsClock, followedBPM != nil else { return }
         let step = currentStep
         followedBPM = nil
-        if let song { unit?.load(song) }
+        if let song { load(song) }
         seek(toStep: step)
         if isPlaying { startEngine() }
       }
@@ -137,7 +143,7 @@
         if sendsClock {
           followsClock = false
         } else {
-          stopClock()
+          deliver(cursor.stop(at: MIDIOutput.now()))
         }
       }
     }
@@ -148,37 +154,14 @@
         guard clockDestination != oldValue else { return }
         // Ticks queued at the destination being left would go on arriving after we had stopped
         // talking to it, so it is stopped properly and the new one is located from scratch.
-        stopClock(on: oldValue)
+        deliver(cursor.stop(at: MIDIOutput.now()), to: oldValue)
       }
     }
 
-    /// The step whose ticks go out next, and when that step begins on the host clock. Held from
-    /// tick to tick rather than worked out afresh each time: `songFrame` only moves when a render
-    /// block runs, so a reading of it is anything up to a block old, and deriving every timestamp
-    /// from a fresh one would put that jitter into the clock — which is the thing stamping the
-    /// messages was for.
-    private struct ClockRun {
-      var step: Int
-      var time: UInt64
-    }
-    private var clockRun: ClockRun?
-    /// Stopped here, but the engine has not said so yet: it hears the stop on its next block and
-    /// the tick reads that later still, and without this the clock would take the interval for a
-    /// transport that is still running and start itself up again a moment after being stopped.
-    private var clockHalted = false
-    /// How far past the transport the ticks are written. Comfortably more than the thirtieth of a
-    /// second between ticks, so a tick that runs late still finds its steps unsent, and little
-    /// enough that a seek throws away only a step or two of what was already queued.
-    private static let clockLookahead = 0.2
-    /// A disagreement between the clock and the transport larger than this is a seek. Smaller than
-    /// the shortest step there can be, so a jump of even one step is noticed.
-    private static let clockTolerance = 0.03
-    /// And anything smaller is the two clocks parting — the audio device's and the host's are not
-    /// the same crystal — which is pulled back a hair at a time. Fifty microseconds a step is a
-    /// good half millisecond a second, far more than the drift, and far too little to hear.
-    private static let clockSlew = 0.00005
+    /// Which step's ticks go out next, and when.
+    private var cursor = ClockCursor()
 
-    init() {
+    public init() {
       AUAudioUnit.registerSubclass(
         DriftboxAudioUnit.self, as: DriftboxAudioUnit.componentDescription, name: "Driftbox", version: 1)
       AVAudioUnit.instantiate(with: DriftboxAudioUnit.componentDescription, options: []) {
@@ -214,6 +197,26 @@
       clockOut = MIDIOutput()
     }
 
+    /// A player on an engine of its own: no audio device, no MIDI ports and no timer behind the
+    /// tick. It is everything the interface does and none of the hardware it usually does it to,
+    /// which is the only shape a test can make one in; whoever builds it renders `host` by hand
+    /// and calls `tick` when it wants the interface to catch up.
+    init(host: EngineHost) {
+      standalone = host
+      sampleRate = host.sampleRate
+    }
+
+    /// Both ends of the engine, which the audio unit and a standalone host answer differently: the
+    /// unit holds what it is given until the device has made it a host, and a player built on one
+    /// of its own has it already.
+    private func load(_ song: Song) {
+      if let unit { unit.load(song) } else { standalone?.load(song) }
+    }
+
+    private func send(_ command: Command) {
+      if let unit { unit.send(command) } else { standalone?.send(command) }
+    }
+
     /// The web app's keys: notes from 33 (A1) play 303 A across two octaves; below that, the drum
     /// voices the grid shows, from note 21 up. A note's velocity past 0.8 is an accent.
     private func midiNote(_ note: Int, velocity: Double) {
@@ -236,13 +239,13 @@
       if let bpm = command.bpm { follow(bpm: bpm) }
       switch command.transport {
       case .start:
-        unit?.send(.seek(songFrame: 0))
+        send(.seek(songFrame: 0))
         startEngine()
       case .resume:
         if let step = command.step { seek(toStep: step) }
         startEngine()
       case .stop:
-        unit?.send(.stop)
+        send(.stop)
       case nil:
         break
       }
@@ -256,7 +259,7 @@
       followedBPM = bpm
       var retimed = song
       retimed.bpm = bpm
-      unit?.load(retimed)
+      load(retimed)
       seek(toStep: step)
       if isPlaying { startEngine() }
     }
@@ -269,14 +272,14 @@
     func seek(toStep step: Int) {
       guard !timeline.times.isEmpty else { return }
       let index = min(max(0, step), timeline.times.count - 1)
-      unit?.send(.seek(songFrame: Int(timeline.times[index] * sampleRate)))
+      send(.seek(songFrame: Int(timeline.times[index] * sampleRate)))
     }
 
     /// Thirty times a second. Everything the views read is written only when it has changed:
     /// an observable that is set every tick has every view that reads it rebuilt every tick,
     /// which was most of the main thread.
-    private func tick() {
-      guard let host = unit?.host else { return }
+    func tick() {
+      guard let host else { return }
       songFrame = max(0, host.songFrame.load(ordering: .relaxed))
       let playing = host.playing.load(ordering: .relaxed)
       if isPlaying != playing { isPlaying = playing }
@@ -295,115 +298,40 @@
 
     /// Write the next fifth of a second of clock, and start or stop it with the transport.
     ///
-    /// Called from the tick, after `songFrame` has been read, because everything here hangs off
-    /// it: the ticks are placed on the host clock ahead of the audio and played by the MIDI server
-    /// at the stamped moment, rather than sent thirty times a second in whatever bursts the main
-    /// thread allows. A cursor over the steps is what keeps that honest — it only moves forward,
-    /// so no step's ticks go out twice, and each pass fills it up to the horizon, so none is
-    /// missed however late the tick was.
+    /// Called from the tick, after `songFrame` has been read, because everything here hangs off it:
+    /// the ticks are placed on the host clock ahead of the audio and played by the MIDI server at
+    /// the stamped moment, rather than sent thirty times a second in whatever bursts the main
+    /// thread allows. Where the cursor has got to is what keeps that honest, and it is the cursor
+    /// that decides; this only finds the port and the moment, and puts what comes back on it.
     private func driveClock() {
       guard let out = clockOut else { return }
       if clockDestinations != out.destinations { clockDestinations = out.destinations }
+      let now = MIDIOutput.now()
       // Anything that leaves the transport without a song to run is a stop as much as the button
       // is: what is listening should not be left ticking through a song nobody is playing.
       guard sendsClock, song != nil, !timeline.times.isEmpty, isPlaying else {
-        if clockRun != nil { stopClock() }
-        // The engine has stopped where it was asked to, so a start may be believed again.
-        clockHalted = false
+        deliver(cursor.idle(at: now))
         return
       }
-      guard !clockHalted else { return }
-      let now = MIDIOutput.now()
       // Where the song is at the speakers, not at the render block: the engine has rendered past
       // what is being heard by the device's latency, and the clock belongs with the music.
       let sounding = MIDIOutput.time(now, after: audio.outputNode.presentationLatency)
-      let songTime = Double(songFrame) / sampleRate
-      let step = timeline.step(at: songTime) ?? 0
-
-      var run: ClockRun
-      var correction = 0.0
-      if let held = clockRun, held.step < timeline.times.count,
-        let drift = clockDrift(held, songTime: songTime, sounding: sounding),
-        abs(drift) <= Self.clockTolerance
-      {
-        run = held
-        correction = drift
-      } else {
-        run = locateClock(step: step, songTime: songTime, sounding: sounding, out: out)
-      }
-
-      while MIDIOutput.seconds(from: now, to: run.time) < Self.clockLookahead {
-        // The drift is taken out a step at a time rather than all at once, so that no gap between
-        // two ticks is off by more than the slew however long the two clocks have been apart.
-        if correction != 0 {
-          let nudge = min(Self.clockSlew, abs(correction)) * (correction > 0 ? 1 : -1)
-          run.time = MIDIOutput.time(run.time, after: nudge)
-          correction -= nudge
-        }
-        let length = timeline.length(ofStep: run.step)
-        for scheduled in scheduleClockStep(at: 0, stepSeconds: length) {
-          out.send(
-            scheduled.message.bytes, to: clockDestination,
-            at: MIDIOutput.time(run.time, after: scheduled.time))
-        }
-        run.time = MIDIOutput.time(run.time, after: length)
-        run.step += 1
-        if run.step == timeline.times.count { run.step = 0 }
-      }
-      clockRun = run
+      deliver(
+        cursor.advance(
+          timeline: timeline, songTime: Double(songFrame) / sampleRate, now: now, sounding: sounding))
     }
 
-    /// How far ahead of the transport the clock has got, in seconds. The run says the song will be
-    /// at the top of `step` at `time`, which is a reading of where the song is; the difference
-    /// from where it actually is is nothing at all while the two run together. The song loops, so
-    /// a difference of nearly a whole pass is the two of them either side of the top rather than a
-    /// jump, and wraps to nothing.
-    private func clockDrift(_ run: ClockRun, songTime: Double, sounding: UInt64) -> Double? {
-      guard timeline.end > 0 else { return nil }
-      var drift = timeline.times[run.step] - MIDIOutput.seconds(from: sounding, to: run.time) - songTime
-      drift = drift.truncatingRemainder(dividingBy: timeline.end)
-      if drift > timeline.end / 2 { drift -= timeline.end }
-      if drift < -timeline.end / 2 { drift += timeline.end }
-      return drift
-    }
-
-    /// Say where the song is and start it there. Starting anywhere but the first step sends the
-    /// position before the continue, which is what a device needs to play the right bar and not
-    /// merely the right tempo. A clock that was already running is stopped first, and what it had
-    /// queued dropped: those ticks are for a bar that is no longer happening.
-    private func locateClock(step: Int, songTime: Double, sounding: UInt64, out: MIDIOutput) -> ClockRun {
-      if clockRun != nil {
-        out.flush(clockDestination)
-        out.send(ClockMessage.stop.bytes, to: clockDestination, at: sounding)
-      }
-      clockRun = nil
-      for scheduled in scheduleClockStart(step: step, at: 0) {
-        out.send(scheduled.message.bytes, to: clockDestination, at: sounding)
-      }
-      // Ticking picks up at the next step to begin: the one the transport is already inside has
-      // had some of its ticks go by, and sending them now would only bunch them at the start.
-      var next = step
-      if songTime - timeline.times[step] > 0.001 { next += 1 }
-      if next >= timeline.times.count { next = 0 }
-      return ClockRun(step: next, time: clockTime(ofStep: next, songTime: songTime, sounding: sounding))
-    }
-
-    /// When `step` begins on the host clock, given that the song is at `songTime` at `sounding`.
-    private func clockTime(ofStep step: Int, songTime: Double, sounding: UInt64) -> UInt64 {
-      var ahead = timeline.times[step] - songTime
-      // Behind the transport means the step is the one coming round on the next pass.
-      if ahead < 0 { ahead += timeline.end }
-      return MIDIOutput.time(sounding, after: ahead)
-    }
-
-    /// Stop, and drop whatever was written ahead of it, so that nothing is left ticking behind the
-    /// stop and running the other end on by itself.
-    private func stopClock(on destination: MIDIOutput.Destination? = nil) {
-      defer { clockRun = nil }
-      guard let out = clockOut, clockRun != nil else { return }
+    /// What the cursor decided, onto a port. The destination is the one in force unless the clock
+    /// is being taken off the one it was just moved away from.
+    private func deliver(_ messages: [ClockCursor.Out], to destination: MIDIOutput.Destination? = nil) {
+      guard let out = clockOut, !messages.isEmpty else { return }
       let target = destination ?? clockDestination
-      out.flush(target)
-      out.send(ClockMessage.stop.bytes, to: target, at: MIDIOutput.now())
+      for message in messages {
+        switch message {
+        case .flush: out.flush(target)
+        case .send(let clock, let time): out.send(clock.bytes, to: target, at: time)
+        }
+      }
     }
 
     func open(_ entry: CatalogueEntry) {
@@ -451,7 +379,7 @@
       refreshUndo()
       song = loaded
       isEdited = false
-      unit?.load(loaded)
+      load(loaded)
     }
 
     /// Write the song back where it came from. Nothing without a file: that is Save As's question.
@@ -480,7 +408,7 @@
     /// Jump to the start of a bar of the arrangement.
     func seek(toBar bar: Int) {
       guard song != nil else { return }
-      unit?.send(.seek(songFrame: Int(timeline.start(ofBar: bar) * sampleRate)))
+      send(.seek(songFrame: Int(timeline.start(ofBar: bar) * sampleRate)))
     }
 
     /// Where each entry of the chain begins, in bars. A song with no chain is one pattern playing
@@ -509,18 +437,17 @@
     }
 
     func stop() {
-      unit?.send(.stop)
+      send(.stop)
       // Here rather than at the next tick: a stop a thirtieth of a second late is a stop that
       // arrives behind ticks the engine is never going to play.
-      clockHalted = true
-      stopClock()
+      deliver(cursor.halt(at: MIDIOutput.now()))
     }
 
     /// Everything that starts the engine goes through here, so that a stop the transport has not
     /// caught up with yet cannot leave the clock out held down.
     private func startEngine() {
-      clockHalted = false
-      unit?.send(.play)
+      cursor.resume()
+      send(.play)
     }
 
     func toggle() {
@@ -535,7 +462,7 @@
 
     /// Strike the `index`th voice of the grid, now, with the song's knobs for it.
     func strike(index: Int, accent: Bool) {
-      guard let host = unit?.host, let song, usedVoices.indices.contains(index) else { return }
+      guard let host, let song, usedVoices.indices.contains(index) else { return }
       let voice = usedVoices[index]
       let group =
         voice.choke.flatMap { ["808.hats", "909.hats"].firstIndex(of: $0) }.map { UInt8($0 + 1) } ?? 0
@@ -543,7 +470,7 @@
         voice.build(song.kit.params[voice.id] ?? VoiceParams(), accent: accent ? 1 : 0.55), voiceId: voice.id,
         at: 0,
         sends: song.kit.sends[voice.id] ?? SendLevels(), chokeGroup: group)
-      unit?.send(.strike(hit))
+      send(.strike(hit))
     }
 
     /// Play a note on 303 A, now, with the song's panel for it.
@@ -555,17 +482,17 @@
         let note = bassNote(
           params: params, step: step, previous: .rest, stepSeconds: secondsPerStep(bpm: song.bpm))
       else { return }
-      unit?.send(.note(line: 0, note))
+      send(.note(line: 0, note))
     }
 
     func pad(x: Double, y: Double) {
       padTouch = SIMD2(Float(x), Float(y))
-      unit?.send(.pad(x: x, y: y))
+      send(.pad(x: x, y: y))
     }
 
     func padRelease() {
       padTouch = nil
-      unit?.send(.padRelease)
+      send(.padRelease)
     }
 
     /// What the engine has reported since the scene last asked.
@@ -580,7 +507,7 @@
     /// Where the song is in quarter notes, read straight from the engine for the scene's frame
     /// rather than from the last tick, so it is smooth at the display's rate.
     func scoreBeat() -> Double? {
-      guard let host = unit?.host, !timeline.times.isEmpty else { return nil }
+      guard let host, !timeline.times.isEmpty else { return nil }
       let frame = host.songFrame.load(ordering: .relaxed)
       guard frame >= 0 else { return nil }
       let time = Double(frame) / sampleRate
@@ -596,7 +523,7 @@
     private var monitor = [Float](repeating: 0, count: Analyser.size)
 
     func analyse() -> Analyser? {
-      guard let host = unit?.host else { return nil }
+      guard let host else { return nil }
       monitor.withUnsafeMutableBufferPointer { buffer in
         host.recentMix(Analyser.size, into: buffer.baseAddress!)
         analyser.update(UnsafeBufferPointer(buffer))
@@ -606,7 +533,7 @@
 
     /// The loudest sample of the last audio block, each side.
     var peaks: (left: Float, right: Float) {
-      guard let host = unit?.host else { return (0, 0) }
+      guard let host else { return (0, 0) }
       return (
         Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
         Float(bitPattern: host.peakRight.load(ordering: .relaxed))
@@ -667,8 +594,8 @@
       undoManager?.setActionName(name)
       refreshUndo()
       let position = songFrame
-      unit?.load(edited)
-      unit?.send(.seek(songFrame: position))
+      load(edited)
+      send(.seek(songFrame: position))
       if isPlaying { startEngine() }
     }
 
@@ -698,9 +625,6 @@
       if force || next != position { position = next }
     }
 
-    /// Where every step of the arrangement starts, at the tempo the song is running at. The
-    /// transport, the grid and the scene all ask where the song is, many times a frame; planning
-    /// the whole song each time was the main thread's entire day, and the tick never ran.
     private var timeline = Timeline()
 
     private func retime() {
@@ -713,51 +637,6 @@
       if let bpm = followedBPM { running.bpm = bpm }
       timeline = Timeline(song: running)
       updatePosition(force: true)
-    }
-
-    private struct Timeline {
-      /// The start of each step, in seconds; `end` is where the last one finishes.
-      var times: [Double] = []
-      var bars: [Int] = []
-      var indices: [Int] = []
-      var end = 0.0
-
-      init() {}
-
-      init(song: Song) {
-        var time = 0.0
-        for bar in 0..<(song.chain.isEmpty ? 1 : song.bars) {
-          for index in 0..<song.barLength(forBar: bar) {
-            times.append(time)
-            bars.append(bar)
-            indices.append(index)
-            time += 60 / song.bpm(bar: bar, index: index) / 4
-          }
-        }
-        end = time
-      }
-
-      /// The last step that had started by `time`.
-      func step(at time: Double) -> Int? {
-        var low = 0
-        var high = times.count
-        while low < high {
-          let middle = (low + high) / 2
-          if times[middle] <= time { low = middle + 1 } else { high = middle }
-        }
-        return low == 0 ? nil : low - 1
-      }
-
-      /// How long `step` lasts; the last one runs to the end of the pass.
-      func length(ofStep step: Int) -> Double {
-        let start = times[step]
-        return max(0, (step + 1 < times.count ? times[step + 1] : end) - start)
-      }
-
-      /// Where `bar` begins; the end of the song for a bar past its last.
-      func start(ofBar bar: Int) -> Double {
-        bars.firstIndex(of: bar).map { times[$0] } ?? end
-      }
     }
   }
 #endif
