@@ -47,19 +47,40 @@ gone native at all.
    catalogue uses and which the renderer refuses rather than ignores.
    What was planned: Done when whole songs match
    `renderMix` by spectral fingerprint.
-4. **A real-time host on the Mac.** ← *here.* In slices, each real-time form held to its offline
-   one rather than to the browser again. Done so far: `VoicePool`, the drum voices for a render
-   thread — fixed slots, everything allocated up front, `render` marked `@_noAllocation` — which
-   is `VoiceRenderer` **to the bit**, chokes included. Next: the 303, a compiled song and a
-   sequencer that runs inside the render call, the partitioned convolver the reverb needs, and
-   then the `AUAudioUnit` and its rings.
+4. ~~**A real-time host on the Mac.**~~ Done, bar two things. Every real-time form is held to
+   its offline one rather than to the browser again: the drum voices and the 303 to the bit,
+   the reverb within single precision, the whole engine within -90dB. `driftbox-play` hosts the
+   engine as an `AUAudioUnit` in an `AVAudioEngine` and plays the catalogue. Carried forward: the
+   engine costs 3.3% of real time in a loop and a fifth of the audio's time on the live IO
+   thread — the difference being what waking a core every ten milliseconds costs, measured by
+   pacing the loop the same way, and not the code. (The events ring — which voice,
+   accents, notes, passes — and the reverb's second stage landed with phase 5.)
    What was planned: `AUAudioUnit` from the start, sequencing sample-accurately
    inside the render block, lock-free rings both ways. The ring back to the interface carries
    *events* — which voice, accents, slides, sections — not only levels, so scenes can react to
    what was played rather than to a spectrum. Done when a bare player plays the catalogue.
-5. **The editor.** Sequencer, voice and bass panels, pattern tools, arrangement, effects, the
-   pad, the library, keys. Document-based, undo, CoreMIDI including clock follow, stems.
-6. **Visuals.** A thin Metal layer — lines, instanced meshes, full-screen and compute passes —
+5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable for now, and
+   never yet looked at — every slice was run and stayed up, and nobody has seen it. In so far:
+   the catalogue as a library; open and save of the web app's documents; a transport with the
+   bar, step and pattern it is on, and the chain as a strip to jump around; the step grid of the
+   pattern playing, live and editable; the 303 grids, with pitch, accent and slide; a panel of
+   knobs and sends per voice, and the effects; the pad; undo of every edit; export of the mix to
+   WAV; voice names that flash from the engine's events ring; and every edit in `pattern.ts` —
+   the pattern list, rotate, transpose, randomise, alter, clear, loop lengths, flams, the chain —
+   ported and held to the reference's own results on 28 edits, with a pattern picker, lane and
+   line menus, chain menus, tempo and swing on the interface; keys, the number row striking
+   the drums and the home row playing 303 A; stems, one WAV per voice; and CoreMIDI — notes
+   from any source play the keys, and a **sync** button follows an external clock's tempo,
+   start, stop and position, the estimator held to the reference's on a synthetic stream of
+   464 messages. Still to come: a proper document model, and MIDI clock *out*.
+6. **Visuals.** ← *begun.* `DriftboxScenes`: a `Scene` protocol keeping the web scenes' ids
+   and accents, a `SceneRenderer` over one compiled shader library, and one scene — Pulse, the
+   fallback: a dark field that breathes with the level, a bloom and a ring on every kick, a
+   flash on a snare, a horizon that sparkles on hats, a 303 note as a line at its pitch, the
+   pad's cursor. Driven from the events ring, the block peaks and the pad, at the display's rate,
+   in a pane above the grid. Tested offscreen — dark when quiet, brighter on a kick, fading,
+   different on a note — and, like the rest of the app, not yet seen by anyone. What was planned:
+   a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.
 7. **iOS.** Audio session, background audio, a layout that opens into the visuals, haptics,

@@ -6,7 +6,8 @@ of TB-303s, synthesised from scratch — for the Mac first, then iOS. Swift thro
 The web app is the reference implementation and is treated as finished. It is here as a pinned
 submodule in `driftbox/`, and nothing in this repository changes it.
 
-**Where this is:** phase 4 of [ROADMAP.md](ROADMAP.md) is under way. There is no app yet. There is
+**Where this is:** phase 4 of [ROADMAP.md](ROADMAP.md) — the engine plays, on a Mac, through an
+Audio Unit — and phase 5, the editor, is next. There is no app yet. There is
 a harness that holds Swift to the web engine's behaviour, and behind it: a song model, a codec that
 reads and writes the web app's documents to the byte, a sequencer that plans every catalogue song
 exactly as the reference does, and the instruments: all 22 drum voices — as data, exactly, and as
@@ -83,6 +84,8 @@ Three levels, in rising cost:
 |---|---|---|
 | Documents | every catalogue song as the web app saves it; 19 damaged and legacy documents with what the reference makes of each | exactly |
 | Events | `planSong` for every song — each hit, its time, its resolved knobs and sends; three deliberately awkward songs; the PRNG as raw bits | exactly |
+| Edits | every transform in `pattern.ts`, applied by the reference to a catalogue song: 28 results | exactly |
+| MIDI clock | a synthetic clock stream — jitter, a tempo change, a lost tick, stop, position, continue, a stall — through the reference's follower: what each of 464 messages made of it | exactly |
 | Voices | what each of the 22 voices *describes* — its `VoiceSpec` — over nine panels and both velocities | exactly |
 | Audio | each voice rendered in Chromium, over four panels, and again panned in stereo; nine probes of one node type each; the waveshaper alone | within -100dB of the peak; -90dB through drive; -75dB with square or sawtooth oscillators |
 
@@ -158,18 +161,18 @@ there. Things learned by measuring rather than reading:
   127 frames before a note; a sequencer that schedules to the sample, as this one will, has no
   such window. (Scheduled all up front, as the reference's *stem* export does, every overlapped
   sweep is cancelled before it plays at all — a bug there, reported.)
-- **The reference starts every oscillator at the wrong pitch, and this does not.** A hit almost
+- **The reference started every oscillator at the wrong pitch, and no longer does.** A hit almost
   never starts on the first frame of a render quantum, and when it does not, Chromium — for the
   rest of that quantum — reads the oscillator's pitch from the *start of the quantum* instead of
-  from where the oscillator started. One that begins 36 frames into a quantum plays 36 frames at
-  440Hz, an `OscillatorNode`'s default, then its pitch envelope 36 frames early, and is right again
-  at the next quantum. Measured on a bare sine at six start times, and exact. (A buffer's playback
-  rate is read once per quantum, so the 909's cymbals start at the wrong speed for the same
-  stretch.) It is why the reference's own notes record a closed hat's peak moving between 0.67 and
-  3.97 "purely with where the hit falls inside a quantum". The delays and phase shifts elsewhere
-  are kept because they are the same every time; this is different on every hit and no two plays
-  agree, so the engine does not do it. `emulatesBrowserSourceStart` turns it on for the
-  comparisons, which without it are at 0dB.
+  from where the oscillator started. The reference only scheduled a pitch, so what got read was
+  the node's default: a hit 36 frames into a quantum played 36 frames of 440Hz, and the 909's
+  cymbals began at the wrong speed. Measured on a bare sine at six start times, and exact; it is
+  what the reference's notes had recorded, unexplained, as a closed hat's peak moving between 0.67
+  and 3.97 "purely with where the hit falls inside a quantum". Found here, fixed there in
+  driftbox#299 by setting the node's value as well. What is left is small: a pitch *envelope* is
+  still read early for that one quantum, so a kick's drop arrives up to 2.6ms ahead. The engine
+  does not do that either — it differs on every hit, and no two plays agree — and
+  `emulatesBrowserSourceStart` turns it on for the comparisons.
 - **Two single-precision details in how noise is read.** An oscillator starts at the top of its
   cycle on its first frame however late that frame is, where a buffer starts a fraction of a frame
   in. And a buffer's start offset goes through single precision before it is rounded to a frame:
@@ -260,7 +263,16 @@ understood: it allocates what it likes, reads like the reference, and is held to
 function on the render path marked `@_noAllocation` — and it is held to the offline form, *to the
 bit* where the arithmetic allows, so that nothing shown against the browser has to be shown again.
 
-`VoicePool` is the first: `VoiceRenderer` for a render thread. A hit is turned into a
+The real-time forms, held to their offline ones: `VoicePool` (the drum voices; **to the bit**),
+`RealtimeBassline` (the 303; **to the bit**, on catalogue lines), `PartitionedConvolver` (the
+reverb, with no latency; within single precision) and `SongEngine`, which plays a `CompiledSong` —
+every hit and note worked out ahead of time on a thread that may allocate — through all of them
+and the master chain, with a transport that loops: within -90dB of `SongRenderer` on four songs,
+and the same whatever block size the host asks for. `EngineHost` puts a lock-free command ring in
+front of it, and `DriftboxAudioUnit` makes that an `AUAudioUnit`, which `driftbox-play` hosts in
+an `AVAudioEngine` and plays through the speakers.
+
+`VoicePool` was the first: `VoiceRenderer` for a render thread. A hit is turned into a
 `FixedVoiceSpec` — plain bytes, small enough for a ring — on a thread that may allocate, and
 started and rendered on one that may not. All 22 voices, struck on and between frames, rendered in
 blocks of 97 frames, match `VoiceRenderer` exactly; so does an open hat choked by a closed one.
@@ -270,6 +282,41 @@ read from a function that promises not to allocate, so storage is pointers owned
 non-copyable type; nor can a generic type be touched, so fixed arrays are written out; and such a
 function can only call what makes the same promise, across files as well as modules — which
 includes reading a `static let`, because that is initialised on first use, behind a lock.
+
+### The app
+
+```bash
+swift run -c release Driftbox
+```
+
+The Mac app, as far as it goes: the catalogue as a library, a transport, and the step grid of the
+pattern the transport is in, live and editable. A SwiftPM executable rather than an Xcode
+project for now, which is why it announces itself to the system by hand on launch.
+
+### Visuals
+
+`DriftboxScenes` is the start of phase 6: a `Scene` protocol that keeps the web scenes' ids and
+accent colours, so a song's `visual` hint resolves here too, and draws whatever it likes; a
+renderer over one shader library compiled at launch; and one scene, the fallback, driven by the
+engine's events ring, the block peaks and the pad. A scene cannot be looked at from a test, but
+it can be drawn into a texture and read back: dark when nothing is happening, brighter on a kick,
+fading, and different again on a note.
+
+### Playing
+
+```bash
+swift run -c release driftbox-play conformance/fixtures/documents/acid.song.json --start-bar 8
+```
+
+The engine as an Audio Unit in an `AVAudioEngine`, through the speakers, printing what reaches
+the output once a second. `--bench` runs the same engine with no device, as fast as it goes:
+**3.3% of real time** on this machine, of which the reverb — now in two stages, the tail in
+partitions eight blocks long — is about a third. Live, the render callback reports a fifth of
+the audio's time on its own clock, and the difference is the platform, not the code: `--bench`
+also runs the same calls paced as a device paces them, one every 10.7ms with a sleep between,
+and they cost **16%** that way — five times the loop — because a core woken every ten
+milliseconds does its first millisecond of work cold and slow. That is the number to budget
+for, and it is fine.
 
 ### Listening
 

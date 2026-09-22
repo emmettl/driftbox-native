@@ -1,0 +1,149 @@
+#if canImport(AVFoundation)
+  import AVFoundation
+  import DriftboxDocument
+  import DriftboxEngine
+  import DriftboxHost
+  import Foundation
+
+  /// Somewhere for an instantiation callback to leave what it made.
+  final class Made: @unchecked Sendable {
+    var unit: AVAudioUnit?
+  }
+
+  /// Plays a song through the speakers: the engine as an Audio Unit, hosted in an AVAudioEngine.
+  ///
+  ///     swift run -c release driftbox-play conformance/fixtures/documents/acid.song.json
+  ///     swift run -c release driftbox-play song.json --seconds 20 --start-bar 8
+  /// The loudest sample seen since last asked, from the audio thread's tap.
+  final class Peak: @unchecked Sendable {
+    private var value: Float = 0
+    private let lock = NSLock()
+    func note(_ sample: Float) {
+      lock.withLock { value = max(value, sample) }
+    }
+    func take() -> Float {
+      lock.withLock {
+        defer { value = 0 }
+        return value
+      }
+    }
+  }
+
+  @main
+  struct Play {
+    static func main() throws {
+      var arguments = Array(CommandLine.arguments.dropFirst())
+      func option(_ name: String) -> Double? {
+        guard let index = arguments.firstIndex(of: name), index + 1 < arguments.count else { return nil }
+        defer { arguments.removeSubrange(index...index + 1) }
+        return Double(arguments[index + 1])
+      }
+      let seconds = option("--seconds")
+      let startBar = option("--start-bar") ?? 0
+      // --bench: no audio device; run the engine as fast as it goes and say how fast that is.
+      let bench = arguments.firstIndex(of: "--bench").map { arguments.remove(at: $0) } != nil
+      guard arguments.count == 1 else {
+        FileHandle.standardError.write(
+          Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n]\n".utf8))
+        exit(64)
+      }
+      let text = String(decoding: try Data(contentsOf: URL(fileURLWithPath: arguments[0])), as: UTF8.self)
+      guard let song = SongCodec.decode(text) else {
+        FileHandle.standardError.write(Data("\(arguments[0]) is not a song\n".utf8))
+        exit(65)
+      }
+
+      if bench {
+        let host = EngineHost(sampleRate: 48000)
+        host.load(song)
+        host.send(.play)
+        let frames = 48000 * 20
+        let left = UnsafeMutablePointer<Float>.allocate(capacity: 512)
+        let right = UnsafeMutablePointer<Float>.allocate(capacity: 512)
+        let began = Date()
+        for _ in 0..<(frames / 512) { host.render(frames: 512, left: left, right: right) }
+        let took = Date().timeIntervalSince(began)
+        let load = host.takeLoad()
+        print(
+          String(
+            format: "20s of %@ in %.2fs: %.1f%% of real time (%.1f%% by the thread's clock)", arguments[0],
+            took, took / 20 * 100, load.fraction * 100))
+        // And paced as a device would pace it, sleeping between calls, to see what waking costs.
+        for _ in 0..<(48000 * 5 / 512) {
+          Thread.sleep(forTimeInterval: 512.0 / 48000)
+          host.render(frames: 512, left: left, right: right)
+        }
+        let paced = host.takeLoad()
+        print(
+          String(
+            format: "paced, one call every 10.7ms: %.1f%% by the thread's clock, longest %.2fms",
+            paced.fraction * 100, paced.longestMilliseconds))
+        return
+      }
+
+      AUAudioUnit.registerSubclass(
+        DriftboxAudioUnit.self, as: DriftboxAudioUnit.componentDescription, name: "Driftbox", version: 1)
+      let audio = AVAudioEngine()
+      let made = Made()
+      let group = DispatchGroup()
+      group.enter()
+      AVAudioUnit.instantiate(with: DriftboxAudioUnit.componentDescription, options: []) { unit, error in
+        if let error { FileHandle.standardError.write(Data("\(error)\n".utf8)) }
+        made.unit = unit
+        group.leave()
+      }
+      group.wait()
+      guard let unit = made.unit, let driftbox = unit.auAudioUnit as? DriftboxAudioUnit else { exit(70) }
+
+      audio.attach(unit)
+      audio.connect(unit, to: audio.mainMixerNode, format: unit.outputFormat(forBus: 0))
+      driftbox.load(song)
+      if startBar > 0 {
+        let plan = song.plan(bars: Int(startBar))
+        if let last = plan.last {
+          driftbox.send(
+            .seek(songFrame: Int((last.time + last.stepSeconds) * unit.outputFormat(forBus: 0).sampleRate)))
+        }
+      }
+      driftbox.send(.play)
+
+      // What reaches the output, once a second: proof of life for a run nobody is listening to.
+      let peak = Peak()
+      // Called on an audio queue, so it must not inherit `main`'s actor.
+      let tap: @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void = { buffer, _ in
+        guard let data = buffer.floatChannelData else { return }
+        var loudest: Float = 0
+        for frame in 0..<Int(buffer.frameLength) {
+          loudest = max(loudest, abs(data[0][frame]), abs(data[1][frame]))
+        }
+        peak.note(loudest)
+      }
+      audio.mainMixerNode.installTap(onBus: 0, bufferSize: 4096, format: nil, block: tap)
+      try audio.start()
+
+      let length = SongRenderer.seconds(of: song)
+      print(
+        String(
+          format: "playing %@ (%.0f seconds a pass) at %.0f Hz", arguments[0], length,
+          unit.outputFormat(forBus: 0).sampleRate))
+      let until = seconds.map { Date().addingTimeInterval($0) }
+      if until == nil { print("ctrl-c to stop") }
+      while until.map({ Date() < $0 }) ?? true {
+        Thread.sleep(forTimeInterval: 1)
+        let load = driftbox.host?.takeLoad() ?? (fraction: 0, longestMilliseconds: 0, calls: 0)
+        print(
+          String(
+            format:
+              "  peak %.3f  song frame %d  render %.1f%% of the audio's time, longest call %.2fms, %d calls",
+            peak.take(), driftbox.host?.songFrame.load(ordering: .relaxed) ?? -1, load.fraction * 100,
+            load.longestMilliseconds, load.calls))
+      }
+      audio.stop()
+    }
+  }
+#else
+  @main
+  struct Play {
+    static func main() { print("driftbox-play needs AVFoundation") }
+  }
+#endif

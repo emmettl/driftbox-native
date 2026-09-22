@@ -11,27 +11,28 @@ public struct VoiceRenderer {
 
   public let sampleRate: Double
 
-  /// Reproduce a fault in how the browser starts an oscillator. **Off, except when being compared
+  /// Reproduce a quirk in how the browser starts an oscillator. **Off, except when being compared
   /// with the browser.**
   ///
-  /// The reference sets an oscillator's pitch with `setValueAtTime` at the moment the hit starts.
-  /// When that moment is not the first frame of a render quantum — and it almost never is —
+  /// When a hit does not start on the first frame of a render quantum — and it almost never does —
   /// Chromium, for the rest of that quantum, reads the oscillator's pitch from the *start of the
   /// quantum* rather than from where the oscillator started. An oscillator that begins 36 frames
-  /// into a quantum plays its first 36 frames at the pitch the node had before it was told one —
-  /// 440Hz, the default — and then its pitch envelope 36 frames early, until the quantum ends and
-  /// everything is right again. Measured on a bare sine at six start times; it is exact. So every
-  /// tom, snare, hat and kick in the reference begins with up to 1.3ms of A440, how much depending
-  /// on where the hit falls against a 128-frame grid that has nothing to do with the music. (A
-  /// buffer's playback rate is read once per quantum, so the 909's cymbals begin at the wrong
-  /// speed for the same stretch.) It is why the reference's own notes record a
-  /// closed hat's peak wandering between 0.67 and 3.97 "purely with where the hit falls inside a
-  /// quantum".
+  /// into a quantum has its pitch envelope read 36 frames early until the quantum ends, and then
+  /// everything is right again. Measured on a bare sine at six start times; it is exact.
+  ///
+  /// This used to be much worse. Until driftbox#299 the reference only *scheduled* an oscillator's
+  /// pitch, so what was read early was the node's default: every tom, snare, hat and kick began
+  /// with up to 1.3ms of 440Hz, and the 909's cymbals at the wrong speed — which is what the
+  /// reference's own notes had recorded, unexplained, as a closed hat's peak wandering between
+  /// 0.67 and 3.97 "purely with where the hit falls inside a quantum". It was found here, and
+  /// fixed there by giving the node its pitch as a value too. What is left touches only a voice
+  /// whose pitch moves — a kick's drop arrives up to 2.6ms early for the length of one quantum.
   ///
   /// The delays and phase shifts elsewhere in this engine are kept because they are the same
-  /// every time and the songs were mixed through them. This is neither: it is different on every
-  /// hit and no two plays of a song agree. So the engine does not do it — but a render cannot be
-  /// held to the reference's without it, and the conformance tests turn it on.
+  /// every time and the songs were mixed through them. This is neither: it depends on where a hit
+  /// falls against a 128-frame grid that has nothing to do with the music, and no two plays of a
+  /// song agree. So the engine does not do it — but a kick cannot be held to the reference's
+  /// without it, and the conformance tests turn it on.
   public var emulatesBrowserSourceStart = false
 
   /// Built the first time a shape is asked for, and kept: a bank of wavetables is a few dozen
@@ -210,7 +211,7 @@ struct RenderedSource {
   var started = false
 
   /// The first frame of the render quantum after the one this source starts in, when the browser's
-  /// fault is being reproduced: until then its pitch, or its playback rate, is the node's default.
+  /// quirk is being reproduced: until then its pitch is read early.
   var properFromFrame = 0
   /// How many frames into its quantum the source starts: how far early its pitch is read.
   var readsEarlyBy = 0
@@ -243,10 +244,8 @@ struct RenderedSource {
 
     switch source.generator {
     case .oscillator(let oscillator):
-      var frequency = timeline(from: oscillator.frequency, oscillator.pitch, at: start)
-      // An `OscillatorNode`'s pitch before it is told one.
-      if emulatesBrowserStart { frequency.defaultValue = 440 }
-      generator = .oscillator(frequency: frequency, phase: 0)
+      generator = .oscillator(
+        frequency: timeline(from: oscillator.frequency, oscillator.pitch, at: start), phase: 0)
     case .noise(let noise):
       let buffer = NoiseBuffer(contextSampleRate: sampleRate, noise: noise)
       let offset = NoiseBuffer.offset(
@@ -307,10 +306,7 @@ struct RenderedSource {
         // Between two samples, a straight line; the buffer loops, so the last sample's neighbour
         // is the first.
         sample = fraction == 0 ? here : here + fraction * (Double(buffer.samples[(index + 1) % count]) - here)
-        // And a buffer plays at a rate of one before it is told another.
-        let early = Int((time * sampleRate).rounded()) < properFromFrame
-        let step = early ? buffer.sampleRate / sampleRate : increment
-        generator = .noise(buffer: buffer, position: wrapped + step, increment: increment)
+        generator = .noise(buffer: buffer, position: wrapped + increment, increment: increment)
       }
     }
     sample *= gain.value(at: time)

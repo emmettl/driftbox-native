@@ -60,6 +60,32 @@ public struct FixedVoiceSpec {
   public var chokeGroup: UInt8 = 0
   public var sendDelay: Float = 0
   public var sendReverb: Float = 0
+  /// Which voice this is, as its index in `allVoices`, and how hard it was struck: for the
+  /// events ring, which tells the interface what was played.
+  public var voiceIndex = 0
+  public var accent: Float = 1
+
+  /// The same hit `frames` frames later. A song is prepared once against its own clock, from
+  /// zero; every pass through it is placed on the engine's clock with this.
+  @_noAllocation
+  public mutating func shift(byFrames frames: Int, sampleRate: Double) {
+    let seconds = Double(frames) / sampleRate
+    time += seconds
+    firstFrame += frames
+    endFrame += frames
+    endsAt += seconds
+    filterFrequency.shift(by: seconds)
+    trim.shift(by: seconds)
+    for index in 0..<sourceCount {
+      var source = source(index)
+      source.start += seconds
+      source.stop += seconds
+      source.gain.shift(by: seconds)
+      source.frequency.shift(by: seconds)
+      source.filterFrequency.shift(by: seconds)
+      setSource(source, at: index)
+    }
+  }
 
   @_noAllocation
   func source(_ index: Int) -> FixedSource {
@@ -75,6 +101,7 @@ public struct FixedVoiceSpec {
     }
   }
 
+  @_noAllocation
   mutating func setSource(_ source: FixedSource, at index: Int) {
     switch index {
     case 0: s0 = source

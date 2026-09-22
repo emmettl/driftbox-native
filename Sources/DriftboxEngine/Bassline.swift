@@ -11,11 +11,11 @@ import DriftboxSeq
 /// This is the offline form, like `VoiceRenderer`: notes are scheduled, then it is rendered.
 public struct Bassline {
   /// Exponential ramps refuse to touch zero. Everything decays to this instead.
-  static let silence = 1e-4
+  static var silence: Double { 1e-4 }
   /// A fixed VCA envelope. On the hardware the decay knob reaches the filter envelope only, which
   /// is why turning it down makes a line sound clipped rather than merely quieter.
-  static let attack = 0.003
-  static let release = 0.012
+  static var attack: Double { 0.003 }
+  static var release: Double { 0.012 }
 
   public let sampleRate: Double
 
@@ -52,8 +52,11 @@ public struct Bassline {
   public mutating func play(_ note: BassNote, at time: Double, scheduledAt: Double? = nil) {
     let now = scheduledAt ?? time
     if note.wave != waves[waves.count - 1].wave { waves.append((now, note.wave)) }
-    // The last frame rendered before this call. Nothing has been, for a call at the very start.
-    let lastRendered: Double? = now > 0 ? now - 1 / sampleRate : nil
+    // The last frame rendered before this call: the frame before the first one at or after `now`.
+    // Nothing has been, for a call at the very start. Worked out in frames, because a second
+    // subtracted from a second is not always on a frame.
+    let nowFrame = (now * sampleRate).rounded(.up)
+    let lastRendered: Double? = nowFrame > 0 ? (nowFrame - 1) / sampleRate : nil
 
     frequency.cancel(from: time, lastRendered: lastRendered)
     if note.glide > 0 {

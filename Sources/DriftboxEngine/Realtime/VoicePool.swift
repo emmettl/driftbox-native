@@ -17,9 +17,6 @@ public struct VoicePool: ~Copyable {
   public let sampleRate: Double
   public let capacity: Int
 
-  /// Frames a voice is rendered for after its sources stop: the waveshaper's delay, and room for
-  /// a filter to finish ringing. The offline form's figure.
-  static var tailFrames: Int { 512 }
   /// Drive is quantised to twentieths, so there are twenty-one curves.
   static var driveCurves: Int { 21 }
   static var driveCurveSamples: Int { 1024 }
@@ -42,7 +39,9 @@ public struct VoicePool: ~Copyable {
   let noiseCounts: UnsafeMutablePointer<Int>
   let noiseOffsets: UnsafeMutablePointer<Int>
   let noiseSampleRates: UnsafeMutablePointer<Double>
-  let noiseKeys: [Noise]
+  /// Turns hits into `FixedVoiceSpec`s that read this pool's noise. Safe to copy and use on
+  /// another thread while the pool renders.
+  public let preparer: HitPreparer
 
   struct SourceState {
     var phase = 0.0
@@ -86,19 +85,8 @@ public struct VoicePool: ~Copyable {
       (slots + index).initialize(to: Slot(shaper: shaper))
     }
 
-    // Every kind of noise the kit asks for, generated once. A voice that asked for another kind
-    // would read the ordinary buffer.
-    var keys = [Noise()]
-    for voice in allVoices {
-      for source in voice.build(accent: 1).sources {
-        if case .noise(var kind) = source.generator {
-          kind.playbackRate = nil
-          if !keys.contains(kind) { keys.append(kind) }
-        }
-      }
-    }
-    noiseKeys = keys
-    let buffers = keys.map { NoiseBuffer(contextSampleRate: sampleRate, noise: $0) }
+    preparer = HitPreparer(sampleRate: sampleRate)
+    let buffers = preparer.noiseKeys.map { NoiseBuffer(contextSampleRate: sampleRate, noise: $0) }
     noise = .allocate(capacity: buffers.reduce(0) { $0 + $1.samples.count })
     noiseCounts = .allocate(capacity: buffers.count)
     noiseOffsets = .allocate(capacity: buffers.count)
@@ -133,90 +121,7 @@ public struct VoicePool: ~Copyable {
     _ spec: VoiceSpec, voiceId: String, at time: Double, sends: SendLevels = SendLevels(),
     chokeGroup: UInt8 = 0
   ) -> FixedVoiceSpec {
-    var fixed = FixedVoiceSpec()
-    fixed.time = time
-    fixed.firstFrame = Int((time * sampleRate).rounded(.down))
-    fixed.endFrame = fixed.firstFrame + Int((spec.duration * sampleRate).rounded(.up)) + Self.tailFrames
-    fixed.endsAt = time + spec.duration
-    fixed.chokeGroup = chokeGroup
-    fixed.sendDelay = Float(sends.delay)
-    fixed.sendReverb = Float(sends.reverb)
-
-    fixed.gain = spec.gain
-    if let drive = spec.drive, drive > 0 { fixed.driveCurve = Int(jsRound(drive * 20)) }
-    if let filter = spec.filter {
-      fixed.hasFilter = true
-      fixed.filterResponse = response(filter.type)
-      fixed.filterFrequency = fixedTimeline(timeline(from: filter.frequency, filter.envelope, at: time))
-      fixed.filterSwept = filter.envelope?.isEmpty == false
-      fixed.filterQ = filter.q ?? 1
-    }
-    if VoiceRenderer.isPanned(spec) {
-      let pan = panGains(spec.pan ?? 0)
-      fixed.panLeft = pan.left
-      fixed.panRight = pan.right
-    }
-    var trim = ParamTimeline(defaultValue: 1)
-    trim.setValue(spec.trim ?? 1, at: time)
-    fixed.trim = fixedTimeline(trim)
-
-    fixed.sourceCount = min(spec.sources.count, FixedVoiceSpec.maximumSources)
-    for (index, source) in spec.sources.prefix(FixedVoiceSpec.maximumSources).enumerated() {
-      var out = FixedSource()
-      out.start = time + (source.delay ?? 0)
-      out.stop = time + spec.duration
-      var gain = timeline(from: 0, source.amp, at: out.start, scale: source.gain)
-      gain.setValue(0, at: time + spec.duration)
-      out.gain = fixedTimeline(gain)
-      if let filter = source.filter {
-        out.hasFilter = true
-        out.filterResponse = response(filter.type)
-        out.filterFrequency = fixedTimeline(timeline(from: filter.frequency, filter.envelope, at: out.start))
-        out.filterSwept = filter.envelope?.isEmpty == false
-        out.filterQ = filter.q ?? 1
-      }
-      switch source.generator {
-      case .oscillator(let oscillator):
-        out.kind = .oscillator
-        out.shape =
-          switch oscillator.type {
-          case .sine: .sine
-          case .triangle: .triangle
-          case .square: .square
-          case .sawtooth: .sawtooth
-          }
-        out.frequency = fixedTimeline(timeline(from: oscillator.frequency, oscillator.pitch, at: out.start))
-      case .noise(let kind):
-        out.kind = .noise
-        var key = kind
-        key.playbackRate = nil
-        out.noiseBuffer = noiseKeys.firstIndex(of: key) ?? 0
-        let bufferRate = noiseSampleRates[out.noiseBuffer]
-        let offset = NoiseBuffer.offset(
-          voice: voiceId, sourceIndex: index, start: out.start, seeded: kind.seed != nil)
-        out.position = (Double(Float(offset)) * bufferRate).rounded()
-        out.increment = Double(Float(kind.playbackRate ?? 1)) * (bufferRate / sampleRate)
-      }
-      fixed.setSource(out, at: index)
-    }
-    return fixed
-  }
-
-  private func response(_ kind: FilterKind) -> Biquad.Response {
-    switch kind {
-    case .lowpass: .lowpass
-    case .highpass: .highpass
-    case .bandpass: .bandpass
-    }
-  }
-
-  /// Every envelope the kit writes fits in four events. One that did not would be a voice this
-  /// pool cannot play, and says so loudly rather than playing it wrong.
-  private func fixedTimeline(_ timeline: ParamTimeline) -> FixedTimeline {
-    guard let fixed = FixedTimeline(timeline) else {
-      preconditionFailure("an envelope with more than four events")
-    }
-    return fixed
+    preparer.prepare(spec, voiceId: voiceId, at: time, sends: sends, chokeGroup: chokeGroup)
   }
 
   // MARK: - On the render thread
@@ -368,4 +273,126 @@ public struct VoicePool: ~Copyable {
     }
     return sourceStates[index].filter.process(sample)
   }
+}
+
+/// What turns a hit into a `FixedVoiceSpec`: the pool's catalogue of noise, and nothing that the
+/// render thread mutates. A song is compiled with one of these on whatever thread is convenient.
+public struct HitPreparer: Sendable {
+  public let sampleRate: Double
+  /// Every kind of noise the kit asks for, in the order the pool holds them. A voice that asked
+  /// for another kind would read the ordinary buffer.
+  let noiseKeys: [Noise]
+  let noiseSampleRates: [Double]
+
+  public init(sampleRate: Double) {
+    self.sampleRate = sampleRate
+    var keys = [Noise()]
+    for voice in allVoices {
+      for source in voice.build(accent: 1).sources {
+        if case .noise(var kind) = source.generator {
+          kind.playbackRate = nil
+          if !keys.contains(kind) { keys.append(kind) }
+        }
+      }
+    }
+    noiseKeys = keys
+    noiseSampleRates = keys.map { $0.sampleRate ?? sampleRate }
+  }
+
+  /// Frames a voice is rendered for after its sources stop: the waveshaper's delay, and room for
+  /// a filter to finish ringing. The offline form's figure.
+  static var tailFrames: Int { 512 }
+
+  /// A hit, made ready to play. `time` is seconds on the clock the pool's `render` counts frames of.
+  public func prepare(
+    _ spec: VoiceSpec, voiceId: String, at time: Double, sends: SendLevels = SendLevels(),
+    chokeGroup: UInt8 = 0
+  ) -> FixedVoiceSpec {
+    var fixed = FixedVoiceSpec()
+    fixed.time = time
+    fixed.firstFrame = Int((time * sampleRate).rounded(.down))
+    fixed.endFrame = fixed.firstFrame + Int((spec.duration * sampleRate).rounded(.up)) + Self.tailFrames
+    fixed.endsAt = time + spec.duration
+    fixed.chokeGroup = chokeGroup
+    fixed.sendDelay = Float(sends.delay)
+    fixed.sendReverb = Float(sends.reverb)
+    fixed.voiceIndex = allVoices.firstIndex { $0.id == voiceId } ?? 0
+
+    fixed.gain = spec.gain
+    if let drive = spec.drive, drive > 0 { fixed.driveCurve = Int(jsRound(drive * 20)) }
+    if let filter = spec.filter {
+      fixed.hasFilter = true
+      fixed.filterResponse = response(filter.type)
+      fixed.filterFrequency = fixedTimeline(timeline(from: filter.frequency, filter.envelope, at: time))
+      fixed.filterSwept = filter.envelope?.isEmpty == false
+      fixed.filterQ = filter.q ?? 1
+    }
+    if VoiceRenderer.isPanned(spec) {
+      let pan = panGains(spec.pan ?? 0)
+      fixed.panLeft = pan.left
+      fixed.panRight = pan.right
+    }
+    var trim = ParamTimeline(defaultValue: 1)
+    trim.setValue(spec.trim ?? 1, at: time)
+    fixed.trim = fixedTimeline(trim)
+
+    fixed.sourceCount = min(spec.sources.count, FixedVoiceSpec.maximumSources)
+    for (index, source) in spec.sources.prefix(FixedVoiceSpec.maximumSources).enumerated() {
+      var out = FixedSource()
+      out.start = time + (source.delay ?? 0)
+      out.stop = time + spec.duration
+      var gain = timeline(from: 0, source.amp, at: out.start, scale: source.gain)
+      gain.setValue(0, at: time + spec.duration)
+      out.gain = fixedTimeline(gain)
+      if let filter = source.filter {
+        out.hasFilter = true
+        out.filterResponse = response(filter.type)
+        out.filterFrequency = fixedTimeline(timeline(from: filter.frequency, filter.envelope, at: out.start))
+        out.filterSwept = filter.envelope?.isEmpty == false
+        out.filterQ = filter.q ?? 1
+      }
+      switch source.generator {
+      case .oscillator(let oscillator):
+        out.kind = .oscillator
+        out.shape =
+          switch oscillator.type {
+          case .sine: .sine
+          case .triangle: .triangle
+          case .square: .square
+          case .sawtooth: .sawtooth
+          }
+        out.frequency = fixedTimeline(timeline(from: oscillator.frequency, oscillator.pitch, at: out.start))
+      case .noise(let kind):
+        out.kind = .noise
+        var key = kind
+        key.playbackRate = nil
+        out.noiseBuffer = noiseKeys.firstIndex(of: key) ?? 0
+        let bufferRate = noiseSampleRates[out.noiseBuffer]
+        let offset = NoiseBuffer.offset(
+          voice: voiceId, sourceIndex: index, start: out.start, seeded: kind.seed != nil)
+        out.position = (Double(Float(offset)) * bufferRate).rounded()
+        out.increment = Double(Float(kind.playbackRate ?? 1)) * (bufferRate / sampleRate)
+      }
+      fixed.setSource(out, at: index)
+    }
+    return fixed
+  }
+
+  private func response(_ kind: FilterKind) -> Biquad.Response {
+    switch kind {
+    case .lowpass: .lowpass
+    case .highpass: .highpass
+    case .bandpass: .bandpass
+    }
+  }
+
+  /// Every envelope the kit writes fits in four events. One that did not would be a voice this
+  /// pool cannot play, and says so loudly rather than playing it wrong.
+  private func fixedTimeline(_ timeline: ParamTimeline) -> FixedTimeline {
+    guard let fixed = FixedTimeline(timeline) else {
+      preconditionFailure("an envelope with more than four events")
+    }
+    return fixed
+  }
+
 }
