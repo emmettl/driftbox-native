@@ -51,7 +51,7 @@
           events: player.takeEvents(), touch: player.padTouch, bar: position?.bar ?? 0,
           step: position?.step ?? 0, running: player.isPlaying, bpm: player.tempo,
           scoreBeat: player.scoreBeat(), levels: analyser?.levels() ?? (0, 0, 0),
-          wideLevels: analyser?.wideLevels() ?? (0, 0))
+          wideLevels: analyser?.wideLevels() ?? (0, 0), bands: analyser?.bands(16) ?? [])
         renderer.draw(input, into: drawable.texture, drawable: drawable)
       }
     }

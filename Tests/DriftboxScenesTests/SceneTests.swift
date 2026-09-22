@@ -92,7 +92,8 @@
               time: time, peakLeft: onBeat ? 0.8 : 0.2, peakRight: onBeat ? 0.8 : 0.2,
               events: struck
                 ? [EngineEvent(kind: .hit, frame: 0, voice: kick, level: 1, frequency: 0, flag: 0)] : [],
-              running: true, bpm: 126, scoreBeat: beat, levels: bands, wideLevels: (bands.bass, bands.high)),
+              running: true, bpm: 126, scoreBeat: beat, levels: bands, wideLevels: (bands.bass, bands.high),
+              bands: (0..<16).map { onBeat && $0 < 4 ? 0.7 : Float($0) / 40 }),
             into: texture)
           time += 1.0 / 60
         }

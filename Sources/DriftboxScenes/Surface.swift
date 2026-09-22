@@ -183,6 +183,7 @@
       // GLSL's mod, which floors; Metal's fmod truncates, and they part company below zero.
       static inline float mod(float x, float y) { return x - y * floor(x / y); }
       static inline float2 mod(float2 x, float y) { return x - y * floor(x / y); }
+      static inline float3 mod(float3 x, float y) { return x - y * floor(x / y); }
       static inline float2x2 rotation(float c, float s) { return float2x2(float2(c, -s), float2(s, c)); }
 
       // A card: one of an instanced layer of quads, the web's `planeGeometry(2, 2)`.
