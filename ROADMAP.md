@@ -127,7 +127,12 @@ gone native at all.
    missing the `- across / 2`, so every stomp and every collect throws its pieces half the
    visible width to the right of the thing they came from — off the edge, in practice, which
    is why nobody has seen the effect. The runner's own death shards use his draw origin and
-   are right, which is presumably why it went unnoticed. The port reproduces it. The other sixteen are three.js
+   are right, which is presumably why it went unnoticed. The port reproduces it.
+
+   And a third, smaller: in portrait GraphicLab draws its section name at a size taken from the
+   page height and never fits it to a width, unlike every other piece of display type on the
+   sheet, so "TYPE PRESS" collides with the stereo line and "XEROX NIGHT" overruns its slab.
+   Visible on the web at the same aspect. The port reproduces it; a fitted width would fix both. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
