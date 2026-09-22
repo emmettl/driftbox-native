@@ -28,7 +28,7 @@ let package = Package(
 
     // Unconstrained: Foundation and the platform are allowed from here up.
     .target(name: "DriftboxDocument", dependencies: ["DriftboxSeq", "DriftboxEngine"]),
-    .target(name: "DriftboxHost", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
+    .target(name: "DriftboxHost", dependencies: ["DriftboxEngine", "DriftboxDocument", "DriftboxRack"]),
     // The visuals: Metal scenes driven by the engine's events. Empty on a platform without Metal.
     .target(name: "DriftboxScenes", dependencies: ["DriftboxDSP", "DriftboxEngine"]),
 
@@ -61,7 +61,7 @@ let package = Package(
     .testTarget(name: "DriftboxScenesTests", dependencies: ["DriftboxScenes", "DriftboxEngine"]),
     .testTarget(
       name: "DriftboxHostTests",
-      dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "ConformanceSupport"]),
+      dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxRack", "ConformanceSupport"]),
     .testTarget(
       name: "DriftboxDocumentTests",
       dependencies: ["DriftboxDocument", "DriftboxSeq", "ConformanceSupport"]),

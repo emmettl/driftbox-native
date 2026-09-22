@@ -99,7 +99,7 @@ public final class RackRenderer {
 
 extension RackGraph {
   /// What outlives a patch change: the clock, the transport and the limiter's state.
-  struct Carried {
+  public struct Carried {
     var frame: Int
     var tempo: Double
     var running: Bool
@@ -109,14 +109,17 @@ extension RackGraph {
     var limitGain: Double
   }
 
-  var carried: Carried {
-    Carried(
-      frame: frame, tempo: tempo, running: running, beat: beat, shuffle: shuffle,
-      limitEnvelope: limitEnvelope,
-      limitGain: limitGain)
+  public var carried: Carried {
+    @_noAllocation get {
+      Carried(
+        frame: frame, tempo: tempo, running: running, beat: beat, shuffle: shuffle,
+        limitEnvelope: limitEnvelope,
+        limitGain: limitGain)
+    }
   }
 
-  mutating func inherit(_ state: Carried) {
+  @_noAllocation
+  public mutating func inherit(_ state: Carried) {
     frame = state.frame
     tempo = state.tempo
     running = state.running
