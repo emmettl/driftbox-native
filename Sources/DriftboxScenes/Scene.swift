@@ -83,13 +83,13 @@
     /// The web's three.js scenes, reinterpreted over the geometry layer.
     static let geometry: [GeometryScene.Type] = [
       Wireframe.self, Sunset.self, Web.self, Saturn.self, Lifeforms.self, Cubik.self, Stillwater.self,
-      Cycles.self,
+      Cycles.self, Clouds.self,
     ]
     static var geometrySources: String {
       GeometryScene.preamble
         + [
           Wireframe.source, Sunset.source, Web.source, Saturn.source, Lifeforms.source, Cubik.source,
-          Stillwater.source, Cycles.source,
+          Stillwater.source, Cycles.source, Clouds.source,
         ]
         .joined()
     }
