@@ -123,28 +123,25 @@ gone native at all.
    it with the outline the safe direction. Fixed in the web as emmettl/driftbox#300 and here
    at the same time, so the two do not disagree while that waits.
 
-   The Jumpman port found a second one, not yet fixed anywhere. Monsters and pick-ups are
-   drawn at `m.x - scroll - across / 2 - 4` but spawn their shards at `m.x - scroll + c.x - 4`,
-   missing the `- across / 2`, so every stomp and every collect throws its pieces half the
-   visible width to the right of the thing they came from — off the edge, in practice, which
-   is why nobody has seen the effect. The runner's own death shards use his draw origin and
-   are right, which is presumably why it went unnoticed. The port reproduces it.
+   The Jumpman port found a second. Monsters and pick-ups are drawn at
+   `m.x - scroll - across / 2 - 4` but spawned their shards at `m.x - scroll + c.x - 4`, missing
+   the `- across / 2`. This roadmap first said that threw the pieces off the edge where nobody
+   saw them; that was wrong, and repeated from the port's report after checking the missing term
+   and not what it did. He stands left of centre and only stomps what is under him, so the
+   pieces burst out of empty air about a fifth of a screen *right* of centre — on screen, and
+   plainly in the wrong place, as a staged stomp showed. Fixed in the web as
+   emmettl/driftbox#301 and here with a test that fails without it.
 
-   And a third, smaller: in portrait GraphicLab draws its section name at a size taken from the
-   page height and never fits it to a width, unlike every other piece of display type on the
-   sheet, so "TYPE PRESS" collides with the stereo line and "XEROX NIGHT" overruns its slab.
-   Visible on the web at the same aspect. The port reproduces it; a fitted width would fix both. The other sixteen are three.js
-   scenes with a perspective camera, and
-   what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
-   Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
-   Longhand, Machine, Cycles, Clouds, Convoy); a shader over an icosahedron or a sphere
-   (Lifeforms, Clouds); boxes, cylinders and a torus under lights (Machine, the only lit one);
-   a 2D canvas drawn each frame and shown as a texture (GraphicLab); and fog (Sunset, Lifeforms,
-   Cubik, Machine, Longhand). Still to add to the layer: the other geometries (sphere, cylinder,
-   torus), lights for the one lit scene, fog in the fragment, and one texture. What was planned:
-   a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
-   and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
-   landed. Needs only the ring from phase 4, so it runs alongside phase 5.
+   And a third: in portrait Graphic Lab sized its section names from the page's height and never
+   fitted them to a width, so Type Press ran over its tempo, Xerox Night off its slab and out of
+   the page, and Live Signal to the very edge; and the broadcast edition, alone of the three,
+   had no portrait branch, so its footer ran into itself. Fixed in the web as
+   emmettl/driftbox#302 and here. The names now go through the scene's own `fittedText`, which
+   only squeezes, and every edition rendered at 1920×1080 is byte-identical before and after.
+
+   What was planned: a thin Metal layer — lines, instanced meshes, full-screen and compute
+   passes — and the scenes reinterpreted one at a time, with a fallback for any a song names that
+   has not landed.
 7. **The Mac app proper.** ← *here.* The engine and the scenes were done; what was missing was
    everything that makes a thing a Mac app rather than a window with controls in it. Most of it
    is in now. A menu bar, which there had not been at all — and whose absence was not cosmetic:

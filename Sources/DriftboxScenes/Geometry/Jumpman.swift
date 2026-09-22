@@ -330,7 +330,8 @@
       if powered > 0 { powered -= step }
 
       spawn(across: across)
-      collide(runnerWorldX: scroll + runnerX + across / 2, runnerX: runnerX, grounded: grounded)
+      collide(
+        runnerWorldX: scroll + runnerX + across / 2, runnerX: runnerX, across: across, grounded: grounded)
 
       // Shards fall and fade.
       for index in shards.indices {
@@ -399,7 +400,7 @@
     }
 
     /// Collisions. Being in the air clears a monster; being on the ground does not.
-    private func collide(runnerWorldX: Float, runnerX: Float, grounded: Bool) {
+    private func collide(runnerWorldX: Float, runnerX: Float, across: Float, grounded: Bool) {
       for index in monsters.indices {
         if !monsters[index].alive { continue }
         // Standing on a platform is safety, not a weapon: a monster passing underneath is out of
@@ -408,15 +409,15 @@
         guard abs(monsters[index].x - runnerWorldX) < 4 && hop < 6 && dead <= 0 else { continue }
         if hop > 2.5 || powered > 0 {
           monsters[index].alive = false
-          // Stamped: the monster comes apart instead of vanishing. The web spawns these without
-          // the `- across / 2` its draw call uses, so the pieces land half a screen to the right
-          // of the monster; kept, because this is what the web does.
+          // Stamped: the monster comes apart instead of vanishing — from where it is drawn, which
+          // is the world less the scroll and half the view. Without the half, as the web first had
+          // it, the pieces burst out of empty air half a screen to the right of him.
           for c in Self.monsterCells {
             let vx = (random.next() - 0.5) * 26
             let vy = 8 + random.next() * 26
             shards.append(
               Shard(
-                x: monsters[index].x - scroll + c.x - 4, y: Self.groundY + c.y, vx: vx, vy: vy,
+                x: monsters[index].x - scroll - across / 2 + c.x - 4, y: Self.groundY + c.y, vx: vx, vy: vy,
                 life: 1.1, colour: c.colour))
           }
         } else {
@@ -444,7 +445,7 @@
           let vy = 14 + random.next() * 22
           shards.append(
             Shard(
-              x: p.x - scroll + c.x - 4, y: Self.groundY + p.y + c.y, vx: vx, vy: vy, life: 0.9,
+              x: p.x - scroll - across / 2 + c.x - 4, y: Self.groundY + p.y + c.y, vx: vx, vy: vy, life: 0.9,
               colour: c.colour))
         }
       }
