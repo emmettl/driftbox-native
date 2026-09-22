@@ -46,7 +46,9 @@
   final class Player {
     private(set) var entries = Catalogue.entries()
     private(set) var current: CatalogueEntry?
-    var song: Song?
+    var song: Song? {
+      didSet { retime() }
+    }
     private(set) var isPlaying = false
     /// Where the transport is, in the song's own frames.
     private(set) var songFrame = 0
@@ -78,9 +80,19 @@
     /// because plenty of gear streams clock the moment it is plugged in, and a sequencer that
     /// handed its transport to whatever is on the cable would be taking an instrument away.
     var followsClock = false {
-      didSet { if !followsClock { followedBPM = nil } }
+      didSet {
+        // Letting go of the clock means the song's own tempo again, in the engine as well as here.
+        guard !followsClock, followedBPM != nil else { return }
+        let step = currentStep
+        followedBPM = nil
+        if let song { unit?.load(song) }
+        seek(toStep: step)
+        if isPlaying { unit?.send(.play) }
+      }
     }
-    private(set) var followedBPM: Double?
+    private(set) var followedBPM: Double? {
+      didSet { retime() }
+    }
     var midiSources: [String] { midi?.sources ?? [] }
     private var follower = ClockFollower()
     /// The song's own tempo, which following leaves alone: the followed tempo is not written in.
@@ -170,20 +182,13 @@
 
     /// The transport's position in sixteenths from the top.
     var currentStep: Int {
-      guard let position, let song else { return 0 }
-      var steps = 0
-      for bar in 0..<position.bar { steps += song.barLength(forBar: bar) }
-      return steps + position.step
+      timeline.step(at: Double(songFrame) / sampleRate) ?? 0
     }
 
     func seek(toStep step: Int) {
-      guard let song else { return }
-      var retimed = song
-      if let bpm = followedBPM { retimed.bpm = bpm }
-      let plan = retimed.plan(bars: retimed.chain.isEmpty ? 1 : retimed.bars)
-      guard !plan.isEmpty else { return }
-      let index = min(max(0, step), plan.count - 1)
-      unit?.send(.seek(songFrame: Int(plan[index].time * sampleRate)))
+      guard !timeline.times.isEmpty else { return }
+      let index = min(max(0, step), timeline.times.count - 1)
+      unit?.send(.seek(songFrame: Int(timeline.times[index] * sampleRate)))
     }
 
     private func tick() {
@@ -239,10 +244,8 @@
 
     /// Jump to the start of a bar of the arrangement.
     func seek(toBar bar: Int) {
-      guard let song else { return }
-      let plan = song.plan(bars: min(bar, song.bars))
-      let time = plan.last.map { $0.time + $0.stepSeconds } ?? 0
-      unit?.send(.seek(songFrame: bar == 0 ? 0 : Int(time * sampleRate)))
+      guard song != nil else { return }
+      unit?.send(.seek(songFrame: Int(timeline.start(ofBar: bar) * sampleRate)))
     }
 
     func play() {
@@ -347,19 +350,65 @@
 
     /// The step the transport is on: which bar of the arrangement, and which step in it.
     var position: (bar: Int, step: Int, pattern: DriftboxSeq.Pattern?)? {
-      guard let song else { return nil }
-      let plan = song.plan(bars: song.chain.isEmpty ? 1 : song.bars)
-      let time = Double(songFrame) / sampleRate
-      var index = 0
-      for (candidate, step) in plan.enumerated() where step.time <= time { index = candidate }
-      guard index < plan.count else { return nil }
-      var bar = 0
-      var counted = 0
-      while bar < song.bars, counted + song.barLength(forBar: bar) <= index {
-        counted += song.barLength(forBar: bar)
-        bar += 1
+      guard let song, let index = timeline.step(at: Double(songFrame) / sampleRate) else {
+        return nil
       }
-      return (bar, index - counted, song.pattern(forBar: bar))
+      let bar = timeline.bars[index]
+      return (bar, timeline.indices[index], song.pattern(forBar: bar))
+    }
+
+    /// Where every step of the arrangement starts, at the tempo the song is running at. The
+    /// transport, the grid and the scene all ask where the song is, many times a frame; planning
+    /// the whole song each time was the main thread's entire day, and the tick never ran.
+    private var timeline = Timeline()
+
+    private func retime() {
+      guard let song else {
+        timeline = Timeline()
+        return
+      }
+      var running = song
+      if let bpm = followedBPM { running.bpm = bpm }
+      timeline = Timeline(song: running)
+    }
+
+    private struct Timeline {
+      /// The start of each step, in seconds; `end` is where the last one finishes.
+      var times: [Double] = []
+      var bars: [Int] = []
+      var indices: [Int] = []
+      var end = 0.0
+
+      init() {}
+
+      init(song: Song) {
+        var time = 0.0
+        for bar in 0..<(song.chain.isEmpty ? 1 : song.bars) {
+          for index in 0..<song.barLength(forBar: bar) {
+            times.append(time)
+            bars.append(bar)
+            indices.append(index)
+            time += 60 / song.bpm(bar: bar, index: index) / 4
+          }
+        }
+        end = time
+      }
+
+      /// The last step that had started by `time`.
+      func step(at time: Double) -> Int? {
+        var low = 0
+        var high = times.count
+        while low < high {
+          let middle = (low + high) / 2
+          if times[middle] <= time { low = middle + 1 } else { high = middle }
+        }
+        return low == 0 ? nil : low - 1
+      }
+
+      /// Where `bar` begins; the end of the song for a bar past its last.
+      func start(ofBar bar: Int) -> Double {
+        bars.firstIndex(of: bar).map { times[$0] } ?? end
+      }
     }
   }
 #endif
