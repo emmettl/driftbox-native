@@ -14,6 +14,9 @@
     /// What the camera is pointed at, if it is pointed at anything; `roll` turns it about its
     /// own axis when it is not.
     public var target: SIMD3<Float>?
+    /// Or its Euler angles, for a scene that aims the camera rather than pointing it at
+    /// something. Takes precedence over both of the above.
+    public var rotation: SIMD3<Float>?
     public var fovDegrees: Float = 60
     public var near: Float = 0.1
     public var far: Float = 200
@@ -34,6 +37,12 @@
       let translate = simd_float4x4(
         SIMD4(1, 0, 0, 0), SIMD4(0, 1, 0, 0), SIMD4(0, 0, 1, 0),
         SIMD4(-position.x, -position.y, -position.z, 1))
+      if let rotation {
+        // The camera's own transform is `T · R`, so what the world is seen through is its
+        // inverse — and for an orthonormal rotation that is its transpose.
+        let turn = modelMatrix(position: .zero, rotation: rotation).transpose
+        return turn * translate
+      }
       guard let target else {
         let c = cos(-roll)
         let s = sin(-roll)
@@ -111,21 +120,27 @@
   public struct Onset {
     public var rise: Float
     public var refractory: Float
+    public var rates: SIMD2<Float>
+    public var floor: Float
     private var fast: Float = 0
     private var slow: Float = 0
     private var wait: Float = 0
 
-    public init(rise: Float, refractory: Float) {
+    public init(
+      rise: Float, refractory: Float, rates: SIMD2<Float> = SIMD2(28, 2.2), floor: Float = 0.07
+    ) {
       self.rise = rise
       self.refractory = refractory
+      self.rates = rates
+      self.floor = floor
     }
 
     /// How hard it was hit, or zero.
     public mutating func detect(_ value: Float, dt: Float) -> Float {
-      fast += (value - fast) * min(1, dt * 28)
-      slow += (value - slow) * min(1, dt * 2.2)
+      fast += (value - fast) * min(1, dt * rates.x)
+      slow += (value - slow) * min(1, dt * rates.y)
       wait -= dt
-      if wait > 0 || fast < 0.07 || fast < slow * rise { return 0 }
+      if wait > 0 || fast < floor || fast < slow * rise { return 0 }
       wait = refractory
       return min(1, fast)
     }
@@ -149,6 +164,45 @@
       seed = (seed &* 1_664_525 &+ 1_013_904_223) % 4_294_967_296
       return Float(Double(seed) / 4_294_967_296)
     }
+  }
+
+  /// three's `BoxGeometry` at one segment a side: six quads with their outward normals.
+  public enum Box {
+    public static func build(width: Float, height: Float, depth: Float) -> (
+      positions: [SIMD3<Float>], normals: [SIMD3<Float>], indices: [UInt32]
+    ) {
+      let half = SIMD3(width, height, depth) / 2
+      let faces: [(normal: SIMD3<Float>, across: SIMD3<Float>, up: SIMD3<Float>)] = [
+        (SIMD3(1, 0, 0), SIMD3(0, 0, -1), SIMD3(0, 1, 0)),
+        (SIMD3(-1, 0, 0), SIMD3(0, 0, 1), SIMD3(0, 1, 0)),
+        (SIMD3(0, 1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, 1)),
+        (SIMD3(0, -1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, -1)),
+        (SIMD3(0, 0, 1), SIMD3(1, 0, 0), SIMD3(0, 1, 0)),
+        (SIMD3(0, 0, -1), SIMD3(-1, 0, 0), SIMD3(0, 1, 0)),
+      ]
+      var positions: [SIMD3<Float>] = []
+      var normals: [SIMD3<Float>] = []
+      var indices: [UInt32] = []
+      for face in faces {
+        let centre = face.normal * half
+        let across = face.across * half
+        let up = face.up * half
+        let first = UInt32(positions.count)
+        for corner in [(-1, 1), (1, 1), (1, -1), (-1, -1)] as [(Float, Float)] {
+          positions.append(centre + across * corner.0 + up * corner.1)
+          normals.append(face.normal)
+        }
+        indices.append(contentsOf: [first, first + 1, first + 2, first, first + 2, first + 3])
+      }
+      return (positions, normals, indices)
+    }
+  }
+
+  /// Symmetric smoothing, for a field of objects where an instant onset looks like a flash.
+  public func glide(_ current: Float, toward target: Float, dt: Float, attack: Float, release: Float)
+    -> Float
+  {
+    current + (target - current) * min(1, dt * (target > current ? attack : release))
   }
 
   /// three's `IcosahedronGeometry`: the solid's twenty faces subdivided `detail` times and
@@ -256,6 +310,17 @@
     public let device: MTLDevice
     public let library: MTLLibrary
     public var camera = Camera()
+    /// Depth, for the scenes with solid geometry. Every geometry pipeline declares the format
+    /// and the pass always carries the texture, so a scene turns depth on by asking for
+    /// `depthState` and leaves it off by not — rather than by each scene owning a pass.
+    public static let depthFormat = MTLPixelFormat.depth32Float
+    var depth: MTLTexture?
+    public private(set) lazy var depthState: MTLDepthStencilState? = {
+      let descriptor = MTLDepthStencilDescriptor()
+      descriptor.depthCompareFunction = .less
+      descriptor.isDepthWriteEnabled = true
+      return device.makeDepthStencilState(descriptor: descriptor)
+    }()
     var lastTime: Double?
     var touchAt = SIMD2<Float>(0.5, 0.5)
     var touchEnergy: Float = 0
@@ -294,6 +359,17 @@
       pass.colorAttachments[0].clearColor = MTLClearColor(
         red: Double(background.x), green: Double(background.y), blue: Double(background.z), alpha: 1)
       pass.colorAttachments[0].storeAction = .store
+      if depth == nil || depth?.width != target.width || depth?.height != target.height {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+          pixelFormat: Self.depthFormat, width: target.width, height: target.height, mipmapped: false)
+        descriptor.usage = .renderTarget
+        descriptor.storageMode = .private
+        depth = device.makeTexture(descriptor: descriptor)
+      }
+      pass.depthAttachment.texture = depth
+      pass.depthAttachment.loadAction = .clear
+      pass.depthAttachment.clearDepth = 1
+      pass.depthAttachment.storeAction = .dontCare
       guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else { return }
       encode(encoder)
       encoder.endEncoding()
@@ -306,6 +382,7 @@
       else { throw SceneRenderer.SceneError.missingFunction("\(vertex), \(fragment)", library.functionNames) }
       descriptor.vertexFunction = vertexFunction
       descriptor.fragmentFunction = fragmentFunction
+      descriptor.depthAttachmentPixelFormat = Self.depthFormat
       let colour = descriptor.colorAttachments[0]!
       colour.pixelFormat = .bgra8Unorm
       switch blend {
