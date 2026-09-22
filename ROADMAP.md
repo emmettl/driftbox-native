@@ -94,14 +94,18 @@ gone native at all.
    Wireframe, the Rez corridor, as its first scene: one line list of sixty-four ribs and their
    rails, moved in the vertex shader. Then Sunset (the chillwave slatted sun and its
    wireframe floor, on plane geometry with a model matrix and a looking camera) and Web (Tempest
-   2000: sixteen lanes, sixteen bands, a finger as a black hole). Thirteen of twenty-seven. The other sixteen are three.js
+   2000: sixteen lanes, sixteen bands, a finger as a black hole). Then Saturn, the first that is an object rather
+   than a place: two point clouds, Keplerian rings, and kicks that punch scars into the planet
+   — which brought point sprites, onset detection and the framing helper with it. The camera's
+   defaults are the web canvas's own (fov 60, far 200, at (0, 1.15, 6)), because a scene that
+   never sets one is relying on it. Fourteen of twenty-seven. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
    Longhand, Machine, Cycles, Clouds, Convoy); a shader over an icosahedron or a sphere
    (Lifeforms, Clouds); boxes, cylinders and a torus under lights (Machine, the only lit one);
    a 2D canvas drawn each frame and shown as a texture (GraphicLab); and fog (Sunset, Lifeforms,
-   Cubik, Machine, Longhand). Still to add to the layer: points, the other geometries (icosahedron, sphere, box,
+   Cubik, Machine, Longhand). Still to add to the layer: the other geometries (icosahedron, sphere, box,
    cylinder, torus), lights for the one lit scene, fog in the fragment, and one texture. What was planned:
    a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not

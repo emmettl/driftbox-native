@@ -6,15 +6,17 @@
   /// a projection. The matrices are what a three vertex shader calls `projectionMatrix` and
   /// `modelViewMatrix` (with the model at the origin), except that depth lands in Metal's
   /// 0...1 rather than GL's -1...1.
+  /// Its defaults are the web canvas's own — `fov: 60, position: [0, 1.15, 6], near: 0.1,
+  /// far: 200` — because a scene that never sets one of them is relying on it.
   public struct Camera {
-    public var position = SIMD3<Float>(0, 0, 5)
+    public var position = SIMD3<Float>(0, 1.15, 6)
     public var roll: Float = 0
     /// What the camera is pointed at, if it is pointed at anything; `roll` turns it about its
     /// own axis when it is not.
     public var target: SIMD3<Float>?
-    public var fovDegrees: Float = 75
+    public var fovDegrees: Float = 60
     public var near: Float = 0.1
-    public var far: Float = 1000
+    public var far: Float = 200
 
     public init() {}
 
@@ -73,6 +75,80 @@
       SIMD4(0, c * scale, s * scale, 0),
       SIMD4(0, -s * scale, c * scale, 0),
       SIMD4(position.x, position.y, position.z, 1))
+  }
+
+  /// three's Euler rotation in its default XYZ order, then a position: `RX · RY · RZ`.
+  public func modelMatrix(position: SIMD3<Float>, rotation: SIMD3<Float>) -> simd_float4x4 {
+    let (sx, cx) = (sin(rotation.x), cos(rotation.x))
+    let (sy, cy) = (sin(rotation.y), cos(rotation.y))
+    let (sz, cz) = (sin(rotation.z), cos(rotation.z))
+    return simd_float4x4(
+      SIMD4(cy * cz, cx * sz + cz * sx * sy, sx * sz - cx * cz * sy, 0),
+      SIMD4(-cy * sz, cx * cz - sx * sy * sz, cz * sx + cx * sy * sz, 0),
+      SIMD4(sy, -cy * sx, cx * cy, 0),
+      SIMD4(position.x, position.y, position.z, 1))
+  }
+
+  /// How far back to sit so a subject fills the frame. A perspective camera's field of view
+  /// is *vertical*, so the horizontal extent it can see is that times the aspect: narrow the
+  /// window and width is the binding constraint, widen it and height is. Solving both and
+  /// taking the larger fits either way round. The extents are the subject's size *on screen*,
+  /// not in space — a ring system seen almost edge on is as wide as its radius and a fraction
+  /// as tall. Never past the far plane: cropping shows part of something, and being beyond
+  /// the far plane shows nothing at all.
+  public func fitDistance(
+    camera: Camera, aspect: Float, halfWidth: Float, halfHeight: Float, fill: Float = 0.9
+  ) -> Float {
+    let halfFov = tan(camera.fovDegrees * .pi / 360)
+    let want = max(halfHeight / halfFov, halfWidth / (halfFov * aspect)) / fill
+    let ceiling = camera.far - max(halfWidth, halfHeight) * 1.6
+    return min(want, max(1, ceiling))
+  }
+
+  /// Onset detection: a fast envelope crossing a slow one, so something lands on hits rather
+  /// than on loudness. A threshold on the level itself fires constantly through a loud
+  /// passage and never through a quiet one.
+  public struct Onset {
+    public var rise: Float
+    public var refractory: Float
+    private var fast: Float = 0
+    private var slow: Float = 0
+    private var wait: Float = 0
+
+    public init(rise: Float, refractory: Float) {
+      self.rise = rise
+      self.refractory = refractory
+    }
+
+    /// How hard it was hit, or zero.
+    public mutating func detect(_ value: Float, dt: Float) -> Float {
+      fast += (value - fast) * min(1, dt * 28)
+      slow += (value - slow) * min(1, dt * 2.2)
+      wait -= dt
+      if wait > 0 || fast < 0.07 || fast < slow * rise { return 0 }
+      wait = refractory
+      return min(1, fast)
+    }
+  }
+
+  /// A small deterministic generator, where a scene wants the web's own arbitrary sequence.
+  public struct Roll {
+    private var state: Double
+    public init(seed: Double) { state = seed }
+    public mutating func next() -> Float {
+      state = (state * 9301 + 0.49297).truncatingRemainder(dividingBy: 1)
+      return Float(state)
+    }
+  }
+
+  /// The linear congruential generator the point clouds are laid out with.
+  public struct Noise {
+    private var seed: UInt64
+    public init(seed: UInt64) { self.seed = seed }
+    public mutating func next() -> Float {
+      seed = (seed &* 1_664_525 &+ 1_013_904_223) % 4_294_967_296
+      return Float(Double(seed) / 4_294_967_296)
+    }
   }
 
   /// three's `PlaneGeometry`: a grid in the xy plane, with uvs from the bottom left and two

@@ -25,6 +25,8 @@
     public var scoreBeat: Double?
     /// The mix's bass, mids and highs, 0...1, from the `Analyser`'s eight bands.
     public var levels: (bass: Float, mid: Float, high: Float)
+    /// The backing scale of what is being drawn into, for anything sized in points.
+    public var pixelRatio: Float
     /// The spectrum in sixteen bands of constant ratio, for a scene with one lane each.
     public var bands: [Float]
     /// The web's other reading of the same spectrum — the bottom few bins and the top half —
@@ -35,7 +37,7 @@
       time: Double, peakLeft: Float = 0, peakRight: Float = 0, events: [EngineEvent] = [],
       touch: SIMD2<Float>? = nil, bar: Int = 0, step: Int = 0, running: Bool = false, bpm: Double = 120,
       scoreBeat: Double? = nil, levels: (bass: Float, mid: Float, high: Float) = (0, 0, 0),
-      wideLevels: (bass: Float, high: Float) = (0, 0), bands: [Float] = []
+      wideLevels: (bass: Float, high: Float) = (0, 0), bands: [Float] = [], pixelRatio: Float = 1
     ) {
       self.time = time
       self.peakLeft = peakLeft
@@ -50,6 +52,7 @@
       self.levels = levels
       self.wideLevels = wideLevels
       self.bands = bands
+      self.pixelRatio = pixelRatio
     }
   }
 
@@ -78,9 +81,9 @@
       Hothouse.self, NightBus.self,
     ]
     /// The web's three.js scenes, reinterpreted over the geometry layer.
-    static let geometry: [GeometryScene.Type] = [Wireframe.self, Sunset.self, Web.self]
+    static let geometry: [GeometryScene.Type] = [Wireframe.self, Sunset.self, Web.self, Saturn.self]
     static var geometrySources: String {
-      GeometryScene.preamble + [Wireframe.source, Sunset.source, Web.source].joined()
+      GeometryScene.preamble + [Wireframe.source, Sunset.source, Web.source, Saturn.source].joined()
     }
 
     static var surfaceSources: String {
