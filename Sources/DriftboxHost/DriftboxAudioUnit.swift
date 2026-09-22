@@ -22,8 +22,9 @@
     private let hostPointer = UnsafeMutablePointer<EngineHost?>.allocate(capacity: 1)
     private var outputBus: AUAudioUnitBus
     private var outputBuses: AUAudioUnitBusArray!
-    /// A few things asked for before the host exists: a song, a play. Sent on once it does.
-    private var pendingSong: Song?
+    /// The last song it was given, so a host made again at a new sample rate can be given it too.
+    private var loaded: Song?
+    /// Commands asked for before there is a host at all. Sent on once there is.
     private var pendingCommands: [Command] = []
 
     public override init(
@@ -43,21 +44,39 @@
 
     public override func allocateRenderResources() throws {
       try super.allocateRenderResources()
-      let host = EngineHost(sampleRate: outputBus.format.sampleRate)
-      self.host = host
-      if let song = pendingSong { host.load(song) }
-      for command in pendingCommands { host.send(command) }
-      pendingSong = nil
+      let rate = outputBus.format.sampleRate
+      if let kept = host, kept.sampleRate == rate {
+        // The same engine, carrying on from where it stopped.
+      } else {
+        let fresh = EngineHost(sampleRate: rate)
+        if let loaded {
+          fresh.load(loaded)
+          // A new rate — an audio unit's host is free to change it between a stop and a start —
+          // keeps the place in the song, which is a time and not a count of frames.
+          if let kept = host {
+            let frame = kept.songFrame.load(ordering: .relaxed)
+            if frame > 0 { fresh.send(.seek(songFrame: Int(Double(frame) / kept.sampleRate * rate))) }
+            if kept.playing.load(ordering: .relaxed) { fresh.send(.play) }
+          }
+        }
+        host = fresh
+      }
+      for command in pendingCommands { host?.send(command) }
       pendingCommands = []
     }
 
+    /// The host is kept. `AVAudioEngine` deallocates every unit when it stops — which it does on
+    /// its own whenever the output device changes, a pair of headphones plugged in or an
+    /// interface unplugged — and a host thrown away here came back from the next start with no
+    /// song in it and the interface none the wiser: the music simply stopped. Nothing renders
+    /// while deallocated, so keeping it costs nothing.
     public override func deallocateRenderResources() {
-      host = nil
       super.deallocateRenderResources()
     }
 
     public func load(_ song: Song) {
-      if let host { host.load(song) } else { pendingSong = song }
+      loaded = song
+      host?.load(song)
     }
 
     public func send(_ command: Command) {
