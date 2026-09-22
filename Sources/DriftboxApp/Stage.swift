@@ -230,8 +230,9 @@
       remember()
     }
 
+    /// Closed as a person closes it, so it is remembered as closed. See `windowShouldClose`.
     public func close() {
-      window?.close()
+      window?.performClose(nil)
     }
 
     private func make() -> NSWindow {
@@ -268,13 +269,21 @@
       defaults.set(window.styleMask.contains(.fullScreen), forKey: Defaults.outputFullScreen)
     }
 
+    /// Asked only when a person closes the window — the button, ⌘W, the menu — and not when
+    /// the application quits and takes its windows with it. So this is where it is remembered
+    /// as closed: recorded in `windowWillClose` instead, quitting with the window open wrote it
+    /// down as shut, and it never came back.
+    public func windowShouldClose(_ sender: NSWindow) -> Bool {
+      UserDefaults.standard.set(false, forKey: Defaults.outputOpen)
+      return true
+    }
+
     public func windowWillClose(_ notification: Notification) {
       if let awake { ProcessInfo.processInfo.endActivity(awake) }
       awake = nil
       window?.contentView = nil
       window = nil
       stage.outputOpen = false
-      UserDefaults.standard.set(false, forKey: Defaults.outputOpen)
     }
 
     public func windowDidEnterFullScreen(_ notification: Notification) {

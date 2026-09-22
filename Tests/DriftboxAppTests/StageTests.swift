@@ -103,6 +103,16 @@
         #expect(!stage.output.isOpen && !stage.outputOpen)
         #expect(!defaults.bool(forKey: Defaults.outputOpen))
 
+        // Closed by the application rather than by a person — which is what quitting does to
+        // every window — it stays remembered as open, so it comes back at the next launch. The
+        // first version recorded this in `windowWillClose` and forgot it on every quit.
+        stage.output.show()
+        let window = try #require(NSApp.windows.first { $0.title == "Visuals" && $0.isVisible })
+        window.close()
+        #expect(!stage.output.isOpen)
+        #expect(defaults.bool(forKey: Defaults.outputOpen))
+        defaults.set(false, forKey: Defaults.outputOpen)
+
         // Nothing is reopened that was not open.
         stage.restore()
         #expect(!stage.output.isOpen)

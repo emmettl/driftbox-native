@@ -13,6 +13,8 @@
     static let ignoredMIDI = "midi.ignored"
     static let sendsClock = "clock.sends"
     static let clockDestination = "clock.destination"
+    static let lastSong = "song.last.catalogue"
+    static let lastFile = "song.last.file"
     static let outputOpen = "visuals.window.open"
     static let outputScreen = "visuals.window.screen"
     static let outputFullScreen = "visuals.window.fullScreen"

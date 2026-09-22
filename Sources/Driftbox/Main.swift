@@ -26,7 +26,7 @@
           // given somewhere to put them the moment there is one. The visuals window comes back
           // with the main one, if it was open when the app last quit.
           .onAppear {
-            delegate.attach(SongFiles(player: player))
+            if !delegate.attach(SongFiles(player: player)) { player.restore() }
             stage.restore()
           }
       }

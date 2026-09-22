@@ -170,7 +170,13 @@
     /// Which step's ticks go out next, and when.
     private var cursor = ClockCursor()
 
+    /// Where the song that is open is written down, so the next launch can open it again. The
+    /// application's own preferences; nothing at all for a player built without a device, so a
+    /// test that opens files by the dozen does not rewrite what the app will open next.
+    var memory: UserDefaults?
+
     public init() {
+      memory = .standard
       AUAudioUnit.registerSubclass(
         DriftboxAudioUnit.self, as: DriftboxAudioUnit.componentDescription, name: "Driftbox", version: 1)
       AVAudioUnit.instantiate(with: DriftboxAudioUnit.componentDescription, options: []) {
@@ -360,18 +366,64 @@
 
     /// A song document from disk, in the web app's format.
     func open(file url: URL) {
-      guard let data = try? Data(contentsOf: url),
-        let loaded = SongCodec.decode(String(decoding: data, as: UTF8.self))
-      else {
+      guard take(file: url) else {
         error = "\(url.lastPathComponent) is not a song"
         return
       }
+      startEngine()
+    }
+
+    /// Read a document and make it the song, without starting anything. False if it is not one.
+    @discardableResult
+    private func take(file url: URL) -> Bool {
+      guard let data = try? Data(contentsOf: url),
+        let loaded = SongCodec.decode(String(decoding: data, as: UTF8.self))
+      else { return false }
       // A document's name is its file's, stripped of both halves of `.song.json`.
       var name = url.deletingPathExtension().lastPathComponent
       if name.hasSuffix(".song") { name.removeLast(5) }
       let entry = CatalogueEntry(id: url.path, name: name, blurb: "", visual: loaded.visual ?? "")
       take(loaded, as: entry, from: url)
-      startEngine()
+      return true
+    }
+
+    // MARK: - Remembered between launches
+
+    /// The song that was open when the app last quit, as it was last saved — and stopped at the
+    /// top, because sound nobody asked for is the one thing not worth restoring. A document comes
+    /// back through a bookmark rather than a path, so one renamed or moved in the Finder since is
+    /// still found; one that has gone is forgotten rather than reported.
+    public func restore() {
+      guard let memory else { return }
+      if let bookmark = memory.data(forKey: Defaults.lastFile) {
+        var stale = false
+        if let url = try? URL(
+          resolvingBookmarkData: bookmark, options: [.withoutUI], relativeTo: nil, bookmarkDataIsStale: &stale
+        ),
+          take(file: url)
+        {
+          return
+        }
+        memory.removeObject(forKey: Defaults.lastFile)
+      } else if let id = memory.string(forKey: Defaults.lastSong),
+        let entry = entries.first(where: { $0.id == id }), let loaded = Catalogue.song(id)
+      {
+        take(loaded, as: entry, from: nil)
+      }
+    }
+
+    /// Write down what is open. A catalogue song by its id, a document by a bookmark, and a new
+    /// song not at all: it has nowhere to come back from, and quitting has already asked whether
+    /// to save it.
+    private func remember(_ entry: CatalogueEntry, at url: URL?) {
+      guard let memory else { return }
+      memory.removeObject(forKey: Defaults.lastSong)
+      memory.removeObject(forKey: Defaults.lastFile)
+      if let url {
+        memory.set(try? url.bookmarkData(), forKey: Defaults.lastFile)
+      } else if !entry.id.isEmpty {
+        memory.set(entry.id, forKey: Defaults.lastSong)
+      }
     }
 
     /// An empty song to start from. It arrives with the 909's core voices and a 303 line already
@@ -393,6 +445,7 @@
     private func take(_ loaded: Song, as entry: CatalogueEntry, from url: URL?) {
       current = entry
       fileURL = url
+      remember(entry, at: url)
       undoManager?.removeAllActions()
       refreshUndo()
       song = loaded
@@ -418,6 +471,8 @@
         if name.hasSuffix(".song") { name.removeLast(5) }
         current = CatalogueEntry(
           id: url.path, name: name, blurb: current?.blurb ?? "", visual: current?.visual ?? "")
+        // Saved somewhere new, it comes back from there.
+        if let current { remember(current, at: url) }
       } catch {
         self.error = "\(error)"
       }
