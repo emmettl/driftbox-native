@@ -118,9 +118,13 @@ public struct ParamDef: Sendable {
   /// A selector rather than a knob: it jumps where a knob ramps, because two thirds of the way
   /// between saw and pulse is not a sound.
   public var stepped: Bool
+  /// Written by the host, never by a knob — a MIDI module's note. A Combinator routing onto one
+  /// is ignored, since it would be a second writer on it.
+  public var hidden: Bool
 
   public init(
-    _ id: String, _ name: String, min: Double, max: Double, default value: Double, stepped: Bool = false
+    _ id: String, _ name: String, min: Double, max: Double, default value: Double, stepped: Bool = false,
+    hidden: Bool = false
   ) {
     self.id = id
     self.name = name
@@ -128,6 +132,7 @@ public struct ParamDef: Sendable {
     self.max = max
     defaultValue = value
     self.stepped = stepped
+    self.hidden = hidden
   }
 }
 
