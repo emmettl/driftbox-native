@@ -25,6 +25,7 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxDSP` | Filters, oscillators, envelopes, noise. **Constrained.** |
 | `Sources/DriftboxSeq` | What a song is and what it decides to play. **Constrained.** |
 | `Sources/DriftboxEngine` | The instruments, mixer and effects behind one `render`. **Constrained.** |
+| `Sources/DriftboxRack` | The modular rack: the patch compiler, the graph, the modules. **Constrained.** |
 | `Sources/DriftboxDocument` | The song codec, migrations, shareable URLs, the catalogue. |
 | `Sources/DriftboxHost` | The audio unit, the rings to and from the render thread, MIDI. |
 | `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |

@@ -17,6 +17,7 @@
   @_extern(c, "tanh") func tanh(_ x: Double) -> Double
   @_extern(c, "sin") func sin(_ x: Double) -> Double
   @_extern(c, "cos") func cos(_ x: Double) -> Double
+  @_extern(c, "tan") func tan(_ x: Double) -> Double
   @_extern(c, "pow") func pow(_ x: Double, _ y: Double) -> Double
   @_extern(c, "log") func log(_ x: Double) -> Double
   @_extern(c, "asin") func asin(_ x: Double) -> Double
@@ -39,6 +40,9 @@ func dbSin(_ x: Double) -> Double { sin(x) }
 func dbCos(_ x: Double) -> Double { cos(x) }
 
 @_semantics("no_performance_analysis") @inline(never)
+func dbTan(_ x: Double) -> Double { tan(x) }
+
+@_semantics("no_performance_analysis") @inline(never)
 func dbAsin(_ x: Double) -> Double { asin(x) }
 
 @_semantics("no_performance_analysis") @inline(never)
@@ -48,6 +52,7 @@ func dbLog(_ x: Double) -> Double { log(x) }
 func dbPow(_ x: Double, _ y: Double) -> Double { pow(x, y) }
 
 /// The sine of `turns` whole cycles. Public because an oscillator lives a target away.
+@_noAllocation
 public func sin2pi(_ turns: Double) -> Double { dbSin(2 * Double.pi * turns) }
 
 /// The equal-power gains for a pan position, -1 hard left to 1 hard right: the Web Audio
@@ -65,3 +70,11 @@ public func powDSP(_ base: Double, _ exponent: Double) -> Double { dbPow(base, e
 /// `tanh`, for the targets above this one.
 @_noAllocation
 public func tanhDSP(_ x: Double) -> Double { dbTanh(x) }
+
+/// `exp`, for the targets above this one.
+@_noAllocation
+public func expDSP(_ x: Double) -> Double { dbExp(x) }
+
+/// `tan`, for the targets above this one.
+@_noAllocation
+public func tanDSP(_ x: Double) -> Double { dbTan(x) }

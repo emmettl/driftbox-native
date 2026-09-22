@@ -450,6 +450,146 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
 // for different hardware — so the reference is not bit-reproducible with itself at double
 // precision, and a byte comparison would fail on every machine but the one that last ran the
 // emitter. They are compared within the tolerance the Swift tests use.
+// The rack: patches rendered by the reference's headless `RackRenderer`, one block at a time, with
+// the knob moves each case makes at the blocks it makes them. Beside each render, the plan the
+// reference compiles the patch to, so the compiler is held to the reference as well as the sound.
+// Written as float32, which is what every rack buffer is.
+{
+  const rack = join(root, 'driftbox', 'packages', 'rack', 'src')
+  const { RackRenderer } = await import(join(rack, 'headless.ts'))
+  const { compile } = await import(join(rack, 'compile.ts'))
+  const { MODULES } = await import(join(rack, 'modules', 'index.ts'))
+  const m = (id, type, params, extra = {}) => ({ id, type, ...(params ? { params } : {}), ...extra })
+  const c = (from, to) => ({ from, to })
+  const cases = [
+    ['vco-saw', { modules: [m('osc', 'vco'), m('out', 'out')], cables: [c(['osc', 'out'], ['out', 'in'])] }, 16],
+    ['vco-pulse', { modules: [m('osc', 'vco', { shape: 1, width: 0.3, tune: -7 }), m('out', 'out')], cables: [c(['osc', 'out'], ['out', 'in'])] }, 16],
+    ['vco-tri', { modules: [m('osc', 'vco', { shape: 2, tune: 12 }), m('out', 'out')], cables: [c(['osc', 'out'], ['out', 'in'])] }, 16],
+    ['noise', {
+      modules: [m('hiss', 'noise'), m('mix', 'mixer', { level2: 0.5 }), m('out', 'out')],
+      cables: [c(['hiss', 'white'], ['mix', 'in1']), c(['hiss', 'pink'], ['mix', 'in2']), c(['mix', 'out'], ['out', 'in'])],
+    }, 16],
+    ['lfo-shapes', {
+      modules: [0, 1, 2, 3].map((shape) => m(`lfo${shape}`, 'lfo', { rate: 37, shape })).concat([m('mix', 'mixer', { level1: 0.25, level2: 0.25, level3: 0.25, level4: 0.25 }), m('out', 'out')]),
+      cables: [0, 1, 2, 3].map((shape) => c([`lfo${shape}`, shape % 2 ? 'uni' : 'bi'], ['mix', `in${shape + 1}`])).concat([c(['mix', 'out'], ['out', 'in'])]),
+    }, 24],
+    ['lfo-random', {
+      modules: [m('wander', 'lfo', { rate: 29, shape: 4 }), m('osc', 'vco'), m('out', 'out')],
+      cables: [c(['wander', 'bi'], ['osc', 'pitch']), c(['osc', 'out'], ['out', 'in'])],
+    }, 24],
+    ['adsr-vca', {
+      modules: [m('clock', 'lfo', { rate: 8, shape: 3 }), m('env', 'adsr', { attack: 0.005, decay: 0.05, sustain: 0.5, release: 0.02 }), m('osc', 'vco'), m('amp', 'vca', { gain: 0 }), m('out', 'out')],
+      cables: [c(['clock', 'uni'], ['env', 'gate']), c(['osc', 'out'], ['amp', 'in']), c(['env', 'out'], ['amp', 'cv']), c(['amp', 'out'], ['out', 'in'])],
+    }, 64],
+    ['ladder', {
+      modules: [m('osc', 'vco', { tune: -12 }), m('sweep', 'lfo', { rate: 3 }), m('filter', 'ladder', { cutoff: 1200, resonance: 0.85 }), m('out', 'out')],
+      cables: [c(['osc', 'out'], ['filter', 'in']), c(['sweep', 'bi'], ['filter', 'cutoff']), c(['filter', 'out'], ['out', 'in'])],
+    }, 32],
+    ['svf', {
+      modules: [m('hiss', 'noise'), m('wobble', 'lfo', { rate: 5 }), m('filter', 'svf', { cutoff: 2000, resonance: 0.7 }), m('mix', 'mixer', { level2: 0.3, level4: 0.2 }), m('out', 'out')],
+      cables: [
+        c(['hiss', 'white'], ['filter', 'in']), c(['wobble', 'uni'], ['filter', 'res']),
+        c(['filter', 'lp'], ['mix', 'in1']), c(['filter', 'hp'], ['mix', 'in2']), c(['filter', 'bp'], ['mix', 'in3']), c(['filter', 'notch'], ['mix', 'in4']),
+        c(['mix', 'out'], ['out', 'in']),
+      ],
+    }, 32],
+    ['sample-hold', {
+      modules: [m('hiss', 'noise'), m('clock', 'lfo', { rate: 20, shape: 3 }), m('hold', 'sample-hold'), m('osc', 'vco'), m('out', 'out')],
+      cables: [c(['hiss', 'white'], ['hold', 'in']), c(['clock', 'uni'], ['hold', 'trig']), c(['hold', 'out'], ['osc', 'pitch']), c(['osc', 'out'], ['out', 'in'])],
+    }, 32],
+    ['delay', {
+      modules: [
+        m('clock', 'lfo', { rate: 6, shape: 3 }), m('env', 'adsr', { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 }),
+        m('osc', 'vco', { shape: 1 }), m('amp', 'vca', { gain: 0 }), m('drift', 'lfo', { rate: 0.7 }),
+        m('echo', 'delay', { time: 0.013, feedback: 0.6 }), m('mix', 'mixer', { level1: 0.7 }), m('out', 'out'),
+      ],
+      cables: [
+        c(['clock', 'uni'], ['env', 'gate']), c(['osc', 'out'], ['amp', 'in']), c(['env', 'out'], ['amp', 'cv']),
+        c(['amp', 'out'], ['echo', 'in']), c(['drift', 'bi'], ['echo', 'time']), c(['echo', 'out'], ['mix', 'in1']), c(['amp', 'out'], ['mix', 'in2']),
+        c(['mix', 'out'], ['out', 'in']),
+      ],
+    }, 64],
+    ['offset', {
+      modules: [m('sweep', 'lfo', { rate: 11, shape: 1 }), m('shift', 'offset', { gain: -0.5, offset: 0.25 }), m('osc', 'vco'), m('out', 'out')],
+      cables: [c(['sweep', 'bi'], ['shift', 'in']), c(['shift', 'out'], ['osc', 'pitch']), c(['osc', 'out'], ['out', 'in'])],
+    }, 24],
+    ['feedback', {
+      modules: [m('osc', 'vco'), m('filter', 'svf', { cutoff: 700, resonance: 0.5 }), m('mix', 'mixer', { level1: 0.8 }), m('out', 'out')],
+      cables: [c(['osc', 'out'], ['filter', 'in']), c(['filter', 'bp'], ['mix', 'in1']), c(['mix', 'out'], ['osc', 'fm']), c(['mix', 'out'], ['out', 'in'])],
+    }, 32],
+    ['ramps', {
+      modules: [m('osc', 'vco', { tune: -5 }), m('filter', 'ladder', { cutoff: 500, resonance: 0.3 }), m('out', 'out')],
+      cables: [c(['osc', 'out'], ['filter', 'in']), c(['filter', 'out'], ['out', 'in'])],
+    }, 20, [
+      [4, 'param', 'filter', 'cutoff', 3000], [8, 'param', 'osc', 'shape', 1],
+      [10, 'schedule', 'filter', 'cutoff', 400, 10 * 128 + 37], [12, 'param', 'out', 'level', 0.3],
+      [12, 'schedule', 'osc', 'tune', 2, 13 * 128 + 5], [12, 'schedule', 'osc', 'tune', 7, 13 * 128 + 90],
+    ]],
+    ['master', {
+      modules: [
+        m('lead', 'vco', { tune: 3 }), m('near', 'out', { level: 1, pan: -0.6 }),
+        m('hiss', 'noise'), m('far', 'out', { pan: 0.8 }),
+        m('loud', 'vco', { shape: 1, tune: -9 }), m('stack', 'mixer', { level1: 2, level2: 2, level3: 2, level4: 2 }), m('wall', 'out', { level: 1 }),
+      ],
+      cables: [
+        c(['lead', 'out'], ['near', 'in']), c(['hiss', 'pink'], ['far', 'in']),
+        c(['loud', 'out'], ['stack', 'in1']), c(['loud', 'out'], ['stack', 'in2']), c(['loud', 'out'], ['stack', 'in3']), c(['loud', 'out'], ['stack', 'in4']),
+        c(['stack', 'out'], ['wall', 'in']),
+      ],
+    }, 32, [[8, 'param', 'near', 'mute', 1], [16, 'param', 'wall', 'solo', 1], [24, 'param', 'wall', 'solo', 0]]],
+    ['placeholder-bypass', {
+      modules: [m('osc', 'vco'), m('ghost', 'futurething', { depth: 3 }), m('filter', 'ladder', { cutoff: 300 }, { bypassed: true }), m('out', 'out')],
+      cables: [c(['osc', 'out'], ['ghost', 'in']), c(['ghost', 'out'], ['out', 'in']), c(['osc', 'out'], ['filter', 'in']), c(['filter', 'out'], ['out', 'in'])],
+    }, 16],
+    ['poly', {
+      voices: 3,
+      modules: [m('wobble', 'lfo', { rate: 4 }), m('osc', 'vco', { tune: -12 }), m('amp', 'vca', { gain: 0.3 }), m('out', 'out')],
+      cables: [c(['wobble', 'bi'], ['osc', 'fm']), c(['osc', 'out'], ['amp', 'in']), c(['amp', 'out'], ['out', 'in'])],
+    }, 24, [[0, 'voice', 'osc', 'tune', 0, 0], [0, 'voice', 'osc', 'tune', 4, 1], [0, 'voice', 'osc', 'tune', 7, 2]]],
+    ['stereo-thru', {
+      modules: [m('osc', 'vco'), m('first', 'out', { level: 0.5, pan: 0.5 }), m('second', 'out', { level: 0.8 })],
+      cables: [c(['osc', 'out'], ['first', 'in']), c(['first', 'out'], ['second', 'in'])],
+    }, 16],
+  ]
+  const summary = []
+  for (const [name, patch, blocks, events = []] of cases) {
+    const renderer = new RackRenderer(MODULES, { sampleRate: 48000, frames: 128 })
+    renderer.patch = patch
+    const left = new Float32Array(blocks * 128)
+    const right = new Float32Array(blocks * 128)
+    for (let block = 0; block < blocks; block++) {
+      for (const [at, kind, module, param, value, extra] of events) {
+        if (at !== block) continue
+        if (kind === 'param') renderer.setParam(module, param, value)
+        else if (kind === 'voice') renderer.setParam(module, param, value, extra)
+        else renderer.scheduleParam(module, param, value, extra)
+      }
+      const l = new Float32Array(128)
+      const r = new Float32Array(128)
+      renderer.process([l, r])
+      left.set(l, block * 128)
+      right.set(r, block * 128)
+    }
+    const both = new Float32Array(blocks * 256)
+    both.set(left, 0)
+    both.set(right, blocks * 128)
+    write(join(fixtures, 'rack'), `${name}.f32`, Buffer.from(both.buffer))
+    const plan = compile(patch, MODULES)
+    summary.push({
+      name, patch, blocks, events,
+      plan: {
+        buffers: plan.buffers, voices: plan.voices, voiceWidths: plan.voiceWidths,
+        nodes: plan.nodes.map(({ id, type, inlets, inletConnected, inletTrims, outlets, outletConnected, params, poly, voices, voiceLanes }) =>
+          ({ id, type, inlets, inletConnected, inletTrims: inletTrims.map((slot) => slot ?? null), outlets, outletConnected, params, poly, voices, voiceLanes })),
+        outputs: plan.outputs,
+        params: plan.params,
+        notes: plan.notes.map(({ kind, module }) => ({ kind, module: module ?? null })),
+      },
+    })
+  }
+  write(join(fixtures, 'rack'), 'cases.json', json(summary))
+}
+
 const AUDIO_TOLERANCE = 1e-12
 
 function filesUnder(dir, base = dir) {
@@ -470,7 +610,16 @@ if (check) {
       stale.push(`${name}: only on one side`)
       continue
     }
-    if (name.endsWith('.f64')) {
+    if (name.endsWith('.f32')) {
+      // Float32 renders: the same arithmetic on another Node could differ in the last bit of a
+      // transcendental, so this is a tolerance rather than a byte comparison.
+      const floats = (buffer) => new Float32Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
+      const x = floats(a)
+      const y = floats(b)
+      let worst = x.length === y.length ? 0 : Infinity
+      for (let i = 0; i < x.length && worst !== Infinity; i++) worst = Math.max(worst, Math.abs(x[i] - y[i]))
+      if (!(worst <= 1e-6)) stale.push(`${name}: ${worst} exceeds 1e-6`)
+    } else if (name.endsWith('.f64')) {
       // Copied out, because a Buffer may sit at any offset in its pool and a Float64Array may not.
       const doubles = (buffer) => new Float64Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
       const x = doubles(a)

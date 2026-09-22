@@ -198,7 +198,33 @@ gone native at all.
 
 The 49 modules, ported against `RackRenderer`, which runs in Node with no browser — so these
 fixtures can be far tighter than the groovebox's. Then the cables and faceplates. This is the
-parity point, and close to done.
+parity point.
+
+1. **The graph, the compiler, the first modules.** ← *here.* `DriftboxRack`, constrained like
+   the engine: the patch types, `compile` — placeholders, port aliases, bypass, one cable an
+   inlet with the last one winning, Kahn's order with cycles broken by the lowest index,
+   polyphonic widths to a fixed point, input trims, delayed-cable and mono-fold notes — and
+   `RackGraph`, which runs a plan a block at a time: knobs ramped across a block and flattened
+   after, stepped ones jumping, changes scheduled to a frame, polyphonic sources collapsed into
+   modules that run once, and the master stage of solo, mute, balance pan, the linked limiter and
+   the tanh ceiling. Modules are one enum dispatched by `switch`, so the render path takes no
+   existential and no class. The first twelve: Out, VCO, Noise, VCA, Mixer, Ladder, SVF, ADSR,
+   LFO, Offset, S&H, Delay. Eighteen patches rendered by the reference's `RackRenderer` — every
+   module, a feedback cycle, knob ramps with scheduled and stepped changes, the limiter driven
+   hard with pan, mute and solo, a placeholder and a bypass, three voices collapsing into a mono
+   Out — compile to the same plans and render bit-identically, block by block.
+   One thing the port had to copy exactly rather than improve: the seeded random generator's
+   FNV hash multiplies in doubles, which past 2^53 rounds before it is truncated to 32 bits, so
+   the Swift does the same arithmetic. A true 32-bit multiply is a different noise, a different
+   random LFO and a different S&H melody from the same patch — the test says so when it is tried.
+2. **The rest of the modules.** Thirty-six to go, in batches held to the same kind of fixture:
+   sources (wavetable, voice, sampler, multisampler, audio input and track), filters (alligator,
+   vocoder), shaping and dynamics, the effects (ping-pong, phaser, the FDN reverb, the looper),
+   modulation (follower, quantizer, the Combinator), sequencing (transport, clock, seq, tracker,
+   arranger, arp, the scale and chord players, note echo, MIDI), the meters, the line mixer and
+   the groovebox bridge. With them the patch codec and the factory patches.
+3. **A host and the panels.** The rack as an Audio Unit beside the groovebox's, then the front and
+   back panels — faceplates, jacks, and cables that swing.
 
 ## Milestone 3 — what only native can do
 
