@@ -29,15 +29,16 @@
           Divider()
           if let song = player.song {
             if player.showsVisuals {
-              Visuals(player: player).frame(minHeight: 180, idealHeight: 220)
+              Visuals(player: player).frame(height: 200)
               Divider()
             }
             PatternBar(player: player, song: song)
             Divider()
             HStack(alignment: .top, spacing: 0) {
               Sequencer(player: player, song: song)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
               Divider()
-              VStack(spacing: 0) {
+              ScrollView {
                 if let id = player.selectedVoice, let voice = voice(id: id) {
                   VoicePanel(
                     player: player, voice: voice, params: song.kit.params[id] ?? VoiceParams(),
@@ -47,8 +48,8 @@
                 }
                 Divider()
                 KaossPad(player: player).frame(width: 220, height: 160).padding(12)
-                Spacer()
               }
+              .frame(width: 244)
             }
           } else {
             ContentUnavailableView("Pick a song", systemImage: "music.note.list")
@@ -203,38 +204,44 @@
         let playing = player.position?.pattern?.id == pattern.id
         let playhead = playing ? (player.position?.step ?? -1) : -1
         let voices = allVoices.filter { pattern.tracks[$0.id] != nil }
-        ScrollView {
-          Grid(alignment: .leading, horizontalSpacing: 4, verticalSpacing: 4) {
-            ForEach(voices, id: \.id) { voice in
-              GridRow {
-                let index = allVoices.firstIndex { $0.id == voice.id } ?? -1
-                let struck = player.lastHits[index].map { player.engineFrame - $0 < 4800 } ?? false
-                HStack(spacing: 2) {
-                  Button(voice.name) {
-                    player.selectedVoice = player.selectedVoice == voice.id ? nil : voice.id
-                  }
-                  .buttonStyle(.plain)
-                  .font(.caption.weight(player.selectedVoice == voice.id ? .bold : .regular))
-                  .foregroundStyle(struck ? Color.orange : Color.primary)
-                  LaneMenu(player: player, pattern: pattern, voiceId: voice.id) {
-                    AnyView(Image(systemName: "ellipsis.circle").font(.caption).foregroundStyle(.secondary))
-                  }
-                }
-                .frame(width: 110, alignment: .leading)
-                ForEach(steps, id: \.self) { index in
-                  StepButton(
-                    value: pattern.step(voice.id, at: index), playing: index == playhead,
-                    onBeat: index % 4 == 0
-                  ) {
-                    cycle(voice.id, at: index, in: pattern.id)
+        GeometryReader { viewport in
+          ScrollView([.horizontal, .vertical]) {
+            VStack(alignment: .leading, spacing: 0) {
+              Grid(alignment: .leading, horizontalSpacing: 4, verticalSpacing: 4) {
+                ForEach(voices, id: \.id) { voice in
+                  GridRow {
+                    let index = allVoices.firstIndex { $0.id == voice.id } ?? -1
+                    let struck = player.lastHits[index].map { player.engineFrame - $0 < 4800 } ?? false
+                    HStack(spacing: 2) {
+                      Button(voice.name) {
+                        player.selectedVoice = player.selectedVoice == voice.id ? nil : voice.id
+                      }
+                      .buttonStyle(.plain)
+                      .font(.caption.weight(player.selectedVoice == voice.id ? .bold : .regular))
+                      .foregroundStyle(struck ? Color.orange : Color.primary)
+                      LaneMenu(player: player, pattern: pattern, voiceId: voice.id) {
+                        AnyView(
+                          Image(systemName: "ellipsis.circle").font(.caption).foregroundStyle(.secondary))
+                      }
+                    }
+                    .frame(width: 110, alignment: .leading)
+                    ForEach(steps, id: \.self) { index in
+                      StepButton(
+                        value: pattern.step(voice.id, at: index), playing: index == playhead,
+                        onBeat: index % 4 == 0
+                      ) {
+                        cycle(voice.id, at: index, in: pattern.id)
+                      }
+                    }
                   }
                 }
               }
+              .padding(12)
+              ForEach(["303.a", "303.b"].filter { pattern.bass[$0] != nil }, id: \.self) { voiceId in
+                BassGrid(player: player, pattern: pattern, voiceId: voiceId, playhead: playhead).padding(12)
+              }
             }
-          }
-          .padding(12)
-          ForEach(["303.a", "303.b"].filter { pattern.bass[$0] != nil }, id: \.self) { voiceId in
-            BassGrid(player: player, pattern: pattern, voiceId: voiceId, playhead: playhead).padding(12)
+            .frame(minWidth: viewport.size.width, minHeight: viewport.size.height, alignment: .topLeading)
           }
         }
       }

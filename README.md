@@ -286,12 +286,16 @@ includes reading a `static let`, because that is initialised on first use, behin
 ### The app
 
 ```bash
-swift run -c release Driftbox
+scripts/bundle-app.sh && open .build-release/Driftbox.app
 ```
 
-The Mac app, as far as it goes: the catalogue as a library, a transport, and the step grid of the
-pattern the transport is in, live and editable. A SwiftPM executable rather than an Xcode
-project for now, which is why it announces itself to the system by hand on launch.
+The Mac app, as far as it goes: the catalogue as a library, a transport, the step and 303 grids
+of the pattern the transport is in, live and editable, the voice and effects panels, the pad,
+the visuals, and open, save and export. A SwiftPM executable rather than an Xcode project for
+now, which is why it announces itself to the system by hand on launch, and why a script has to
+wrap it into a bundle: `swift run Driftbox` also works, but the catalogue lives in a resource
+bundle that `Bundle.module` looks for beside the executable and in `Contents/Resources`, and the
+script puts a copy in both.
 
 ### Visuals
 
