@@ -172,20 +172,25 @@
 
     var body: some View {
       let bar = player.position?.bar ?? -1
-      HStack(spacing: 3) {
-        ForEach(Array(song.chain.enumerated()), id: \.offset) { index, entry in
-          let start = song.chain.prefix(index).reduce(0) { $0 + max(1, $1.repeat) }
-          let playing = bar >= start && bar < start + max(1, entry.repeat)
-          Button {
-            player.seek(toBar: start)
-          } label: {
-            Text(song.pattern(id: entry.pattern)?.name.prefix(6) ?? "?")
-              .font(.system(size: 9)).padding(.horizontal, 4).padding(.vertical, 3)
-              .background(playing ? Color.orange : Color.secondary.opacity(0.2)).cornerRadius(3)
+      // A long chain scrolls; it never wraps a name onto two lines to fit.
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 3) {
+          ForEach(Array(song.chain.enumerated()), id: \.offset) { index, entry in
+            let start = song.chain.prefix(index).reduce(0) { $0 + max(1, $1.repeat) }
+            let playing = bar >= start && bar < start + max(1, entry.repeat)
+            Button {
+              player.seek(toBar: start)
+            } label: {
+              Text(song.pattern(id: entry.pattern)?.name.prefix(6) ?? "?")
+                .font(.system(size: 9)).lineLimit(1).fixedSize()
+                .padding(.horizontal, 4).padding(.vertical, 3)
+                .background(playing ? Color.orange : Color.secondary.opacity(0.2)).cornerRadius(3)
+            }
+            .buttonStyle(.plain)
           }
-          .buttonStyle(.plain)
         }
       }
+      .frame(width: 420)
     }
   }
 

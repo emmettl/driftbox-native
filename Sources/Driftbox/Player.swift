@@ -3,6 +3,7 @@
   import DriftboxDocument
   import DriftboxEngine
   import DriftboxHost
+  import DriftboxScenes
   import DriftboxSeq
   import Foundation
   import Observation
@@ -315,6 +316,36 @@
     func takeEvents() -> [EngineEvent] {
       defer { pendingEvents.removeAll() }
       return pendingEvents
+    }
+
+    /// The tempo the song is running at: the followed one, or its own.
+    var tempo: Double { followedBPM ?? songBPM }
+
+    /// Where the song is in quarter notes, read straight from the engine for the scene's frame
+    /// rather than from the last tick, so it is smooth at the display's rate.
+    func scoreBeat() -> Double? {
+      guard let host = unit?.host, !timeline.times.isEmpty else { return nil }
+      let frame = host.songFrame.load(ordering: .relaxed)
+      guard frame >= 0 else { return nil }
+      let time = Double(frame) / sampleRate
+      guard let index = timeline.step(at: time) else { return 0 }
+      let start = timeline.times[index]
+      let end = index + 1 < timeline.times.count ? timeline.times[index + 1] : timeline.end
+      let fraction = end > start ? min(1, (time - start) / (end - start)) : 0
+      return (Double(index) + fraction) / 4
+    }
+
+    /// The mix's bass, mids and highs for the scene, from the last two thousand frames it heard.
+    private let analyser = Analyser()
+    private var monitor = [Float](repeating: 0, count: Analyser.size)
+
+    func levels() -> (bass: Float, mid: Float, high: Float) {
+      guard let host = unit?.host else { return (0, 0, 0) }
+      monitor.withUnsafeMutableBufferPointer { buffer in
+        host.recentMix(Analyser.size, into: buffer.baseAddress!)
+        analyser.update(UnsafeBufferPointer(buffer))
+      }
+      return analyser.levels()
     }
 
     /// The loudest sample of the last audio block, each side.

@@ -80,14 +80,18 @@ gone native at all.
    from any source play the keys, and a **sync** button follows an external clock's tempo,
    start, stop and position, the estimator held to the reference's on a synthetic stream of
    464 messages. Still to come: a proper document model, and MIDI clock *out*.
-6. **Visuals.** ← *begun.* `DriftboxScenes`: a `Scene` protocol keeping the web scenes' ids
-   and accents, a `SceneRenderer` over one compiled shader library, and one scene — Pulse, the
-   fallback: a dark field that breathes with the level, a bloom and a ring on every kick, a
-   flash on a snare, a horizon that sparkles on hats, a 303 note as a line at its pitch, the
-   pad's cursor. Driven from the events ring, the block peaks and the pad, at the display's rate,
-   in a pane above the grid. Tested offscreen — dark when quiet, brighter on a kick, fading,
-   different on a note — and seen running above the grid: the ring on each kick, the horizon's
-   sparkle on the hats. What was planned:
+6. **Visuals.** ← *here.* `DriftboxScenes`: a `Scene` protocol keeping the web scenes' ids
+   and accents, a `SceneRenderer` over one compiled shader library, and Pulse, the fallback: a
+   dark field that breathes with the level, a bloom and a ring on every kick, a flash on a
+   snare, a horizon that sparkles on hats, a 303 note as a line at its pitch, the pad's cursor.
+   Then the web's eight surface scenes, ported shader for shader — Orrery, Switchback, Daydream,
+   Small Hours, Paper Cities, Weave, Frost, Hothouse — over an `Analyser` that is the web's
+   `AnalyserNode` on a mono tap of the mix, and a score position read from the engine at the
+   display's rate. Every scene is drawn offscreen by a test and, with an environment variable,
+   written out as PNGs; the eight were checked against the web's by eye that way, and Small
+   Hours and Paper Cities seen live in the app. Nine of twenty-seven; the other eighteen are
+   three.js geometry and cameras (a corridor, mannequins, a wireframe station) and need a small
+   mesh layer first. What was planned:
    a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.

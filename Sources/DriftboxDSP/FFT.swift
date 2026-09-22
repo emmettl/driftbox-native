@@ -1,8 +1,17 @@
-/// A plain radix-2 Fourier transform, for building wavetables — work done once, off the render
-/// path, where clarity matters more than speed.
-enum FFT {
+/// A plain radix-2 Fourier transform, for building wavetables and for a scene's spectrum — work
+/// done off the render path, where clarity matters more than speed.
+public enum FFT {
   /// In place: `x[k] = Σ X[n] · e^(+2πi·nk/N)`, unscaled. `count` must be a power of two.
-  static func inverse(real: inout [Double], imaginary: inout [Double]) {
+  public static func inverse(real: inout [Double], imaginary: inout [Double]) {
+    transform(real: &real, imaginary: &imaginary, sign: 1)
+  }
+
+  /// In place: `X[k] = Σ x[n] · e^(-2πi·nk/N)`, unscaled. `count` must be a power of two.
+  public static func forward(real: inout [Double], imaginary: inout [Double]) {
+    transform(real: &real, imaginary: &imaginary, sign: -1)
+  }
+
+  static func transform(real: inout [Double], imaginary: inout [Double], sign: Double) {
     let count = real.count
     precondition(count == imaginary.count && count > 0 && count & (count - 1) == 0)
 
@@ -23,7 +32,7 @@ enum FFT {
 
     var length = 2
     while length <= count {
-      let angle = 2 * Double.pi / Double(length)
+      let angle = sign * 2 * Double.pi / Double(length)
       let stepReal = dbCos(angle)
       let stepImaginary = dbSin(angle)
       var start = 0

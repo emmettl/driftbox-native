@@ -3,7 +3,8 @@
   /// Shading Language rather than a `.metal` file, so the package builds with nothing but
   /// SwiftPM.
   enum Shaders {
-    static let source = """
+    static let source =
+      """
       #include <metal_stdlib>
       using namespace metal;
 
@@ -74,5 +75,6 @@
         return float4(colour, 1);
       }
       """
+      + SurfaceScene.preamble + Scenes.surfaceSources
   }
 #endif

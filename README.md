@@ -299,12 +299,26 @@ script puts a copy in both.
 
 ### Visuals
 
-`DriftboxScenes` is the start of phase 6: a `Scene` protocol that keeps the web scenes' ids and
-accent colours, so a song's `visual` hint resolves here too, and draws whatever it likes; a
-renderer over one shader library compiled at launch; and one scene, the fallback, driven by the
-engine's events ring, the block peaks and the pad. A scene cannot be looked at from a test, but
-it can be drawn into a texture and read back: dark when nothing is happening, brighter on a kick,
-fading, and different again on a note.
+`DriftboxScenes` is phase 6: a `Scene` protocol that keeps the web scenes' ids and accent
+colours, so a song's `visual` hint resolves here too, and draws whatever it likes; a renderer
+over one shader library compiled at launch; the fallback scene, driven by the engine's events
+ring, the block peaks and the pad; and the web's eight *surface* scenes — Orrery, Switchback,
+Daydream, Small Hours, Paper Cities, Weave, Frost and Hothouse — which are each one fragment
+shader over the screen (two of them with a layer of instanced cards on top), fed the same
+handful of numbers. Their GLSL carries to Metal almost line for line, under the web's own
+uniform names, so those eight look exactly as they do there.
+
+What they are fed is what the web feeds them. `Analyser` is Web Audio's `AnalyserNode` as the
+web engine configures it — 2048 frames, Blackman window, 0.75 smoothing, -100 to -30 dB as
+bytes — over a mono tap of the mix the host keeps for it, and then the web's `readBands`: eight
+bands of constant ratio, three for bass, three for mids, two for highs. The score position
+comes straight from the engine's atomics at the display's rate, smooth between steps, which is
+one better than the web's.
+
+A scene cannot be looked at from a test, but it can be drawn into a texture and read back:
+every scene draws something that is not black and moves, and with `DRIFTBOX_SCENE_SHOTS` set
+to a directory the test writes each one there as PNGs at three moments — which is how the
+ports were checked by eye.
 
 ### Playing
 

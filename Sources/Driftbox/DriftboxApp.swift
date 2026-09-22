@@ -15,8 +15,10 @@
     var body: some Scene {
       WindowGroup("Driftbox") {
         ContentView(player: player)
-          .frame(minWidth: 1100, minHeight: 720)
+          .frame(minWidth: 1100, idealWidth: 1100, minHeight: 720, idealHeight: 720)
       }
+      // The window is the user's size, not whatever a long chain or a wide grid would like.
+      .windowResizability(.contentMinSize)
     }
   }
 #else

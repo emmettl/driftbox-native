@@ -27,7 +27,7 @@ let package = Package(
     .target(name: "DriftboxDocument", dependencies: ["DriftboxSeq", "DriftboxEngine"]),
     .target(name: "DriftboxHost", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
     // The visuals: Metal scenes driven by the engine's events. Empty on a platform without Metal.
-    .target(name: "DriftboxScenes", dependencies: ["DriftboxEngine"]),
+    .target(name: "DriftboxScenes", dependencies: ["DriftboxDSP", "DriftboxEngine"]),
 
     // A song document in, a WAV file out: something to listen to.
     .executableTarget(name: "driftbox-render", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
