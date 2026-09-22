@@ -196,7 +196,6 @@
     let song: Song
 
     var pattern: DriftboxSeq.Pattern? { player.shownPattern }
-    var steps: [Int] { (0..<(pattern?.length ?? 0)).map { $0 } }
 
     var body: some View {
       if let pattern {
@@ -209,31 +208,11 @@
             VStack(alignment: .leading, spacing: 0) {
               Grid(alignment: .leading, horizontalSpacing: 4, verticalSpacing: 4) {
                 ForEach(voices, id: \.id) { voice in
-                  GridRow {
-                    let index = allVoices.firstIndex { $0.id == voice.id } ?? -1
-                    let struck = player.lastHits[index].map { player.engineFrame - $0 < 4800 } ?? false
-                    HStack(spacing: 2) {
-                      Button(voice.name) {
-                        player.selectedVoice = player.selectedVoice == voice.id ? nil : voice.id
-                      }
-                      .buttonStyle(.plain)
-                      .font(.caption.weight(player.selectedVoice == voice.id ? .bold : .regular))
-                      .foregroundStyle(struck ? Color.orange : Color.primary)
-                      LaneMenu(player: player, pattern: pattern, voiceId: voice.id) {
-                        AnyView(
-                          Image(systemName: "ellipsis.circle").font(.caption).foregroundStyle(.secondary))
-                      }
-                    }
-                    .frame(width: 110, alignment: .leading)
-                    ForEach(steps, id: \.self) { index in
-                      StepButton(
-                        value: pattern.step(voice.id, at: index), playing: index == playhead,
-                        onBeat: index % 4 == 0
-                      ) {
-                        cycle(voice.id, at: index, in: pattern.id)
-                      }
-                    }
-                  }
+                  let index = allVoices.firstIndex { $0.id == voice.id } ?? -1
+                  Lane(
+                    player: player, pattern: pattern, voiceId: voice.id, name: voice.name,
+                    struck: player.struck.contains(index), selected: player.selectedVoice == voice.id,
+                    playhead: playhead)
                 }
               }
               .padding(12)
@@ -247,22 +226,53 @@
       }
     }
 
-    func cycle(_ voiceId: String, at index: Int, in patternId: String) {
-      player.edit { song in
-        guard let at = song.patterns.firstIndex(where: { $0.id == patternId }) else { return }
-        song.patterns[at] = song.patterns[at].cyclingStep(voiceId, at: index)
+  }
+
+  /// One voice's row of the grid. Its inputs are all plain values, so a step elsewhere, or a
+  /// flash on another lane, leaves this one's body alone.
+  struct Lane: View {
+    let player: Player
+    let pattern: DriftboxSeq.Pattern
+    let voiceId: String
+    let name: String
+    let struck: Bool
+    let selected: Bool
+    let playhead: Int
+
+    var body: some View {
+      GridRow {
+        HStack(spacing: 2) {
+          Button(name) {
+            player.selectedVoice = selected ? nil : voiceId
+          }
+          .buttonStyle(.plain)
+          .font(.caption.weight(selected ? .bold : .regular))
+          .foregroundStyle(struck ? Color.orange : Color.primary)
+          LaneMenu(player: player, pattern: pattern, voiceId: voiceId) {
+            AnyView(Image(systemName: "ellipsis.circle").font(.caption).foregroundStyle(.secondary))
+          }
+        }
+        .frame(width: 110, alignment: .leading)
+        ForEach(0..<pattern.length, id: \.self) { index in
+          StepButton(
+            player: player, patternId: pattern.id, voiceId: voiceId, index: index,
+            value: pattern.step(voiceId, at: index), playing: index == playhead)
+        }
       }
     }
   }
 
   struct StepButton: View {
+    let player: Player
+    let patternId: String
+    let voiceId: String
+    let index: Int
     let value: StepValue
     let playing: Bool
-    let onBeat: Bool
-    let action: () -> Void
+    var onBeat: Bool { index % 4 == 0 }
 
     var body: some View {
-      Button(action: action) {
+      Button(action: cycle) {
         RoundedRectangle(cornerRadius: 3)
           .fill(color)
           .frame(width: 22, height: 22)
@@ -270,6 +280,13 @@
             RoundedRectangle(cornerRadius: 3).stroke(onBeat ? Color.primary.opacity(0.3) : Color.clear))
       }
       .buttonStyle(.plain)
+    }
+
+    func cycle() {
+      player.edit { song in
+        guard let at = song.patterns.firstIndex(where: { $0.id == patternId }) else { return }
+        song.patterns[at] = song.patterns[at].cyclingStep(voiceId, at: index)
+      }
     }
 
     var color: Color {

@@ -54,12 +54,15 @@
     private(set) var songFrame = 0
     private(set) var sampleRate = 48000.0
     private(set) var error: String?
-    /// The last voice struck, by index into `allVoices`, and when: for anything that wants to
-    /// flash. Taken from the engine's events ring thirty times a second.
-    private(set) var lastHits: [Int: Int] = [:]
+    /// The last voice struck, by index into `allVoices`, and when. Taken from the engine's
+    /// events ring thirty times a second.
+    private var lastHits: [Int: Int] = [:]
+    /// The voices struck in the last tenth of a second, by index into `allVoices`: for anything
+    /// that wants to flash.
+    private(set) var struck: Set<Int> = []
     /// The engine's own clock, which the events are stamped in.
-    private(set) var engineFrame = 0
-    /// Events since the scene last drew, kept for it here; the grid's flashes read `lastHits`.
+    private var engineFrame = 0
+    /// Events since the scene last drew, kept for it here; the grid's flashes read `struck`.
     private var pendingEvents: [EngineEvent] = []
     /// Where the pad is being touched, for the scene's cursor.
     var padTouch: SIMD2<Float>?
@@ -146,7 +149,7 @@
     }
 
     private func midiClock(_ message: ClockMessage, at time: Double) {
-      guard followsClock, let song else { return }
+      guard followsClock, song != nil else { return }
       let local = LocalClockState(
         bpm: followedBPM ?? songBPM,
         ticks: Double(songFrame) / sampleRate * (followedBPM ?? songBPM) * 24 / 60,
@@ -191,10 +194,14 @@
       unit?.send(.seek(songFrame: Int(timeline.times[index] * sampleRate)))
     }
 
+    /// Thirty times a second. Everything the views read is written only when it has changed:
+    /// an observable that is set every tick has every view that reads it rebuilt every tick,
+    /// which was most of the main thread.
     private func tick() {
       guard let host = unit?.host else { return }
       songFrame = max(0, host.songFrame.load(ordering: .relaxed))
-      isPlaying = host.playing.load(ordering: .relaxed)
+      let playing = host.playing.load(ordering: .relaxed)
+      if isPlaying != playing { isPlaying = playing }
       host.collect()
       engineFrame = host.engineFrame.load(ordering: .relaxed)
       while let event = host.nextEvent() {
@@ -202,6 +209,9 @@
         pendingEvents.append(event)
       }
       if pendingEvents.count > 512 { pendingEvents.removeFirst(pendingEvents.count - 512) }
+      let lit = Set(lastHits.filter { engineFrame - $0.value < 4800 }.keys)
+      if struck != lit { struck = lit }
+      updatePosition()
     }
 
     func open(_ entry: CatalogueEntry) {
@@ -348,13 +358,28 @@
 
     // MARK: - Where the song is
 
-    /// The step the transport is on: which bar of the arrangement, and which step in it.
-    var position: (bar: Int, step: Int, pattern: DriftboxSeq.Pattern?)? {
-      guard let song, let index = timeline.step(at: Double(songFrame) / sampleRate) else {
-        return nil
+    struct Position: Equatable {
+      /// Which bar of the arrangement, and which step in it.
+      var bar: Int
+      var step: Int
+      var pattern: DriftboxSeq.Pattern?
+
+      /// The same place in the same pattern; the pattern's contents are the song's business.
+      static func == (a: Position, b: Position) -> Bool {
+        a.bar == b.bar && a.step == b.step && a.pattern?.id == b.pattern?.id
       }
-      let bar = timeline.bars[index]
-      return (bar, timeline.indices[index], song.pattern(forBar: bar))
+    }
+
+    /// The step the transport is on. Written when the step changes, and when the song does.
+    private(set) var position: Position?
+
+    private func updatePosition(force: Bool = false) {
+      var next: Position?
+      if let song, let index = timeline.step(at: Double(songFrame) / sampleRate) {
+        let bar = timeline.bars[index]
+        next = Position(bar: bar, step: timeline.indices[index], pattern: song.pattern(forBar: bar))
+      }
+      if force || next != position { position = next }
     }
 
     /// Where every step of the arrangement starts, at the tempo the song is running at. The
@@ -365,11 +390,13 @@
     private func retime() {
       guard let song else {
         timeline = Timeline()
+        updatePosition(force: true)
         return
       }
       var running = song
       if let bpm = followedBPM { running.bpm = bpm }
       timeline = Timeline(song: running)
+      updatePosition(force: true)
     }
 
     private struct Timeline {
