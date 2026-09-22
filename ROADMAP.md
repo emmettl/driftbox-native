@@ -84,12 +84,12 @@ gone native at all.
    and accents, a `SceneRenderer` over one compiled shader library, and Pulse, the fallback: a
    dark field that breathes with the level, a bloom and a ring on every kick, a flash on a
    snare, a horizon that sparkles on hats, a 303 note as a line at its pitch, the pad's cursor.
-   Then the web's eight surface scenes, ported shader for shader — Orrery, Switchback, Daydream,
-   Small Hours, Paper Cities, Weave, Frost, Hothouse — over an `Analyser` that is the web's
+   Then the web's nine surface scenes, ported shader for shader — Orrery, Switchback, Daydream,
+   Small Hours, Paper Cities, Weave, Frost, Hothouse, Night Bus — over an `Analyser` that is the web's
    `AnalyserNode` on a mono tap of the mix, and a score position read from the engine at the
    display's rate. Every scene is drawn offscreen by a test and, with an environment variable,
    written out as PNGs; the eight were checked against the web's by eye that way, and Small
-   Hours and Paper Cities seen live in the app. Nine of twenty-seven; the other eighteen are
+   Hours and Paper Cities seen live in the app. Ten of twenty-seven; the other seventeen are
    three.js geometry and cameras (a corridor, mannequins, a wireframe station) and need a small
    mesh layer first. What was planned:
    a thin Metal layer — lines, instanced meshes, full-screen and compute passes —

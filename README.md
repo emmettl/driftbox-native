@@ -302,10 +302,10 @@ script puts a copy in both.
 `DriftboxScenes` is phase 6: a `Scene` protocol that keeps the web scenes' ids and accent
 colours, so a song's `visual` hint resolves here too, and draws whatever it likes; a renderer
 over one shader library compiled at launch; the fallback scene, driven by the engine's events
-ring, the block peaks and the pad; and the web's eight *surface* scenes — Orrery, Switchback,
-Daydream, Small Hours, Paper Cities, Weave, Frost and Hothouse — which are each one fragment
-shader over the screen (two of them with a layer of instanced cards on top), fed the same
-handful of numbers. Their GLSL carries to Metal almost line for line, under the web's own
+ring, the block peaks and the pad; and the web's nine *surface* scenes — Orrery, Switchback,
+Daydream, Small Hours, Paper Cities, Weave, Frost, Hothouse and Night Bus — which are each one
+fragment shader over the screen (two of them with a layer of instanced cards on top), fed the
+same handful of numbers. Their GLSL carries to Metal almost line for line, under the web's own
 uniform names, so those eight look exactly as they do there.
 
 What they are fed is what the web feeds them. `Analyser` is Web Audio's `AnalyserNode` as the
