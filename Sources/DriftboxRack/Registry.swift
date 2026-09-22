@@ -5,9 +5,9 @@ import DriftboxDSP
 /// are the file format — in the order its defs declare them, which is the order a processor's
 /// slots arrive in.
 public enum RackModules {
-  public static let all: [ModuleDef] = [
-    out, vco, noise, vca, mixer, ladder, svf, adsr, lfo, offset, sampleHold, delay,
-  ]
+  public static let all: [ModuleDef] =
+    [out, vco, noise, vca, mixer, ladder, svf, adsr, lfo, offset, sampleHold, delay]
+    + shapingDefs + spaceDefs + controlDefs + sourceDefs + sequencingDefs + playerDefs
 
   public static let registry: [String: ModuleDef] = {
     var byType: [String: ModuleDef] = [:]
@@ -17,7 +17,9 @@ public enum RackModules {
 
   /// A processor for one voice of one module. `id` seeds anything random in it, so a module's
   /// second voice, `id#1`, is a different noise from its first.
-  public static func make(_ type: String, sampleRate: Double, id: String) -> RackProcessor? {
+  public static func make(_ type: String, sampleRate: Double, id: String, voice: VoiceInfo = .single)
+    -> RackProcessor?
+  {
     switch type {
     case "out": .out
     case "vco": .vco(VCO(sampleRate: sampleRate))
@@ -31,7 +33,13 @@ public enum RackModules {
     case "offset": .offset
     case "sample-hold": .sampleHold(SampleHold())
     case "delay": .delay(Delay(sampleRate: sampleRate))
-    default: nil
+    default:
+      makeShaping(type, sampleRate: sampleRate, id: id, voice: voice).map { .shaping($0) }
+        ?? makeSpace(type, sampleRate: sampleRate, id: id, voice: voice).map { .space($0) }
+        ?? makeControl(type, sampleRate: sampleRate, id: id, voice: voice).map { .control($0) }
+        ?? makeSource(type, sampleRate: sampleRate, id: id, voice: voice).map { .sources($0) }
+        ?? makeSequencing(type, sampleRate: sampleRate, id: id, voice: voice).map { .sequencing($0) }
+        ?? makePlayer(type, sampleRate: sampleRate, id: id, voice: voice).map { .players($0) }
     }
   }
 

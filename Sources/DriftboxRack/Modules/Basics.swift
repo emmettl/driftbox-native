@@ -9,7 +9,8 @@ import DriftboxDSP
 /// Pan, mute and solo are the graph's, which is the only place that sees every Out at once.
 enum Out {
   @_noAllocation
-  static func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  static func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let left = inlets[0]
     let right = inlets[1]
     let outLeft = outlets[0]
@@ -31,7 +32,8 @@ public struct VCO {
   var lastRatio = 1.0
 
   @_noAllocation
-  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let pitch = inlets[0]
     let fm = inlets[1]
     let out = outlets[0]
@@ -60,7 +62,8 @@ public struct NoiseSource {
   var b0 = 0.0, b1 = 0.0, b2 = 0.0, b3 = 0.0, b4 = 0.0, b5 = 0.0, b6 = 0.0
 
   @_noAllocation
-  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let white = outlets[0]
     let pink = outlets[1]
     for i in 0..<frames {
@@ -81,7 +84,8 @@ public struct NoiseSource {
 /// Volume from a cable, linear or squared.
 enum VCA {
   @_noAllocation
-  static func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  static func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let input = inlets[0]
     let cv = inlets[1]
     let out = outlets[0]
@@ -99,7 +103,8 @@ enum VCA {
 /// Four in, one out, a level and a CV on each.
 enum Mixer {
   @_noAllocation
-  static func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  static func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let out = outlets[0]
     for i in 0..<frames {
       var sum = 0.0
@@ -118,7 +123,8 @@ public struct LadderModule {
   var filter: Ladder
 
   @_noAllocation
-  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let input = inlets[0]
     let cutoffCv = inlets[1]
     let resonanceCv = inlets[2]
@@ -144,7 +150,8 @@ public struct SVF {
   var a1 = 0.0, a2 = 0.0, a3 = 0.0, k = 0.0
 
   @_noAllocation
-  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let input = inlets[0]
     let cutoffCv = inlets[1]
     let resonanceCv = inlets[2]
@@ -198,7 +205,8 @@ public struct ADSR {
   var lastRelease = Double.nan, releaseCoef = 0.0
 
   @_noAllocation
-  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let gateIn = inlets[0]
     let trigIn = inlets[1]
     let out = outlets[0]
@@ -275,7 +283,8 @@ public struct LFO {
   }
 
   @_noAllocation
-  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let rateCv = inlets[0]
     let reset = inlets[1]
     let bi = outlets[0]
@@ -317,7 +326,8 @@ public struct LFO {
 /// Scale, invert and shift.
 enum Offset {
   @_noAllocation
-  static func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  static func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let input = inlets[0]
     let out = outlets[0]
     let gain = params[0]
@@ -334,7 +344,8 @@ public struct SampleHold {
   var lastTrig = 0
 
   @_noAllocation
-  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let input = inlets[0]
     let trig = inlets[1]
     let out = outlets[0]
@@ -363,7 +374,8 @@ public struct Delay {
   }
 
   @_noAllocation
-  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ frames: Int) {
+  mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
+    let frames = context.frames
     let input = inlets[0]
     let timeCv = inlets[1]
     let feedbackCv = inlets[2]

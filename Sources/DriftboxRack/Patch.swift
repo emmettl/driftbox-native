@@ -14,10 +14,12 @@ public struct PatchModule: Equatable, Sendable {
   /// Per inlet, a gain between -1 and 1 applied before the module reads it. Unity is no trim.
   public var inputTrims: [String: Double]
   public var bypassed: Bool
+  /// Bulk data the patch carries for the module — a pattern, a table — by slot.
+  public var data: [String: [Double]]
 
   public init(
     id: String, type: String, version: Int? = nil, params: [String: Double] = [:],
-    inputTrims: [String: Double] = [:], bypassed: Bool = false
+    inputTrims: [String: Double] = [:], bypassed: Bool = false, data: [String: [Double]] = [:]
   ) {
     self.id = id
     self.type = type
@@ -25,6 +27,7 @@ public struct PatchModule: Equatable, Sendable {
     self.params = params
     self.inputTrims = inputTrims
     self.bypassed = bypassed
+    self.data = data
   }
 }
 
@@ -49,18 +52,38 @@ public struct PatchCable: Equatable, Sendable {
   }
 }
 
+/// A Combinator routing: one knob (`from`) driving another (`to`) across a range.
+public struct ModRoute: Equatable, Sendable {
+  public var from: PortReference
+  public var to: PortReference
+  public var min: Double?
+  public var max: Double?
+
+  public init(from: PortReference, to: PortReference, min: Double? = nil, max: Double? = nil) {
+    self.from = from
+    self.to = to
+    self.min = min
+    self.max = max
+  }
+}
+
 public struct Patch: Equatable, Sendable {
   public var modules: [PatchModule]
   public var cables: [PatchCable]
   /// How many notes the patch plays at once, 1 to 8. Nil is one.
   public var voices: Double?
   public var tempo: Double?
+  public var modulation: [ModRoute]
 
-  public init(modules: [PatchModule], cables: [PatchCable], voices: Double? = nil, tempo: Double? = nil) {
+  public init(
+    modules: [PatchModule], cables: [PatchCable], voices: Double? = nil, tempo: Double? = nil,
+    modulation: [ModRoute] = []
+  ) {
     self.modules = modules
     self.cables = cables
     self.voices = voices
     self.tempo = tempo
+    self.modulation = modulation
   }
 }
 
@@ -128,6 +151,10 @@ public struct ModuleDef: Sendable {
   /// Child output voices per input voice.
   public var voiceExpansion: Int?
   public var voiceCollector = false
+  /// The names of the bulk data slots it reads, in the order `ProcessContext.data` holds them.
+  public var dataSlots: [String] = []
+  /// Doubles of scratch every voice of one module shares.
+  public var sharedDoubles = 0
 
   public init(
     type: String, version: Int = 1, name: String, inlets: [Port], outlets: [Port], params: [ParamDef]

@@ -28,46 +28,91 @@ public enum RackProcessor {
   case offset
   case sampleHold(SampleHold)
   case delay(Delay)
+  // The rest of the modules, a family to an enum, each in its own file.
+  case shaping(ShapingProcessor)
+  case space(SpaceProcessor)
+  case control(ControlProcessor)
+  case sources(SourceProcessor)
+  case sequencing(SequencingProcessor)
+  case players(PlayerProcessor)
 
   @_noAllocation
-  mutating func process(
-    inlets: Slots, outlets: Slots, params: Slots, frames: Int, transport: Transport
-  ) {
+  mutating func process(inlets: Slots, outlets: Slots, params: Slots, context: ProcessContext) {
     switch self {
-    case .out: Out.process(inlets, outlets, params, frames)
+    case .out: Out.process(inlets, outlets, params, context)
     case .vco(var module):
-      module.process(inlets, outlets, params, frames)
+      module.process(inlets, outlets, params, context)
       self = .vco(module)
     case .noise(var module):
-      module.process(inlets, outlets, params, frames)
+      module.process(inlets, outlets, params, context)
       self = .noise(module)
-    case .vca: VCA.process(inlets, outlets, params, frames)
-    case .mixer: Mixer.process(inlets, outlets, params, frames)
+    case .vca: VCA.process(inlets, outlets, params, context)
+    case .mixer: Mixer.process(inlets, outlets, params, context)
     case .ladder(var module):
-      module.process(inlets, outlets, params, frames)
+      module.process(inlets, outlets, params, context)
       self = .ladder(module)
     case .svf(var module):
-      module.process(inlets, outlets, params, frames)
+      module.process(inlets, outlets, params, context)
       self = .svf(module)
     case .adsr(var module):
-      module.process(inlets, outlets, params, frames)
+      module.process(inlets, outlets, params, context)
       self = .adsr(module)
     case .lfo(var module):
-      module.process(inlets, outlets, params, frames)
+      module.process(inlets, outlets, params, context)
       self = .lfo(module)
-    case .offset: Offset.process(inlets, outlets, params, frames)
+    case .offset: Offset.process(inlets, outlets, params, context)
     case .sampleHold(var module):
-      module.process(inlets, outlets, params, frames)
+      module.process(inlets, outlets, params, context)
       self = .sampleHold(module)
     case .delay(var module):
-      module.process(inlets, outlets, params, frames)
+      module.process(inlets, outlets, params, context)
       self = .delay(module)
+    case .shaping(var family):
+      family.process(inlets, outlets, params, context)
+      self = .shaping(family)
+    case .space(var family):
+      family.process(inlets, outlets, params, context)
+      self = .space(family)
+    case .control(var family):
+      family.process(inlets, outlets, params, context)
+      self = .control(family)
+    case .sources(var family):
+      family.process(inlets, outlets, params, context)
+      self = .sources(family)
+    case .sequencing(var family):
+      family.process(inlets, outlets, params, context)
+      self = .sequencing(family)
+    case .players(var family):
+      family.process(inlets, outlets, params, context)
+      self = .players(family)
+    }
+  }
+
+  /// What the module shows its faceplate, for the few that show anything.
+  func meter() -> MeterReading? {
+    switch self {
+    case .shaping(let family): family.meter()
+    case .space(let family): family.meter()
+    case .control(let family): family.meter()
+    case .sources(let family): family.meter()
+    case .sequencing(let family): family.meter()
+    case .players(let family): family.meter()
+    default: nil
     }
   }
 
   /// Give back what the processor allocated, when the graph that made it is done with it.
   mutating func release() {
-    if case .delay(let module) = self { module.buffer.deallocate() }
+    switch self {
+    case .delay(let module): module.buffer.deallocate()
+    case .shaping(var family): family.release()
+    case .space(var family): family.release()
+    case .control(var family): family.release()
+    case .sources(var family): family.release()
+    case .sequencing(var family): family.release()
+    case .players(var family): family.release()
+    default: break
+    }
   }
 }
 

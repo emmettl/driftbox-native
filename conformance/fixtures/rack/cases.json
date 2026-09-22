@@ -27,6 +27,7 @@
   },
   "blocks": 16,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 4,
    "voices": 1,
@@ -176,6 +177,7 @@
   },
   "blocks": 16,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 4,
    "voices": 1,
@@ -324,6 +326,7 @@
   },
   "blocks": 16,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 4,
    "voices": 1,
@@ -495,6 +498,7 @@
   },
   "blocks": 16,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 6,
    "voices": 1,
@@ -761,6 +765,7 @@
   },
   "blocks": 24,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 12,
    "voices": 1,
@@ -1110,6 +1115,7 @@
   },
   "blocks": 24,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 6,
    "voices": 1,
@@ -1350,6 +1356,7 @@
   },
   "blocks": 64,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 8,
    "voices": 1,
@@ -1659,6 +1666,7 @@
   },
   "blocks": 32,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 7,
    "voices": 1,
@@ -1968,6 +1976,7 @@
   },
   "blocks": 32,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 12,
    "voices": 1,
@@ -2293,6 +2302,7 @@
   },
   "blocks": 32,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 9,
    "voices": 1,
@@ -2646,6 +2656,7 @@
   },
   "blocks": 64,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 12,
    "voices": 1,
@@ -3101,6 +3112,7 @@
   },
   "blocks": 24,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 7,
    "voices": 1,
@@ -3366,6 +3378,7 @@
   },
   "blocks": 32,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 9,
    "voices": 1,
@@ -3698,6 +3711,7 @@
     1754
    ]
   ],
+  "hostBuses": 0,
   "plan": {
    "buffers": 5,
    "voices": 1,
@@ -4008,6 +4022,7 @@
     0
    ]
   ],
+  "hostBuses": 0,
   "plan": {
    "buffers": 12,
    "voices": 1,
@@ -4443,6 +4458,7 @@
   },
   "blocks": 16,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 5,
    "voices": 1,
@@ -4668,6 +4684,7 @@
     2
    ]
   ],
+  "hostBuses": 0,
   "plan": {
    "buffers": 7,
    "voices": 3,
@@ -4912,6 +4929,7 @@
   },
   "blocks": 16,
   "events": [],
+  "hostBuses": 0,
   "plan": {
    "buffers": 6,
    "voices": 1,

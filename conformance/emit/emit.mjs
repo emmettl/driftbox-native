@@ -551,22 +551,45 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
       cables: [c(['osc', 'out'], ['first', 'in']), c(['first', 'out'], ['second', 'in'])],
     }, 16],
   ]
+  // Host input buses, when a case has them: bus b, channel c is a sine at 110(b+1) + 3c Hz at half
+  // scale, the same on both sides because it is float32 by the time anything reads it.
+  const hostBlock = (buses, block) => Array.from({ length: buses }, (_, bus) => [0, 1].map((channel) => {
+    const out = new Float32Array(128)
+    const frequency = 110 * (bus + 1) + 3 * channel
+    for (let i = 0; i < 128; i++) out[i] = 0.5 * Math.sin((2 * Math.PI * frequency * (block * 128 + i)) / 48000)
+    return out
+  }))
+  // Each family of modules keeps its cases in a file of its own, `rack-cases-<family>.mjs`, whose
+  // default export is a list of cases in the shape below, so the families can be ported apart.
+  for (const file of readdirSync(here).filter((name) => /^rack-cases-.+\.mjs$/.test(name)).sort()) {
+    const { default: more } = await import(join(here, file))
+    cases.push(...more)
+  }
   const summary = []
-  for (const [name, patch, blocks, events = []] of cases) {
+  // A case is [name, patch, blocks, events, host buses]. An event is [block, kind, ...]:
+  //   param    module param value            a knob, every voice
+  //   voice    module param value voice      a knob, one voice
+  //   schedule module param value frame      a knob at an exact frame
+  //   transport tempo running shuffle        the transport (running is 1 or 0)
+  //   data     module slot values            bulk data pushed to a module
+  for (const [name, patch, blocks, events = [], hostBuses = 0] of cases) {
     const renderer = new RackRenderer(MODULES, { sampleRate: 48000, frames: 128 })
     renderer.patch = patch
     const left = new Float32Array(blocks * 128)
     const right = new Float32Array(blocks * 128)
     for (let block = 0; block < blocks; block++) {
-      for (const [at, kind, module, param, value, extra] of events) {
+      for (const [at, kind, a, b, c, d] of events) {
         if (at !== block) continue
-        if (kind === 'param') renderer.setParam(module, param, value)
-        else if (kind === 'voice') renderer.setParam(module, param, value, extra)
-        else renderer.scheduleParam(module, param, value, extra)
+        if (kind === 'param') renderer.setParam(a, b, c)
+        else if (kind === 'voice') renderer.setParam(a, b, c, d)
+        else if (kind === 'schedule') renderer.scheduleParam(a, b, c, d)
+        else if (kind === 'transport') renderer.setTransport(a, b === 1, c ?? 0)
+        else if (kind === 'data') renderer.setData(a, b, Float32Array.from(c))
+        else throw new Error(`unknown rack event ${kind}`)
       }
       const l = new Float32Array(128)
       const r = new Float32Array(128)
-      renderer.process([l, r])
+      renderer.process([l, r], hostBuses > 0 ? hostBlock(hostBuses, block) : [])
       left.set(l, block * 128)
       right.set(r, block * 128)
     }
@@ -576,7 +599,7 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
     write(join(fixtures, 'rack'), `${name}.f32`, Buffer.from(both.buffer))
     const plan = compile(patch, MODULES)
     summary.push({
-      name, patch, blocks, events,
+      name, patch, blocks, events, hostBuses,
       plan: {
         buffers: plan.buffers, voices: plan.voices, voiceWidths: plan.voiceWidths,
         nodes: plan.nodes.map(({ id, type, inlets, inletConnected, inletTrims, outlets, outletConnected, params, poly, voices, voiceLanes }) =>

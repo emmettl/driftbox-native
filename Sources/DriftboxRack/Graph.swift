@@ -26,6 +26,11 @@ struct NodeRuntime {
   var collapseCount: Int
   var trims: UnsafeMutablePointer<TrimOp>
   var trimCount: Int
+  var data: DataSlots
+  var voiceInlets: VoiceInlets?
+  var inletConnected: Flags
+  var outletConnected: Flags
+  var voice: VoiceInfo
 }
 
 struct OutputRuntime {
@@ -53,6 +58,9 @@ public struct RackGraph: ~Copyable {
 
   /// Everything allocated, to be freed with the graph. Never touched while rendering.
   private var owned: [UnsafeMutableRawPointer] = []
+  /// Each module's data table, by id, and the slot names in it: what `setData` looks up.
+  private var dataTables: [String: (table: UnsafeMutablePointer<DataBuffer>, slots: [String])] = [:]
+  private var dataRevision = 0
 
   let nodes: UnsafeMutablePointer<NodeRuntime>
   let nodeCount: Int
@@ -157,20 +165,58 @@ public struct RackGraph: ~Copyable {
     // Nodes: one per voice of each polyphonic module, one for the rest.
     var runtimes: [NodeRuntime] = []
     var missing: [String] = []
+    var dataTables: [String: (table: UnsafeMutablePointer<DataBuffer>, slots: [String])] = [:]
+    var revision = 0
     for node in plan.nodes {
-      guard registry[node.type] != nil else {
+      guard let definition = registry[node.type] else {
         missing.append(node.type)
         continue
       }
       let poly = node.poly
       let instances = poly ? max(1, min(capacity, node.voices)) : 1
+      let lanes = poly ? max(1, min(8, node.voiceLanes)) : 1
+      // Data, seeded from the patch and shared by every voice; the host can replace a slot.
+      let dataTable = UnsafeMutablePointer<DataBuffer>.allocate(capacity: max(1, definition.dataSlots.count))
+      owned.append(UnsafeMutableRawPointer(dataTable))
+      for (slot, name) in definition.dataSlots.enumerated() {
+        if let values = node.data[name] {
+          let copy = floats(values.count)
+          for (index, value) in values.enumerated() { copy[index] = Float(value) }
+          revision += 1
+          dataTable[slot] = DataBuffer(samples: UnsafePointer(copy), count: values.count, revision: revision)
+        } else {
+          dataTable[slot] = DataBuffer(samples: nil, count: 0, revision: 0)
+        }
+      }
+      dataTables[node.id] = (dataTable, definition.dataSlots)
+      let shared: UnsafeMutablePointer<Double>? =
+        definition.sharedDoubles > 0
+        ? {
+          let pointer = UnsafeMutablePointer<Double>.allocate(capacity: definition.sharedDoubles)
+          pointer.initialize(repeating: 0, count: definition.sharedDoubles)
+          owned.append(UnsafeMutableRawPointer(pointer))
+          return pointer
+        }() : nil
       for voice in 0..<instances {
+        var voiceInletSlots: [Slots] = []
         var collapse: [CollapseOp] = []
         var trims: [TrimOp] = []
         var inlets: [UnsafeMutablePointer<Float>] = []
         for (inlet, index) in node.inlets.enumerated() {
           var source: UnsafeMutablePointer<Float>
           let width = index >= 0 && index < buffers.count ? buffers[index].count : 1
+          let trimSlot = inlet < node.inletTrims.count ? node.inletTrims[inlet] : nil
+          if !poly && node.collectVoices {
+            // Every voice on its own, trimmed where the jack's pot says, beside the sum.
+            let perVoice = index >= 0 && index < buffers.count ? buffers[index] : [scratch]
+            let gathered: [UnsafeMutablePointer<Float>] = perVoice.map { from in
+              guard let trimSlot else { return from }
+              let into = floats(frames)
+              trims.append(TrimOp(into: into, from: from, gain: paramBuffer(trimSlot, 0)))
+              return into
+            }
+            voiceInletSlots.append(Slots(base: table(gathered), count: gathered.count))
+          }
           if poly {
             let mapped = width <= 1 ? 0 : min(width - 1, (voice * width) / instances)
             source = at(index, mapped)
@@ -181,7 +227,7 @@ public struct RackGraph: ~Copyable {
           } else {
             source = at(index, 0)
           }
-          if inlet < node.inletTrims.count, let slot = node.inletTrims[inlet] {
+          if let slot = trimSlot {
             let into = floats(frames)
             trims.append(TrimOp(into: into, from: source, gain: paramBuffer(slot, poly ? voice : 0)))
             source = into
@@ -191,7 +237,10 @@ public struct RackGraph: ~Copyable {
         let outlets = node.outlets.map { $0 > 0 ? at($0, voice) : scratch }
         let params = node.params.map { paramBuffer($0, poly ? voice : 0) }
         let id = voice == 0 ? node.id : "\(node.id)#\(voice)"
-        guard let processor = RackModules.make(node.type, sampleRate: sampleRate, id: id) else {
+        let info = VoiceInfo(
+          voice: voice, sourceVoice: voice / lanes, lane: voice % lanes, lanes: lanes, voices: instances,
+          shared: shared, sharedCount: definition.sharedDoubles)
+        guard let processor = RackModules.make(node.type, sampleRate: sampleRate, id: id, voice: info) else {
           missing.append(node.type)
           continue
         }
@@ -200,7 +249,13 @@ public struct RackGraph: ~Copyable {
             processor: processor, inlets: Slots(base: table(inlets), count: inlets.count),
             outlets: Slots(base: table(outlets), count: outlets.count),
             params: Slots(base: table(params), count: params.count), collapse: table(collapse),
-            collapseCount: collapse.count, trims: table(trims), trimCount: trims.count))
+            collapseCount: collapse.count, trims: table(trims), trimCount: trims.count,
+            data: DataSlots(base: dataTable, count: definition.dataSlots.count),
+            voiceInlets: voiceInletSlots.isEmpty
+              ? nil : VoiceInlets(base: table(voiceInletSlots), count: voiceInletSlots.count),
+            inletConnected: Flags(base: table(node.inletConnected), count: node.inletConnected.count),
+            outletConnected: Flags(base: table(node.outletConnected), count: node.outletConnected.count),
+            voice: info))
       }
     }
     nodes = table(runtimes)
@@ -234,6 +289,8 @@ public struct RackGraph: ~Copyable {
     due = dueQueue
 
     self.missing = missing
+    self.dataTables = dataTables
+    dataRevision = revision
     self.owned = owned
   }
 
@@ -323,9 +380,29 @@ public struct RackGraph: ~Copyable {
 
   // MARK: - Rendering
 
-  /// One block of `frames` frames into `left` and `right`.
+  /// Replace one data slot of a module: a sample loaded, a pattern drawn. Copied, and kept until
+  /// the graph goes. Not for the render thread.
+  public mutating func setData(module: String, slot: String, samples: [Float]) {
+    guard let entry = dataTables[module], let index = entry.slots.firstIndex(of: slot) else { return }
+    let copy = UnsafeMutablePointer<Float>.allocate(capacity: max(1, samples.count))
+    copy.initialize(from: samples, count: samples.count)
+    owned.append(UnsafeMutableRawPointer(copy))
+    dataRevision += 1
+    entry.table[index] = DataBuffer(
+      samples: UnsafePointer(copy), count: samples.count, revision: dataRevision)
+  }
+
+  /// What the modules that show anything are showing, by module id.
+  public func meters() -> [(id: String, reading: MeterReading)] {
+    []
+  }
+
+  /// One block of `frames` frames into `left` and `right`, with the host's input buses.
   @_noAllocation
-  public mutating func process(left mix: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>) {
+  public mutating func process(
+    left mix: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>,
+    host: HostInputs = .none
+  ) {
     let frames = self.frames
     let blockStart = frame
     frame = blockStart + frames
@@ -384,8 +461,11 @@ public struct RackGraph: ~Copyable {
         let trim = node.trims[op]
         for i in 0..<frames { trim.into[i] = Float(Double(trim.from[i]) * Double(trim.gain[i])) }
       }
+      let context = ProcessContext(
+        frames: frames, transport: transport, data: node.data, host: host, voiceInlets: node.voiceInlets,
+        inletConnected: node.inletConnected, outletConnected: node.outletConnected, voice: node.voice)
       nodes[index].processor.process(
-        inlets: node.inlets, outlets: node.outlets, params: node.params, frames: frames, transport: transport)
+        inlets: node.inlets, outlets: node.outlets, params: node.params, context: context)
     }
 
     if outputCount == 0 {

@@ -13,6 +13,7 @@ struct RackConformanceTests {
     let patch: Patch
     let blocks: Int
     let events: [JSONValue]
+    let hostBuses: Int
     let plan: JSONObject
   }
 
@@ -32,9 +33,16 @@ struct RackConformanceTests {
         let module = try need(value.object)
         var params: [String: Double] = [:]
         for (key, param) in module["params"]?.object?.members ?? [] { params[key] = param.finite }
+        var inputTrims: [String: Double] = [:]
+        for (key, trim) in module["inputTrims"]?.object?.members ?? [] { inputTrims[key] = trim.finite }
+        var data: [String: [Double]] = [:]
+        for (key, values) in module["data"]?.object?.members ?? [] {
+          data[key] = (values.array ?? []).compactMap(\.finite)
+        }
         return PatchModule(
-          id: try need(module["id"]?.string), type: try need(module["type"]?.string), params: params,
-          bypassed: module["bypassed"]?.bool ?? false)
+          id: try need(module["id"]?.string), type: try need(module["type"]?.string),
+          version: module["version"]?.finite.map(Int.init), params: params, inputTrims: inputTrims,
+          bypassed: module["bypassed"]?.bool ?? false, data: data)
       }
       let cables = try (patchJSON["cables"]?.array ?? []).map { value -> PatchCable in
         let cable = try need(value.object)
@@ -44,9 +52,11 @@ struct RackConformanceTests {
       }
       return Case(
         name: try need(object["name"]?.string),
-        patch: Patch(modules: modules, cables: cables, voices: patchJSON["voices"]?.finite),
+        patch: Patch(
+          modules: modules, cables: cables, voices: patchJSON["voices"]?.finite,
+          tempo: patchJSON["tempo"]?.finite),
         blocks: Int(try need(object["blocks"]?.finite)), events: object["events"]?.array ?? [],
-        plan: try need(object["plan"]?.object))
+        hostBuses: Int(object["hostBuses"]?.finite ?? 0), plan: try need(object["plan"]?.object))
     }
   }
 
@@ -107,22 +117,28 @@ struct RackConformanceTests {
     renderer.patch = fixture.patch
     var left = [Float](repeating: 0, count: frames)
     var right = [Float](repeating: 0, count: frames)
+    let host = HostBuses(count: fixture.hostBuses)
     for block in 0..<fixture.blocks {
       for event in fixture.events.compactMap(\.array) where Int(event[0].finite ?? -1) == block {
         let kind = event[1].string ?? ""
-        let module = event[2].string ?? ""
-        let param = event[3].string ?? ""
-        let value = event[4].finite ?? 0
-        let extra = event.count > 5 ? event[5].finite.map(Int.init) : nil
+        func text(_ index: Int) -> String { index < event.count ? event[index].string ?? "" : "" }
+        func number(_ index: Int) -> Double? { index < event.count ? event[index].finite : nil }
         switch kind {
-        case "param": renderer.setParam(module, param, value)
-        case "voice": renderer.setParam(module, param, value, voice: extra)
-        default: renderer.scheduleParam(module, param, value, frame: extra ?? 0)
+        case "param": renderer.setParam(text(2), text(3), number(4) ?? 0)
+        case "voice": renderer.setParam(text(2), text(3), number(4) ?? 0, voice: number(5).map(Int.init))
+        case "schedule": renderer.scheduleParam(text(2), text(3), number(4) ?? 0, frame: Int(number(5) ?? 0))
+        case "transport":
+          renderer.setTransport(tempo: number(2) ?? 120, running: number(3) == 1, shuffle: number(4) ?? 0)
+        case "data":
+          renderer.setData(text(2), text(3), (event[4].array ?? []).compactMap { $0.finite.map(Float.init) })
+        default: Issue.record("unknown rack event \(kind)")
         }
       }
+      host.fill(block: block)
       left.withUnsafeMutableBufferPointer { l in
         right.withUnsafeMutableBufferPointer { r in
-          renderer.process(left: l.baseAddress! + block * 128, right: r.baseAddress! + block * 128)
+          renderer.process(
+            left: l.baseAddress! + block * 128, right: r.baseAddress! + block * 128, host: host.inputs)
         }
       }
     }
@@ -139,5 +155,40 @@ struct RackConformanceTests {
     // The same arithmetic in the same order: bit-identical on the Mac, and the tolerance is for
     // another platform's libm differing in the last bit of a transcendental.
     #expect(worst < 1e-5, "\(name) differs by \(worst), first at frame \(firstDifference)")
+  }
+}
+
+/// The fixtures' host input buses: bus b, channel c a half-scale sine at 110(b+1) + 3c Hz, as the
+/// emitter makes them.
+final class HostBuses {
+  let count: Int
+  let pointers: UnsafeMutablePointer<UnsafeMutablePointer<Float>>
+
+  init(count: Int) {
+    self.count = count
+    pointers = .allocate(capacity: max(1, count * 2))
+    for index in 0..<count * 2 {
+      pointers[index] = .allocate(capacity: 128)
+      pointers[index].initialize(repeating: 0, count: 128)
+    }
+  }
+
+  deinit {
+    for index in 0..<count * 2 { pointers[index].deallocate() }
+    pointers.deallocate()
+  }
+
+  var inputs: HostInputs { count == 0 ? .none : HostInputs(base: pointers, buses: count, channels: 2) }
+
+  func fill(block: Int) {
+    for bus in 0..<count {
+      for channel in 0..<2 {
+        let frequency = Double(110 * (bus + 1) + 3 * channel)
+        let out = pointers[bus * 2 + channel]
+        for i in 0..<128 {
+          out[i] = Float(0.5 * sin((2 * Double.pi * frequency * Double(block * 128 + i)) / 48000))
+        }
+      }
+    }
   }
 }

@@ -7,6 +7,9 @@ public final class RackRenderer {
   public let frames: Int
   public private(set) var plan: Plan?
   private var graph: RackGraph?
+  /// Data the host pushed, which outlives a patch change: recompiling must not throw away a
+  /// sample somebody loaded. It wins over the patch's own data in the same slot.
+  private var pushed: [String: [String: [Float]]] = [:]
 
   public init(sampleRate: Double = 48000, frames: Int = 128) {
     self.sampleRate = sampleRate
@@ -26,6 +29,9 @@ public final class RackRenderer {
       plan = compiled
       var fresh = RackGraph(plan: compiled, sampleRate: sampleRate, frames: frames)
       if let carried = graph?.carried { fresh.inherit(carried) }
+      for (module, slots) in pushed {
+        for (slot, samples) in slots { fresh.setData(module: module, slot: slot, samples: samples) }
+      }
       graph = consume fresh
     }
   }
@@ -45,18 +51,26 @@ public final class RackRenderer {
     graph?.setParam(slot: slot, value: value, voice: voice, frame: frame)
   }
 
+  /// Hand a module some bulk data: a sample, a table.
+  public func setData(_ module: String, _ slot: String, _ samples: [Float]) {
+    pushed[module, default: [:]][slot] = samples
+    graph?.setData(module: module, slot: slot, samples: samples)
+  }
+
   public func setTransport(tempo: Double, running: Bool, shuffle: Double = 0) {
     graph?.setTransport(tempo: tempo, running: running, shuffle: shuffle)
   }
 
-  /// One block into `left` and `right`, each `frames` long.
-  public func process(left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>) {
+  /// One block into `left` and `right`, each `frames` long, with the host's input buses.
+  public func process(
+    left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>, host: HostInputs = .none
+  ) {
     guard graph != nil else {
       left.update(repeating: 0, count: frames)
       right.update(repeating: 0, count: frames)
       return
     }
-    graph!.process(left: left, right: right)
+    graph!.process(left: left, right: right, host: host)
   }
 
   /// `count` frames, rendered whole blocks at a time and trimmed to length.

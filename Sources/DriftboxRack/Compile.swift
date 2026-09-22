@@ -21,6 +21,8 @@ public struct PlanNode: Equatable, Sendable {
   public var voices: Int
   public var voiceLanes: Int
   public var collectVoices: Bool
+  /// The patch's own data for the module, carried through untouched.
+  public var data: [String: [Double]]
 }
 
 public struct PlanOutput: Equatable, Sendable {
@@ -86,8 +88,10 @@ func portMatch(_ ports: [Port], _ id: String) -> (port: Port, channel: Int?, ali
 }
 
 /// Compile `patch` against the modules in `registry`.
-public func compile(_ patch: Patch, registry: [String: ModuleDef] = RackModules.registry) -> Plan {
+public func compile(_ rawPatch: Patch, registry: [String: ModuleDef] = RackModules.registry) -> Plan {
   var notes: [PlanNote] = []
+  // Combinator routings, baked into the params before anything else looks at one.
+  let patch = applyModulation(rawPatch, registry: registry)
   let voices = Int(max(1, min(8, jsRound(clampParam(patch.voices, 1, 8, 1)))))
 
   // ---- Modules: an unknown type is a placeholder, kept so cables to it still resolve.
@@ -388,7 +392,7 @@ public func compile(_ patch: Patch, registry: [String: ModuleDef] = RackModules.
       outlets: outlets, outletConnected: outletConnected,
       params: definition.params.map { slots[module.id]![$0.id]! }, poly: definition.poly,
       voices: moduleVoices[index], voiceLanes: moduleLanes[index],
-      collectVoices: !definition.poly && definition.voiceCollector)
+      collectVoices: !definition.poly && definition.voiceCollector, data: module.data)
   }
 
   var outputs: [PlanOutput] = []
