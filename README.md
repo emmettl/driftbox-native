@@ -318,7 +318,8 @@ one better than the web's.
 The three.js scenes go over a geometry layer instead — `Camera`, three's projection and view
 matrices with Metal's depth range, and `GeometryScene`, which owns buffers and pipelines under
 three's blend modes — with each scene's vertex and fragment shaders carried over as the
-surfaces' are. Wireframe is the first.
+surfaces' are. Wireframe, Sunset and Web are the first three; between them they
+need a camera that looks and unprojects, model matrices, plane geometry and indexed draws.
 
 A scene cannot be looked at from a test, but it can be drawn into a texture and read back:
 every scene draws something that is not black and moves, and with `DRIFTBOX_SCENE_SHOTS` set

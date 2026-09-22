@@ -92,14 +92,17 @@ gone native at all.
    Hours and Paper Cities seen live in the app. Then the geometry layer — `Camera`, three's matrices with Metal's depth range, and
    `GeometryScene`: buffers, pipelines under three's blend modes, a cleared background — with
    Wireframe, the Rez corridor, as its first scene: one line list of sixty-four ribs and their
-   rails, moved in the vertex shader. Eleven of twenty-seven. The other sixteen are three.js
+   rails, moved in the vertex shader. Then Sunset (the chillwave slatted sun and its
+   wireframe floor, on plane geometry with a model matrix and a looking camera) and Web (Tempest
+   2000: sixteen lanes, sixteen bands, a finger as a black hole). Thirteen of twenty-seven. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
    Longhand, Machine, Cycles, Clouds, Convoy); a shader over an icosahedron or a sphere
    (Lifeforms, Clouds); boxes, cylinders and a torus under lights (Machine, the only lit one);
    a 2D canvas drawn each frame and shown as a texture (GraphicLab); and fog (Sunset, Lifeforms,
-   Cubik, Machine, Longhand). Still to add to the layer: points, indexed meshes, fog in the fragment, and one texture. What was planned:
+   Cubik, Machine, Longhand). Still to add to the layer: points, the other geometries (icosahedron, sphere, box,
+   cylinder, torus), lights for the one lit scene, fog in the fragment, and one texture. What was planned:
    a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.
