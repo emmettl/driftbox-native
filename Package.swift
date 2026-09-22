@@ -15,6 +15,7 @@ let package = Package(
     .library(name: "DriftboxEngine", targets: ["DriftboxEngine"]),
     .library(name: "DriftboxDocument", targets: ["DriftboxDocument"]),
     .library(name: "DriftboxHost", targets: ["DriftboxHost"]),
+    .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
   ],
   targets: [
     // Constrained: arithmetic only.
@@ -25,12 +26,15 @@ let package = Package(
     // Unconstrained: Foundation and the platform are allowed from here up.
     .target(name: "DriftboxDocument", dependencies: ["DriftboxSeq", "DriftboxEngine"]),
     .target(name: "DriftboxHost", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
+    // The visuals: Metal scenes driven by the engine's events. Empty on a platform without Metal.
+    .target(name: "DriftboxScenes", dependencies: ["DriftboxEngine"]),
 
     // A song document in, a WAV file out: something to listen to.
     .executableTarget(name: "driftbox-render", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
     // The Mac app.
     .executableTarget(
-      name: "Driftbox", dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq"],
+      name: "Driftbox",
+      dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq", "DriftboxScenes"],
       resources: [.copy("Resources/Songs"), .copy("Resources/catalogue.json")]),
     // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine.
     .executableTarget(
@@ -46,6 +50,7 @@ let package = Package(
     .testTarget(
       name: "DriftboxEngineTests",
       dependencies: ["DriftboxEngine", "DriftboxSeq", "DriftboxDocument", "ConformanceSupport"]),
+    .testTarget(name: "DriftboxScenesTests", dependencies: ["DriftboxScenes", "DriftboxEngine"]),
     .testTarget(
       name: "DriftboxHostTests",
       dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "ConformanceSupport"]),

@@ -73,7 +73,14 @@ gone native at all.
    from any source play the keys, and a **sync** button follows an external clock's tempo,
    start, stop and position, the estimator held to the reference's on a synthetic stream of
    464 messages. Still to come: a proper document model, and MIDI clock *out*.
-6. **Visuals.** A thin Metal layer — lines, instanced meshes, full-screen and compute passes —
+6. **Visuals.** ← *begun.* `DriftboxScenes`: a `Scene` protocol keeping the web scenes' ids
+   and accents, a `SceneRenderer` over one compiled shader library, and one scene — Pulse, the
+   fallback: a dark field that breathes with the level, a bloom and a ring on every kick, a
+   flash on a snare, a horizon that sparkles on hats, a 303 note as a line at its pitch, the
+   pad's cursor. Driven from the events ring, the block peaks and the pad, at the display's rate,
+   in a pane above the grid. Tested offscreen — dark when quiet, brighter on a kick, fading,
+   different on a note — and, like the rest of the app, not yet seen by anyone. What was planned:
+   a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.
 7. **iOS.** Audio session, background audio, a layout that opens into the visuals, haptics,

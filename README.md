@@ -293,6 +293,15 @@ The Mac app, as far as it goes: the catalogue as a library, a transport, and the
 pattern the transport is in, live and editable. A SwiftPM executable rather than an Xcode
 project for now, which is why it announces itself to the system by hand on launch.
 
+### Visuals
+
+`DriftboxScenes` is the start of phase 6: a `Scene` protocol that keeps the web scenes' ids and
+accent colours, so a song's `visual` hint resolves here too, and draws whatever it likes; a
+renderer over one shader library compiled at launch; and one scene, the fallback, driven by the
+engine's events ring, the block peaks and the pad. A scene cannot be looked at from a test, but
+it can be drawn into a texture and read back: dark when nothing is happening, brighter on a kick,
+fading, and different again on a note.
+
 ### Playing
 
 ```bash

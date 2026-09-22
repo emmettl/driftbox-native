@@ -57,6 +57,12 @@
     private(set) var lastHits: [Int: Int] = [:]
     /// The engine's own clock, which the events are stamped in.
     private(set) var engineFrame = 0
+    /// Events since the scene last drew, kept for it here; the grid's flashes read `lastHits`.
+    private var pendingEvents: [EngineEvent] = []
+    /// Where the pad is being touched, for the scene's cursor.
+    var padTouch: SIMD2<Float>?
+    /// Whether the visuals pane is showing.
+    var showsVisuals = true
     /// Where the song came from, if a file; where Save goes.
     var fileURL: URL?
     var undoManager: UndoManager?
@@ -188,7 +194,9 @@
       engineFrame = host.engineFrame.load(ordering: .relaxed)
       while let event = host.nextEvent() {
         if event.kind == .hit { lastHits[event.voice] = event.frame }
+        pendingEvents.append(event)
       }
+      if pendingEvents.count > 512 { pendingEvents.removeFirst(pendingEvents.count - 512) }
     }
 
     func open(_ entry: CatalogueEntry) {
@@ -281,11 +289,28 @@
     }
 
     func pad(x: Double, y: Double) {
+      padTouch = SIMD2(Float(x), Float(y))
       unit?.send(.pad(x: x, y: y))
     }
 
     func padRelease() {
+      padTouch = nil
       unit?.send(.padRelease)
+    }
+
+    /// What the engine has reported since the scene last asked.
+    func takeEvents() -> [EngineEvent] {
+      defer { pendingEvents.removeAll() }
+      return pendingEvents
+    }
+
+    /// The loudest sample of the last audio block, each side.
+    var peaks: (left: Float, right: Float) {
+      guard let host = unit?.host else { return (0, 0) }
+      return (
+        Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
+        Float(bitPattern: host.peakRight.load(ordering: .relaxed))
+      )
     }
 
     /// Which voice's panel is showing.

@@ -28,6 +28,10 @@
           TransportBar(player: player)
           Divider()
           if let song = player.song {
+            if player.showsVisuals {
+              Visuals(player: player).frame(minHeight: 180, idealHeight: 220)
+              Divider()
+            }
             PatternBar(player: player, song: song)
             Divider()
             HStack(alignment: .top, spacing: 0) {
@@ -60,6 +64,8 @@
           Button("Save…") { saveFile() }.keyboardShortcut("s").disabled(player.song == nil)
           Button("Export Mix…") { exportMix() }.keyboardShortcut("e").disabled(player.song == nil)
           Button("Export Stems…") { exportStems() }.disabled(player.song == nil)
+          Toggle("Visuals", isOn: Binding(get: { player.showsVisuals }, set: { player.showsVisuals = $0 }))
+            .keyboardShortcut("v")
         }
       }
       .overlay(alignment: .bottom) {

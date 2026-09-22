@@ -31,6 +31,11 @@ public final class EngineHost: @unchecked Sendable {
   let renderCalls = Atomic<Int>(0)
   let renderedFrames = Atomic<Int>(0)
 
+  /// The loudest sample of the last render call, each side, as float bits — what a scene reads
+  /// to breathe with the music without any analysis on the render thread.
+  public let peakLeft = Atomic<UInt32>(0)
+  public let peakRight = Atomic<UInt32>(0)
+
   /// What the render thread last reported: where the song is, and whether it is playing.
   public let songFrame = Atomic<Int>(-1)
   public let engineFrame = Atomic<Int>(0)
@@ -142,6 +147,14 @@ public final class EngineHost: @unchecked Sendable {
       }
     }
     engine.pointee.render(frames: frames, left: left, right: right)
+    var loudestLeft: Float = 0
+    var loudestRight: Float = 0
+    for index in 0..<frames {
+      loudestLeft = max(loudestLeft, abs(left[index]))
+      loudestRight = max(loudestRight, abs(right[index]))
+    }
+    peakLeft.store(loudestLeft.bitPattern, ordering: .relaxed)
+    peakRight.store(loudestRight.bitPattern, ordering: .relaxed)
     songFrame.store(engine.pointee.songFrame(), ordering: .relaxed)
     engineFrame.store(engine.pointee.frame, ordering: .relaxed)
     playing.store(engine.pointee.isPlaying, ordering: .relaxed)
