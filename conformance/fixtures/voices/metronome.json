@@ -1,0 +1,136 @@
+[
+ {
+  "strong": true,
+  "spec": {
+   "duration": 0.05500000000000001,
+   "gain": 0.376,
+   "sources": [
+    {
+     "kind": "osc",
+     "type": "square",
+     "frequency": 1600,
+     "gain": 0.6,
+     "amp": [
+      {
+       "to": 1,
+       "at": 0.0008,
+       "curve": "lin"
+      },
+      {
+       "to": 0,
+       "at": 0.035
+      }
+     ]
+    },
+    {
+     "kind": "osc",
+     "type": "square",
+     "frequency": 2352,
+     "gain": 0.4,
+     "amp": [
+      {
+       "to": 1,
+       "at": 0.0008,
+       "curve": "lin"
+      },
+      {
+       "to": 0,
+       "at": 0.035
+      }
+     ]
+    },
+    {
+     "kind": "noise",
+     "gain": 0.35,
+     "amp": [
+      {
+       "to": 1,
+       "at": 0.0004,
+       "curve": "lin"
+      },
+      {
+       "to": 0,
+       "at": 0.008
+      }
+     ],
+     "filter": {
+      "type": "highpass",
+      "frequency": 4000
+     }
+    }
+   ],
+   "filter": {
+    "type": "bandpass",
+    "frequency": 1600,
+    "Q": 1.1
+   }
+  }
+ },
+ {
+  "strong": false,
+  "spec": {
+   "duration": 0.05500000000000001,
+   "gain": 0.25,
+   "sources": [
+    {
+     "kind": "osc",
+     "type": "square",
+     "frequency": 1050,
+     "gain": 0.6,
+     "amp": [
+      {
+       "to": 1,
+       "at": 0.0008,
+       "curve": "lin"
+      },
+      {
+       "to": 0,
+       "at": 0.035
+      }
+     ]
+    },
+    {
+     "kind": "osc",
+     "type": "square",
+     "frequency": 1543.5,
+     "gain": 0.4,
+     "amp": [
+      {
+       "to": 1,
+       "at": 0.0008,
+       "curve": "lin"
+      },
+      {
+       "to": 0,
+       "at": 0.035
+      }
+     ]
+    },
+    {
+     "kind": "noise",
+     "gain": 0.35,
+     "amp": [
+      {
+       "to": 1,
+       "at": 0.0004,
+       "curve": "lin"
+      },
+      {
+       "to": 0,
+       "at": 0.008
+      }
+     ],
+     "filter": {
+      "type": "highpass",
+      "frequency": 4000
+     }
+    }
+   ],
+   "filter": {
+    "type": "bandpass",
+    "frequency": 1050,
+    "Q": 1.1
+   }
+  }
+ }
+]

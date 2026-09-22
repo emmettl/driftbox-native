@@ -188,8 +188,19 @@ gone native at all.
    store, so they are held to that code by tests written from it. And the pattern being edited
    comes back at the next launch.
 
-   Left: the transport's loop, metronome and count-in, which want the engine; the 303's step
-   entry from the keyboard; performance mode; automation recording; and more
+   Then the transport's own aids: a loop, set from a section's menu or the Transport menu and
+   drawn as a bracket over the song strip, which the engine turns round on its exact frame and
+   holds in bars so an edit keeps it; a metronome; and a count-in. The click is the reference's
+   own spec, held to it exactly, and added after the master as it is there, so the pad cannot
+   take it away. Two things turned up in the reference. Its count-in spends the song's first
+   bar on the clicks — it counts transport bars, so bar one is heard as clicks and the song
+   starts at bar two — which is not what a count-in is for; here the song waits at its start
+   for the count-in and then plays from the top. And its comment on the click's levels says
+   they render at 0.70 and 0.50; in Chromium they render at 0.341 and 0.228, which the Swift
+   click matches to six places, so the ratio the comment was after holds and the numbers in it
+   do not.
+
+   Left: the 303's step entry from the keyboard; performance mode; automation recording; and more
    than one song open at once, which is deliberately not done. It is not a scene change: the
    player owns the audio engine, the MIDI ports and the clock, and two of them would be two
    engines fighting over one output and two sources both called Driftbox Clock. The honest

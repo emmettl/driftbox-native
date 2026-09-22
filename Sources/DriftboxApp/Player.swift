@@ -333,6 +333,8 @@
       songFrame = max(0, host.songFrame.load(ordering: .relaxed))
       let playing = host.playing.load(ordering: .relaxed)
       if isPlaying != playing { isPlaying = playing }
+      let counting = host.countingIn.load(ordering: .relaxed)
+      if countingIn != counting { countingIn = counting }
       host.collect()
       engineFrame = host.engineFrame.load(ordering: .relaxed)
       while let event = host.nextEvent() {
@@ -359,7 +361,8 @@
       let now = MIDIOutput.now()
       // Anything that leaves the transport without a song to run is a stop as much as the button
       // is: what is listening should not be left ticking through a song nobody is playing.
-      guard sendsClock, song != nil, !timeline.times.isEmpty, isPlaying else {
+      // A count-in is not the song yet: what is listening starts with it, not with the clicks.
+      guard sendsClock, song != nil, !timeline.times.isEmpty, isPlaying, !countingIn else {
         deliver(cursor.idle(at: now))
         return
       }
@@ -479,6 +482,7 @@
       current = entry
       fileURL = url
       editing = nil
+      loop = nil
       remember(entry, at: url)
       undoManager?.removeAllActions()
       refreshUndo()
@@ -541,8 +545,56 @@
       seek(toBar: starts[next])
     }
 
+    /// Play because someone asked to: from a stop, that counts in first if a count-in is set.
     func play() {
-      startEngine()
+      cursor.resume()
+      send(.start)
+    }
+
+    // MARK: Loop, metronome, count-in
+
+    /// A click on every beat while the song plays.
+    var metronome = false {
+      didSet { if metronome != oldValue { send(.metronome(metronome)) } }
+    }
+
+    /// A bar of clicks before the song moves, when play is pressed from a stop.
+    var countsIn = false {
+      didSet { if countsIn != oldValue { send(.countIn(bars: countsIn ? 1 : 0)) } }
+    }
+
+    /// Whether the song is waiting on its count-in.
+    private(set) var countingIn = false
+
+    /// A run of whole bars to play round and round.
+    struct LoopRange: Equatable {
+      var start: Int
+      var bars: Int
+      var end: Int { start + bars }
+      func contains(bar: Int) -> Bool { bar >= start && bar < end }
+    }
+
+    /// The bars being looped. The engine goes round at the loop's end on its exact frame, and
+    /// holds the loop in bars, so an edit — which moves every frame — leaves it where it was.
+    var loop: LoopRange? {
+      didSet {
+        guard loop != oldValue else { return }
+        send(.loop(startBar: loop?.start ?? 0, bars: loop?.bars ?? 0))
+      }
+    }
+
+    /// Loop the section from `start` for `bars`, or stop looping it if it already is.
+    func toggleLoop(start: Int, bars: Int) {
+      let range = LoopRange(start: max(0, start), bars: max(1, bars))
+      loop = loop == range ? nil : range
+    }
+
+    /// Stretch the loop to take in the section from `start` for `bars`, whichever side it is on.
+    func extendLoop(toStart start: Int, bars: Int) {
+      guard let current = loop else { return toggleLoop(start: start, bars: bars) }
+      let from = min(current.start, start)
+      let to = max(current.end, start + max(1, bars))
+      loop = LoopRange(start: from, bars: to - from)
     }
 
     func stop() {

@@ -38,6 +38,7 @@ const { ClockFollower, parseClock, clockBytes, scheduleClockStart, scheduleClock
 )
 const { followClock } = await import(join(root, 'driftbox', 'packages', 'app', 'src', 'clock-follow.ts'))
 const { ALL_VOICES, buildVoice } = await import(join(engine, 'kit.ts'))
+const { metronomeClick } = await import(join(engine, 'metronome.ts'))
 
 /** How many bars of each song's plan are checked in. The whole song is `--full`. */
 const PLAN_BARS = 4
@@ -442,6 +443,8 @@ write(join(fixtures, 'prng'), 'xorshift32.json', json(SEEDS.map((seed) => {
     }
   }
   write(join(fixtures, 'voices'), 'specs.json', `[\n${lines.join(',\n')}\n]\n`)
+  // The metronome's two clicks, which are not voices but are described as one.
+  write(join(fixtures, 'voices'), 'metronome.json', json([true, false].map((strong) => ({ strong, spec: metronomeClick(strong) }))))
   write(join(fixtures, 'voices'), 'kit.json', json(ALL_VOICES.map(({ id, name, machine, choke, trim, pitched }) => ({ id, name, machine, choke, trim, pitched }))))
 }
 
