@@ -22,6 +22,21 @@
         return out;
       }
 
+      // A finished frame shown in a view: a quad scaled to the fitted rectangle, sampling with
+      // the texture's own origin at the top, which is where a render pass put row zero.
+      vertex Full presentVertex(uint id [[vertex_id]], constant float2 &scale [[buffer(0)]]) {
+        float2 corners[4] = { float2(-1, -1), float2(1, -1), float2(-1, 1), float2(1, 1) };
+        Full out;
+        out.position = float4(corners[id] * scale, 0, 1);
+        out.uv = float2((corners[id].x + 1) * 0.5, (1 - corners[id].y) * 0.5);
+        return out;
+      }
+
+      fragment float4 presentFragment(Full in [[stage_in]], texture2d<float> frame [[texture(0)]]) {
+        constexpr sampler smooth(filter::linear, address::clamp_to_edge);
+        return float4(frame.sample(smooth, in.uv).rgb, 1);
+      }
+
       struct PulseUniforms {
         float time;
         float peak;

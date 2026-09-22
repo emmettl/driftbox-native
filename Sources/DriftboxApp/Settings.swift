@@ -9,6 +9,9 @@
     static let listensToMIDI = "midi.listens"
     static let sendsClock = "clock.sends"
     static let clockDestination = "clock.destination"
+    static let outputOpen = "visuals.window.open"
+    static let outputScreen = "visuals.window.screen"
+    static let outputFullScreen = "visuals.window.fullScreen"
   }
 
   extension MIDIOutput.Destination {

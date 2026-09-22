@@ -522,14 +522,23 @@
     private let analyser = Analyser()
     private var monitor = [Float](repeating: 0, count: Analyser.size)
 
+    /// The spectrum is only worked out again when new audio has arrived. That is what Web
+    /// Audio's analyser does — two reads inside one render quantum get the same answer — and it
+    /// matters because the smoothing is applied per analysis: a display faster than the audio
+    /// blocks, or two views asking in one frame, would otherwise make the bands fall faster
+    /// than they do on the web.
     func analyse() -> Analyser? {
       guard let host else { return nil }
+      let written = host.mixWritten
+      if written == analysedAt { return analyser }
+      analysedAt = written
       monitor.withUnsafeMutableBufferPointer { buffer in
         host.recentMix(Analyser.size, into: buffer.baseAddress!)
         analyser.update(UnsafeBufferPointer(buffer))
       }
       return analyser
     }
+    private var analysedAt = -1
 
     /// The loudest sample of the last audio block, each side.
     var peaks: (left: Float, right: Float) {

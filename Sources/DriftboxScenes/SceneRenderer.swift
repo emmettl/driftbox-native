@@ -43,6 +43,52 @@
       commandBuffer.commit()
     }
 
+    // MARK: - Presenting a finished frame
+
+    /// How much of `target` a frame of size `frame` covers on each axis once fitted inside it
+    /// without distortion: one on the axis that fills, less than one on the one that is
+    /// letterboxed. A scene is framed for the shape it was drawn at, so a preview of a
+    /// projector's output shows the projector's picture with bars, not a picture of its own.
+    public static func fit(_ frame: SIMD2<Float>, in target: SIMD2<Float>) -> SIMD2<Float> {
+      guard frame.x > 0, frame.y > 0, target.x > 0, target.y > 0 else { return .zero }
+      let frameAspect = frame.x / frame.y
+      let targetAspect = target.x / target.y
+      return frameAspect > targetAspect
+        ? SIMD2(1, targetAspect / frameAspect) : SIMD2(frameAspect / targetAspect, 1)
+    }
+
+    private lazy var presentPipeline: MTLRenderPipelineState? = {
+      let descriptor = MTLRenderPipelineDescriptor()
+      descriptor.vertexFunction = library.makeFunction(name: "presentVertex")
+      descriptor.fragmentFunction = library.makeFunction(name: "presentFragment")
+      descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+      return try? device.makeRenderPipelineState(descriptor: descriptor)
+    }()
+
+    /// Show a frame `draw` has already finished in another target — a view's drawable —
+    /// fitted and centred, black around it. On the same queue as the drawing, so it can never
+    /// read a frame before that frame is written.
+    public func present(_ frame: MTLTexture, into target: MTLTexture, drawable: MTLDrawable? = nil) {
+      guard let presentPipeline, let commandBuffer = queue.makeCommandBuffer() else { return }
+      let pass = MTLRenderPassDescriptor()
+      pass.colorAttachments[0].texture = target
+      pass.colorAttachments[0].loadAction = .clear
+      pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+      pass.colorAttachments[0].storeAction = .store
+      if let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) {
+        var scale = Self.fit(
+          SIMD2(Float(frame.width), Float(frame.height)), in: SIMD2(Float(target.width), Float(target.height))
+        )
+        encoder.setRenderPipelineState(presentPipeline)
+        encoder.setVertexBytes(&scale, length: MemoryLayout<SIMD2<Float>>.stride, index: 0)
+        encoder.setFragmentTexture(frame, index: 0)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        encoder.endEncoding()
+      }
+      if let drawable { commandBuffer.present(drawable) }
+      commandBuffer.commit()
+    }
+
     public enum SceneError: Error {
       case noDevice
       /// A scene named a shader function the library does not have; the names it does have.
