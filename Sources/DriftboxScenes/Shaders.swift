@@ -75,6 +75,6 @@
         return float4(colour, 1);
       }
       """
-      + SurfaceScene.preamble + Scenes.surfaceSources
+      + SurfaceScene.preamble + Scenes.surfaceSources + Scenes.geometrySources
   }
 #endif

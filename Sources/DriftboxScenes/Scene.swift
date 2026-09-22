@@ -66,7 +66,7 @@
 
   /// The scenes there are, by id, and the one a song gets when the one it names is not here yet.
   public enum Scenes {
-    public static let all: [Scene.Type] = [Pulse.self] + surfaces
+    public static let all: [Scene.Type] = [Pulse.self] + surfaces + geometry
     public static let fallback: Scene.Type = Pulse.self
 
     /// The web's material studies, ported shader for shader.
@@ -74,6 +74,10 @@
       Orrery.self, Switchback.self, Daydream.self, SmallHours.self, PaperCities.self, Weave.self, Frost.self,
       Hothouse.self, NightBus.self,
     ]
+    /// The web's three.js scenes, reinterpreted over the geometry layer.
+    static let geometry: [GeometryScene.Type] = [Wireframe.self]
+    static var geometrySources: String { GeometryScene.preamble + [Wireframe.source].joined() }
+
     static var surfaceSources: String {
       [
         Orrery.source, Switchback.source, Daydream.source, SmallHours.source, PaperCities.source,

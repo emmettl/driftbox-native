@@ -315,6 +315,11 @@ bands of constant ratio, three for bass, three for mids, two for highs. The scor
 comes straight from the engine's atomics at the display's rate, smooth between steps, which is
 one better than the web's.
 
+The three.js scenes go over a geometry layer instead — `Camera`, three's projection and view
+matrices with Metal's depth range, and `GeometryScene`, which owns buffers and pipelines under
+three's blend modes — with each scene's vertex and fragment shaders carried over as the
+surfaces' are. Wireframe is the first.
+
 A scene cannot be looked at from a test, but it can be drawn into a texture and read back:
 every scene draws something that is not black and moves, and with `DRIFTBOX_SCENE_SHOTS` set
 to a directory the test writes each one there as PNGs at three moments — which is how the
