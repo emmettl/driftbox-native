@@ -59,7 +59,7 @@ gone native at all.
    inside the render block, lock-free rings both ways. The ring back to the interface carries
    *events* — which voice, accents, slides, sections — not only levels, so scenes can react to
    what was played rather than to a spectrum. Done when a bare player plays the catalogue.
-5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable wrapped into a
+5. ~~**The editor.**~~ Done. Begun as the Mac app itself, a SwiftPM executable wrapped into a
    bundle by `scripts/bundle-app.sh` (which the resource bundle needs, or `Bundle.module`
    asserts). Looked at, once, and three things came of it: a transport pushed above the window
    and a grid centred in its scroll view (layout, fixed); a main thread that re-planned the
@@ -79,7 +79,8 @@ gone native at all.
    the drums and the home row playing 303 A; stems, one WAV per voice; and CoreMIDI — notes
    from any source play the keys, and a **sync** button follows an external clock's tempo,
    start, stop and position, the estimator held to the reference's on a synthetic stream of
-   464 messages. Still to come: a proper document model, and MIDI clock *out*.
+   464 messages. Then MIDI clock *out*, held to the reference the same way, and the document
+   model, which turned out to be the same job as making the app a Mac app and went into phase 7.
 6. ~~**Visuals.**~~ Done. `DriftboxScenes`: a `Scene` protocol keeping the web scenes' ids
    and accents, a `SceneRenderer` over one compiled shader library, and Pulse, the fallback: a
    dark field that breathes with the level, a bloom and a ring on every kick, a flash on a
