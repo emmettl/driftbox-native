@@ -151,6 +151,45 @@
     }
   }
 
+  /// three's `BoxGeometry` at one segment a side: six quads with their outward normals.
+  public enum Box {
+    public static func build(width: Float, height: Float, depth: Float) -> (
+      positions: [SIMD3<Float>], normals: [SIMD3<Float>], indices: [UInt32]
+    ) {
+      let half = SIMD3(width, height, depth) / 2
+      let faces: [(normal: SIMD3<Float>, across: SIMD3<Float>, up: SIMD3<Float>)] = [
+        (SIMD3(1, 0, 0), SIMD3(0, 0, -1), SIMD3(0, 1, 0)),
+        (SIMD3(-1, 0, 0), SIMD3(0, 0, 1), SIMD3(0, 1, 0)),
+        (SIMD3(0, 1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, 1)),
+        (SIMD3(0, -1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, -1)),
+        (SIMD3(0, 0, 1), SIMD3(1, 0, 0), SIMD3(0, 1, 0)),
+        (SIMD3(0, 0, -1), SIMD3(-1, 0, 0), SIMD3(0, 1, 0)),
+      ]
+      var positions: [SIMD3<Float>] = []
+      var normals: [SIMD3<Float>] = []
+      var indices: [UInt32] = []
+      for face in faces {
+        let centre = face.normal * half
+        let across = face.across * half
+        let up = face.up * half
+        let first = UInt32(positions.count)
+        for corner in [(-1, 1), (1, 1), (1, -1), (-1, -1)] as [(Float, Float)] {
+          positions.append(centre + across * corner.0 + up * corner.1)
+          normals.append(face.normal)
+        }
+        indices.append(contentsOf: [first, first + 1, first + 2, first, first + 2, first + 3])
+      }
+      return (positions, normals, indices)
+    }
+  }
+
+  /// Symmetric smoothing, for a field of objects where an instant onset looks like a flash.
+  public func glide(_ current: Float, toward target: Float, dt: Float, attack: Float, release: Float)
+    -> Float
+  {
+    current + (target - current) * min(1, dt * (target > current ? attack : release))
+  }
+
   /// three's `IcosahedronGeometry`: the solid's twenty faces subdivided `detail` times and
   /// pushed out to the sphere, in three's own order, and not indexed — as three leaves it.
   public enum Icosahedron {
@@ -256,6 +295,17 @@
     public let device: MTLDevice
     public let library: MTLLibrary
     public var camera = Camera()
+    /// Depth, for the scenes with solid geometry. Every geometry pipeline declares the format
+    /// and the pass always carries the texture, so a scene turns depth on by asking for
+    /// `depthState` and leaves it off by not — rather than by each scene owning a pass.
+    public static let depthFormat = MTLPixelFormat.depth32Float
+    var depth: MTLTexture?
+    public private(set) lazy var depthState: MTLDepthStencilState? = {
+      let descriptor = MTLDepthStencilDescriptor()
+      descriptor.depthCompareFunction = .less
+      descriptor.isDepthWriteEnabled = true
+      return device.makeDepthStencilState(descriptor: descriptor)
+    }()
     var lastTime: Double?
     var touchAt = SIMD2<Float>(0.5, 0.5)
     var touchEnergy: Float = 0
@@ -294,6 +344,17 @@
       pass.colorAttachments[0].clearColor = MTLClearColor(
         red: Double(background.x), green: Double(background.y), blue: Double(background.z), alpha: 1)
       pass.colorAttachments[0].storeAction = .store
+      if depth == nil || depth?.width != target.width || depth?.height != target.height {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+          pixelFormat: Self.depthFormat, width: target.width, height: target.height, mipmapped: false)
+        descriptor.usage = .renderTarget
+        descriptor.storageMode = .private
+        depth = device.makeTexture(descriptor: descriptor)
+      }
+      pass.depthAttachment.texture = depth
+      pass.depthAttachment.loadAction = .clear
+      pass.depthAttachment.clearDepth = 1
+      pass.depthAttachment.storeAction = .dontCare
       guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else { return }
       encode(encoder)
       encoder.endEncoding()
@@ -306,6 +367,7 @@
       else { throw SceneRenderer.SceneError.missingFunction("\(vertex), \(fragment)", library.functionNames) }
       descriptor.vertexFunction = vertexFunction
       descriptor.fragmentFunction = fragmentFunction
+      descriptor.depthAttachmentPixelFormat = Self.depthFormat
       let colour = descriptor.colorAttachments[0]!
       colour.pixelFormat = .bgra8Unorm
       switch blend {
