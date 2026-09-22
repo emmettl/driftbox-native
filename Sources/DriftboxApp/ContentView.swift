@@ -104,7 +104,7 @@
         }
       }
       .overlay(alignment: .bottom) {
-        if let error = player.error {
+        if let error = player.error ?? player.outputError {
           Text(error).padding(8).background(.red.opacity(0.8)).foregroundStyle(.white).cornerRadius(6)
             .padding()
         }

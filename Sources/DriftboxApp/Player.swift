@@ -53,7 +53,9 @@
     private(set) var isPlaying = false
     /// Where the transport is, in the song's own frames.
     private(set) var songFrame = 0
-    private(set) var sampleRate = 48000.0
+    /// The engine's rate, which is the unit's and not the device's: the device can change under
+    /// the unit, and the output converts.
+    var sampleRate: Double { host?.sampleRate ?? 48000 }
     private(set) var error: String?
     /// The last voice struck, by index into `allVoices`, and when. Taken from the engine's
     /// events ring thirty times a second.
@@ -89,6 +91,22 @@
 
     private let audio = AVAudioEngine()
     private var unit: DriftboxAudioUnit?
+    /// Where the sound goes out, kept there as devices come and go.
+    private var route: AudioRoute?
+    /// The device chosen to play through, by its UID; nil for whatever the system plays through.
+    var outputDevice: String? {
+      didSet { route?.chosen = outputDevice }
+    }
+    /// Every device there is to play through, kept up to date as they come and go.
+    private(set) var outputs: [AudioOutput] = []
+    /// The one the sound is going out of: the chosen one while it is there, the system's while
+    /// it is not.
+    private(set) var playingThrough: AudioOutput?
+    /// The device the system plays through, which is what "the system's" means today.
+    private(set) var systemOutput: AudioOutput?
+    /// Why nothing can be heard, while nothing can. Apart from `error`, because it goes away on
+    /// its own when a device comes back.
+    private(set) var outputError: String?
     /// An engine of the player's own, for a player made without an audio unit to hold one.
     private var standalone: EngineHost?
     private var clock: Timer?
@@ -188,14 +206,20 @@
           }
           audio.attach(made)
           audio.connect(made, to: audio.mainMixerNode, format: made.outputFormat(forBus: 0))
-          sampleRate = made.outputFormat(forBus: 0).sampleRate
           unit = driftbox
-          do {
-            try audio.start()
-          } catch {
-            self.error = "\(error)"
-          }
           if let song { driftbox.load(song) }
+          // The route starts the engine, on the device chosen, and starts it again whenever a
+          // change of device stops it.
+          let route = AudioRoute(engine: audio, chosen: outputDevice)
+          route.onChange = { [weak self, weak route] in
+            guard let self, let route else { return }
+            outputs = route.outputs
+            playingThrough = route.current
+            systemOutput = route.systemDefault
+            outputError = route.error
+          }
+          route.onChange?()
+          self.route = route
         }
       }
       clock = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
@@ -227,7 +251,6 @@
     /// and calls `tick` when it wants the interface to catch up.
     init(host: EngineHost) {
       standalone = host
-      sampleRate = host.sampleRate
     }
 
     /// Both ends of the engine, which the audio unit and a standalone host answer differently: the

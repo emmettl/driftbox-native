@@ -18,6 +18,10 @@
     static let outputOpen = "visuals.window.open"
     static let outputScreen = "visuals.window.screen"
     static let outputFullScreen = "visuals.window.fullScreen"
+    /// The device to play through, by its UID; empty for the system's.
+    static let audioOutput = "audio.output"
+    /// Its name, for saying which device it is while it is not plugged in.
+    static let audioOutputName = "audio.output.name"
   }
 
   extension MIDIOutput.Destination {
@@ -43,9 +47,11 @@
     @AppStorage(Defaults.ignoredMIDI) private var ignored = ""
     @AppStorage(Defaults.sendsClock) private var sends = false
     @AppStorage(Defaults.clockDestination) private var destination = ""
+    @AppStorage(Defaults.audioOutput) private var output = ""
 
     func body(content: Content) -> some View {
       content
+        .onChange(of: output, initial: true) { _, uid in player.outputDevice = uid.isEmpty ? nil : uid }
         .onChange(of: visuals, initial: true) { _, on in player.showsVisuals = on }
         .onChange(of: listens, initial: true) { _, on in player.listensToMIDI = on }
         .onChange(of: ignored, initial: true) { _, names in
@@ -59,8 +65,8 @@
     }
   }
 
-  /// The settings window: the MIDI the app listens to, the clock it sends, and whether the
-  /// visuals run. Everything here is something the engine actually reads.
+  /// The settings window: where the sound goes, the MIDI the app listens to, the clock it sends,
+  /// and whether the visuals run. Everything here is something the engine actually reads.
   public struct SettingsView: View {
     let player: Player
     @AppStorage(Defaults.visuals) private var visuals = true
@@ -68,6 +74,8 @@
     @AppStorage(Defaults.ignoredMIDI) private var ignored = ""
     @AppStorage(Defaults.sendsClock) private var sends = false
     @AppStorage(Defaults.clockDestination) private var destination = ""
+    @AppStorage(Defaults.audioOutput) private var output = ""
+    @AppStorage(Defaults.audioOutputName) private var outputName = ""
 
     public init(player: Player) {
       self.player = player
@@ -75,6 +83,20 @@
 
     public var body: some View {
       Form {
+        Section("Audio Out") {
+          Picker("Play through", selection: device) {
+            Text(player.systemOutput.map { "System (\($0.name))" } ?? "System").tag("")
+            ForEach(player.outputs, id: \.uid) { output in Text(output.name).tag(output.uid) }
+            // A choice that is not plugged in is still the choice, and says so, rather than the
+            // picker quietly showing something else.
+            if !output.isEmpty, !player.outputs.contains(where: { $0.uid == output }) {
+              Text("\(outputName.isEmpty ? "A device" : outputName) (not connected)").tag(output)
+            }
+          }
+          if !output.isEmpty, let playing = player.playingThrough, playing.uid != output {
+            Text("Playing through \(playing.name) until it is back.").foregroundStyle(.secondary)
+          }
+        }
         Section("MIDI In") {
           Toggle("Play notes and follow clock from MIDI", isOn: $listens)
           // One switch per source, under the one over all of them. A source that is gone keeps
@@ -100,6 +122,17 @@
       .formStyle(.grouped)
       .frame(width: 440)
       .fixedSize()
+    }
+
+    /// The device chosen, as a selection that writes its name down with it.
+    private var device: Binding<String> {
+      Binding(
+        get: { output },
+        set: { uid in
+          if let chosen = player.outputs.first(where: { $0.uid == uid }) { outputName = chosen.name }
+          if uid.isEmpty { outputName = "" }
+          output = uid
+        })
     }
 
     /// Whether `name` is heard, as a switch that writes the stored list of what is not.
