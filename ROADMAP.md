@@ -104,7 +104,7 @@ gone native at all.
    instancing with it. Then Stillwater, the one that reads events
    rather than levels: rings dropped on black water by an onset detector, and a camera aimed
    by its own angles. Then Light Cycles, whose walls are rewritten
-   every frame and whose bikes turn on the beat. Then Clouds and Longhand. Twenty of twenty-seven,
+   every frame and whose bikes turn on the beat. Then Clouds and Longhand. Then Defcon and Dancers. Twenty-two of twenty-seven,
    and the snapshot test now draws with a finger as well — Longhand is a blank page until
    something is drawn on it, so a scene given no touch had nothing to show and nothing to move.
    One thing Longhand wants that the native side does not have yet: the web samples the pointer
