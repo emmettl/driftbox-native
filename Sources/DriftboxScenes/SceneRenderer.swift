@@ -33,15 +33,11 @@
       sceneType = type
     }
 
-    /// One frame, drawn and committed. `now` is on the same clock `init` was given.
-    public func draw(
-      into target: MTLTexture, now: Double, peakLeft: Float, peakRight: Float, events: [EngineEvent],
-      touch: SIMD2<Float>? = nil, bar: Int = 0, step: Int = 0, drawable: MTLDrawable? = nil
-    ) {
+    /// One frame, drawn and committed. `input.time` is on the same clock `init` was given.
+    public func draw(_ input: SceneInput, into target: MTLTexture, drawable: MTLDrawable? = nil) {
       guard let commandBuffer = queue.makeCommandBuffer() else { return }
-      let input = SceneInput(
-        time: now - started, peakLeft: peakLeft, peakRight: peakRight, events: events, touch: touch, bar: bar,
-        step: step)
+      var input = input
+      input.time -= started
       scene.draw(input, into: target, size: SIMD2(target.width, target.height), commandBuffer: commandBuffer)
       if let drawable { commandBuffer.present(drawable) }
       commandBuffer.commit()
@@ -49,6 +45,8 @@
 
     public enum SceneError: Error {
       case noDevice
+      /// A scene named a shader function the library does not have; the names it does have.
+      case missingFunction(String, [String])
     }
   }
 #endif

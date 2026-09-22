@@ -41,8 +41,17 @@ public final class EngineHost: @unchecked Sendable {
   public let engineFrame = Atomic<Int>(0)
   public let playing = Atomic<Bool>(false)
 
+  /// The last `monitorFrames` frames of the mix, mono, for a scene's spectrum: the render thread
+  /// writes them after each call and `recentMix` copies them out. No lock — a frame that is
+  /// half-written when it is read is a frame of visuals, not of audio.
+  public static let monitorFrames = 4096
+  let monitor: UnsafeMutablePointer<Float>
+  let monitorWritten = Atomic<Int>(0)
+
   public init(sampleRate: Double, voiceCapacity: Int = 32) {
     self.sampleRate = sampleRate
+    monitor = .allocate(capacity: Self.monitorFrames)
+    monitor.initialize(repeating: 0, count: Self.monitorFrames)
     engine = .allocate(capacity: 1)
     engine.initialize(to: SongEngine(sampleRate: sampleRate, voiceCapacity: voiceCapacity))
     commands = .allocate(capacity: 1)
@@ -52,6 +61,7 @@ public final class EngineHost: @unchecked Sendable {
   }
 
   deinit {
+    monitor.deallocate()
     engine.deinitialize(count: 1)
     engine.deallocate()
     commands.deinitialize(count: 1)
@@ -69,6 +79,19 @@ public final class EngineHost: @unchecked Sendable {
   /// The next thing the engine reports having played, from the interface's thread only.
   public func nextEvent() -> EngineEvent? {
     engine.pointee.events.receive()
+  }
+
+  /// The most recent `count` frames of the mix, oldest first, into `out`. At most
+  /// `monitorFrames`.
+  public func recentMix(_ count: Int, into out: UnsafeMutablePointer<Float>) {
+    let count = min(count, Self.monitorFrames)
+    let end = monitorWritten.load(ordering: .acquiring)
+    var at = ((end - count) % Self.monitorFrames + Self.monitorFrames) % Self.monitorFrames
+    for index in 0..<count {
+      out[index] = monitor[at]
+      at += 1
+      if at == Self.monitorFrames { at = 0 }
+    }
   }
 
   // MARK: - From the interface
@@ -155,6 +178,15 @@ public final class EngineHost: @unchecked Sendable {
     }
     peakLeft.store(loudestLeft.bitPattern, ordering: .relaxed)
     peakRight.store(loudestRight.bitPattern, ordering: .relaxed)
+    var written = monitorWritten.load(ordering: .relaxed)
+    var at = written % Self.monitorFrames
+    for index in 0..<frames {
+      monitor[at] = (left[index] + right[index]) * 0.5
+      at += 1
+      if at == Self.monitorFrames { at = 0 }
+    }
+    written += frames
+    monitorWritten.store(written, ordering: .releasing)
     songFrame.store(engine.pointee.songFrame(), ordering: .relaxed)
     engineFrame.store(engine.pointee.frame, ordering: .relaxed)
     playing.store(engine.pointee.isPlaying, ordering: .relaxed)

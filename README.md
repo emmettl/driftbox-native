@@ -286,21 +286,44 @@ includes reading a `static let`, because that is initialised on first use, behin
 ### The app
 
 ```bash
-swift run -c release Driftbox
+scripts/bundle-app.sh && open .build-release/Driftbox.app
 ```
 
-The Mac app, as far as it goes: the catalogue as a library, a transport, and the step grid of the
-pattern the transport is in, live and editable. A SwiftPM executable rather than an Xcode
-project for now, which is why it announces itself to the system by hand on launch.
+The Mac app, as far as it goes: the catalogue as a library, a transport, the step and 303 grids
+of the pattern the transport is in, live and editable, the voice and effects panels, the pad,
+the visuals, and open, save and export. A SwiftPM executable rather than an Xcode project for
+now, which is why it announces itself to the system by hand on launch, and why a script has to
+wrap it into a bundle: `swift run Driftbox` also works, but the catalogue lives in a resource
+bundle that `Bundle.module` looks for beside the executable and in `Contents/Resources`, and the
+script puts a copy in both.
 
 ### Visuals
 
-`DriftboxScenes` is the start of phase 6: a `Scene` protocol that keeps the web scenes' ids and
-accent colours, so a song's `visual` hint resolves here too, and draws whatever it likes; a
-renderer over one shader library compiled at launch; and one scene, the fallback, driven by the
-engine's events ring, the block peaks and the pad. A scene cannot be looked at from a test, but
-it can be drawn into a texture and read back: dark when nothing is happening, brighter on a kick,
-fading, and different again on a note.
+`DriftboxScenes` is phase 6: a `Scene` protocol that keeps the web scenes' ids and accent
+colours, so a song's `visual` hint resolves here too, and draws whatever it likes; a renderer
+over one shader library compiled at launch; the fallback scene, driven by the engine's events
+ring, the block peaks and the pad; and the web's nine *surface* scenes — Orrery, Switchback,
+Daydream, Small Hours, Paper Cities, Weave, Frost, Hothouse and Night Bus — which are each one
+fragment shader over the screen (two of them with a layer of instanced cards on top), fed the
+same handful of numbers. Their GLSL carries to Metal almost line for line, under the web's own
+uniform names, so those eight look exactly as they do there.
+
+What they are fed is what the web feeds them. `Analyser` is Web Audio's `AnalyserNode` as the
+web engine configures it — 2048 frames, Blackman window, 0.75 smoothing, -100 to -30 dB as
+bytes — over a mono tap of the mix the host keeps for it, and then the web's `readBands`: eight
+bands of constant ratio, three for bass, three for mids, two for highs. The score position
+comes straight from the engine's atomics at the display's rate, smooth between steps, which is
+one better than the web's.
+
+The three.js scenes go over a geometry layer instead — `Camera`, three's projection and view
+matrices with Metal's depth range, and `GeometryScene`, which owns buffers and pipelines under
+three's blend modes — with each scene's vertex and fragment shaders carried over as the
+surfaces' are. Wireframe is the first.
+
+A scene cannot be looked at from a test, but it can be drawn into a texture and read back:
+every scene draws something that is not black and moves, and with `DRIFTBOX_SCENE_SHOTS` set
+to a directory the test writes each one there as PNGs at three moments — which is how the
+ports were checked by eye.
 
 ### Playing
 

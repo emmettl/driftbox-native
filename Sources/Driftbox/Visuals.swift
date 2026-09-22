@@ -44,10 +44,15 @@
       func draw(in view: MTKView) {
         guard let renderer, let drawable = view.currentDrawable else { return }
         let peaks = player.peaks
-        renderer.draw(
-          into: drawable.texture, now: CACurrentMediaTime(), peakLeft: peaks.left, peakRight: peaks.right,
-          events: player.takeEvents(), touch: player.padTouch, bar: player.position?.bar ?? 0,
-          step: player.position?.step ?? 0, drawable: drawable)
+        let position = player.position
+        let analyser = player.analyse()
+        let input = SceneInput(
+          time: CACurrentMediaTime(), peakLeft: peaks.left, peakRight: peaks.right,
+          events: player.takeEvents(), touch: player.padTouch, bar: position?.bar ?? 0,
+          step: position?.step ?? 0, running: player.isPlaying, bpm: player.tempo,
+          scoreBeat: player.scoreBeat(), levels: analyser?.levels() ?? (0, 0, 0),
+          wideLevels: analyser?.wideLevels() ?? (0, 0))
+        renderer.draw(input, into: drawable.texture, drawable: drawable)
       }
     }
   }

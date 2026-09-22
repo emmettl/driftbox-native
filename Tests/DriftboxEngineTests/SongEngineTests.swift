@@ -98,4 +98,42 @@ struct SongEngineTests {
     #expect(rendered.left[join - 480..<join].contains { $0 != 0 })
     #expect(rendered.left[join..<join + 240].map(abs).max()! > 0.05)
   }
+
+  /// A stopped song stays where it stopped, however long the engine's own clock runs on — and
+  /// takes up from there, not from wherever the clock has got to.
+  @Test func aStoppedSongHoldsItsPlace() throws {
+    let song = try Self.song("acid")
+    var engine = SongEngine(sampleRate: Self.sampleRate, voiceCapacity: 32)
+    let compiled = UnsafeMutablePointer<CompiledSong>.allocate(capacity: 1)
+    compiled.initialize(to: CompiledSong(song, preparer: engine.voices.preparer))
+    defer {
+      compiled.deinitialize(count: 1)
+      compiled.deallocate()
+    }
+    var left = [Float](repeating: 0, count: 128)
+    var right = [Float](repeating: 0, count: 128)
+    func render(blocks: Int) {
+      for _ in 0..<blocks {
+        left.withUnsafeMutableBufferPointer { l in
+          right.withUnsafeMutableBufferPointer { r in
+            engine.render(frames: 128, left: l.baseAddress!, right: r.baseAddress!)
+          }
+        }
+      }
+    }
+    engine.load(compiled)
+    engine.play()
+    render(blocks: 100)
+    #expect(engine.songFrame() == 12800)
+    engine.stop()
+    render(blocks: 1000)
+    #expect(engine.songFrame() == 12800)
+    engine.seek(toSongFrame: 4800)
+    render(blocks: 10)
+    #expect(engine.songFrame() == 4800)
+    engine.play()
+    render(blocks: 10)
+    #expect(engine.songFrame() == 4800 + 1280)
+    engine.load(nil)
+  }
 }

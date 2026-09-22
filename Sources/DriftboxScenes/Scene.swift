@@ -17,11 +17,23 @@
     /// Which bar and step the transport is on, for scenes that count.
     public var bar: Int
     public var step: Int
+    /// Whether the transport is running: scenes that travel stand still when it is not.
+    public var running: Bool
+    /// The transport's tempo, so a scene can dance on the record rather than near it.
+    public var bpm: Double
+    /// Where the song is in quarter notes from the top, when it is somewhere.
+    public var scoreBeat: Double?
+    /// The mix's bass, mids and highs, 0...1, from the `Analyser`'s eight bands.
+    public var levels: (bass: Float, mid: Float, high: Float)
+    /// The web's other reading of the same spectrum — the bottom few bins and the top half —
+    /// for the scenes written against `readLevels`.
+    public var wideLevels: (bass: Float, high: Float)
 
     public init(
       time: Double, peakLeft: Float = 0, peakRight: Float = 0, events: [EngineEvent] = [],
-      touch: SIMD2<Float>? = nil,
-      bar: Int = 0, step: Int = 0
+      touch: SIMD2<Float>? = nil, bar: Int = 0, step: Int = 0, running: Bool = false, bpm: Double = 120,
+      scoreBeat: Double? = nil, levels: (bass: Float, mid: Float, high: Float) = (0, 0, 0),
+      wideLevels: (bass: Float, high: Float) = (0, 0)
     ) {
       self.time = time
       self.peakLeft = peakLeft
@@ -30,6 +42,11 @@
       self.touch = touch
       self.bar = bar
       self.step = step
+      self.running = running
+      self.bpm = bpm
+      self.scoreBeat = scoreBeat
+      self.levels = levels
+      self.wideLevels = wideLevels
     }
   }
 
@@ -49,8 +66,25 @@
 
   /// The scenes there are, by id, and the one a song gets when the one it names is not here yet.
   public enum Scenes {
-    public static let all: [Scene.Type] = [Pulse.self]
+    public static let all: [Scene.Type] = [Pulse.self] + surfaces + geometry
     public static let fallback: Scene.Type = Pulse.self
+
+    /// The web's material studies, ported shader for shader.
+    static let surfaces: [SurfaceScene.Type] = [
+      Orrery.self, Switchback.self, Daydream.self, SmallHours.self, PaperCities.self, Weave.self, Frost.self,
+      Hothouse.self, NightBus.self,
+    ]
+    /// The web's three.js scenes, reinterpreted over the geometry layer.
+    static let geometry: [GeometryScene.Type] = [Wireframe.self]
+    static var geometrySources: String { GeometryScene.preamble + [Wireframe.source].joined() }
+
+    static var surfaceSources: String {
+      [
+        Orrery.source, Switchback.source, Daydream.source, SmallHours.source, PaperCities.source,
+        Weave.source, Frost.source, Hothouse.source, NightBus.source,
+      ]
+      .joined()
+    }
 
     public static func type(for id: String?) -> Scene.Type {
       all.first { $0.id == id } ?? fallback

@@ -29,15 +29,16 @@
           Divider()
           if let song = player.song {
             if player.showsVisuals {
-              Visuals(player: player).frame(minHeight: 180, idealHeight: 220)
+              Visuals(player: player).frame(height: 200)
               Divider()
             }
             PatternBar(player: player, song: song)
             Divider()
             HStack(alignment: .top, spacing: 0) {
               Sequencer(player: player, song: song)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
               Divider()
-              VStack(spacing: 0) {
+              ScrollView {
                 if let id = player.selectedVoice, let voice = voice(id: id) {
                   VoicePanel(
                     player: player, voice: voice, params: song.kit.params[id] ?? VoiceParams(),
@@ -47,8 +48,8 @@
                 }
                 Divider()
                 KaossPad(player: player).frame(width: 220, height: 160).padding(12)
-                Spacer()
               }
+              .frame(width: 244)
             }
           } else {
             ContentUnavailableView("Pick a song", systemImage: "music.note.list")
@@ -171,20 +172,25 @@
 
     var body: some View {
       let bar = player.position?.bar ?? -1
-      HStack(spacing: 3) {
-        ForEach(Array(song.chain.enumerated()), id: \.offset) { index, entry in
-          let start = song.chain.prefix(index).reduce(0) { $0 + max(1, $1.repeat) }
-          let playing = bar >= start && bar < start + max(1, entry.repeat)
-          Button {
-            player.seek(toBar: start)
-          } label: {
-            Text(song.pattern(id: entry.pattern)?.name.prefix(6) ?? "?")
-              .font(.system(size: 9)).padding(.horizontal, 4).padding(.vertical, 3)
-              .background(playing ? Color.orange : Color.secondary.opacity(0.2)).cornerRadius(3)
+      // A long chain scrolls; it never wraps a name onto two lines to fit.
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 3) {
+          ForEach(Array(song.chain.enumerated()), id: \.offset) { index, entry in
+            let start = song.chain.prefix(index).reduce(0) { $0 + max(1, $1.repeat) }
+            let playing = bar >= start && bar < start + max(1, entry.repeat)
+            Button {
+              player.seek(toBar: start)
+            } label: {
+              Text(song.pattern(id: entry.pattern)?.name.prefix(6) ?? "?")
+                .font(.system(size: 9)).lineLimit(1).fixedSize()
+                .padding(.horizontal, 4).padding(.vertical, 3)
+                .background(playing ? Color.orange : Color.secondary.opacity(0.2)).cornerRadius(3)
+            }
+            .buttonStyle(.plain)
           }
-          .buttonStyle(.plain)
         }
       }
+      .frame(width: 420)
     }
   }
 
@@ -195,7 +201,6 @@
     let song: Song
 
     var pattern: DriftboxSeq.Pattern? { player.shownPattern }
-    var steps: [Int] { (0..<(pattern?.length ?? 0)).map { $0 } }
 
     var body: some View {
       if let pattern {
@@ -203,59 +208,76 @@
         let playing = player.position?.pattern?.id == pattern.id
         let playhead = playing ? (player.position?.step ?? -1) : -1
         let voices = allVoices.filter { pattern.tracks[$0.id] != nil }
-        ScrollView {
-          Grid(alignment: .leading, horizontalSpacing: 4, verticalSpacing: 4) {
-            ForEach(voices, id: \.id) { voice in
-              GridRow {
-                let index = allVoices.firstIndex { $0.id == voice.id } ?? -1
-                let struck = player.lastHits[index].map { player.engineFrame - $0 < 4800 } ?? false
-                HStack(spacing: 2) {
-                  Button(voice.name) {
-                    player.selectedVoice = player.selectedVoice == voice.id ? nil : voice.id
-                  }
-                  .buttonStyle(.plain)
-                  .font(.caption.weight(player.selectedVoice == voice.id ? .bold : .regular))
-                  .foregroundStyle(struck ? Color.orange : Color.primary)
-                  LaneMenu(player: player, pattern: pattern, voiceId: voice.id) {
-                    AnyView(Image(systemName: "ellipsis.circle").font(.caption).foregroundStyle(.secondary))
-                  }
-                }
-                .frame(width: 110, alignment: .leading)
-                ForEach(steps, id: \.self) { index in
-                  StepButton(
-                    value: pattern.step(voice.id, at: index), playing: index == playhead,
-                    onBeat: index % 4 == 0
-                  ) {
-                    cycle(voice.id, at: index, in: pattern.id)
-                  }
+        GeometryReader { viewport in
+          ScrollView([.horizontal, .vertical]) {
+            VStack(alignment: .leading, spacing: 0) {
+              Grid(alignment: .leading, horizontalSpacing: 4, verticalSpacing: 4) {
+                ForEach(voices, id: \.id) { voice in
+                  let index = allVoices.firstIndex { $0.id == voice.id } ?? -1
+                  Lane(
+                    player: player, pattern: pattern, voiceId: voice.id, name: voice.name,
+                    struck: player.struck.contains(index), selected: player.selectedVoice == voice.id,
+                    playhead: playhead)
                 }
               }
+              .padding(12)
+              ForEach(["303.a", "303.b"].filter { pattern.bass[$0] != nil }, id: \.self) { voiceId in
+                BassGrid(player: player, pattern: pattern, voiceId: voiceId, playhead: playhead).padding(12)
+              }
             }
-          }
-          .padding(12)
-          ForEach(["303.a", "303.b"].filter { pattern.bass[$0] != nil }, id: \.self) { voiceId in
-            BassGrid(player: player, pattern: pattern, voiceId: voiceId, playhead: playhead).padding(12)
+            .frame(minWidth: viewport.size.width, minHeight: viewport.size.height, alignment: .topLeading)
           }
         }
       }
     }
 
-    func cycle(_ voiceId: String, at index: Int, in patternId: String) {
-      player.edit { song in
-        guard let at = song.patterns.firstIndex(where: { $0.id == patternId }) else { return }
-        song.patterns[at] = song.patterns[at].cyclingStep(voiceId, at: index)
+  }
+
+  /// One voice's row of the grid. Its inputs are all plain values, so a step elsewhere, or a
+  /// flash on another lane, leaves this one's body alone.
+  struct Lane: View {
+    let player: Player
+    let pattern: DriftboxSeq.Pattern
+    let voiceId: String
+    let name: String
+    let struck: Bool
+    let selected: Bool
+    let playhead: Int
+
+    var body: some View {
+      GridRow {
+        HStack(spacing: 2) {
+          Button(name) {
+            player.selectedVoice = selected ? nil : voiceId
+          }
+          .buttonStyle(.plain)
+          .font(.caption.weight(selected ? .bold : .regular))
+          .foregroundStyle(struck ? Color.orange : Color.primary)
+          LaneMenu(player: player, pattern: pattern, voiceId: voiceId) {
+            AnyView(Image(systemName: "ellipsis.circle").font(.caption).foregroundStyle(.secondary))
+          }
+        }
+        .frame(width: 110, alignment: .leading)
+        ForEach(0..<pattern.length, id: \.self) { index in
+          StepButton(
+            player: player, patternId: pattern.id, voiceId: voiceId, index: index,
+            value: pattern.step(voiceId, at: index), playing: index == playhead)
+        }
       }
     }
   }
 
   struct StepButton: View {
+    let player: Player
+    let patternId: String
+    let voiceId: String
+    let index: Int
     let value: StepValue
     let playing: Bool
-    let onBeat: Bool
-    let action: () -> Void
+    var onBeat: Bool { index % 4 == 0 }
 
     var body: some View {
-      Button(action: action) {
+      Button(action: cycle) {
         RoundedRectangle(cornerRadius: 3)
           .fill(color)
           .frame(width: 22, height: 22)
@@ -263,6 +285,13 @@
             RoundedRectangle(cornerRadius: 3).stroke(onBeat ? Color.primary.opacity(0.3) : Color.clear))
       }
       .buttonStyle(.plain)
+    }
+
+    func cycle() {
+      player.edit { song in
+        guard let at = song.patterns.firstIndex(where: { $0.id == patternId }) else { return }
+        song.patterns[at] = song.patterns[at].cyclingStep(voiceId, at: index)
+      }
     }
 
     var color: Color {

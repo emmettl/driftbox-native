@@ -59,8 +59,15 @@ gone native at all.
    inside the render block, lock-free rings both ways. The ring back to the interface carries
    *events* — which voice, accents, slides, sections — not only levels, so scenes can react to
    what was played rather than to a spectrum. Done when a bare player plays the catalogue.
-5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable for now, and
-   never yet looked at — every slice was run and stayed up, and nobody has seen it. In so far:
+5. **The editor.** ← *here.* Begun as the Mac app itself, a SwiftPM executable wrapped into a
+   bundle by `scripts/bundle-app.sh` (which the resource bundle needs, or `Bundle.module`
+   asserts). Looked at, once, and three things came of it: a transport pushed above the window
+   and a grid centred in its scroll view (layout, fixed); a main thread that re-planned the
+   whole song every frame and then spent what was left re-diffing four hundred grid cells (the
+   step times are planned once, the tick writes only what changed, the 303 grid is a canvas);
+   and a stopped song that drifted with the engine's clock, thirteen bars in twenty-five
+   seconds (held in place, tested). It now plays the catalogue with the scene running and the
+   voice names flashing. In so far:
    the catalogue as a library; open and save of the web app's documents; a transport with the
    bar, step and pattern it is on, and the chain as a strip to jump around; the step grid of the
    pattern playing, live and editable; the 303 grids, with pitch, accent and slide; a panel of
@@ -73,13 +80,26 @@ gone native at all.
    from any source play the keys, and a **sync** button follows an external clock's tempo,
    start, stop and position, the estimator held to the reference's on a synthetic stream of
    464 messages. Still to come: a proper document model, and MIDI clock *out*.
-6. **Visuals.** ← *begun.* `DriftboxScenes`: a `Scene` protocol keeping the web scenes' ids
-   and accents, a `SceneRenderer` over one compiled shader library, and one scene — Pulse, the
-   fallback: a dark field that breathes with the level, a bloom and a ring on every kick, a
-   flash on a snare, a horizon that sparkles on hats, a 303 note as a line at its pitch, the
-   pad's cursor. Driven from the events ring, the block peaks and the pad, at the display's rate,
-   in a pane above the grid. Tested offscreen — dark when quiet, brighter on a kick, fading,
-   different on a note — and, like the rest of the app, not yet seen by anyone. What was planned:
+6. **Visuals.** ← *here.* `DriftboxScenes`: a `Scene` protocol keeping the web scenes' ids
+   and accents, a `SceneRenderer` over one compiled shader library, and Pulse, the fallback: a
+   dark field that breathes with the level, a bloom and a ring on every kick, a flash on a
+   snare, a horizon that sparkles on hats, a 303 note as a line at its pitch, the pad's cursor.
+   Then the web's nine surface scenes, ported shader for shader — Orrery, Switchback, Daydream,
+   Small Hours, Paper Cities, Weave, Frost, Hothouse, Night Bus — over an `Analyser` that is the web's
+   `AnalyserNode` on a mono tap of the mix, and a score position read from the engine at the
+   display's rate. Every scene is drawn offscreen by a test and, with an environment variable,
+   written out as PNGs; the eight were checked against the web's by eye that way, and Small
+   Hours and Paper Cities seen live in the app. Then the geometry layer — `Camera`, three's matrices with Metal's depth range, and
+   `GeometryScene`: buffers, pipelines under three's blend modes, a cleared background — with
+   Wireframe, the Rez corridor, as its first scene: one line list of sixty-four ribs and their
+   rails, moved in the vertex shader. Eleven of twenty-seven. The other sixteen are three.js
+   scenes with a perspective camera, and
+   what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
+   Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
+   Longhand, Machine, Cycles, Clouds, Convoy); a shader over an icosahedron or a sphere
+   (Lifeforms, Clouds); boxes, cylinders and a torus under lights (Machine, the only lit one);
+   a 2D canvas drawn each frame and shown as a texture (GraphicLab); and fog (Sunset, Lifeforms,
+   Cubik, Machine, Longhand). Still to add to the layer: points, indexed meshes, fog in the fragment, and one texture. What was planned:
    a thin Metal layer — lines, instanced meshes, full-screen and compute passes —
    and the scenes reinterpreted one at a time, with a fallback for any a song names that has not
    landed. Needs only the ring from phase 4, so it runs alongside phase 5.

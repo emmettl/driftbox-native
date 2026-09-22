@@ -5,6 +5,9 @@
   /// A 303 line: for each step, whether it sounds, its pitch across two octaves, accent and slide.
   /// Clicking a cell in the pitch rows sets the note there; clicking the note that is already set
   /// pauses it; the two rows underneath toggle accent and slide.
+  ///
+  /// Drawn as one canvas rather than four hundred views: the playhead moves eight times a second,
+  /// and re-diffing that many cells each time was a quarter of a core.
   struct BassGrid: View {
     let player: Player
     let pattern: DriftboxSeq.Pattern
@@ -13,45 +16,80 @@
 
     static let notes = Array((0...24).reversed())
     static let names = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
-    var steps: [Int] { (0..<pattern.length).map { $0 } }
+
+    static let labelWidth = 24.0
+    static let cellWidth = 22.0
+    static let columnStride = 24.0
+    static let noteHeight = 8.0
+    static let noteStride = 9.0
+    static let flagHeight = 12.0
+    static let flagStride = 13.0
+    static var notesHeight: Double { Double(notes.count) * noteStride }
+    static var height: Double { notesHeight + flagStride * 2 - 1 }
 
     var body: some View {
       VStack(alignment: .leading, spacing: 2) {
         BassMenu(player: player, pattern: pattern, voiceId: voiceId)
-        Grid(alignment: .leading, horizontalSpacing: 2, verticalSpacing: 1) {
-          ForEach(Self.notes, id: \.self) { note in
-            GridRow {
+        HStack(alignment: .top, spacing: 2) {
+          // The labels never change, so they are views; the cells are one drawing.
+          VStack(alignment: .trailing, spacing: 0) {
+            ForEach(Self.notes, id: \.self) { note in
               Text(note % 12 == 0 ? "C\(note / 12 + 1)" : Self.names[note % 12])
-                .font(.system(size: 9)).frame(width: 24, alignment: .trailing)
-              ForEach(steps, id: \.self) { index in
-                let step = pattern.bassStep(voiceId, at: index)
-                let here = Int(step.note ?? -1) == note
-                Rectangle()
-                  .fill(cellColor(step: step, here: here, playing: index == playhead))
-                  .frame(width: 22, height: 8)
-                  .onTapGesture { setNote(note, at: index) }
-              }
+                .font(.system(size: 9)).frame(height: Self.noteStride)
             }
+            Text("acc").font(.system(size: 9)).frame(height: Self.flagStride)
+            Text("sld").font(.system(size: 9)).frame(height: Self.flagStride)
           }
-          GridRow {
-            Text("acc").font(.system(size: 9)).frame(width: 24, alignment: .trailing)
-            ForEach(steps, id: \.self) { index in
-              let step = pattern.bassStep(voiceId, at: index)
-              Rectangle().fill(step.accent ? Color.red.opacity(0.8) : Color.secondary.opacity(0.15))
-                .frame(width: 22, height: 12)
-                .onTapGesture { edit(index) { $0.accent.toggle() } }
-            }
+          .frame(width: Self.labelWidth, alignment: .trailing)
+          Canvas(rendersAsynchronously: false) { context, _ in
+            draw(in: &context)
           }
-          GridRow {
-            Text("sld").font(.system(size: 9)).frame(width: 24, alignment: .trailing)
-            ForEach(steps, id: \.self) { index in
-              let step = pattern.bassStep(voiceId, at: index)
-              Rectangle().fill(step.slide ? Color.blue.opacity(0.8) : Color.secondary.opacity(0.15))
-                .frame(width: 22, height: 12)
-                .onTapGesture { edit(index) { $0 = $0.settingSlide(!$0.slide) } }
-            }
-          }
+          .frame(width: Double(pattern.length) * Self.columnStride - 2, height: Self.height)
+          .gesture(SpatialTapGesture().onEnded { tap in click(at: tap.location) })
         }
+      }
+    }
+
+    private static func x(ofStep index: Int) -> Double { Double(index) * columnStride }
+
+    /// Every cell of one colour is a single path: five fills rather than four hundred.
+    private func draw(in context: inout GraphicsContext) {
+      var paths: [Color: Path] = [:]
+      func add(_ rect: CGRect, _ color: Color) { paths[color, default: Path()].addRect(rect) }
+      for index in 0..<pattern.length {
+        let step = pattern.bassStep(voiceId, at: index)
+        let x = Self.x(ofStep: index)
+        for (row, note) in Self.notes.enumerated() {
+          let here = Int(step.note ?? -1) == note
+          add(
+            CGRect(x: x, y: Double(row) * Self.noteStride, width: Self.cellWidth, height: Self.noteHeight),
+            cellColor(step: step, here: here, playing: index == playhead))
+        }
+        add(
+          CGRect(x: x, y: Self.notesHeight, width: Self.cellWidth, height: Self.flagHeight),
+          step.accent ? Color.red.opacity(0.8) : Color.secondary.opacity(0.15))
+        add(
+          CGRect(
+            x: x, y: Self.notesHeight + Self.flagStride, width: Self.cellWidth, height: Self.flagHeight),
+          step.slide ? Color.blue.opacity(0.8) : Color.secondary.opacity(0.15))
+      }
+      for (color, path) in paths { context.fill(path, with: .color(color)) }
+    }
+
+    private func click(at point: CGPoint) {
+      let column = point.x / Self.columnStride
+      guard column >= 0, Int(column) < pattern.length,
+        column - column.rounded(.down) <= Self.cellWidth / Self.columnStride
+      else { return }
+      let index = Int(column)
+      if point.y < Self.notesHeight {
+        let row = Int(point.y / Self.noteStride)
+        guard row < Self.notes.count else { return }
+        setNote(Self.notes[row], at: index)
+      } else if point.y < Self.notesHeight + Self.flagStride {
+        edit(index) { $0.accent.toggle() }
+      } else {
+        edit(index) { $0 = $0.settingSlide(!$0.slide) }
       }
     }
 

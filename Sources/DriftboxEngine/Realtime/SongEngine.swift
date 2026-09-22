@@ -228,5 +228,8 @@ public struct SongEngine: ~Copyable {
       outRight[index] = filtered.right * Self.masterGain
     }
     frame += count
+    // The engine's clock always runs — tails, the pad and struck voices need it — but a stopped
+    // song stays where it stopped.
+    if !isPlaying { passStart += count }
   }
 }
