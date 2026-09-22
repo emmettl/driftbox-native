@@ -1,3 +1,5 @@
+import DriftboxDSP
+
 // Turning a patch into something the render thread can run without thinking. A port of
 // `driftbox/packages/rack/src/compile.ts`, which has the reasoning for every rule here: the
 // ordering, the cycle breaking, which buffer each cable is. It runs when a patch changes, never
@@ -61,9 +63,6 @@ public struct Plan: Sendable {
 let zeroBuffer = 0
 /// Eight notes through an eight-lane chord expander.
 let maximumRenderVoices = 64
-
-/// JavaScript's `Math.round`: halves go up, towards positive infinity.
-func jsRound(_ x: Double) -> Double { (x + 0.5).rounded(.down) }
 
 func clampParam(_ value: Double?, _ low: Double, _ high: Double, _ fallback: Double) -> Double {
   guard let value, value.isFinite else { return fallback }
