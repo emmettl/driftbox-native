@@ -104,14 +104,25 @@ gone native at all.
    instancing with it. Then Stillwater, the one that reads events
    rather than levels: rings dropped on black water by an onset detector, and a camera aimed
    by its own angles. Then Light Cycles, whose walls are rewritten
-   every frame and whose bikes turn on the beat. Then Clouds and Longhand. Twenty of twenty-seven,
+   every frame and whose bikes turn on the beat. Then Clouds and Longhand. Then Defcon and Dancers. Then Convoy and Machine — the last being the only lit
+   scene, with three's standard material approximated under an ambient, a directional and a
+   point light, and the one place three's fog is actually applied. Twenty-five of twenty-seven,
    and the snapshot test now draws with a finger as well — Longhand is a blank page until
    something is drawn on it, so a scene given no touch had nothing to show and nothing to move.
    One thing Longhand wants that the native side does not have yet: the web samples the pointer
    at its own rate, 120Hz on a ProMotion screen, so a flick that begins and ends between two
    frames is still drawn. `SceneInput` carries one touch a frame, so a fast hand draws a
    coarser line here. It needs a touch history on the input, which is a change to make when a
-   second scene wants one. The other sixteen are three.js
+   second scene wants one.
+
+   One thing the porting found in the web, not in the port: Defcon builds its land fill with
+   `rotateX(PI/2)` and then `scale(1, 1, -1)`, which puts it at z = -y, while the coastline
+   outline is pushed straight through at z = +y. The outlines are mirrored across z from the
+   landmasses they belong to, and since the blobs are not symmetric it shows. The scale is not
+   removable — laid flat by the rotation alone the triangles face down and a front-side
+   material draws nothing, so it is doing double duty as a winding fix — which makes following
+   it with the outline the safe direction. Fixed in the web as emmettl/driftbox#300 and here
+   at the same time, so the two do not disagree while that waits. The other sixteen are three.js
    scenes with a perspective camera, and
    what they draw, counted: `lineSegments` under a shader or a basic material (Wireframe, Web,
    Trench, Defcon, Convoy, Cycles, Clouds, Dancers); `points` (Saturn, Stillwater, Jumpman,
