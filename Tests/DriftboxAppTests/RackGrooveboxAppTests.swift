@@ -59,6 +59,7 @@
       player.edit("Set Tempo") { $0.bpm = 97 }
       #expect(rack.song?.bpm == 97)
       #expect(rack.tempo == 97)
+      #expect(!player.isEdited, "the rack keeps each edit, so quitting has nothing to ask about")
       rack.undo()
       #expect(rack.patch.modules.map(\.type) == ["groovebox"], "the rack's own edit undone")
       #expect(rack.song?.bpm == 97, "and the song as the window left it")
@@ -75,9 +76,14 @@
       let (rack, player) = Self.pair()
       rack.openSong(try Self.song(), name: "Garage")
       rack.editInGroovebox()
+      player.edit("Set Tempo") { $0.bpm = 97 }
       rack.open(Patch(modules: [], cables: []), name: "Empty")
       #expect(!rack.songLinked)
       #expect(!player.linkedToRack)
+      // Let go, the song is the window's own, and only what is done to it from here is unsaved.
+      #expect(!player.isEdited)
+      player.edit("Set Tempo") { $0.bpm = 150 }
+      #expect(player.isEdited)
       #expect(rack.song == nil)
       #expect(rack.notice == nil)
     }

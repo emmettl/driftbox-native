@@ -878,6 +878,8 @@
 
     private func replace(with edited: Song, undoing before: Song, name: String) {
       song = edited
+      // Linked, each edit is kept by the rack as it is made, so there is nothing here to save.
+      if rackLink != nil { saved = edited }
       isEdited = edited != saved
       undoManager?.registerUndo(withTarget: self) { player in
         MainActor.assumeIsolated { player.replace(with: before, undoing: edited, name: name) }
