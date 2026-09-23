@@ -66,6 +66,8 @@
       var y: Double
 
       var point: CGPoint { CGPoint(x: x, y: y) }
+      /// Which jack it is, whichever way round it is drawn.
+      var key: String { "\(module).\(port).\(kind == .inlet ? "in" : "out")" }
     }
 
     // MARK: Sizes

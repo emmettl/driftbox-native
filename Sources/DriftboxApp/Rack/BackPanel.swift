@@ -7,7 +7,8 @@
   /// outlets down the right in amber, and the cables hanging between them. Drag from a jack to a
   /// jack to patch — from either end, and it snaps — click a cable's belly or the × by its inlet
   /// to pull it out, and it goes up in smoke; drag a bay to move the module, and the cables on it
-  /// swing behind. Drawn in the layout's design units, scaled as one piece.
+  /// swing behind. Beside every inlet is a trim pot, bipolar, dragged up and down, double-clicked
+  /// back to unity. Drawn in the layout's design units, scaled as one piece.
   struct BackPanel: View {
     let model: RackModel
     let layout: RackLayout.Layout
@@ -16,6 +17,8 @@
     private enum Gesture {
       case patching(from: RackLayout.Jack)
       case moving(id: String, grab: CGPoint)
+      /// A trim pot, from where the press was and what the pot read then.
+      case trimming(RackLayout.Jack, y: Double, from: Double)
       case nothing
     }
 
@@ -47,8 +50,64 @@
       }
       .onChange(of: model.flippedAt) { keepAnimating(for: Cable.swingMilliseconds / 1000 + 0.1) }
       .onChange(of: wake) {}
-      .accessibilityElement(children: .ignore)
+      .accessibilityElement(children: .contain)
       .accessibilityLabel("Rack back panel, \(model.patch.cables.count) cables")
+      .accessibilityChildren { trimSliders(jacks) }
+    }
+
+    // MARK: Trims
+
+    /// Each pot as a slider, to a screen reader, where the pot is drawn: the panel is a picture,
+    /// so it says what is on it.
+    private func trimSliders(_ jacks: [RackLayout.Jack]) -> some View {
+      let inlets = jacks.filter { $0.kind == .inlet }
+      return ZStack(alignment: .topLeading) {
+        ForEach(inlets, id: \.key) { jack in
+          let pot = Self.pot(jack)
+          Circle()
+            .accessibilityRepresentation {
+              Slider(
+                value: Binding(
+                  get: { model.trim(jack.module, jack.port) },
+                  set: { value in
+                    model.setTrim(jack.module, jack.port, to: Self.trimStep(value))
+                    model.endTurn()
+                  }),
+                in: -1...1, step: 0.05
+              ) {
+                Text("\(jack.module) \(jack.name) input trim")
+              }
+              .accessibilityValue(Self.trimText(model.trim(jack.module, jack.port)))
+            }
+            .frame(width: 18 * scale, height: 18 * scale)
+            .position(x: pot.x * scale, y: pot.y * scale)
+        }
+      }
+      .frame(width: layout.width * scale, height: layout.height * scale)
+    }
+
+    /// Where an inlet's trim pot sits: to the right of its name, as the reference places it.
+    static func pot(_ jack: RackLayout.Jack) -> CGPoint { CGPoint(x: jack.x + 84, y: jack.y) }
+
+    /// A trim as the reference writes one: `0.55×`, `−0.30×`.
+    static func trimText(_ value: Double) -> String {
+      "\(value < 0 ? "−" : "")\(RackDisplay.fixed(abs(value), 2))×"
+    }
+
+    /// A trim held to its range and to hundredths, as the reference's pot turns.
+    static func trimStep(_ value: Double) -> Double {
+      RackDisplay.jsRound(max(-1, min(1, value)) * 100) / 100
+    }
+
+    /// The pot's pointer, in radians from straight up: -135° at -1, straight up at 0, 135° at 1.
+    static func potAngle(_ value: Double) -> Double { (-135 + (value + 1) / 2 * 270) * .pi / 180 }
+
+    private func potUnder(_ at: CGPoint, jacks: [RackLayout.Jack]) -> RackLayout.Jack? {
+      jacks.first { jack in
+        guard jack.kind == .inlet else { return false }
+        let pot = Self.pot(jack)
+        return hypot(at.x - pot.x, at.y - pot.y) < 12
+      }
     }
 
     // MARK: Geometry
@@ -98,6 +157,7 @@
     static let jackFill = Color(red: 27 / 255, green: 20 / 255, blue: 48 / 255)
     static let hole = Color(red: 5 / 255, green: 3 / 255, blue: 11 / 255)
     static let outline = Color(red: 11 / 255, green: 7 / 255, blue: 22 / 255)
+    static let potFill = Color(red: 23 / 255, green: 16 / 255, blue: 38 / 255)
     static let cableColours = [Theme.nine, Theme.three, Theme.eight]
 
     private func draw(in context: inout GraphicsContext, jacks: [RackLayout.Jack], at date: Date) {
@@ -199,6 +259,43 @@
           anchor: anchor)
         context.draw(label, at: at, anchor: anchor)
       }
+
+      // The trim pots: teal and bright when off unity, the only time one does anything, since a
+      // pot sits by every inlet whether or not anybody has touched it.
+      let turning: RackLayout.Jack? = if case .trimming(let jack, _, _) = gesture { jack } else { nil }
+      let overPot = hover.flatMap { potUnder($0, jacks: jacks) }
+      for jack in jacks where jack.kind == .inlet {
+        let centre = Self.pot(jack)
+        let value = model.trim(jack.module, jack.port)
+        let on = value != 1
+        let active = turning == jack || overPot == jack
+        context.fill(
+          circle(centre, 7),
+          with: .color(active ? Color(red: 42 / 255, green: 31 / 255, blue: 74 / 255) : Self.potFill))
+        context.stroke(
+          circle(centre, 7), with: .color(active ? Theme.ink : on ? Theme.nine : Theme.nine.opacity(0.62)),
+          lineWidth: active ? 2 : on ? 1.8 : 1.2)
+        let angle = Self.potAngle(value)
+        var pointer = Path()
+        pointer.move(to: CGPoint(x: centre.x + 2 * sin(angle), y: centre.y - 2 * cos(angle)))
+        pointer.addLine(to: CGPoint(x: centre.x + 6 * sin(angle), y: centre.y - 6 * cos(angle)))
+        context.stroke(
+          pointer, with: .color(on ? Theme.nine : Theme.ink),
+          style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+        if active {
+          let text = Text(Self.trimText(value)).font(Theme.mono(9, .semibold)).foregroundStyle(Theme.ink)
+          let at = CGPoint(x: centre.x + 12, y: centre.y)
+          let size = context.resolve(text).measure(in: CGSize(width: 200, height: 40))
+          context.fill(
+            Path(
+              roundedRect: CGRect(
+                x: at.x - 3, y: at.y - size.height / 2 - 2, width: size.width + 6, height: size.height + 4),
+              cornerRadius: 4),
+            with: .color(Theme.ground.opacity(0.92)))
+          context.draw(text, at: at, anchor: .leading)
+        }
+      }
+
       for cable in model.patch.cables {
         guard let (_, to) = ends(cable, in: jacks) else { continue }
         let at = CGPoint(x: to.x - 18, y: to.y)
@@ -230,8 +327,14 @@
       DragGesture(minimumDistance: 0)
         .onChanged { value in
           let at = CGPoint(x: value.location.x / scale, y: value.location.y / scale)
-          if gesture == nil { gesture = begin(at, jacks: jacks) }
+          if gesture == nil { gesture = begin(at, raw: value.location.y, jacks: jacks) }
           if case .moving = gesture, let pointer { motion.kick(from: pointer, to: at) }
+          if case .trimming(let jack, let y, let from) = gesture {
+            // In points on the screen, as the reference's pot reads the pointer: a fiftieth a point,
+            // a two-hundredth with shift held.
+            let rate = NSEvent.modifierFlags.contains(.shift) ? 0.005 : 0.02
+            model.setTrim(jack.module, jack.port, to: Self.trimStep(from + (y - value.location.y) * rate))
+          }
           pointer = at
           keepAnimating(for: 0.1)
         }
@@ -243,14 +346,24 @@
         }
     }
 
-    /// What a press starts, by what is under it: an unplug button, a jack, a cable, a bay.
-    private func begin(_ at: CGPoint, jacks: [RackLayout.Jack]) -> Gesture {
+    /// What a press starts, by what is under it: an unplug button, a trim pot, a jack, a cable,
+    /// a bay.
+    private func begin(_ at: CGPoint, raw y: Double, jacks: [RackLayout.Jack]) -> Gesture {
       for cable in model.patch.cables {
         guard let (from, to) = ends(cable, in: jacks) else { continue }
         if hypot(at.x - (to.x - 18), at.y - to.y) < 13 {
           pull(cable, from, to)
           return .nothing
         }
+      }
+      if let jack = potUnder(at, jacks: jacks) {
+        if (NSApp.currentEvent?.clickCount ?? 1) >= 2 {
+          model.setTrim(jack.module, jack.port, to: 1)
+          model.endTurn()
+          return .nothing
+        }
+        NSCursor.resizeUpDown.push()
+        return .trimming(jack, y: y, from: model.trim(jack.module, jack.port))
       }
       if let jack = RackLayout.nearestJack(in: jacks, to: at, radius: 16) {
         NSCursor.closedHand.push()
@@ -284,6 +397,9 @@
         else { return }
         let (outlet, inlet) = from.kind == .outlet ? (from, to) : (to, from)
         model.connect(PortReference(outlet.module, outlet.port), PortReference(inlet.module, inlet.port))
+      case .trimming:
+        NSCursor.pop()
+        model.endTurn()
       case .moving(let id, let grab):
         // Where the carried module's own middle is, not the pointer: it is the module being placed.
         let placement = layout.placements.first { $0.id == id }

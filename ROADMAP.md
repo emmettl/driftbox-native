@@ -320,8 +320,11 @@ parity point.
    they applied only when the graph was rebuilt, and a knob a routing drives is marked. The
    routing is edited in an inspector beside the rack, showing what each routing puts on its
    target as it moves, and each rotary learns a controller, the binding kept beside the patch.
-   Left: the inlet trims on the back, the rack as an Audio Unit, and the groovebox as a module
-   in it.
+   Then a trim pot by every inlet on the back, bipolar, lit when it is off unity: turned
+   within its travel it reaches the sound through a slot of its own, and only leaving unity or
+   coming back to it rebuilds, as the reference's compiler spends a slot only on a pot doing
+   something. Each pot is a slider to VoiceOver.
+   Left: the rack as an Audio Unit, and the groovebox as a module in it.
 
 ## Help and tutorials
 
