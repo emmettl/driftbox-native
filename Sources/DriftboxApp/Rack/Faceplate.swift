@@ -30,12 +30,17 @@
         case "arranger": ArrangerFace(face: face)
         case "scale-player": ScalePlayerFace(face: face)
         case "note-echo": NoteEchoFace(face: face)
+        case "chord-player": ChordPlayerFace(face: face)
+        case "arp": ArpFace(face: face)
+        case "combi": CombinatorFace(face: face)
         default: GenericFace(face: face, span: span)
         }
       }
       .padding(.vertical, 10)
       .padding(.horizontal, 12)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      // A face never spills out of its module, whatever it is given to show.
+      .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
       .background {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
           .fill(
@@ -218,7 +223,11 @@
         }
         Text(def.name.uppercased())
           .font(Theme.mono(8.5, .medium)).tracking(0.6).foregroundStyle(Theme.dim).lineLimit(1)
+          .minimumScaleFactor(0.7)
+          .truncationMode(.tail)
+          .frame(maxWidth: RackLayout.cellWidth - 6)
       }
+      .frame(maxWidth: RackLayout.cellWidth)
       .accessibilityElement(children: .contain)
       .accessibilityLabel(def.name)
       .accessibilityValue(label(current))

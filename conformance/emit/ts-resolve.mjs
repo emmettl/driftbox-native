@@ -16,6 +16,9 @@ registerHooks({
     if (specifier === '@driftbox/engine' && context.parentURL?.startsWith('file:')) {
       return nextResolve(new URL('../../driftbox/packages/engine/src/index.ts', import.meta.url).href, context)
     }
+    if (specifier === '@driftbox/rack' && context.parentURL?.startsWith('file:')) {
+      return nextResolve(new URL('../../driftbox/packages/rack/src/index.ts', import.meta.url).href, context)
+    }
     if (specifier.startsWith('.') && specifier.endsWith('.js') && context.parentURL?.startsWith('file:')) {
       const ts = new URL(`${specifier.slice(0, -3)}.ts`, context.parentURL)
       if (existsSync(fileURLToPath(ts))) return nextResolve(ts.href, context)

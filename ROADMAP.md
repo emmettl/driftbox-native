@@ -297,7 +297,12 @@ parity point.
    render thread, whole, so a module never reads a new pointer with an old count, and frees it
    with the graph. A drag is one step of undo. The Tracker's lane tags cycle the lane's mode,
    which the reference's face shows but cannot change.
-   Left: the Chord Player, the Arp, the Combinator and the sample players' faces, the inlet
+   Then the Chord Player (the eight voices a setting makes, named, and a held Alter), the Arp
+   (sixteen rhythm steps showing the figure's notes, over all seventeen of its controls) and the
+   Combinator (its rotaries and buttons, what each drives, and the whole routing written out).
+   The chord and figure previews are held to the reference's own over a grid of settings: 2,520
+   chords and 960 figures, exactly.
+   Left: the sample players' faces, the Combinator's routing editor and MIDI learn, the inlet
    trims on the back, the breaks the break-built patches expect, hardware MIDI into the rack,
    the rack as an Audio Unit, and the groovebox as a module in it.
 
