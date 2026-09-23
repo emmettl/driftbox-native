@@ -38,7 +38,8 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxGPU` | What the scenes ask of a GPU, as a protocol every backend answers the same way. |
 | `Sources/DriftboxGPUD3D11` | That protocol on Direct3D 11: the GPU on Windows. |
 | `Sources/DriftboxGPUMetal` | That protocol on Metal: the GPU on the Mac and iOS. |
-| `Sources/DriftboxWin32` | The Windows shell: a window and its messages, so far. |
+| `Sources/DriftboxShell` | What the app asks of a window — input, menus, file panels, a loop — the same on every platform. |
+| `Sources/DriftboxWin32` | That on Windows: the Windows shell. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
 | `Sources/Driftbox` | The executable, which is nothing but `@main`. |
@@ -161,11 +162,24 @@ same memory as `simd_float4x4`.
 **On screen**, a `GPUSurface` is a window's swap chain: the frame's target, a resize, and a present
 that waits for the display. A backend makes one from its own platform's kind of window; drawing
 into it and showing it are the same everywhere. `Presenter` shows a finished frame in one, fitted
-or cropped. On Windows the window is `DriftboxWin32`'s — the Windows shell, so far a window and its
-messages, aware of each monitor's DPI — and the surface a flip-model swap chain, tested on a real
-one for a window that is never shown. On the Mac it is a `CAMetalLayer`'s drawables, not
-framebuffer-only so that a frame can be sampled and read back as Direct3D's can, tested on a layer
-in no window.
+or cropped. On Windows the surface is a flip-model swap chain, tested on a real one for a window
+that is never shown. On the Mac it is a `CAMetalLayer`'s drawables, not framebuffer-only so that a
+frame can be sampled and read back as Direct3D's can, tested on a layer in no window.
+
+**The window itself** is a port as well. `DriftboxShell` says what the app asks of one, in terms that
+are the same on every platform: input as `ShellEvent`s — a pointer for a mouse, a finger and a pen
+alike, in points from the top left; keys known by what they type; scrolling — a `MenuBar` as data,
+whose commands arrive by id whether chosen or reached by their shortcut; the file panels; a loop to
+draw in; and `post`, for word from another thread. A shortcut is written with `.primary`, which is
+Command on the Mac and Control elsewhere, so one menu reads ⌘S on the one and Ctrl+S on the other.
+The Mac has AppKit and SwiftUI for all of this and needs none of it; it is for Windows and Android.
+
+`DriftboxWin32` answers it. While a window is dragged or resized Windows runs a loop of its own and
+the app's stops, so the window draws a frame from a timer and on every change of size until the
+drag ends, and the picture follows the edge instead of freezing. Its loop is the only one on its
+thread — Foundation's run loop, turned as well, took the window's key messages before its shortcuts
+could, which is how Space came to play nothing — so work from other threads, such as an audio
+device's change, comes through `post`, onto the window's own queue.
 
 **The scenes move across one at a time.** `GPUScene` is a scene on the layer, and Pulse is the
 first: `PulseScene`, its shader the Metal one's GLSL line for line, held on WARP to what the Metal
@@ -177,9 +191,12 @@ driftbox-play conformance/fixtures/documents/acid.song.json --window
 ```
 
 The song through WASAPI and Pulse through Direct3D on Windows, and through the engine's Audio Unit
-and Metal on the Mac, drawn once per refresh from the events the engine reports playing. With
-`DRIFTBOX_SCENE_SHOTS` set to a directory, as for the scene tests, each second's frame is written
-there as it was presented: a BMP on Windows, a PNG on the Mac.
+and Metal on the Mac, drawn once per refresh from the events the engine reports playing. On Windows
+the window is the shell's: File ▸ Open… (Ctrl+O) for another song, Space to play and stop,
+Ctrl+Enter back to the start, and the whole window a pad for the performance filter, as vibes mode
+is on the Mac, with Pulse drawing the finger. With `DRIFTBOX_SCENE_SHOTS` set to a directory, as for
+the scene tests, each second's frame is written there as it was presented: a BMP on Windows, a PNG
+on the Mac.
 
 ### Windows
 

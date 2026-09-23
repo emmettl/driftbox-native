@@ -20,6 +20,7 @@ let package = Package(
     .library(name: "DriftboxHostAndroid", targets: ["DriftboxHostAndroid"]),
     .library(name: "DriftboxGPU", targets: ["DriftboxGPU"]),
     .library(name: "DriftboxGPUD3D11", targets: ["DriftboxGPUD3D11"]),
+    .library(name: "DriftboxShell", targets: ["DriftboxShell"]),
     .library(name: "DriftboxWin32", targets: ["DriftboxWin32"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
   ],
@@ -70,8 +71,10 @@ let package = Package(
         .linkedLibrary("d3d11", .when(platforms: [.windows])),
         .linkedLibrary("d3dcompiler", .when(platforms: [.windows])),
       ]),
-    // The Windows shell: a window and its messages, so far.
-    .target(name: "DriftboxWin32"),
+    // What a window gives the app — input, menus, a loop to draw in, file panels — in terms that are
+    // the same on every platform, and the Windows shell that answers it with Win32.
+    .target(name: "DriftboxShell"),
+    .target(name: "DriftboxWin32", dependencies: ["DriftboxShell"]),
     // The visuals: scenes driven by the engine's events, moving from Metal onto the GPU layer. On a
     // platform without Metal, the ones that have moved.
     .target(name: "DriftboxScenes", dependencies: ["DriftboxDSP", "DriftboxEngine", "DriftboxGPU"]),
@@ -102,6 +105,7 @@ let package = Package(
         .target(name: "DriftboxHostAndroid", condition: .when(platforms: [.android])),
         .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxGPUMetal", condition: .when(platforms: [.macOS])),
+        .target(name: "DriftboxShell", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
       ]),
 
@@ -124,6 +128,11 @@ let package = Package(
     .testTarget(
       name: "DriftboxGPUTests",
       dependencies: ["DriftboxGPU", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxWin32"]),
+    .testTarget(
+      name: "DriftboxShellTests",
+      dependencies: [
+        "DriftboxShell", .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
+      ]),
     .testTarget(
       name: "DriftboxScenesTests",
       dependencies: [

@@ -249,6 +249,8 @@
   import DriftboxHost
   import DriftboxHostWindows
   import DriftboxScenes
+  import DriftboxSeq
+  import DriftboxShell
   import DriftboxWin32
   import Foundation
 
@@ -290,7 +292,17 @@
         return
       }
 
-      let route = WASAPIRoute()
+      // With a window, word of a device change comes through the window's loop, the only one that
+      // turns while it runs; without one, through the main queue, which the loop below turns.
+      let name = URL(fileURLWithPath: arguments[0]).lastPathComponent
+      let window =
+        windowed
+        ? try Win32Window(title: "Driftbox — \(SongFile.name(fromFileName: name))", width: 960, height: 540)
+        : nil
+      let route =
+        if let window { WASAPIRoute(hop: { [mailbox = window] work in mailbox.post(work) }) } else {
+          WASAPIRoute()
+        }
       route.onChange = { [unowned route] in
         print(
           route.current.map { "  playing through \($0.name)" } ?? "  no sound: \(route.error ?? "no device")")
@@ -309,9 +321,8 @@
           format: "playing %@ (%.0f seconds a pass) at %.0f Hz, %.1fms from render to speaker", arguments[0],
           SongRenderer.seconds(of: song), route.sampleRate, route.latency * 1000))
       let until = seconds.map { Date().addingTimeInterval($0) }
-      if windowed {
-        let name = URL(fileURLWithPath: arguments[0]).lastPathComponent
-        try watch(host, bpm: song.bpm, title: "Driftbox — \(SongFile.name(fromFileName: name))", until: until)
+      if let window {
+        try watch(host, song: song, in: window, until: until)
       } else {
         if until == nil { print("ctrl-c to stop") }
         while until.map({ Date() < $0 }) ?? true {
@@ -323,7 +334,9 @@
       route.detach(host.renderSource.context)
     }
 
-    /// What reaches the output, and what making it costs: proof of life, once a second.
+    /// What reaches the output, and what making it costs: proof of life, once a second. Whether the
+    /// transport is running too, since the song frame goes on counting with the engine's clock when
+    /// it is stopped, and says nothing either way.
     static func report(_ host: EngineHost) {
       let load = host.takeLoad()
       let peak = max(
@@ -332,9 +345,9 @@
       print(
         String(
           format:
-            "  peak %.3f  song frame %d  render %.1f%% of the audio's time, longest call %.2fms, %d calls",
-          peak, host.songFrame.load(ordering: .relaxed), load.fraction * 100, load.longestMilliseconds,
-          load.calls))
+            "  %@  peak %.3f  song frame %d  render %.1f%% of the audio's time, longest call %.2fms, %d calls",
+          host.playing.load(ordering: .relaxed) ? "playing" : "stopped", peak,
+          host.songFrame.load(ordering: .relaxed), load.fraction * 100, load.longestMilliseconds, load.calls))
     }
 
     /// BGRA pixels, rows from the top, as a 32-bit BMP: the one image format that needs nothing
@@ -360,17 +373,76 @@
 
     /// The song, seen: Pulse in a window, from what the engine reports having played, drawn once
     /// per refresh of the display — presenting waits for it, which is what paces the loop — until
-    /// the window is closed or the time is up.
+    /// the window is closed or the time is up. The window is the shell's: a menu to open another
+    /// song and to play and stop it, and the whole of it a pad for the performance filter, as vibes
+    /// mode is on the Mac, with Pulse drawing the finger where it is.
     @MainActor
-    static func watch(_ host: EngineHost, bpm: Double, title: String, until: Date?) throws {
-      let window = try Win32Window(title: title, width: 960, height: 540)
+    static func watch(_ host: EngineHost, song: Song, in window: Win32Window, until: Date?) throws {
       let device = try D3D11Device()
       let surface = try device.makeSurface(window: window.handle, width: window.width, height: window.height)
       let scene = try PulseScene(device: device)
       let presenter = try Presenter(device: device)
       var frame = try device.makeTarget(width: window.width, height: window.height)
       var resized: (width: Int, height: Int)?
-      window.onResize = { resized = ($0, $1) }
+      var bpm = song.bpm
+      var touch: SIMD2<Float>?
+
+      window.menuBar = MenuBar([
+        Menu(
+          "File",
+          [
+            .command("Open…", id: "open", shortcut: Shortcut("o")), .separator,
+            .command("Exit", id: "exit", shortcut: Shortcut("q")),
+          ]),
+        Menu(
+          "Transport",
+          [
+            .command("Play or Stop", id: "toggle", shortcut: Shortcut(.space, [])),
+            .command("Return to Start", id: "start", shortcut: Shortcut(.return)),
+          ]),
+      ])
+      window.onEvent = { [unowned window] event in
+        switch event {
+        case .resized(let width, let height, _):
+          resized = (width, height)
+        case .command("open"):
+          let songs = FileType(name: "Driftbox Song", extensions: SongFile.extensions)
+          guard let url = window.chooseFile(ofTypes: [songs]), let data = try? Data(contentsOf: url),
+            let next = SongCodec.decode(String(decoding: data, as: UTF8.self))
+          else { return }
+          host.load(next)
+          host.send(.seek(songFrame: 0))
+          host.send(.play)
+          bpm = next.bpm
+          window.title = "Driftbox — \(SongFile.name(fromFileName: url.lastPathComponent))"
+        case .command("exit"):
+          window.close()
+        case .command("toggle"):
+          host.send(host.playing.load(ordering: .relaxed) ? .stop : .play)
+        case .command("start"):
+          host.send(.seek(songFrame: 0))
+        case .pointer(let pointer):
+          // The window as the pad: 0...1 from the bottom left, as the engine and Pulse both take it.
+          let size = SIMD2(Float(window.width), Float(window.height)) / window.scale
+          let at = SIMD2(pointer.location.x / size.x, 1 - pointer.location.y / size.y)
+            .clamped(lowerBound: SIMD2(0, 0), upperBound: SIMD2(1, 1))
+          switch pointer.phase {
+          case .began:
+            touch = at
+          case .moved where touch != nil:
+            touch = at
+          case .ended, .cancelled:
+            touch = nil
+            host.send(.padRelease)
+            return
+          default:
+            return
+          }
+          host.send(.pad(x: Double(at.x), y: Double(at.y)))
+        default:
+          break
+        }
+      }
 
       // As the scene tests do on the Mac: with DRIFTBOX_SCENE_SHOTS set to a directory, each
       // second's frame is written there as it was presented, for looking at a run nobody watched.
@@ -379,7 +451,11 @@
       let began = HostTime.now()
       var reported = began
       var events: [EngineEvent] = []
-      while window.pump(), until.map({ Date() < $0 }) ?? true {
+      try window.run {
+        if let until, Date() >= until {
+          window.close()
+          return
+        }
         if let size = resized {
           resized = nil
           try surface.resize(width: size.width, height: size.height)
@@ -391,8 +467,8 @@
         let input = SceneInput(
           time: HostTime.seconds(from: began, to: HostTime.now()),
           peakLeft: Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
-          peakRight: Float(bitPattern: host.peakRight.load(ordering: .relaxed)), events: events,
-          running: host.playing.load(ordering: .relaxed), bpm: bpm, pixelRatio: 1)
+          peakRight: Float(bitPattern: host.peakRight.load(ordering: .relaxed)), events: events, touch: touch,
+          running: host.playing.load(ordering: .relaxed), bpm: bpm, pixelRatio: window.scale)
         scene.draw(input, into: frame, on: device)
         let target = try surface.target()
         presenter.present(frame, into: target, on: device)
@@ -402,9 +478,9 @@
           try bitmap(try device.readPixels(target), width: target.width, height: target.height)
             .write(to: URL(fileURLWithPath: shots).appendingPathComponent("pulse-\(shot).bmp"))
         }
+        // Nothing else turns a loop here: Foundation's would take the window's own messages — its
+        // shortcuts among them — before the window saw them.
         try surface.present()
-        // Word of a device change, which the audio route hops to the main queue with.
-        RunLoop.main.run(mode: .default, before: Date())
         if second {
           reported = HostTime.now()
           report(host)
