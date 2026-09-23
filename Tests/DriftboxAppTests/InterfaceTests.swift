@@ -90,6 +90,14 @@
       #expect(grid.hit(at: CGPoint(x: 30 * 16 + 5, y: 1)) == nil)
     }
 
+    /// The icon ships with the library, at every size the Dock and the Finder ask for, so a bare
+    /// `swift run` has one as well as the bundle.
+    @Test func theIconShipsAtEverySize() throws {
+      let icon = try #require(AppIcon.image)
+      let sizes = Set(icon.representations.map(\.pixelsWide))
+      #expect(sizes.isSuperset(of: [16, 32, 64, 128, 256, 512, 1024]))
+    }
+
     @Test func aSongsBlurbSplitsIntoWhatItIsAndHowItGoes() {
       let entry = CatalogueEntry(
         id: "x", name: "Acieed", blurb: "Acid house — 126bpm, straight, 303 doing its thing", visual: "")

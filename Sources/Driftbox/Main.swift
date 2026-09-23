@@ -12,6 +12,11 @@
     init() {
       // A bare executable, not a bundle: without this there is no window and no menu.
       NSApplication.shared.setActivationPolicy(.regular)
+      // A bundle's icon comes from its Info.plist; a bare executable, run with `swift run`, would
+      // otherwise sit in the Dock as a blank one.
+      if Bundle.main.object(forInfoDictionaryKey: "CFBundleIconFile") == nil, let icon = AppIcon.image {
+        NSApplication.shared.applicationIconImage = icon
+      }
       NSApplication.shared.activate(ignoringOtherApps: true)
       let player = Player()
       _player = State(initialValue: player)
