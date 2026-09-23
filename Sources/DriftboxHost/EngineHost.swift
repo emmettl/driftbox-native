@@ -161,6 +161,15 @@ public final class EngineHost: @unchecked Sendable {
   /// Everything the render callback does: take what the interface asked for, then render.
   @_noAllocation
   public func render(frames: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>) {
+    render(frames: frames, left: left, right: right, sections: nil)
+  }
+
+  /// The same, with each of the song's machines into `sections` as well: the rack's way in.
+  @_noAllocation
+  public func render(
+    frames: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>,
+    sections: SectionOutputs?
+  ) {
     let began = threadNanoseconds()
     defer {
       let took = Int(threadNanoseconds() &- began)
@@ -188,7 +197,7 @@ public final class EngineHost: @unchecked Sendable {
       case .note(let line, let note): engine.pointee.play(note, line: line)
       }
     }
-    engine.pointee.render(frames: frames, left: left, right: right)
+    engine.pointee.render(frames: frames, left: left, right: right, sections: sections)
     var loudestLeft: Float = 0
     var loudestRight: Float = 0
     for index in 0..<frames {

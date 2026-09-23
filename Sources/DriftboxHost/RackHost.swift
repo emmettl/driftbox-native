@@ -1,4 +1,6 @@
+import DriftboxEngine
 import DriftboxRack
+import DriftboxSeq
 import Synchronization
 
 /// What the interface asks of the rack's render thread.
@@ -8,6 +10,9 @@ public enum RackCommand {
   /// A knob, on every voice (`voice` -1) or one, now (`frame` -1) or at a frame of the graph's clock.
   case param(slot: Int, value: Double, voice: Int, frame: Int)
   case transport(tempo: Double, running: Bool, shuffle: Double)
+  /// Whether a song is hosted beside the rack, and which of its machines the rack takes: bit `n`
+  /// for machine `n`, diverted from the song's mix to the rack's input buses alone.
+  case hosting(Bool, diverted: UInt8)
   /// A module's data slot, swapped whole on a block boundary so a module never reads a new pointer
   /// with an old count. Ignored unless `graph` is the one playing.
   case data(
@@ -145,6 +150,27 @@ public final class RackHost: @unchecked Sendable {
   let meterSequence = Atomic<Int>(0)
   /// Blocks since the last snapshot. Only the render thread touches it.
   let sinceMeters: UnsafeMutablePointer<Int>
+
+  /// The patch's retained groovebox song, played beside the rack as the reference's rack mode
+  /// plays it: an engine of its own whose mix is added to the rack's, and whose four machines
+  /// reach the rack on input buses 0 to 3 — the `groovebox` module's way in.
+  public let song: EngineHost
+  /// The same host for the render thread, which may not retain or release it: `song` keeps it.
+  let songOnRenderThread: Unmanaged<EngineHost>
+  /// Each machine's block, left then right, the input buses the graph reads.
+  let buses: UnsafeMutablePointer<UnsafeMutablePointer<Float>>
+  /// The song's own mix for a block.
+  let songLeft: UnsafeMutablePointer<Float>
+  let songRight: UnsafeMutablePointer<Float>
+  /// Whether there is a song, and which machines the rack takes. Only the render thread touches it.
+  let hosting: UnsafeMutablePointer<(on: Bool, diverted: UInt8)>
+  /// Whether the song was last told to play, so starting the rack starts it from the top once.
+  private var songRunning = false
+  /// Which machines the loaded patch takes, sent again when a song arrives.
+  private var diverted: UInt8 = 0
+  private var hasSong = false
+  /// The tempo of the song last given, which the place in the next one is worked out from.
+  private var songBPM = 120.0
   /// How often the meters are copied: every eight blocks, as the reference's worklet posts them.
   public static var meterEvery: Int { 8 }
   /// The last readings that were whole, for when a read keeps losing to the render thread.
@@ -167,6 +193,19 @@ public final class RackHost: @unchecked Sendable {
     blockUsed.initialize(to: blockFrames)
     sinceMeters = .allocate(capacity: 1)
     sinceMeters.initialize(to: 0)
+    song = EngineHost(sampleRate: sampleRate)
+    songOnRenderThread = Unmanaged.passUnretained(song)
+    buses = .allocate(capacity: 8)
+    for index in 0..<8 {
+      buses[index] = .allocate(capacity: blockFrames)
+      buses[index].initialize(repeating: 0, count: blockFrames)
+    }
+    songLeft = .allocate(capacity: blockFrames)
+    songLeft.initialize(repeating: 0, count: blockFrames)
+    songRight = .allocate(capacity: blockFrames)
+    songRight.initialize(repeating: 0, count: blockFrames)
+    hosting = .allocate(capacity: 1)
+    hosting.initialize(to: (false, 0))
   }
 
   deinit {
@@ -184,6 +223,11 @@ public final class RackHost: @unchecked Sendable {
     blockRight.deallocate()
     blockUsed.deallocate()
     sinceMeters.deallocate()
+    for index in 0..<8 { buses[index].deallocate() }
+    buses.deallocate()
+    songLeft.deallocate()
+    songRight.deallocate()
+    hosting.deallocate()
   }
 
   // MARK: - From the interface
@@ -191,6 +235,12 @@ public final class RackHost: @unchecked Sendable {
   /// Compile and build `patch` here, and have the render thread play it from its next call.
   public func load(_ patch: Patch) {
     collect()
+    // The machines this patch takes into the rack, which a cable more or fewer changes.
+    let routed = GrooveboxModule.routed(patch)
+    if routed != diverted {
+      diverted = routed
+      if hasSong { commands.pointee.send(.hosting(true, diverted: diverted)) }
+    }
     let compiled = compile(patch)
     plan = compiled
     let graph = UnsafeMutablePointer<RackGraph>.allocate(capacity: 1)
@@ -264,6 +314,46 @@ public final class RackHost: @unchecked Sendable {
 
   public func setTransport(tempo: Double, running: Bool, shuffle: Double = 0) {
     commands.pointee.send(.transport(tempo: tempo, running: running, shuffle: shuffle))
+    // The song goes with the rack: from its top when the rack starts, as the rack's own clock
+    // does, and stopped, to ring out, when it stops.
+    if running != songRunning {
+      songRunning = running
+      if running {
+        song.send(.seek(songFrame: 0))
+        song.send(.play)
+      } else {
+        song.send(.stop)
+      }
+    }
+  }
+
+  /// Play `song` beside the rack, or none. A song replacing another carries on where the other
+  /// was, as an edit to the song the rack is playing should; the first one waits for the rack.
+  public func setSong(_ song: Song?) {
+    guard let song else {
+      if hasSong {
+        hasSong = false
+        commands.pointee.send(.hosting(false, diverted: 0))
+        self.song.send(.stop)
+        songRunning = false
+      }
+      return
+    }
+    // Where the song it replaces had got to, in its own tempo's frames.
+    let position = max(0, self.song.songFrame.load(ordering: .relaxed))
+    let replacing = hasSong
+    self.song.load(song)
+    if replacing {
+      // The same beat of the new one, which a new tempo puts at another frame.
+      let scaled = Int((Double(position) * songBPM / max(1, song.bpm)).rounded(.down))
+      self.song.send(.seek(songFrame: scaled))
+    } else {
+      hasSong = true
+      commands.pointee.send(.hosting(true, diverted: diverted))
+      self.song.send(.seek(songFrame: 0))
+    }
+    songBPM = song.bpm
+    if songRunning { self.song.send(.play) }
   }
 
   /// What the metered modules are showing, by module id, as of the render thread's last copy of
@@ -316,13 +406,26 @@ public final class RackHost: @unchecked Sendable {
         current.pointee?.pointee.setTransport(tempo: tempo, running: running, shuffle: shuffle)
       case .data(let graph, let entry, let buffer):
         if current.pointee == graph { entry.pointee = buffer }
+      case .hosting(let on, let diverted):
+        hosting.pointee = (on, diverted)
       }
     }
     var done = 0
     while done < frames {
       if blockUsed.pointee >= blockFrames {
+        // The song first, so its machines are on the buses the graph is about to read.
+        let hosted = hosting.pointee.on
+        if hosted {
+          // Locals, so the closure holds pointers and not `self`, which it would retain.
+          let sections = SectionOutputs(buffers: buses, diverted: hosting.pointee.diverted)
+          let (frames, left, right) = (blockFrames, songLeft, songRight)
+          songOnRenderThread._withUnsafeGuaranteedRef {
+            $0.render(frames: frames, left: left, right: right, sections: sections)
+          }
+        }
+        let inputs = hosted ? HostInputs(base: buses, buses: 4, channels: 2) : HostInputs.none
         if let graph = current.pointee {
-          graph.pointee.process(left: blockLeft, right: blockRight)
+          graph.pointee.process(left: blockLeft, right: blockRight, host: inputs)
           frame.store(graph.pointee.frame, ordering: .relaxed)
           sinceMeters.pointee += 1
           if sinceMeters.pointee >= 8 {  // `meterEvery`
@@ -335,6 +438,12 @@ public final class RackHost: @unchecked Sendable {
           for i in 0..<blockFrames {
             blockLeft[i] = 0
             blockRight[i] = 0
+          }
+        }
+        if hosted {
+          for i in 0..<blockFrames {
+            blockLeft[i] += songLeft[i]
+            blockRight[i] += songRight[i]
           }
         }
         blockUsed.pointee = 0

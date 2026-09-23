@@ -127,6 +127,28 @@ public struct GrooveboxModule {
   func release() { waveforms.deallocate() }
 }
 
+extension GrooveboxModule {
+  /// The machines a patch takes into the rack, as a mask with bit `n` for machine `n`: any with a
+  /// cable from a groovebox's outlet for it, or either side's older alias. Diverting a machine
+  /// takes the whole of it out of the song's mix, so routing one old side must divert both, or the
+  /// other would be heard twice. The reference's `routedGrooveboxSections`.
+  public static func routed(_ patch: Patch) -> UInt8 {
+    var sources: [String] = []
+    for module in patch.modules where module.type == "groovebox" { sources.append(module.id) }
+    let ports: [[String]] = [
+      ["tr808-out", "tr808-l", "tr808-r"], ["tr909-out", "tr909-l", "tr909-r"],
+      ["303-a-out", "303.a-l", "303.a-r"], ["303-b-out", "303.b-l", "303.b-r"],
+    ]
+    var mask: UInt8 = 0
+    for cable in patch.cables where sources.contains(cable.from.module) {
+      for (section, ids) in ports.enumerated() where ids.contains(cable.from.port) {
+        mask |= 1 << UInt8(section)
+      }
+    }
+    return mask
+  }
+}
+
 extension RackModules {
   /// The machine names on the panel, and the ids its ports and params take from the machine's,
   /// as the reference's `GROOVEBOX_PORTS` makes them: `tr808-out`, `303-a-level`, and so on, with
