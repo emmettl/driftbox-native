@@ -1,4 +1,5 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
+  import AppKit
   import DriftboxRack
   import SwiftUI
 
@@ -482,6 +483,67 @@
     }
   }
 
+  /// A control's MIDI learn, in the one small chip there is room for: `learn`, then `turn one…`
+  /// while it waits for a controller, then the controller it learnt. Clicking an armed chip
+  /// disarms it; shift-clicking, or its menu, forgets what it learnt, which re-learning cannot.
+  struct LearnChip: View {
+    let model: RackModel
+    let module: String
+    let param: String
+    @Environment(\.accessibilityReduceMotion) private var still
+    @State private var dim = false
+
+    var body: some View {
+      let arming = model.ccLearning == PortReference(module, param)
+      let bound = RackCC.bindings(model.ccBindings, for: module)[param]
+      Button {
+        if NSEvent.modifierFlags.contains(.shift) {
+          model.clearCcBinding(module, param)
+        } else if arming {
+          model.cancelCcLearn()
+        } else {
+          model.startCcLearn(module, param)
+        }
+      } label: {
+        Text(arming ? "turn one…" : bound.map(RackCC.describe) ?? "learn")
+          .font(Theme.mono(8.5))
+          .lineLimit(1)
+          .padding(.horizontal, 5).padding(.vertical, 1)
+          .foregroundStyle(arming ? Theme.ground : bound != nil ? Theme.nine : Theme.dim)
+          .background(RoundedRectangle(cornerRadius: 4).fill(arming ? Theme.three : .clear))
+          .overlay(
+            RoundedRectangle(cornerRadius: 4).strokeBorder(
+              arming ? Theme.three : bound != nil ? Theme.nine.opacity(0.4) : Theme.edge)
+          )
+          // Armed, it pulses: the instruction is to go and touch the hardware, and something
+          // has to still be saying so when the eyes come back.
+          .opacity(arming && dim ? 0.45 : 1)
+      }
+      .buttonStyle(.plain)
+      .onChange(of: arming, initial: true) { _, arming in
+        guard arming, !still else {
+          dim = false
+          return
+        }
+        withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) { dim = true }
+      }
+      .contextMenu {
+        if let bound {
+          Button("Forget \(RackCC.describe(bound))") { model.clearCcBinding(module, param) }
+        }
+        Button(bound == nil ? "Learn a Controller" : "Learn Another Controller") {
+          model.startCcLearn(module, param)
+        }
+      }
+      .help(
+        bound.map { "\(RackCC.describe($0)) — click to learn another, shift-click to forget" }
+          ?? "Click, then turn a knob on your controller"
+      )
+      .accessibilityLabel("MIDI learn")
+      .accessibilityValue(arming ? "waiting for a controller" : bound.map(RackCC.describe) ?? "none")
+    }
+  }
+
   /// The Combinator: four rotaries and four buttons, what each drives, and the whole routing,
   /// written out, underneath.
   struct CombinatorFace: View {
@@ -509,6 +571,8 @@
               Text(doing(id, routes))
                 .font(Theme.mono(10))
                 .foregroundStyle(live(id, routes) ? Theme.nine : Theme.dim)
+              LearnChip(model: face.model, module: face.module.id, param: id)
+                .padding(.top, 3)
             }
             .frame(maxWidth: .infinity)
           }
@@ -556,6 +620,12 @@
         }
         .scrollIndicators(.automatic)
         .frame(maxHeight: .infinity)
+        let open = face.model.editingRoutes == face.module.id
+        Button(open ? "Close Routing" : "Routing…") {
+          face.model.editRoutes(open ? nil : face.module.id)
+        }
+        .buttonStyle(OptionStyle(on: open, tint: Theme.nine))
+        .help("Edit which knobs each rotary and button drives, and between what")
       }
       .padding(.horizontal, 4)
     }

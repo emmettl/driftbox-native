@@ -42,6 +42,13 @@
     private(set) var loading: Set<String> = []
     /// Why the last file could not be loaded, for the face that asked.
     private(set) var loadFailure: (module: String, reason: String)?
+    /// The Combinator whose routing is open beside the rack. Where the window is, not what the
+    /// patch is, so it is never saved.
+    private(set) var editingRoutes: String?
+    /// What the controllers on the desk have been taught: kept beside the patch, never in it.
+    private(set) var ccBindings: [RackCC.Binding] = []
+    /// The param waiting for a controller to be turned, if one is.
+    private(set) var ccLearning: PortReference?
 
     // MARK: History
 
@@ -97,6 +104,8 @@
       patch = saved ?? first?.load() ?? Patch(modules: [], cables: [])
       name =
         saved == nil ? first?.name ?? "Untitled" : memory?.string(forKey: Self.savedNameKey) ?? "Untitled"
+      ccBindings = RackCC.load(memory)
+      patch = applyModulation(patch, registry: RackModules.registry)
       rebuild()
     }
 
@@ -158,7 +167,7 @@
       recordings = [:]
       tracks = [:]
       held = [:]
-      self.patch = patch
+      self.patch = applyModulation(patch, registry: RackModules.registry)
       self.name = name
       selection = []
       undoStack = []
@@ -179,6 +188,7 @@
     private func structural(_ name: String, _ change: (inout Patch) -> Void) {
       var next = patch
       change(&next)
+      next = applyModulation(next, registry: RackModules.registry)
       guard next != patch else { return }
       record(name)
       patch = next
@@ -195,6 +205,9 @@
     /// Compile what is there and hand it to the host; and work out which cables to draw as what.
     private func rebuild() {
       settleSamples()
+      // Its Combinator gone, the routing closes rather than waiting to reopen on a new one of
+      // the same name.
+      if let combi = editingRoutes, !patch.modules.contains(where: { $0.id == combi }) { editingRoutes = nil }
       let plan: Plan
       if live {
         host.load(patch)
@@ -246,8 +259,15 @@
     }
 
     /// Turn a knob, now. The first move of a turn is what undo goes back to; the rest join it.
+    /// The routings run over the result, so a rotary turns everything it drives as it turns; a
+    /// knob a routing drives, turned by hand, is taken straight back — the routing owns it, and
+    /// its face says so — and that is no edit at all.
     func turn(_ moduleId: String, _ param: String, to value: Double) {
       guard let at = patch.modules.firstIndex(where: { $0.id == moduleId }) else { return }
+      var next = patch
+      next.modules[at].params[param] = value
+      next = applyModulation(next, registry: RackModules.registry)
+      guard next != patch else { return }
       let key = "\(moduleId)/\(param)"
       if turning != key {
         let name =
@@ -255,9 +275,20 @@
         record("Set \(name)")
         turning = key
       }
-      patch.modules[at].params[param] = value
-      if live { host.setParam(moduleId, param, value) }
+      settle(next)
       save()
+    }
+
+    /// Take a settled patch, and send the sound every param that differs from the one before.
+    private func settle(_ next: Patch) {
+      if live {
+        for (before, after) in zip(patch.modules, next.modules) where before.params != after.params {
+          for (param, value) in after.params where before.params[param] != value {
+            host.setParam(after.id, param, value)
+          }
+        }
+      }
+      patch = next
     }
 
     /// Change one of a module's data slots — a lane of a pattern, a song, a scale — as a gesture
@@ -361,6 +392,127 @@
 
     func disconnect(_ cable: PatchCable) {
       structural("Disconnect") { $0.cables.removeAll { $0 == cable } }
+    }
+
+    // MARK: Routing
+
+    /// Open one Combinator's routing beside the rack, or close it.
+    func editRoutes(_ moduleId: String?) { editingRoutes = moduleId }
+
+    /// The params a routing can drive: any a hand could set. The hidden ones are written by the
+    /// host — the MIDI module's note — and a routing would be a second writer.
+    static func routable(_ type: String) -> [ParamDef] {
+      RackModules.registry[type]?.params.filter { !$0.hidden } ?? []
+    }
+
+    /// Whether a routing drives this knob, for its face to mark it.
+    func isRouted(_ moduleId: String, _ param: String) -> Bool {
+      patch.modulation.contains { $0.to.module == moduleId && $0.to.port == param }
+    }
+
+    /// Where a new routing from `combi` points: a filter's cutoff if there is one, since that is
+    /// what most first routings are for, or else the first knob of the first other module.
+    func defaultTarget(_ combi: String) -> PortReference? {
+      let others = patch.modules.filter { $0.id != combi }
+      for wanted in ["cutoff", "freq", "gain", "level"] {
+        if let module = others.first(where: { Self.routable($0.type).contains { $0.id == wanted } }) {
+          return PortReference(module.id, wanted)
+        }
+      }
+      for module in others {
+        if let first = Self.routable(module.type).first { return PortReference(module.id, first.id) }
+      }
+      return nil
+    }
+
+    /// A routing from the Combinator's first control without one, so adding four gives four
+    /// rotaries rather than four routings fighting over one. It sweeps its target end to end.
+    func addRoute(_ combi: String) {
+      guard let type = patch.modules.first(where: { $0.id == combi })?.type,
+        let to = defaultTarget(combi)
+      else { return }
+      let controls = Self.routable(type).map(\.id)
+      let used = Set(patch.modulation.filter { $0.from.module == combi }.map(\.from.port))
+      let free = controls.first { !used.contains($0) } ?? controls.first ?? "rotary1"
+      routing("Add Routing") { $0.append(ModRoute(from: PortReference(combi, free), to: to)) }
+    }
+
+    /// Change one routing. Aimed at another knob, its range goes, since it was in the old knob's
+    /// units; aimed at another module, it lands on that module's first knob.
+    func setRoute(_ index: Int, _ change: (inout ModRoute) -> Void) {
+      routing("Edit Routing") { routes in
+        guard routes.indices.contains(index) else { return }
+        var route = routes[index]
+        change(&route)
+        if route.to.module != routes[index].to.module,
+          let type = patch.modules.first(where: { $0.id == route.to.module })?.type,
+          let first = Self.routable(type).first
+        {
+          route.to = PortReference(route.to.module, first.id)
+        }
+        if route.to != routes[index].to {
+          route.min = nil
+          route.max = nil
+        }
+        // An end that is not a number is the target's own limit, which is its absence.
+        if let min = route.min, !min.isFinite { route.min = nil }
+        if let max = route.max, !max.isFinite { route.max = nil }
+        routes[index] = route
+      }
+    }
+
+    func removeRoute(_ index: Int) {
+      routing("Remove Routing") { routes in
+        guard routes.indices.contains(index) else { return }
+        routes.remove(at: index)
+      }
+    }
+
+    /// A routing edit: the patch changes and the graph does not, so it goes the way a knob does.
+    private func routing(_ name: String, _ change: (inout [ModRoute]) -> Void) {
+      var next = patch
+      change(&next.modulation)
+      guard next.modulation != patch.modulation else { return }
+      record(name)
+      settle(applyModulation(next, registry: RackModules.registry))
+      save()
+    }
+
+    // MARK: Controllers
+
+    /// Arm a param: the next controller turned is what moves it.
+    func startCcLearn(_ moduleId: String, _ param: String) { ccLearning = PortReference(moduleId, param) }
+
+    func cancelCcLearn() { ccLearning = nil }
+
+    /// Teach the armed param controller `cc`, on any channel. Nothing armed, nothing learnt.
+    func finishCcLearn(_ cc: Int) {
+      guard let armed = ccLearning else { return }
+      ccBindings = RackCC.learn(ccBindings, RackCC.Binding(cc: cc, module: armed.module, param: armed.port))
+      ccLearning = nil
+      RackCC.save(ccBindings, to: memory)
+    }
+
+    /// Forget what a param learnt: re-learning cannot unbind, so a mistake needs a way out.
+    func clearCcBinding(_ moduleId: String, _ param: String) {
+      ccBindings = RackCC.forget(ccBindings, module: moduleId, param: param)
+      RackCC.save(ccBindings, to: memory)
+    }
+
+    /// A controller moved: teach it the armed param, or move what it was taught — as a hand
+    /// would, so the knob on the face turns and a rotary's routings follow.
+    private func control(_ cc: Int, _ raw: Int, channel: Int) {
+      if ccLearning != nil {
+        finishCcLearn(cc)
+        return
+      }
+      for binding in RackCC.targets(ccBindings, cc: cc, channel: channel) {
+        // A binding for a module this patch does not have is kept: its patch may open again.
+        guard let module = patch.modules.first(where: { $0.id == binding.module }),
+          let param = Self.routable(module.type).first(where: { $0.id == binding.param })
+        else { continue }
+        turn(binding.module, binding.param, to: RackCC.value(raw, param))
+      }
     }
 
     // MARK: Selection and sides
@@ -627,8 +779,8 @@
         case .performance(let control, let value, let channel):
           guard live else { continue }
           for module in listening(on: channel) { host.setParam(module.id, control.rawValue, value) }
-        case .control:
-          break
+        case .control(let cc, let value, let channel):
+          control(cc, value, channel: channel)
         }
       }
     }

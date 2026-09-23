@@ -1,4 +1,5 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
+  import DriftboxRack
   import Foundation
 
   /// What a MIDI channel message means to the rack: the reference's `midiPerformance` and the
@@ -72,6 +73,86 @@
         break
       }
       return events
+    }
+  }
+
+  /// Which knob on the desk moves which knob in the rack: the reference's `midi-cc.ts`. Learnt,
+  /// not a fixed table of controller numbers, so it works with whatever is plugged in; and kept
+  /// beside the patch rather than in it, because a binding describes the box on somebody's desk
+  /// and a patch travels to people who do not have that box.
+  enum RackCC {
+    struct Binding: Equatable {
+      /// Controller number, 0...127.
+      var cc: Int
+      /// 1...16, or 0 for any: a controller's knobs and keys are often on different channels, and
+      /// somebody who has just turned a knob to teach it should not have to know which listened.
+      var channel = 0
+      var module: String
+      var param: String
+    }
+
+    static let key = "midi.cc"
+
+    /// One binding per target, and a controller may drive several: teaching a target a new
+    /// controller replaces the old one, which would otherwise go on moving it invisibly.
+    static func learn(_ bindings: [Binding], _ binding: Binding) -> [Binding] {
+      bindings.filter { !($0.module == binding.module && $0.param == binding.param) } + [binding]
+    }
+
+    static func forget(_ bindings: [Binding], module: String, param: String) -> [Binding] {
+      bindings.filter { !($0.module == module && $0.param == param) }
+    }
+
+    /// Everything a module has learnt, by param.
+    static func bindings(_ bindings: [Binding], for module: String) -> [String: Binding] {
+      var out: [String: Binding] = [:]
+      for binding in bindings where binding.module == module { out[binding.param] = binding }
+      return out
+    }
+
+    /// What a controller message should move. A binding on channel 0 hears every channel.
+    static func targets(_ bindings: [Binding], cc: Int, channel: Int) -> [Binding] {
+      bindings.filter { $0.cc == cc && ($0.channel == 0 || $0.channel == channel) }
+    }
+
+    /// A controller's 0...127 in a param's own units, rounded onto a stepped one so a selector
+    /// lands on a choice.
+    static func value(_ raw: Int, _ param: ParamDef) -> Double {
+      let clamped = Double(max(0, min(127, raw)))
+      let value = param.min + clamped / 127 * (param.max - param.min)
+      return param.stepped ? RackDisplay.jsRound(value) : value
+    }
+
+    /// `CC 74`, or `CC 74 ch3`: short, because it sits under a knob.
+    static func describe(_ binding: Binding) -> String {
+      binding.channel == 0 ? "CC \(binding.cc)" : "CC \(binding.cc) ch\(binding.channel)"
+    }
+
+    /// What was learnt. Anything unreadable is no bindings, and one bad entry costs only itself.
+    static func load(_ memory: UserDefaults?) -> [Binding] {
+      guard let text = memory?.string(forKey: key), let data = text.data(using: .utf8),
+        let entries = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
+      else { return [] }
+      return entries.compactMap { entry in
+        guard let entry = entry as? [String: Any],
+          let cc = entry["cc"] as? Int, (0...127).contains(cc),
+          let channel = entry["channel"] as? Int, (0...16).contains(channel),
+          let module = entry["module"] as? String, !module.isEmpty,
+          let param = entry["param"] as? String, !param.isEmpty
+        else { return nil }
+        return Binding(cc: cc, channel: channel, module: module, param: param)
+      }
+    }
+
+    static func save(_ bindings: [Binding], to memory: UserDefaults?) {
+      guard let memory else { return }
+      let entries = bindings.map {
+        ["cc": $0.cc, "channel": $0.channel, "module": $0.module, "param": $0.param] as [String: Any]
+      }
+      guard let data = try? JSONSerialization.data(withJSONObject: entries, options: [.sortedKeys]),
+        let text = String(data: data, encoding: .utf8)
+      else { return }
+      memory.set(text, forKey: key)
     }
   }
 #endif

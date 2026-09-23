@@ -101,7 +101,7 @@
       if let param = param(id) {
         ParamControl(
           def: param, value: value(id), labels: options ?? ModuleFace.byType[def.type]?.labels[id],
-          tint: tint ?? self.tint, diameter: diameter
+          tint: tint ?? self.tint, diameter: diameter, routed: model.isRouted(module.id, id)
         ) { value, final in
           if final { model.set(module.id, id, to: value) } else { model.turn(module.id, id, to: value) }
         } end: {
@@ -173,11 +173,27 @@
     let labels: [String]?
     let tint: Color
     var diameter: CGFloat = 34
+    /// A Combinator drives it. Marked rather than disabled, as the reference marks it: it still
+    /// turns, and the routing takes it back, and a dead knob would say less about why.
+    var routed = false
     /// A value, and whether it is the last of a gesture.
     let change: (Double, Bool) -> Void
     let end: () -> Void
 
     var body: some View {
+      control
+        .overlay(alignment: .topTrailing) {
+          if routed {
+            Circle().fill(Theme.three).frame(width: 5, height: 5)
+              .shadow(color: Theme.three, radius: 3)
+              .padding(.trailing, 6)
+              .help("\(def.name) is driven by a Combinator")
+              .accessibilityHidden(true)
+          }
+        }
+    }
+
+    @ViewBuilder private var control: some View {
       if def.stepped {
         stepped
       } else {
