@@ -44,7 +44,7 @@
       let bench = arguments.firstIndex(of: "--bench").map { arguments.remove(at: $0) } != nil
       guard arguments.count == 1 else {
         FileHandle.standardError.write(
-          Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n]\n".utf8))
+          Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n] [--bench]\n".utf8))
         exit(64)
       }
       let text = String(decoding: try Data(contentsOf: URL(fileURLWithPath: arguments[0])), as: UTF8.self)
@@ -54,30 +54,7 @@
       }
 
       if bench {
-        let host = EngineHost(sampleRate: 48000)
-        host.load(song)
-        host.send(.play)
-        let frames = 48000 * 20
-        let left = UnsafeMutablePointer<Float>.allocate(capacity: 512)
-        let right = UnsafeMutablePointer<Float>.allocate(capacity: 512)
-        let began = Date()
-        for _ in 0..<(frames / 512) { host.render(frames: 512, left: left, right: right) }
-        let took = Date().timeIntervalSince(began)
-        let load = host.takeLoad()
-        print(
-          String(
-            format: "20s of %@ in %.2fs: %.1f%% of real time (%.1f%% by the thread's clock)", arguments[0],
-            took, took / 20 * 100, load.fraction * 100))
-        // And paced as a device would pace it, sleeping between calls, to see what waking costs.
-        for _ in 0..<(48000 * 5 / 512) {
-          Thread.sleep(forTimeInterval: 512.0 / 48000)
-          host.render(frames: 512, left: left, right: right)
-        }
-        let paced = host.takeLoad()
-        print(
-          String(
-            format: "paced, one call every 10.7ms: %.1f%% by the thread's clock, longest %.2fms",
-            paced.fraction * 100, paced.longestMilliseconds))
+        runBench(song, named: arguments[0])
         return
       }
 
@@ -165,15 +142,21 @@
       }
       let seconds = option("--seconds")
       let startBar = option("--start-bar") ?? 0
+      let bench = arguments.firstIndex(of: "--bench").map { arguments.remove(at: $0) } != nil
       guard arguments.count == 1 else {
         FileHandle.standardError.write(
-          Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n]\n".utf8))
+          Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n] [--bench]\n".utf8))
         exit(64)
       }
       let text = String(decoding: try Data(contentsOf: URL(fileURLWithPath: arguments[0])), as: UTF8.self)
       guard let song = SongCodec.decode(text) else {
         FileHandle.standardError.write(Data("\(arguments[0]) is not a song\n".utf8))
         exit(65)
+      }
+
+      if bench {
+        runBench(song, named: arguments[0])
+        return
       }
 
       let route = WASAPIRoute()
@@ -214,8 +197,38 @@
     }
   }
 #else
+  import DriftboxDocument
+  #if canImport(FoundationEssentials)
+    import FoundationEssentials
+  #else
+    import Foundation
+  #endif
+  #if canImport(Android)
+    import Android
+  #elseif canImport(Glibc)
+    import Glibc
+  #endif
+
+  /// No player here yet — Linux and Android have no route behind the ports — but the bench needs
+  /// no device, and this is how the engine is timed on a phone before there is an app around it.
+  /// Only the essentials of Foundation, which is what lets it link on Android without the rest.
+  ///
+  ///     driftbox-play song.json --bench
   @main
   struct Play {
-    static func main() { print("driftbox-play needs AVFoundation or WASAPI") }
+    static func main() throws {
+      var arguments = Array(CommandLine.arguments.dropFirst())
+      guard let flag = arguments.firstIndex(of: "--bench"), arguments.count == 2 else {
+        print("driftbox-play only benches here, with no device: driftbox-play <song.json> --bench")
+        exit(64)
+      }
+      arguments.remove(at: flag)
+      let text = String(decoding: try Data(contentsOf: URL(fileURLWithPath: arguments[0])), as: UTF8.self)
+      guard let song = SongCodec.decode(text) else {
+        print("\(arguments[0]) is not a song")
+        exit(65)
+      }
+      runBench(song, named: arguments[0])
+    }
   }
 #endif

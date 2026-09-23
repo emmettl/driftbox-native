@@ -4,6 +4,8 @@
 // them with implementations of our own is what would make every render bit-exact across platforms.
 #if canImport(Darwin)
   import Darwin
+#elseif canImport(Android)
+  import Android
 #elseif canImport(Glibc)
   import Glibc
 #elseif canImport(ucrt)
