@@ -42,6 +42,9 @@ Metal. Next after this is the rack.
 | `Sources/CGLES` | EGL's and OpenGL ES 3.0's headers. Declarations only. |
 | `Sources/DriftboxShell` | What the app asks of a window — input, menus, file panels, a loop — the same on every platform. |
 | `Sources/DriftboxWin32` | That on Windows: the Windows shell. |
+| `Sources/DriftboxText` | What the app asks of a platform's type: a line set in a font, and a glyph's coverage. |
+| `Sources/DriftboxTextWindows` | That on DirectWrite: type on Windows. |
+| `Sources/CDirectWrite` | The part of DirectWrite that is called, declared in C, since its own headers are C++. Declarations only. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
 | `Sources/Driftbox` | The executable, which is nothing but `@main`. |
@@ -195,6 +198,23 @@ drag ends, and the picture follows the edge instead of freezing. Its loop is the
 thread — Foundation's run loop, turned as well, took the window's key messages before its shortcuts
 could, which is how Space came to play nothing — so work from other threads, such as an audio
 device's change, comes through `post`, onto the window's own queue.
+
+**Type is a port too, and a small one.** Drawing text is mostly the same everywhere: packing glyphs
+into a texture, placing them through a transform, colouring them. So that part will live on the GPU
+layer, where the Windows app's interface will draw, and only two things are asked of a platform.
+`DriftboxText`'s `Typesetter` is asked for a font the way the web's canvas asks, as families in
+order of preference with a weight and a size in pixels. It must then:
+- set a line: shaped, so kerned as the font says, and returned as glyphs placed on the baseline
+  with the width `measureText` would give;
+- give one glyph's coverage: grey, antialiased, and at a fraction of a pixel along.
+
+`DriftboxTextWindows` answers it with DirectWrite. Its text layout does the shaping, drawn through a
+text renderer written in Swift that collects the glyphs, and a glyph run analysis rasterises each
+glyph. DirectWrite's headers are C++ only, so `CDirectWrite` declares the part of it that is called,
+transcribed in vtable order. COM never changes that order, and a slot in the wrong place fails the
+first test that reaches it. `TypesetterTests` holds a typesetter to how type behaves rather than to
+one font's numbers: it falls back through its families, scales exactly, kerns AV, measures trailing
+spaces, and stands an I on its baseline.
 
 **The scenes move across one at a time.** `GPUScene` is a scene on the layer, and Pulse is the
 first: `PulseScene`, its shader the Metal one's GLSL line for line, held on WARP to what the Metal

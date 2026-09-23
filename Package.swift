@@ -23,6 +23,8 @@ let package = Package(
     .library(name: "DriftboxShell", targets: ["DriftboxShell"]),
     .library(name: "DriftboxGPUGLES", targets: ["DriftboxGPUGLES"]),
     .library(name: "DriftboxWin32", targets: ["DriftboxWin32"]),
+    .library(name: "DriftboxText", targets: ["DriftboxText"]),
+    .library(name: "DriftboxTextWindows", targets: ["DriftboxTextWindows"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
   ],
   targets: [
@@ -78,6 +80,14 @@ let package = Package(
     // the same on every platform, and the Windows shell that answers it with Win32.
     .target(name: "DriftboxShell"),
     .target(name: "DriftboxWin32", dependencies: ["DriftboxShell"]),
+    // Type: a line set in a font and a glyph's coverage, which is all that is asked of a platform,
+    // and DirectWrite answering it on Windows. DirectWrite's headers are C++ only, so the C target
+    // declares the part of it that is called; every call is made from Swift.
+    .target(name: "DriftboxText"),
+    .systemLibrary(name: "CDirectWrite"),
+    .target(
+      name: "DriftboxTextWindows",
+      dependencies: ["DriftboxText", .target(name: "CDirectWrite", condition: .when(platforms: [.windows]))]),
     // The GPU layer on OpenGL ES 3.0: Android's, and Linux's, where Mesa draws it in software for CI.
     // OpenGL ES is libGLESv3 on Android and libGLESv2 on Linux, which carries 3.0 as well.
     .systemLibrary(name: "CGLES"),
@@ -149,6 +159,11 @@ let package = Package(
       name: "DriftboxShellTests",
       dependencies: [
         "DriftboxShell", .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
+      ]),
+    .testTarget(
+      name: "DriftboxTextTests",
+      dependencies: [
+        "DriftboxText", .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
       ]),
     .testTarget(
       name: "DriftboxScenesTests",
