@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// The web's "material studies" on the GPU layer: a scene that is one fragment shader over the
 /// whole screen, fed the same handful of numbers, and sometimes a layer of instanced cards over it.
 /// The Metal `SurfaceScene`, moved across: the shaders are its MSL back in GLSL, which is nearer
