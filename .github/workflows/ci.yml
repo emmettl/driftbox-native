@@ -74,8 +74,8 @@ jobs:
           path: conformance/generated
       - uses: compnerd/gha-setup-swift@bbae8ce86bac5a3449f3992b3d88bc4ca25f2057  # main, pinned
         with:
-          swift-version: swift-6.4-release
-          swift-build: 6.4-RELEASE
+          swift-version: swift-6.4.0-release
+          swift-build: 6.4.0-RELEASE
       - name: Build
         run: swift build -c release --build-tests --build-system native -Xswiftc -enable-testing
       - name: Test
