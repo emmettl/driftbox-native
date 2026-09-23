@@ -109,4 +109,10 @@ jobs:
       - name: Build
         run: swift build -c release --build-tests --build-system native -Xswiftc -enable-testing
       - name: Test
-        run: swift test -c release --skip-build --build-system native
+        run: swift test -c release --skip-build --build-system native --skip MIDISchedulerTests
+      # The MIDI scheduler is held to a few milliseconds, and alongside the rest of the suite —
+      # Direct3D on the software rasteriser, the DSP — a runner's few cores are busy enough that the
+      # whole process is sometimes not scheduled for 40ms or more, at any thread priority. So it runs
+      # on its own, afterwards, where the only thing it can be late for is itself.
+      - name: Test the MIDI scheduler on its own
+        run: swift test -c release --skip-build --build-system native --filter MIDISchedulerTests
