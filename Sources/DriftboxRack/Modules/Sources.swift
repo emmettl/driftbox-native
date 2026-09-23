@@ -12,6 +12,7 @@ public enum SourceProcessor {
   case multisampler(Multisampler)
   case audioInput
   case audioTrack(AudioTrack)
+  case groovebox(GrooveboxModule)
 
   @_noAllocation
   mutating func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
@@ -32,14 +33,19 @@ public enum SourceProcessor {
     case .audioTrack(var module):
       module.process(inlets, outlets, params, context)
       self = .audioTrack(module)
+    case .groovebox(var module):
+      module.process(inlets, outlets, params, context)
+      self = .groovebox(module)
     }
   }
 
   func meter() -> MeterReading? { nil }
 
-  /// Nothing to give back: the wavetable bank is shared for the life of the program, and the
-  /// recordings belong to the graph.
-  mutating func release() {}
+  /// The groovebox's waveforms; nothing else to give back: the wavetable bank is shared for the
+  /// life of the program, and the recordings belong to the graph.
+  mutating func release() {
+    if case .groovebox(let module) = self { module.release() }
+  }
 }
 
 /// The host's live input, bus 4, as an ordinary outlet: the left channel or the right, a mono
@@ -64,7 +70,9 @@ enum AudioInput {
 }
 
 extension RackModules {
-  static let sourceDefs: [ModuleDef] = [wavetable, voice, sampler, multisampler, audioInput, audioTrack]
+  static let sourceDefs: [ModuleDef] = [
+    wavetable, voice, sampler, multisampler, audioInput, audioTrack, groovebox,
+  ]
 
   static func makeSource(_ type: String, sampleRate: Double, id: String, voice: VoiceInfo) -> SourceProcessor?
   {
@@ -75,6 +83,7 @@ extension RackModules {
     case "multisampler": .multisampler(Multisampler(sampleRate: sampleRate))
     case "audio-input": .audioInput
     case "audio-track": .audioTrack(AudioTrack(sampleRate: sampleRate))
+    case "groovebox": .groovebox(GrooveboxModule(sampleRate: sampleRate))
     default: nil
     }
   }

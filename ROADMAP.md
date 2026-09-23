@@ -330,7 +330,13 @@ parity point.
    state as the patch document — what an AUv3 extension will ask of it. It plays at its host's
    rate and refuses any other, since the rack's audio is decoded at that rate; MIDI as render
    events and a parameter tree for a host to automate are for the extension itself.
-   Left: the groovebox as a module in the rack.
+   Then the groovebox as a module, begun: the engine gives each of a song's four machines outputs
+   of its own, which feed the mix unless a host diverts one, as the web engine's `sectionOutputs`
+   do; and the `groovebox` module takes them from the host's buses 0 to 3 through a strip of level,
+   pan and mute onto a stereo outlet each, metering each machine after its strip, held to the
+   reference's samples and its meters' arithmetic.
+   Left: the host playing the retained song into the rack, in time with its transport, and the
+   app — opening a groovebox song in the rack, the module's face, and saving both.
 
 ## Help and tutorials
 
