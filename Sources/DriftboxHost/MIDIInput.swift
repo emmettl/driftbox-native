@@ -5,9 +5,10 @@
   import Synchronization
 
   /// Every MIDI source, as it arrives, less any it has been told to ignore. Notes go to `onNote`
-  /// (note number, velocity 0...1 — 0 is a release); clock messages, stamped in milliseconds, to
-  /// `onClock`; the list of sources, whenever a device comes or goes, to `onSourcesChange`. All
-  /// three are called on CoreMIDI's own thread.
+  /// (note number, velocity 0...1 — 0 is a release); every channel message — notes with their
+  /// channel, controllers, pressure, bend — as its three bytes to `onMessage`; clock messages,
+  /// stamped in milliseconds, to `onClock`; the list of sources, whenever a device comes or goes,
+  /// to `onSourcesChange`. All are called on CoreMIDI's own thread.
   ///
   /// Everything here is read on that thread and written on another, so all of it sits behind
   /// one lock — the callbacks too, since a message can arrive between making this and setting
@@ -21,6 +22,7 @@
       var ignoring: Set<String> = []
       var hiding: Set<MIDIUniqueID> = []
       var onNote: (@Sendable (Int, Double) -> Void)?
+      var onMessage: (@Sendable ([UInt8]) -> Void)?
       var onClock: (@Sendable (ClockMessage, Double) -> Void)?
       var onSourcesChange: (@Sendable ([String]) -> Void)?
     }
@@ -32,6 +34,11 @@
     public var onNote: (@Sendable (Int, Double) -> Void)? {
       get { state.withLock { $0.onNote } }
       set { state.withLock { $0.onNote = newValue } }
+    }
+
+    public var onMessage: (@Sendable ([UInt8]) -> Void)? {
+      get { state.withLock { $0.onMessage } }
+      set { state.withLock { $0.onMessage = newValue } }
     }
 
     public var onClock: (@Sendable (ClockMessage, Double) -> Void)? {
@@ -127,15 +134,18 @@
     }
 
     private func receive(_ list: UnsafePointer<MIDIEventList>, from source: MIDIEndpointRef) {
-      let (onNote, onClock) = state.withLock { state in
+      let (onNote, onMessage, onClock) = state.withLock { state in
         // A source not in the table yet was connected a moment ago; it is heard, as every
         // source is until somebody says otherwise.
         if let name = state.names[source], state.ignoring.contains(name) {
-          return ((@Sendable (Int, Double) -> Void)?.none, (@Sendable (ClockMessage, Double) -> Void)?.none)
+          return (
+            (@Sendable (Int, Double) -> Void)?.none, (@Sendable ([UInt8]) -> Void)?.none,
+            (@Sendable (ClockMessage, Double) -> Void)?.none
+          )
         }
-        return (state.onNote, state.onClock)
+        return (state.onNote, state.onMessage, state.onClock)
       }
-      guard onNote != nil || onClock != nil else { return }
+      guard onNote != nil || onMessage != nil || onClock != nil else { return }
       let now = Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000
       for packet in list.unsafeSequence() {
         // Universal MIDI Packets, protocol 1.0: each word is one message.
@@ -148,6 +158,7 @@
           case 1:
             if let message = ClockMessage(bytes: [status, data1, data2]) { onClock?(message, now) }
           case 2:
+            onMessage?([status, data1, data2])
             switch status & 0xF0 {
             case 0x90: onNote?(Int(data1), Double(data2) / 127)
             case 0x80: onNote?(Int(data1), 0)

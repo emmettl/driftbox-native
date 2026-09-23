@@ -233,11 +233,17 @@
       midi.onNote = { [weak self] note, velocity in
         Task { @MainActor in self?.midiNote(note, velocity: velocity) }
       }
+      midi.onMessage = { [weak self] bytes in
+        Task { @MainActor in self?.midiMessage(bytes) }
+      }
       midi.onClock = { [weak self] message, time in
         Task { @MainActor in self?.midiClock(message, at: time) }
       }
       midi.onSourcesChange = { [weak self] names in
-        Task { @MainActor in self?.midiSources = names }
+        Task { @MainActor in
+          self?.midiSources = names
+          self?.rack?.midiSources = names
+        }
       }
       midiSources = midi.sources
       self.midi = midi
@@ -270,13 +276,20 @@
     /// The web app's keys: notes from 33 (A1) play 303 A across two octaves; below that, the drum
     /// voices the grid shows, from note 21 up. A note's velocity past 0.8 is an accent.
     private func midiNote(_ note: Int, velocity: Double) {
-      guard listensToMIDI, velocity > 0 else { return }
+      // The rack plays what arrives while its window is in front; the groovebox otherwise.
+      guard listensToMIDI, velocity > 0, rack?.inFront != true else { return }
       let accent = velocity >= 0.8
       if note >= 33 {
         playNote(semitone: note - 33 - 12, accent: accent)
       } else if note >= 21 {
         strike(index: note - 21, accent: accent)
       }
+    }
+
+    /// Every channel message, for the rack while its window is in front.
+    private func midiMessage(_ bytes: [UInt8]) {
+      guard listensToMIDI, let rack, rack.inFront else { return }
+      rack.midi(bytes)
     }
 
     private func midiClock(_ message: ClockMessage, at time: Double) {
@@ -422,7 +435,12 @@
     /// source on this engine, so choosing an output moves both.
     public func attach(_ rack: RackModel) {
       rack.attach(to: audio)
+      rack.midiSources = midiSources
+      self.rack = rack
     }
+
+    /// The rack, once its window has been opened: where MIDI goes while that window is in front.
+    private weak var rack: RackModel?
 
     /// The song that was open when the app last quit, as it was last saved — and stopped at the
     /// top, because sound nobody asked for is the one thing not worth restoring. A document comes

@@ -52,7 +52,9 @@
     // MARK: Sound
 
     @ObservationIgnored let host: RackHost
-    @ObservationIgnored private var keyboard = RackKeyboard()
+    /// A keyboard for each MIDI channel notes arrive on — the typing keys are channel 1 — so two
+    /// controllers on two channels do not steal each other's voices.
+    @ObservationIgnored private var keyboards: [Int: RackKeyboard] = [:]
     @ObservationIgnored private var node: AVAudioSourceNode?
     /// Whether anything renders the host. Until something does, nothing drains its command ring,
     /// so nothing is sent to it; whatever is there is loaded the moment something starts to.
@@ -187,8 +189,11 @@
       }
       self.delayed = delayed
       self.folded = folded
-      if keyboard.voices != voices {
-        for state in keyboard.setVoices(voices) { play(state) }
+      for (channel, keyboard) in keyboards where keyboard.voices != voices {
+        var keyboard = keyboard
+        let silenced = keyboard.setVoices(voices)
+        keyboards[channel] = keyboard
+        for state in silenced { play(state, channel: channel) }
       }
       save()
     }
@@ -391,28 +396,71 @@
 
     var voices: Int { max(1, min(8, Int(patch.voices ?? 1))) }
 
-    func noteDown(_ note: Int, velocity: Double = 0.8) {
-      for state in keyboard.down(note, velocity: velocity) { play(state) }
-      sounding = keyboard.playing
+    /// Whether the rack's window is the one in front, so MIDI from outside comes here rather
+    /// than to the groovebox.
+    var inFront = false
+    /// The MIDI sources there are, for the MIDI module's face to say whether it is listening.
+    var midiSources: [String] = []
+
+    func noteDown(_ note: Int, velocity: Double = 0.8, channel: Int = 1) {
+      var keyboard = keyboards[channel] ?? RackKeyboard(voices: voices)
+      let changes = keyboard.down(note, velocity: velocity)
+      keyboards[channel] = keyboard
+      for state in changes { play(state, channel: channel) }
+      sounding = keyboards.values.flatMap(\.playing)
     }
 
-    func noteUp(_ note: Int) {
-      for state in keyboard.up(note) { play(state) }
-      sounding = keyboard.playing
+    func noteUp(_ note: Int, channel: Int = 1) {
+      guard var keyboard = keyboards[channel] else { return }
+      let changes = keyboard.up(note)
+      keyboards[channel] = keyboard
+      for state in changes { play(state, channel: channel) }
+      sounding = keyboards.values.flatMap(\.playing)
     }
 
-    func allNotesOff() {
-      for state in keyboard.allOff() { play(state) }
-      sounding = []
+    /// Every note off on one channel, or on all of them.
+    func allNotesOff(channel: Int? = nil) {
+      for (at, keyboard) in keyboards where channel == nil || at == channel {
+        var keyboard = keyboard
+        let changes = keyboard.allOff()
+        keyboards[at] = keyboard
+        for state in changes { play(state, channel: at) }
+      }
+      sounding = keyboards.values.flatMap(\.playing)
     }
 
-    /// One voice's note to every MIDI module listening on channel 1 — omni, or set to it.
-    private func play(_ state: RackKeyboard.VoiceState) {
+    /// A channel message from a MIDI cable: notes through that channel's keyboard, and the mod
+    /// wheel, bend, pressure, expression, breath and sustain straight to the modules listening,
+    /// on every voice — one wheel moves every note.
+    func midi(_ bytes: [UInt8]) {
+      for event in RackMIDI.events(bytes) {
+        switch event {
+        case .down(let note, let velocity, let channel): noteDown(note, velocity: velocity, channel: channel)
+        case .up(let note, let channel): noteUp(note, channel: channel)
+        case .allOff(let channel): allNotesOff(channel: channel)
+        case .performance(let control, let value, let channel):
+          guard live else { continue }
+          for module in listening(on: channel) { host.setParam(module.id, control.rawValue, value) }
+        case .control:
+          break
+        }
+      }
+    }
+
+    /// The MIDI modules that hear `channel`: those on it, and those on all of them.
+    private func listening(on channel: Int) -> [PatchModule] {
+      patch.modules.filter { module in
+        guard module.type == "midi" else { return false }
+        let wanted = Int(module.params["channel"] ?? 0)
+        return wanted == 0 || wanted == channel
+      }
+    }
+
+    /// One voice's note to every MIDI module listening on its channel.
+    private func play(_ state: RackKeyboard.VoiceState, channel: Int) {
       if state.gate == 1 { lastNote = state.note }
       guard live else { return }
-      for module in patch.modules where module.type == "midi" {
-        let channel = module.params["channel"] ?? 0
-        guard channel == 0 || channel == 1 else { continue }
+      for module in listening(on: channel) {
         host.setParam(module.id, "note", Double(state.note), voice: state.voice)
         host.setParam(module.id, "gate", Double(state.gate), voice: state.voice)
         host.setParam(module.id, "velocity", state.velocity, voice: state.voice)

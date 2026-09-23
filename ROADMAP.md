@@ -302,9 +302,13 @@ parity point.
    Combinator (its rotaries and buttons, what each drives, and the whole routing written out).
    The chord and figure previews are held to the reference's own over a grid of settings: 2,520
    chords and 960 figures, exactly.
+   Then MIDI from outside plays the rack while its window is in front, and the groovebox
+   otherwise: notes through a keyboard of their own on each channel, so two controllers do not
+   steal each other's voices, and the mod wheel, bend, pressure, expression, breath and sustain
+   to the modules listening on that channel — the reference's decoding, byte for byte.
    Left: the sample players' faces, the Combinator's routing editor and MIDI learn, the inlet
-   trims on the back, the breaks the break-built patches expect, hardware MIDI into the rack,
-   the rack as an Audio Unit, and the groovebox as a module in it.
+   trims on the back, the breaks the break-built patches expect, the rack as an Audio Unit, and
+   the groovebox as a module in it.
 
 ## Milestone 3 — what only native can do
 

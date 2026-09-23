@@ -85,6 +85,38 @@
       }
     }
 
+    /// Channel messages arrive whole, with their channel: what the rack plays from a controller.
+    @Test func channelMessagesArriveAsTheirBytes() async throws {
+      let output = MIDIOutput()
+      let input = MIDIInput()
+      let messages = Messages()
+      input.onMessage = { bytes in messages.add(bytes) }
+      try await Task.sleep(for: .milliseconds(400))
+      let sent: [[UInt8]] = [[0x91, 60, 100], [0xB0, 1, 127], [0xE3, 0, 64], [0x81, 60, 0]]
+      let now = MIDIOutput.now()
+      for (index, bytes) in sent.enumerated() {
+        #expect(
+          output.send(bytes, to: .virtual, at: MIDIOutput.time(now, after: 0.01 + Double(index) * 0.005)))
+      }
+      try await Task.sleep(for: .milliseconds(600))
+      let got = messages.all()
+      var remaining = got[...]
+      for bytes in sent {
+        guard let at = remaining.firstIndex(of: bytes) else {
+          Issue.record("\(bytes) never arrived; got \(got)")
+          return
+        }
+        remaining = remaining[(at + 1)...]
+      }
+    }
+
+    final class Messages: @unchecked Sendable {
+      private var received: [[UInt8]] = []
+      private let lock = NSLock()
+      func add(_ bytes: [UInt8]) { lock.withLock { received.append(bytes) } }
+      func all() -> [[UInt8]] { lock.withLock { received } }
+    }
+
     /// A source that has been ignored delivers nothing, and the same source heard again
     /// delivers. By name, which is how it is stored, through the real server, which is the
     /// only place the tag that says where a message came from is ever written.

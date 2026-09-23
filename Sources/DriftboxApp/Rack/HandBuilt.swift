@@ -88,11 +88,14 @@
 
     var body: some View {
       PanelTitle(name: "MIDI") {
-        Text(face.model.lastNote.map(RackKeyboard.name) ?? "keys")
-          .font(Theme.mono(10, .semibold))
-          .foregroundStyle(face.model.lastNote == nil ? Theme.dim : Theme.nine)
-          .contentTransition(.numericText())
-          .animation(.easeOut(duration: 0.12), value: face.model.lastNote)
+        Text(
+          face.model.lastNote.map(RackKeyboard.name)
+            ?? (face.model.midiSources.isEmpty ? "keys" : "listening")
+        )
+        .font(Theme.mono(10, .semibold))
+        .foregroundStyle(face.model.lastNote == nil ? Theme.dim : Theme.nine)
+        .contentTransition(.numericText())
+        .animation(.easeOut(duration: 0.12), value: face.model.lastNote)
       }
       HStack(alignment: .top, spacing: 0) {
         ForEach(face.def.params.filter { !$0.hidden }, id: \.id) { param in
