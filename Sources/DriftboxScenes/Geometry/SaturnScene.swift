@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Rings of Saturn. The first scene that is an OBJECT rather than a place: every other one
 /// puts you inside something and this one puts a body in front of you and leaves you
 /// outside it. The rings shimmer on the sixteenths, and the big hits punch holes in the

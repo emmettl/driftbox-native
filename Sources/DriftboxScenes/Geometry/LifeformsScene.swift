@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Pulsing spheres, drifting in deep space — the ISDN-era Future Sound of London videos:
 /// organic bodies breathing slowly, wireframe over translucent, nothing quite still and
 /// nothing quite symmetrical. The surfaces are NOT spheres: every vertex is pushed in and

@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Wireframe dancers.
 ///
 /// The first scene with a FIGURE in it. Everything else here is a place, a body or a board;

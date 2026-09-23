@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// DEFCON.
 ///
 /// A map, seen from almost straight down, with two sides that shoot at each other on the beat.

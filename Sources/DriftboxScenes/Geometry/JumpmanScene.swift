@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Jump Man. An 80s platformer, run on hardware that would have been a supercomputer then.
 ///
 /// The homage is the sprite work: everything on screen is drawn on a grid at one colour per
