@@ -5,6 +5,8 @@ import Synchronization
 
 #if canImport(Darwin)
   import Darwin
+#elseif os(Windows)
+  import WinSDK
 #else
   import Glibc
 #endif
@@ -142,6 +144,15 @@ public final class EngineHost: @unchecked Sendable {
   private func threadNanoseconds() -> UInt64 {
     #if canImport(Darwin)
       return clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+    #elseif os(Windows)
+      // Kernel plus user time, in 100ns units — but only as fine as the scheduler's tick.
+      var creation = FILETIME()
+      var exit = FILETIME()
+      var kernel = FILETIME()
+      var user = FILETIME()
+      GetThreadTimes(GetCurrentThread(), &creation, &exit, &kernel, &user)
+      func ticks(_ t: FILETIME) -> UInt64 { UInt64(t.dwHighDateTime) << 32 | UInt64(t.dwLowDateTime) }
+      return (ticks(kernel) + ticks(user)) * 100
     #else
       var spec = timespec()
       clock_gettime(CLOCK_THREAD_CPUTIME_ID, &spec)

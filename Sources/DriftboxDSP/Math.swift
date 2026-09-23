@@ -6,6 +6,8 @@
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(ucrt)
+  import ucrt
 #elseif canImport(Musl)
   import Musl
 #elseif canImport(WASILibc)
