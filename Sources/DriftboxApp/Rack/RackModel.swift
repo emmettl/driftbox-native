@@ -166,6 +166,7 @@
       live = true
       host.load(patch)
       sendSong()
+      if let loop = songLoop { host.loopSong(startBar: loop.start, bars: loop.bars) }
       host.setTransport(tempo: tempo, running: running, shuffle: swing)
       metering = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
         Task { @MainActor in self?.refreshReadings() }
@@ -175,6 +176,12 @@
     /// Take the host's latest readings.
     func refreshReadings() {
       readings = host.readings()
+      let bar: Int? =
+        if sentSong != nil, host.song.playing.load(ordering: .relaxed) {
+          songTimeline.step(at: Double(host.song.songFrame.load(ordering: .relaxed)) / host.sampleRate)
+            .map { songTimeline.bars[$0] }
+        } else { nil }
+      if bar != songBar { songBar = bar }
     }
 
     // MARK: Opening
@@ -182,6 +189,15 @@
     /// Put a different patch in the rack. Its history is the old one's, so it starts afresh.
     func open(_ patch: Patch, name: String) {
       allNotesOff()
+      if songLinked {
+        groovebox?.unlinkRack()
+        songLinked = false
+      }
+      // The engine keeps a loop from song to song, so the old one goes with the old patch.
+      if songLoop != nil {
+        songLoop = nil
+        if live { host.loopSong(startBar: 0, bars: 0) }
+      }
       // Another patch's samples are not this one's, even under the same ids.
       host.clearSamples()
       samples = [:]
@@ -603,6 +619,10 @@
 
     private func restore(_ patch: Patch) {
       turning = nil
+      // The song's history is the groovebox window's, so going back in the rack's keeps the song
+      // as it is now rather than as it was when the rack last changed.
+      var patch = patch
+      patch.groovebox = self.patch.groovebox
       self.patch = patch
       selection = selection.filter { id in patch.modules.contains { $0.id == id } }
       rebuild()
@@ -783,15 +803,99 @@
     @ObservationIgnored private var decoded: Song?
     /// The song the host was last given, so an edit to the rack alone sends it nothing.
     @ObservationIgnored private var sentSong: Song?
+    /// Where its every step starts, made once a song rather than thirty times a second.
+    @ObservationIgnored private var songTimeline = Timeline()
+
+    /// What saving this document keeps, which is what the rack says about it.
+    var compatibility: PatchCompatibility { patch.compatibility }
+    /// What the rack says about a document it did not author, if anything.
+    var notice: DocumentNotice? {
+      DocumentNotice.notice(compatibility, song: song.map { ($0.patterns.count, $0.bpm) })
+    }
+
+    /// The groovebox window: the song in it, and where the rack's song is edited.
+    @ObservationIgnored weak var groovebox: Player?
+    /// Whether the rack's song is open in the groovebox window, its edits coming straight back.
+    private(set) var songLinked = false
+    /// The bars of the song being looped, if any.
+    private(set) var songLoop: (start: Int, bars: Int)?
+    /// Which bar the song is on while it plays, for the face; read with the meters.
+    private(set) var songBar: Int?
+
+    /// A song, whole, in the rack: its document with the groovebox source its machines come in by,
+    /// rather than the song taken apart into modules.
+    func openSong(_ song: Song, name: String) {
+      open(Patch.embedding(song: SongCodec.encode(song)), name: name)
+    }
+
+    /// Start the song at `bar`, and the rack with it if it was not running: a song jumped into
+    /// against a rack that is not running would play alone, on a clock nothing else follows.
+    func startSong(atBar bar: Int) {
+      guard live, let song = playedSong else { return }
+      sendSong()
+      let bar = Self.clampBar(bar, song.bars)
+      if !running { toggleRunning() }
+      host.startSong(atFrame: Int((songTimeline.start(ofBar: bar) * host.sampleRate).rounded()))
+    }
+
+    /// Loop `bars` bars from `start`, as much of them as the song has after it.
+    func loopSong(start: Int, bars: Int) {
+      guard let song = playedSong else { return }
+      let loop = Self.clampLoop(start, bars, song.bars)
+      songLoop = loop
+      if live { host.loopSong(startBar: loop.start, bars: loop.bars) }
+    }
+
+    func clearSongLoop() {
+      songLoop = nil
+      if live { host.loopSong(startBar: 0, bars: 0) }
+    }
+
+    /// The first bar and the last one there is: the reference's `clampBar`.
+    static func clampBar(_ bar: Int, _ total: Int) -> Int { max(0, min(max(1, total) - 1, bar)) }
+
+    /// A loop that fits inside the song after its start: the reference's `clampLoop`.
+    static func clampLoop(_ start: Int, _ bars: Int, _ total: Int) -> (start: Int, bars: Int) {
+      let start = clampBar(start, total)
+      return (start, max(1, min(max(1, total) - start, bars)))
+    }
+
+    /// Open the rack's song in the groovebox window to edit it there. Asks first if the window
+    /// has work it would lose.
+    func editInGroovebox() {
+      guard let groovebox, let song else { return }
+      guard SongFiles(player: groovebox).confirmDiscard() else { return }
+      groovebox.link(
+        song, name: name,
+        edited: { [weak self] edited in self?.songEdited(edited) },
+        ended: { [weak self] in self?.songLinked = false })
+      songLinked = true
+    }
+
+    /// An edit from the groovebox window: the song changes in place and plays on where it was.
+    /// Not a step of the rack's undo; the window's own undo has it.
+    private func songEdited(_ edited: Song) {
+      patch.groovebox = SongCodec.encode(edited)
+      sendSong()
+      if live { host.setTransport(tempo: tempo, running: running, shuffle: swing) }
+      save()
+    }
+
+    /// The song as the rack plays it: at the patch's tempo when it sets one.
+    var playedSong: Song? {
+      var played = song
+      if let tempo = patch.tempo { played?.bpm = tempo }
+      return played
+    }
 
     /// Hand the host the patch's song, at the patch's tempo when it sets one, if it is not the one
     /// it has: the rack plays it beside itself, its machines on the `groovebox` module's buses.
     private func sendSong() {
       guard live else { return }
-      var next = song
-      if let tempo = patch.tempo { next?.bpm = tempo }
+      let next = playedSong
       guard next != sentSong else { return }
       sentSong = next
+      songTimeline = next.map { Timeline(song: $0) } ?? Timeline()
       host.setSong(next)
     }
 

@@ -327,6 +327,19 @@ public final class RackHost: @unchecked Sendable {
     }
   }
 
+  /// Move the song to `frame` of its own, playing: a start at a bar, which the rack's transport
+  /// must be running for, or the song would play against a clock nothing else follows.
+  public func startSong(atFrame frame: Int) {
+    guard hasSong else { return }
+    song.send(.seek(songFrame: max(0, frame)))
+    if songRunning { song.send(.play) }
+  }
+
+  /// Loop `bars` bars of the song from `startBar`; zero bars loops nothing.
+  public func loopSong(startBar: Int, bars: Int) {
+    song.send(.loop(startBar: max(0, startBar), bars: max(0, bars)))
+  }
+
   /// Play `song` beside the rack, or none. A song replacing another carries on where the other
   /// was, as an edit to the song the rack is playing should; the first one waits for the rack.
   public func setSong(_ song: Song?) {

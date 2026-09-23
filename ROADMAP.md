@@ -339,8 +339,12 @@ parity point.
    mix is added to the rack's, whose machines reach the `groovebox` module on the host's buses,
    whose patched machines leave its mix, and which starts from the top and stops with the rack's
    transport, at the patch's tempo or the song's, with the song's swing, keeping its beat through
-   an edit. Left: the app — opening a groovebox song in the rack, the module's face, and saving
-   both.
+   an edit. Then the app: a groovebox song opens in the rack whole, from the song in the groovebox
+   window or the catalogue, with its source wired in; the Groovebox face has each machine's strip
+   and meter and the song's arrangement, section by section, to start from or loop; the song is
+   edited in the groovebox window, linked so each edit plays on in the rack, rather than in a
+   second editor in the face as the reference has it for want of another window; and the rack says
+   what it holds, as the reference's three states of compatibility do. The rack is at parity.
 
 ## Help and tutorials
 

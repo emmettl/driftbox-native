@@ -36,6 +36,7 @@
         case "sampler": SamplerFace(face: face)
         case "multisampler": MultisamplerFace(face: face)
         case "audio-track": AudioTrackFace(face: face)
+        case "groovebox": GrooveboxFace(face: face)
         default: GenericFace(face: face, span: span)
         }
       }
@@ -95,12 +96,19 @@
 
     /// The control for one param, as the generic face draws it, in a cell of the usual size.
     @ViewBuilder
+    /// `named` puts a shorter name under it, where the face already says whose control it is.
     func control(
-      _ id: String, tint: Color? = nil, diameter: CGFloat = 34, options: [String]? = nil
+      _ id: String, tint: Color? = nil, diameter: CGFloat = 34, options: [String]? = nil, named: String? = nil
     ) -> some View {
       if let param = param(id) {
+        let shown =
+          named.map { name in
+            var renamed = param
+            renamed.name = name
+            return renamed
+          } ?? param
         ParamControl(
-          def: param, value: value(id), labels: options ?? ModuleFace.byType[def.type]?.labels[id],
+          def: shown, value: value(id), labels: options ?? ModuleFace.byType[def.type]?.labels[id],
           tint: tint ?? self.tint, diameter: diameter, routed: model.isRouted(module.id, id)
         ) { value, final in
           if final { model.set(module.id, id, to: value) } else { model.turn(module.id, id, to: value) }
