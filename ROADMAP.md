@@ -506,8 +506,9 @@ each question, and the rest is Android's alone:
    `scripts/android-app.sh scenes` on the Adreno — drawn, not black, moving. At every pixel of the
    phone's screen Frost took 21ms a frame and two more over the display's 8.3; drawn at two
    pixels to a point, as a Retina Mac draws them, and scaled up, nine keep 120 frames a second and
-   Frost 98. Left: the scenes still on Metal alone, which move to the layer on every platform at
-   once; and `GraphicLab`, which sets its type with CoreText and needs another way to set text.
+   Frost 98. Then the sixteen geometry scenes, as they moved to the layer on every platform at
+   once: each passing on the Adreno, at no more than 3.2ms a frame drawn. Left: `GraphicLab`,
+   which sets its type with CoreText and needs another way to set text.
 4. **The touch interface, designed with iOS.** See below.
 5. **Shipping.** The shell is a `GameActivity`, which hands the window, input and lifecycle to
    native code. Songs open and save through the storage access framework as `.driftbox`, and

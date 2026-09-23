@@ -313,7 +313,8 @@ catalogue with the scene the song names drawn from it over the whole screen, and
 the performance filter's pad, as the window is on Windows; two fingers tapped step on to the next
 scene. A scene is drawn at no more than two pixels to a point, a Mac's Retina display's, and
 scaled up to the screen: on a Fairphone 6, which has three, every scene but Frost then keeps the
-display's 120 frames a second, and Frost 98. Given a test's name, the app runs that instead and
+display's 120 frames a second, and Frost 98. That is all of them but Graphic Lab, which sets its
+type through CoreText. Given a test's name, the app runs that instead and
 says what happened.
 
 ```bash
