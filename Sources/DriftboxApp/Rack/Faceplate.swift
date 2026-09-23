@@ -254,7 +254,7 @@
 
     /// A value in words, guessed from its range as the reference guesses it: thousands are hertz,
     /// three orders of magnitude inside ten are seconds, a range across ±12 is signed semitones.
-    static func display(_ def: ParamDef, _ value: Double) -> String {
+    nonisolated static func display(_ def: ParamDef, _ value: Double) -> String {
       if def.max > 1000 {
         return value >= 1000 ? RackDisplay.fixed(value / 1000, 2) + "k" : "\(Int(RackDisplay.jsRound(value)))"
       }
