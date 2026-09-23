@@ -108,7 +108,7 @@
 
     /// A song that has never had a file is a Save As in disguise, and one that has is not.
     @Test func saveAsksWhereOnlyWhenTheSongHasNoFileOfItsOwn() throws {
-      try withTemporaryDirectory { directory in
+      withTemporaryDirectory { directory in
         let player = Player(host: EngineHost(sampleRate: 48000))
         let asked = Asked()
         let files = files(player, asking: asked)

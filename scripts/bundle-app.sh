@@ -25,7 +25,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
-  <key>LSMinimumSystemVersion</key><string>15.0</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <!-- A song is JSON, and claiming every .json file on the machine would be rude, so songs get a
        type of their own under the bundle identifier which conforms to JSON, so that whatever

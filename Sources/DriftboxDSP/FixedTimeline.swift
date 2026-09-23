@@ -25,8 +25,7 @@ public struct FixedTimeline {
   public var defaultValue: Double
   var count = 0
   // Four events inline. A generic fixed array would do, except that a generic type cannot be
-  // touched from a function that promises not to allocate, and `InlineArray` needs a newer system
-  // than this package's floor.
+  // touched from a function that promises not to allocate.
   var e0 = Event(kind: .set, value: 0, time: 0)
   var e1 = Event(kind: .set, value: 0, time: 0)
   var e2 = Event(kind: .set, value: 0, time: 0)

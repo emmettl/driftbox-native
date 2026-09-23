@@ -8,7 +8,7 @@ import PackageDescription
 
 let package = Package(
   name: "DriftboxKit",
-  platforms: [.macOS(.v15), .iOS(.v18)],
+  platforms: [.macOS(.v26), .iOS(.v26)],
   products: [
     .library(name: "DriftboxDSP", targets: ["DriftboxDSP"]),
     .library(name: "DriftboxSeq", targets: ["DriftboxSeq"]),
