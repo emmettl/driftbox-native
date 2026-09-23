@@ -67,12 +67,57 @@ jobs:
       - name: Audio targets stay constrained
         run: scripts/check-constrained.sh
 
+  # Whether a change can reach the Windows build, since a Windows minute costs twice a Linux one.
+  # It can unless every file changed is in something that compiles to nothing there — the Mac app,
+  # the Metal backend, GLES, the Android app and its C modules, all behind `#if`s Windows fails —
+  # or is not code at all. When it cannot tell, it says yes.
+  scope:
+    name: What changed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      windows: ${{ steps.windows.outputs.relevant }}
+    steps:
+      - id: windows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename') || files=""
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            # The comparison lists at most 300 files; a push that many long is simply run.
+            files=$(gh api "repos/$REPO/compare/$BEFORE...$AFTER" --jq 'if (.files | length) < 300 then .files[].filename else "unknown" end') || files=""
+          else
+            files=""
+          fi
+          relevant=false
+          [ -z "$files" ] && relevant=true
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              Sources/Driftbox/*|Sources/DriftboxApp/*|Sources/DriftboxGPUMetal/*|Tests/DriftboxAppTests/*) ;;
+              Sources/DriftboxGPUGLES/*|Sources/DriftboxAndroid/*|Sources/CAAudio/*|Sources/CAMidi/*|Sources/CGLES/*) ;;
+              android/*|shaders/*|scripts/*|*.md|LICENSE|.swift-format|.gitignore) ;;
+              *) relevant=true ;;
+            esac
+          done <<< "$files"
+          echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+          echo "Windows is $([ $relevant = true ] && echo needed || echo not needed) for this change"
+
   # The Windows host is the one target Linux cannot build, so it is built and tested here, over
   # everything else as well: the core is meant to be platform-free, and this is where that is kept.
   # Release, because a debug build does not link on Windows yet (see the README's "Windows").
   windows:
     name: Windows
-    needs: fixtures
+    needs: [fixtures, scope]
+    if: needs.scope.outputs.windows == 'true'
     runs-on: windows-latest
     env:
       DRIFTBOX_REQUIRE_GENERATED: 1
