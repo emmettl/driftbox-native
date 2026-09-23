@@ -17,6 +17,8 @@ let package = Package(
     .library(name: "DriftboxDocument", targets: ["DriftboxDocument"]),
     .library(name: "DriftboxHost", targets: ["DriftboxHost"]),
     .library(name: "DriftboxHostWindows", targets: ["DriftboxHostWindows"]),
+    .library(name: "DriftboxGPU", targets: ["DriftboxGPU"]),
+    .library(name: "DriftboxGPUD3D11", targets: ["DriftboxGPUD3D11"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
   ],
   targets: [
@@ -36,6 +38,15 @@ let package = Package(
     .target(
       name: "DriftboxHostWindows",
       dependencies: ["DriftboxHost", .target(name: "CWASAPI", condition: .when(platforms: [.windows]))]),
+    // What the scenes ask of a GPU, and the backends that answer it. The shaders are GLSL in
+    // `shaders/`, made into every backend's language by `scripts/shaders.mjs` and checked in.
+    .target(name: "DriftboxGPU"),
+    .target(
+      name: "DriftboxGPUD3D11", dependencies: ["DriftboxGPU"],
+      linkerSettings: [
+        .linkedLibrary("d3d11", .when(platforms: [.windows])),
+        .linkedLibrary("d3dcompiler", .when(platforms: [.windows])),
+      ]),
     // The visuals: Metal scenes driven by the engine's events. Empty on a platform without Metal.
     .target(name: "DriftboxScenes", dependencies: ["DriftboxDSP", "DriftboxEngine"]),
 
@@ -79,6 +90,7 @@ let package = Package(
       dependencies: ["DriftboxRack", "DriftboxDocument", "ConformanceSupport"]),
     .testTarget(
       name: "DriftboxHostWindowsTests", dependencies: ["DriftboxHostWindows", "DriftboxHost", "DriftboxSeq"]),
+    .testTarget(name: "DriftboxGPUTests", dependencies: ["DriftboxGPU", "DriftboxGPUD3D11"]),
     .testTarget(name: "DriftboxScenesTests", dependencies: ["DriftboxScenes", "DriftboxEngine"]),
     .testTarget(
       name: "DriftboxHostTests",

@@ -31,6 +31,9 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxHostWindows` | WASAPI and WinMM behind those ports: the host on Windows. |
 | `Sources/CWASAPI` | The Windows audio headers Swift's WinSDK module leaves out. Declarations only. |
 | `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |
+| `Sources/DriftboxGPU` | What the scenes ask of a GPU, as a protocol every backend answers the same way. |
+| `Sources/DriftboxGPUD3D11` | That protocol on Direct3D 11: the GPU on Windows. |
+| `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
 | `Sources/Driftbox` | The executable, which is nothing but `@main`. |
 
@@ -97,6 +100,45 @@ The Mac's adapters — `AudioRoute`, `DriftboxAudioUnit`, `MIDIInput`, `MIDIOutp
 the ports, still in `DriftboxHost`, and not yet behind them; `Player` and `RackModel` use them
 directly. Moving them into a target of their own that conforms is the next step, and needs a Mac to
 build. After it, `driftbox-play` is one program on both platforms rather than two branches.
+
+### The GPU
+
+The scenes' GPU is a port of the same kind: `DriftboxGPU` says what they may ask of one, and a
+backend answers it on each platform — Direct3D 11 on Windows now, Metal and OpenGL ES 3.0 to come.
+What it offers is what all three do the same way, and nothing more: buffers, textures, pipelines
+under three.js's three blends and depth, per-draw uniforms, and vertex attributes stepping per
+vertex or per instance. There are no sized points, since Direct3D cannot size one, so a sprite is
+an instanced quad everywhere; and no storage buffers, since OpenGL ES 3.0 has none. The
+conventions every backend keeps: clip space y up with depth 0...1, a target's first row its top.
+
+`GPUContractTests` holds a backend to those conventions — which way up a target reads back,
+depth, the blends to the byte, instanced sprites, textures, buffers written again — and runs
+against every backend the platform has. Direct3D runs it on WARP, Windows' software rasteriser,
+so the pixels are the same on every machine and CI needs no graphics card.
+
+**The shaders are written once, in GLSL**, the language the web's scenes were written in, so a scene
+still reads like the one it came from. They live in `shaders/<Target>/<program>.vert` and `.frag`.
+
+```bash
+node scripts/shaders.mjs           # make every backend's language from the GLSL
+node scripts/shaders.mjs --check   # fail if what is checked in is stale
+```
+
+glslang compiles the GLSL to SPIR-V, and SPIRV-Cross writes that out as Metal, HLSL and GLSL ES.
+Both come with the Vulkan SDK, which only whoever edits a shader needs. What comes out is checked
+in as Swift, in each target's `Generated/Shaders.swift`: the programs in every language, and a
+Swift struct for every uniform block, written from SPIRV-Cross's reflection member by member at the
+offsets the shaders read. Swift and std140 disagree in two places — a scalar after a `vec3`, and an
+array of anything smaller than a `vec4` — and a block that falls into either is refused by the
+generator with the reason, rather than drawn from the wrong bytes. A test holds every generated
+struct to its block besides.
+
+Without the SDK, `--check` compares each generated file's hashes, of its GLSL and of itself, which
+is what CI does rather than download 330MB to check a few files; with it, `--check` makes
+everything again and compares it whole.
+
+Apple's `simd` exists only on Apple's platforms, so `DriftboxGPU` has a `Matrix4` of its own, the
+same memory as `simd_float4x4`.
 
 ### Windows
 
