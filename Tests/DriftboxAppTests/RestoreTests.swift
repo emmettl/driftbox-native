@@ -44,6 +44,37 @@
       }
     }
 
+    /// The pattern being worked on comes back with its song; one that follows the transport
+    /// stays following, and opening a different song forgets the choice.
+    @Test func thePatternBeingEditedComesBackWithItsSong() throws {
+      try withMemory { memory in
+        let (first, _) = player(remembering: memory)
+        let entry = try #require(first.entries.first { (Catalogue.song($0.id)?.patterns.count ?? 0) > 1 })
+        first.open(entry)
+        let chosen = try #require(first.song?.patterns[1].id)
+        first.editing = chosen
+
+        let (next, _) = player(remembering: memory)
+        next.restore()
+        #expect(next.editing == chosen)
+        #expect(next.shownPattern?.id == chosen)
+
+        next.editing = nil
+        let (again, _) = player(remembering: memory)
+        again.restore()
+        #expect(again.editing == nil)
+
+        again.editing = chosen
+        let other = try #require(again.entries.first { $0.id != entry.id })
+        again.open(other)
+        #expect(again.editing == nil)
+        let (last, _) = player(remembering: memory)
+        last.restore()
+        #expect(last.current?.id == other.id)
+        #expect(last.editing == nil)
+      }
+    }
+
     /// Through a bookmark, so a document renamed in the Finder since is still found.
     @Test func aDocumentComesBackEvenAfterBeingRenamed() throws {
       try withMemory { memory in

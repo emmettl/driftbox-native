@@ -1,4 +1,5 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
+  import AppKit
   import DriftboxEngine
   import DriftboxSeq
   import SwiftUI
@@ -54,6 +55,8 @@
                   struck: player.struck.contains(index), selected: player.selectedVoice == voice.id,
                   playhead: playhead)
               }
+              PCFLane(player: player, pattern: pattern, metrics: metrics, playhead: playhead)
+              PatternFooter(player: player, song: song, pattern: pattern)
               ForEach(["303.a", "303.b"].filter { pattern.bass[$0] != nil }, id: \.self) { voiceId in
                 BassGrid(
                   player: player, pattern: pattern, voiceId: voiceId, metrics: metrics, playhead: playhead,
@@ -178,6 +181,101 @@
     }
   }
 
+  /// The pattern-controlled filter's lane: strikes of the song-wide filter, on the drums'
+  /// columns, in teal, as the web draws it.
+  struct PCFLane: View {
+    let player: Player
+    let pattern: DriftboxSeq.Pattern
+    let metrics: GridMetrics
+    let playhead: Int
+
+    var body: some View {
+      HStack(spacing: 0) {
+        HStack(spacing: 7) {
+          Circle().fill(Theme.nine.opacity(0.35)).frame(width: 6, height: 6)
+          Text("PCF").font(Theme.mono(11, .medium)).tracking(1.2).foregroundStyle(Theme.nine)
+        }
+        .frame(width: GridMetrics.labelWidth, alignment: .leading)
+        .help("The pattern-controlled filter: each step strikes the song-wide filter's envelope")
+        HStack(spacing: GridMetrics.gap) {
+          ForEach(0..<pattern.length, id: \.self) { index in
+            let value = pattern.pcf(at: index)
+            Button {
+              player.editPattern(pattern.id, "Set Filter Step") { $0.cyclingPCF(at: index) }
+            } label: {
+              StepFace(
+                value: value, playing: index == playhead, machine: .tr909, onBeat: index % 4 == 0,
+                flam: false,
+                fill: Theme.gradient(
+                  Color(red: 159 / 255, green: 1, blue: 240 / 255),
+                  Color(red: 39 / 255, green: 185 / 255, blue: 159 / 255))
+              )
+              .frame(width: metrics.cell, height: metrics.stepHeight * 0.8)
+            }
+            .buttonStyle(StepPress())
+          }
+        }
+      }
+      .padding(.horizontal, 4)
+      .padding(.top, 5)
+      .overlay(alignment: .top) {
+        Rectangle().fill(Theme.nine.opacity(0.18)).frame(height: 1).padding(.horizontal, 4)
+      }
+    }
+  }
+
+  /// A lane for a voice the pattern does not use yet, or a 303 line it has not got.
+  struct AddLaneMenu: View {
+    let player: Player
+    let pattern: DriftboxSeq.Pattern
+
+    var body: some View {
+      let unused = allVoices.filter { pattern.tracks[$0.id] == nil }
+      let lines = ["303.a", "303.b"].filter { pattern.bass[$0] == nil }
+      Menu {
+        Section("TR-808") {
+          ForEach(unused.filter { $0.machine == .tr808 }, id: \.id) { voice in
+            Button(voice.name) { add(voice.id) }
+          }
+        }
+        Section("TR-909") {
+          ForEach(unused.filter { $0.machine == .tr909 }, id: \.id) { voice in
+            Button(voice.name) { add(voice.id) }
+          }
+        }
+        if !lines.isEmpty {
+          Section("TB-303") {
+            ForEach(lines, id: \.self) { line in
+              Button(line == "303.a" ? "303 A" : "303 B") {
+                player.editShown("Add Line") { pattern in
+                  var out = pattern
+                  out.bass[line] = [BassStep](repeating: .rest, count: pattern.length)
+                  return out
+                }
+              }
+            }
+          }
+        }
+      } label: {
+        Label("lane", systemImage: "plus").font(Theme.mono(10)).foregroundStyle(Theme.dim)
+      }
+      .menuStyle(.borderlessButton)
+      .menuIndicator(.hidden)
+      .fixedSize()
+      .help("Add a drum voice or a 303 line to this pattern")
+      .disabled(unused.isEmpty && lines.isEmpty)
+    }
+
+    private func add(_ voiceId: String) {
+      player.editShown("Add Lane") { pattern in
+        var out = pattern
+        out.tracks[voiceId] = [StepValue](repeating: .off, count: pattern.length)
+        return out
+      }
+      player.selectedVoice = voiceId
+    }
+  }
+
   /// One step. Off, on, or accented, lit in its machine's colour; the playhead's column is
   /// outlined and glowing all the way down. A press gives under the pointer, and a change of
   /// state fades rather than snaps.
@@ -208,10 +306,11 @@
       .opacity(tail ? 0.28 : 1)
     }
 
+    /// Cycle the step; or, on a 909 lane in flam mode or with Option held, mark a flam on it.
     func cycle() {
-      player.edit("Set Step") { song in
-        guard let at = song.patterns.firstIndex(where: { $0.id == patternId }) else { return }
-        song.patterns[at] = song.patterns[at].cyclingStep(voiceId, at: index)
+      let flamming = voiceId.hasPrefix("909.") && (player.flamMode || NSEvent.modifierFlags.contains(.option))
+      player.editPattern(patternId, flamming ? "Set Flam" : "Set Step") {
+        flamming ? $0.togglingFlam(voiceId, at: index) : $0.cyclingStep(voiceId, at: index)
       }
     }
   }
@@ -231,13 +330,15 @@
     let machine: Machine
     let onBeat: Bool
     let flam: Bool
+    /// A fill other than the machine's, for the PCF lane.
+    var fill: LinearGradient?
     @State private var hovering = false
 
     var body: some View {
       let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
       ZStack {
         shape.fill(Color.white.opacity(onBeat ? 0.075 : 0.03))
-        shape.fill(Theme.stepFill(machine)).opacity(value == .on ? 1 : 0)
+        shape.fill(fill ?? Theme.stepFill(machine)).opacity(value == .on ? 1 : 0)
         shape.fill(Theme.accentFill).opacity(value == .accent ? 1 : 0)
         if playing {
           shape.fill(Theme.live.opacity(value == .off ? 0.2 : 0.12))

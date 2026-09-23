@@ -266,3 +266,178 @@ extension Pattern {
     return out
   }
 }
+
+// MARK: - The PCF lane
+
+extension Pattern {
+  /// Set one step of the pattern-controlled filter's lane, writing the lane out at the pattern's
+  /// length if it was not there.
+  public func settingPCF(at step: Int, to value: StepValue) -> Pattern {
+    guard length > 0, step >= 0, step < length else { return self }
+    let existing = pcf ?? []
+    var lane = (0..<length).map { $0 < existing.count ? existing[$0] : StepValue.off }
+    lane[step] = value
+    var out = self
+    out.pcf = lane
+    return out
+  }
+
+  /// Off, on, accent, off, as a drum step cycles.
+  public func cyclingPCF(at step: Int) -> Pattern {
+    settingPCF(at: step, to: StepValue(rawValue: (pcf(at: step).rawValue + 1) % 3) ?? .off)
+  }
+}
+
+// MARK: - Clipboards
+
+/// One drum lane lifted out of its pattern: its steps to its loop length, and its flams if it has
+/// any, detached from the song so it can be pasted anywhere.
+public struct DrumLaneClipboard: Equatable, Sendable {
+  public var length: Int
+  public var steps: [StepValue]
+  public var flams: [Bool]?
+}
+
+/// One 303 line lifted out of its pattern.
+public struct BassLineClipboard: Equatable, Sendable {
+  public var steps: [BassStep]
+}
+
+extension Pattern {
+  public func copyingDrumLane(_ voiceId: String) -> DrumLaneClipboard {
+    let loop = trackLength(voiceId)
+    let track = tracks[voiceId] ?? []
+    let marks = flams[voiceId] ?? []
+    let steps = (0..<loop).map { $0 < track.count ? track[$0] : StepValue.off }
+    let flamMarks = (0..<loop).map { $0 < marks.count && marks[$0] }
+    return DrumLaneClipboard(length: loop, steps: steps, flams: flamMarks.contains(true) ? flamMarks : nil)
+  }
+
+  /// Replace one drum lane with a copied one, fitted to this pattern's length, loop length and
+  /// all. A lane pasted without flams leaves none of the old ones behind.
+  public func pastingDrumLane(_ voiceId: String, _ clipboard: DrumLaneClipboard) -> Pattern {
+    var out = self
+    out.tracks[voiceId] = (0..<length).map { $0 < clipboard.steps.count ? clipboard.steps[$0] : .off }
+    if let marks = clipboard.flams, marks.contains(true) {
+      out.flams[voiceId] = (0..<length).map { $0 < marks.count && marks[$0] }
+    } else {
+      out.flams[voiceId] = nil
+    }
+    return out.settingTrackLength(voiceId, to: clipboard.length)
+  }
+
+  public func copyingBassLine(_ voiceId: String) -> BassLineClipboard {
+    BassLineClipboard(steps: (0..<length).map { bassStep(voiceId, at: $0) })
+  }
+
+  public func pastingBassLine(_ voiceId: String, _ clipboard: BassLineClipboard) -> Pattern {
+    var out = self
+    out.bass[voiceId] = (0..<length).map { $0 < clipboard.steps.count ? clipboard.steps[$0] : .rest }
+    return out
+  }
+}
+
+// MARK: - Step entry
+
+/// What a step entry did: the pattern after it, where the cursor goes next, and whether it
+/// wrote anything at all.
+public struct BassEntry: Equatable, Sendable {
+  public var pattern: Pattern
+  public var nextStep: Int
+  public var written: Bool
+}
+
+extension Pattern {
+  private func entryIndex(_ step: Int) -> Int { length <= 0 ? 0 : wrap(step, length) }
+
+  /// Write a note from the keyboard at the cursor and move on, keeping the step's slide.
+  public func enteringBassNote(_ voiceId: String, at step: Int, note: Double, accent: Bool = false)
+    -> BassEntry
+  {
+    guard length > 0 else { return BassEntry(pattern: self, nextStep: 0, written: false) }
+    let index = entryIndex(step)
+    let current = bassStep(voiceId, at: index)
+    // `Math.round`: halves go up.
+    let pitch = max(0, min(24, (note + 0.5).rounded(.down)))
+    let value = BassStep(note: pitch, accent: accent, slide: current.slide).settingGate(true)
+    return BassEntry(
+      pattern: settingBassStep(voiceId, at: index, to: value), nextStep: (index + 1) % length, written: true)
+  }
+
+  /// Pause the cursor's step and move on, keeping any pitch it holds.
+  public func enteringBassRest(_ voiceId: String, at step: Int) -> BassEntry {
+    guard length > 0 else { return BassEntry(pattern: self, nextStep: 0, written: false) }
+    let index = entryIndex(step)
+    let paused = bassStep(voiceId, at: index).settingGate(false)
+    return BassEntry(
+      pattern: settingBassStep(voiceId, at: index, to: paused), nextStep: (index + 1) % length, written: true)
+  }
+
+  /// Hold the previous pitch through the cursor's step and move on. Nothing to hold, nothing done.
+  public func enteringBassTie(_ voiceId: String, at step: Int) -> BassEntry {
+    guard length > 0 else { return BassEntry(pattern: self, nextStep: 0, written: false) }
+    let index = entryIndex(step)
+    let previousIndex = (index - 1 + length) % length
+    var previous = bassStep(voiceId, at: previousIndex)
+    guard previous.sounds else { return BassEntry(pattern: self, nextStep: index, written: false) }
+    let current = bassStep(voiceId, at: index)
+    previous.slide = true
+    let held = settingBassStep(voiceId, at: previousIndex, to: previous)
+    let tied = BassStep(note: previous.note, accent: false, slide: current.slide).settingGate(true)
+    return BassEntry(
+      pattern: held.settingBassStep(voiceId, at: index, to: tied), nextStep: (index + 1) % length,
+      written: true)
+  }
+}
+
+// MARK: - Clips, length, clearing
+
+extension Song {
+  /// Give one machine its own pattern in a section. Choosing the section's own pattern again
+  /// takes the override away, so a section with none is written as it always was.
+  public func settingChainClip(at index: Int, slot: ClipSlot, to patternId: String) -> Song {
+    guard chain.indices.contains(index) else { return self }
+    var out = self
+    out.chain[index].clips[slot] = patternId == chain[index].pattern ? nil : patternId
+    return out
+  }
+}
+
+extension Pattern {
+  /// Change the pattern's length, 1 to 64 steps. Steps past the end are kept rather than
+  /// dropped, and what was never written reads as a rest, so shortening a pattern and
+  /// lengthening it again gives the tail back. A lane's loop length never outgrows the pattern.
+  public func resizing(to requested: Int) -> Pattern {
+    let clamped = max(1, min(64, requested))
+    var out = self
+    out.length = clamped
+    for (voiceId, track) in zip(tracks.keys, tracks.values) {
+      out.tracks[voiceId] = (0..<clamped).map { $0 < track.count ? track[$0] : .off }
+    }
+    for (voiceId, line) in zip(bass.keys, bass.values) {
+      out.bass[voiceId] = (0..<clamped).map { $0 < line.count ? line[$0] : .rest }
+    }
+    for (voiceId, marks) in zip(flams.keys, flams.values) {
+      out.flams[voiceId] = (0..<clamped).map { $0 < marks.count && marks[$0] }
+    }
+    out.trackLengths = OrderedMap()
+    for (voiceId, loop) in zip(trackLengths.keys, trackLengths.values) where min(clamped, loop) < clamped {
+      out.trackLengths[voiceId] = min(clamped, loop)
+    }
+    if let pcf {
+      out.pcf = (0..<clamped).map { $0 < pcf.count ? pcf[$0] : .off }
+    }
+    return out
+  }
+
+  /// Everything in the pattern, drums and 303 lines both: "clear this pattern" leaving an acid
+  /// line running underneath would be a surprise, and an unhelpful one.
+  public func clearingAll() -> Pattern {
+    var out = self
+    out.tracks = OrderedMap()
+    out.trackLengths = OrderedMap()
+    out.bass = OrderedMap()
+    out.flams = OrderedMap()
+    return out
+  }
+}

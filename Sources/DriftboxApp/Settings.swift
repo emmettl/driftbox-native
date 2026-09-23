@@ -15,6 +15,8 @@
     static let clockDestination = "clock.destination"
     static let lastSong = "song.last.catalogue"
     static let lastFile = "song.last.file"
+    /// The pattern chosen to edit in that song, if one was rather than following the transport.
+    static let lastPattern = "song.last.pattern"
     static let outputOpen = "visuals.window.open"
     static let outputScreen = "visuals.window.screen"
     static let outputFullScreen = "visuals.window.fullScreen"

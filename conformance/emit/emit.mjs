@@ -284,6 +284,10 @@ for (const preset of SONGS) {
   const drum = Object.keys(first.tracks)[0]
   const drumWithFlams = { ...first, flams: { [drum]: first.tracks[drum].map((_, i) => i % 5 === 0) }, trackLengths: { [drum]: 10 } }
   const bassId = Object.keys(first.bass ?? {})[0] ?? '303.a'
+  const otherDrum = Object.keys(first.tracks).find((id) => id !== drum)
+  const otherBass = bassId === '303.a' ? '303.b' : '303.a'
+  // The first step of the line that sounds, so a rest and a tie have something to work on.
+  const firstNote = (first.bass?.[bassId] ?? []).findIndex((step) => step.note !== undefined && step.gate !== false)
   const withSong = (patterns) => ({ ...song, patterns })
   const edits = [
     ['addPattern', () => pattern.addPattern(song).song],
@@ -314,10 +318,35 @@ for (const preset of SONGS) {
     ['setTrackLength to full clears it', () => withSong([pattern.setTrackLength(drumWithFlams, drum, 16)])],
     ['toggleFlam on a rest', () => withSong([pattern.toggleFlam(first, drum, 1)])],
     ['toggleFlam off again', () => withSong([pattern.toggleFlam(pattern.toggleFlam(first, drum, 1), drum, 1)])],
+    ['cycleStep to off clears its flam', () => withSong([pattern.cycleStep(pattern.cycleStep(drumWithFlams, drum, 5), drum, 5)])],
+    ['cyclePcfStep from nothing', () => withSong([pattern.cyclePcfStep(first, 3)])],
+    ['cyclePcfStep round to off', () => withSong([pattern.cyclePcfStep(pattern.cyclePcfStep(pattern.cyclePcfStep(first, 3), 3), 3)])],
+    ['setPcfStep', () => withSong([pattern.setPcfStep(first, 7, 2)])],
+    ['pasteDrumLane with flams and a loop length', () => withSong([pattern.pasteDrumLane(first, otherDrum, pattern.copyDrumLane(drumWithFlams, drum))])],
+    ['pasteDrumLane without flams drops the old ones', () => withSong([pattern.pasteDrumLane(drumWithFlams, drum, pattern.copyDrumLane(first, otherDrum))])],
+    ['pasteBassLine', () => withSong([pattern.pasteBassLine(first, otherBass, pattern.copyBassLine(first, bassId))])],
+    ['enterBassNote', () => withSong([pattern.enterBassNote(first, bassId, 18, 30.4, true).pattern])],
+    ['enterBassRest', () => withSong([pattern.enterBassRest(first, bassId, firstNote).pattern])],
+    ['enterBassTie', () => withSong([pattern.enterBassTie(first, bassId, firstNote + 1).pattern])],
+    ['enterBassTie after silence is refused', () => withSong([pattern.enterBassTie(pattern.clearBassLine(first, bassId), bassId, 4).pattern])],
+    ['chainSetClip', () => ({ ...song, chain: pattern.chainSetClip(song, 1, 'tr909', first.id) })],
+    ['chainSetClip back to the fallback', () => {
+      const once = { ...song, chain: pattern.chainSetClip(song, 1, 'tr909', first.id) }
+      return { ...once, chain: pattern.chainSetClip(once, 1, 'tr909', once.chain[1].pattern) }
+    }],
   ]
+  // Where the step cursor goes after each of the 303 entries, which is half of what they do.
+  const entries = [
+    ['enterBassNote', pattern.enterBassNote(first, bassId, 18, 30.4, true)],
+    ['enterBassNote wraps', pattern.enterBassNote(first, bassId, first.length - 1, 3)],
+    ['enterBassRest', pattern.enterBassRest(first, bassId, firstNote)],
+    ['enterBassTie', pattern.enterBassTie(first, bassId, firstNote + 1)],
+    ['enterBassTie after silence is refused', pattern.enterBassTie(pattern.clearBassLine(first, bassId), bassId, 4)],
+  ].map(([name, result]) => ({ name, next: result.nextStep, written: result.written }))
   write(fixtures, 'edits.json', json({
     song: encodeSong(song),
     drum, bass: bassId, flams: drumWithFlams.flams[drum], trackLength: 10,
+    otherDrum, otherBass, firstNote, entries,
     edits: edits.map(([name, apply]) => ({ name, output: encodeSong(decodeSong(encodeSong(apply()))) })),
   }))
 }

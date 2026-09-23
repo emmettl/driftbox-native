@@ -99,6 +99,16 @@
             }
           }
         }
+        // The voice's swing, as an offset from the song's: in the middle it swings as the song
+        // does, and says so with a dot before the number it comes to.
+        let offset = player.song?.kit.swing[voiceId] ?? 0.5
+        let effective = Int((VoicePanel.swing(song: player.song, voiceId: voiceId) * 100).rounded())
+        RotaryKnob(
+          spec: KnobSpec(label: "Swing", format: { _ in offset == 0.5 ? "· \(effective)" : "\(effective)" }),
+          value: offset, tint: tint.opacity(0.8), rest: 0.5, diameter: 32
+        ) { value in
+          player.edit("Set Voice Swing") { song in song.kit.swing[voiceId] = value }
+        }
         Spacer()
       }
       .padding(.top, 8)
@@ -114,6 +124,13 @@
     let sends: SendLevels
 
     var tint: Color { Theme.color(voice.machine) }
+
+    /// How much a voice swings: the song's, moved by its own offset, as `swingFor` has it.
+    static func swing(song: Song?, voiceId: String) -> Double {
+      guard let song else { return 0 }
+      guard let offset = song.kit.swing[voiceId] else { return song.swing }
+      return max(0, min(1, song.swing + (offset - 0.5) * 2))
+    }
 
     var body: some View {
       VStack(alignment: .leading, spacing: 12) {

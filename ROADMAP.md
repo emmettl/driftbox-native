@@ -175,7 +175,21 @@ gone native at all.
    strip, which the native app had not had at all; and the visuals as a dimmed backdrop behind
    everything, as on the web, instead of a letterboxed pane.
 
-   Left: the pattern being edited, which restoration does not put back; and more
+   Then the editing the web has and this did not. Phase 5 above says the chain had menus;
+   the edits were ported and tested, but the interface never offered them, and a new pattern
+   could not even be given a voice it did not already have. Now: the song strip's sections have
+   a context menu — pattern, a pattern per machine, repeat, move, remove — and can be dragged
+   into a new order, with a button to add one; patterns rename by double-click, and clear,
+   duplicate and join the song from theirs; a lane can be added for any voice or 303 line; a
+   pattern's length is dragged like the tempo; the PCF lane is on the grid; flams are marked in
+   flam mode or with Option held, with the flam's width beside the switch; lanes and lines copy,
+   cut and paste; each strip has its voice's swing. The edits the web keeps in `pattern.ts`
+   are held to its own results as the others are; resizing and clearing a pattern live in its
+   store, so they are held to that code by tests written from it. And the pattern being edited
+   comes back at the next launch.
+
+   Left: the transport's loop, metronome and count-in, which want the engine; the 303's step
+   entry from the keyboard; performance mode; automation recording; and more
    than one song open at once, which is deliberately not done. It is not a scene change: the
    player owns the audio engine, the MIDI ports and the clock, and two of them would be two
    engines fighting over one output and two sources both called Driftbox Clock. The honest

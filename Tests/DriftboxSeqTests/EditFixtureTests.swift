@@ -18,6 +18,15 @@ struct EditFixtureTests {
     let bass: String
     let flams: [Bool]
     let trackLength: Int
+    let otherDrum: String
+    let otherBass: String
+    let firstNote: Int
+    struct Entry: Decodable {
+      let name: String
+      let next: Int
+      let written: Bool
+    }
+    let entries: [Entry]
     let edits: [Edit]
   }
 
@@ -30,6 +39,8 @@ struct EditFixtureTests {
     withFlams.trackLengths[fixture.drum] = fixture.trackLength
     let drum = fixture.drum
     let bass = fixture.bass
+    let otherDrum = fixture.otherDrum
+    let otherBass = fixture.otherBass
     func random(_ seed: UInt32) -> RandomSource {
       var stream = SeededRandom(seed: seed)
       return { stream.next() }
@@ -69,6 +80,30 @@ struct EditFixtureTests {
       "setTrackLength to full clears it": { with(withFlams.settingTrackLength(drum, to: 16)) },
       "toggleFlam on a rest": { with(first.togglingFlam(drum, at: 1)) },
       "toggleFlam off again": { with(first.togglingFlam(drum, at: 1).togglingFlam(drum, at: 1)) },
+      "cycleStep to off clears its flam": {
+        with(withFlams.cyclingStep(drum, at: 5).cyclingStep(drum, at: 5))
+      },
+      "cyclePcfStep from nothing": { with(first.cyclingPCF(at: 3)) },
+      "cyclePcfStep round to off": { with(first.cyclingPCF(at: 3).cyclingPCF(at: 3).cyclingPCF(at: 3)) },
+      "setPcfStep": { with(first.settingPCF(at: 7, to: .accent)) },
+      "pasteDrumLane with flams and a loop length": {
+        with(first.pastingDrumLane(otherDrum, withFlams.copyingDrumLane(drum)))
+      },
+      "pasteDrumLane without flams drops the old ones": {
+        with(withFlams.pastingDrumLane(drum, first.copyingDrumLane(otherDrum)))
+      },
+      "pasteBassLine": { with(first.pastingBassLine(otherBass, first.copyingBassLine(bass))) },
+      "enterBassNote": { with(first.enteringBassNote(bass, at: 18, note: 30.4, accent: true).pattern) },
+      "enterBassRest": { with(first.enteringBassRest(bass, at: fixture.firstNote).pattern) },
+      "enterBassTie": { with(first.enteringBassTie(bass, at: fixture.firstNote + 1).pattern) },
+      "enterBassTie after silence is refused": {
+        with(first.clearingBassLine(bass).enteringBassTie(bass, at: 4).pattern)
+      },
+      "chainSetClip": { song.settingChainClip(at: 1, slot: .tr909, to: first.id) },
+      "chainSetClip back to the fallback": {
+        let once = song.settingChainClip(at: 1, slot: .tr909, to: first.id)
+        return once.settingChainClip(at: 1, slot: .tr909, to: once.chain[1].pattern)
+      },
     ]
     #expect(fixture.edits.count == mine.count)
     for edit in fixture.edits {
@@ -80,6 +115,21 @@ struct EditFixtureTests {
       // would be saved.
       let result = SongCodec.decode(SongCodec.encode(apply())).map(SongCodec.encode)
       #expect(result == edit.output, "\(edit.name)")
+    }
+
+    // Where the cursor goes after each 303 entry, and whether it wrote at all.
+    let entries: [String: BassEntry] = [
+      "enterBassNote": first.enteringBassNote(bass, at: 18, note: 30.4, accent: true),
+      "enterBassNote wraps": first.enteringBassNote(bass, at: first.length - 1, note: 3),
+      "enterBassRest": first.enteringBassRest(bass, at: fixture.firstNote),
+      "enterBassTie": first.enteringBassTie(bass, at: fixture.firstNote + 1),
+      "enterBassTie after silence is refused": first.clearingBassLine(bass).enteringBassTie(bass, at: 4),
+    ]
+    #expect(fixture.entries.count == entries.count)
+    for entry in fixture.entries {
+      let mine = try #require(entries[entry.name], "\(entry.name)")
+      #expect(mine.nextStep == entry.next, "\(entry.name)")
+      #expect(mine.written == entry.written, "\(entry.name)")
     }
   }
 }
