@@ -416,6 +416,13 @@ public struct RackGraph: ~Copyable {
       samples: UnsafePointer(copy), count: samples.count, revision: dataRevision)
   }
 
+  /// Where one module's data slot is held, for a host to swap a new buffer into from the render
+  /// thread: `setData` allocates, so it may not be called there.
+  public func dataEntry(module: String, slot: String) -> UnsafeMutablePointer<DataBuffer>? {
+    guard let entry = dataTables[module], let index = entry.slots.firstIndex(of: slot) else { return nil }
+    return entry.table + index
+  }
+
   /// Copy what every metered module shows into its mirror. Cheap and allocation-free, so a host
   /// can do it from the render thread every few blocks.
   @_noAllocation

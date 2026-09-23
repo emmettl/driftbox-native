@@ -8,6 +8,10 @@ public enum RackCommand {
   /// A knob, on every voice (`voice` -1) or one, now (`frame` -1) or at a frame of the graph's clock.
   case param(slot: Int, value: Double, voice: Int, frame: Int)
   case transport(tempo: Double, running: Bool, shuffle: Double)
+  /// A module's data slot, swapped whole on a block boundary so a module never reads a new pointer
+  /// with an old count. Ignored unless `graph` is the one playing.
+  case data(
+    graph: UnsafeMutablePointer<RackGraph>, entry: UnsafeMutablePointer<DataBuffer>, buffer: DataBuffer)
 }
 
 /// A single-producer, single-consumer ring of rack commands, as `CommandRing` is for the engine.
@@ -95,6 +99,14 @@ public final class RackHost: @unchecked Sendable {
   let blockUsed: UnsafeMutablePointer<Int>
   /// Graphs made and not yet freed, so the host can free them all when it goes.
   private var owned: [UnsafeMutablePointer<RackGraph>] = []
+  /// The graph loaded last, which is the one new data is meant for.
+  private var latest: UnsafeMutablePointer<RackGraph>?
+  /// Data swapped into each graph since it was built, freed with it: a buffer replaced by a newer
+  /// one may still be being read until the block ends, and the graph going is the moment it is
+  /// certainly not.
+  private var copies: [UnsafeMutablePointer<RackGraph>: [UnsafeMutablePointer<Float>]] = [:]
+  /// Revisions for swapped data, far above any a graph numbers its own from.
+  private var dataRevision = 1 << 40
   private let lock = Mutex<Void>(())
 
   /// The plan the interface last loaded: what a knob's name is looked up in.
@@ -139,6 +151,7 @@ public final class RackHost: @unchecked Sendable {
       graph.deinitialize(count: 1)
       graph.deallocate()
     }
+    for pointers in copies.values { for pointer in pointers { pointer.deallocate() } }
     commands.deinitialize(count: 1)
     commands.deallocate()
     released.deinitialize(count: 1)
@@ -160,7 +173,22 @@ public final class RackHost: @unchecked Sendable {
     let graph = UnsafeMutablePointer<RackGraph>.allocate(capacity: 1)
     graph.initialize(to: RackGraph(plan: compiled, sampleRate: sampleRate, frames: blockFrames))
     lock.withLock { _ in owned.append(graph) }
+    latest = graph
     commands.pointee.send(.load(graph))
+  }
+
+  /// Replace one of a module's data slots — a pattern, a song, a scale — on the next block, without
+  /// rebuilding anything, so a sequence can be edited while it plays.
+  public func setData(_ module: String, _ slot: String, _ values: [Double]) {
+    guard let graph = latest, let entry = graph.pointee.dataEntry(module: module, slot: slot) else { return }
+    let copy = UnsafeMutablePointer<Float>.allocate(capacity: max(1, values.count))
+    for (index, value) in values.enumerated() { (copy + index).initialize(to: Float(value)) }
+    copies[graph, default: []].append(copy)
+    dataRevision += 1
+    commands.pointee.send(
+      .data(
+        graph: graph, entry: entry,
+        buffer: DataBuffer(samples: UnsafePointer(copy), count: values.count, revision: dataRevision)))
   }
 
   /// Turn a knob by module and param id: now, or at `frame` of the graph's clock.
@@ -198,6 +226,7 @@ public final class RackHost: @unchecked Sendable {
       lock.withLock { _ in owned.removeAll { $0 == graph } }
       graph.deinitialize(count: 1)
       graph.deallocate()
+      for pointer in copies.removeValue(forKey: graph) ?? [] { pointer.deallocate() }
     }
   }
 
@@ -221,6 +250,8 @@ public final class RackHost: @unchecked Sendable {
           slot: slot, value: value, voice: voice < 0 ? nil : voice, frame: frame < 0 ? nil : frame)
       case .transport(let tempo, let running, let shuffle):
         current.pointee?.pointee.setTransport(tempo: tempo, running: running, shuffle: shuffle)
+      case .data(let graph, let entry, let buffer):
+        if current.pointee == graph { entry.pointee = buffer }
       }
     }
     var done = 0
