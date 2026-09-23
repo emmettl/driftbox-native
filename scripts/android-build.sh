@@ -32,7 +32,8 @@ for need in "$swiftc" "$sdk" "$ndk" "$adb"; do
   [ -e "$need" ] || { echo "not found: $need" >&2; exit 1; }
 done
 llvm="$(newest "$ndk"/toolchains/llvm/prebuilt/*)"
-target=aarch64-unknown-linux-android28
+# Android 10, the first with native MIDI.
+target=aarch64-unknown-linux-android29
 
 # Short on purpose: swiftc on Windows writes nothing, and says nothing, past MAX_PATH.
 out="${DRIFTBOX_ANDROID_OUT:-${TMPDIR:-/tmp}/dbxa/arm64}"
@@ -40,15 +41,20 @@ mkdir -p "$out"
 if command -v cygpath >/dev/null 2>&1; then out="$(cygpath -m "$out")"; fi
 echo "using $("$swiftc" --version 2>&1 | head -1), NDK $(basename "$ndk")"
 
-# Sources/CAAudio is where the AAudio module map is found.
-common="-target $target -sdk $sdk -sysroot $llvm/sysroot -I $sdk/usr/include -I Sources/CAAudio"
+# Sources/CAAudio and Sources/CAMidi are where the NDK module maps are found.
+common="-target $target -sdk $sdk -sysroot $llvm/sysroot -I $sdk/usr/include -I Sources/CAAudio -I Sources/CAMidi"
 for module in DriftboxDSP DriftboxSeq DriftboxEngine DriftboxRack DriftboxDocument DriftboxHost DriftboxHostAndroid; do
+  # Gone first, so that a module that fails cannot leave the last build's in its place.
+  rm -f "$out/$module.o" "$out/$module.swiftmodule"
   # shellcheck disable=SC2086
-  "$swiftc" $common -enable-experimental-feature Extern -wmo -O -parse-as-library -swift-version 6 \
+  if ! "$swiftc" $common -enable-experimental-feature Extern -wmo -O -parse-as-library -swift-version 6 \
     -module-name "$module" -I "$out" \
     -emit-module -emit-module-path "$out/$module.swiftmodule" -c -o "$out/$module.o" \
-    $(find "Sources/$module" -name '*.swift' | sort) 2>&1 | grep -v "libc not found" || true
-  [ -f "$out/$module.o" ] || { echo "$module did not build" >&2; exit 1; }
+    $(find "Sources/$module" -name '*.swift' | sort) >"$out/$module.log" 2>&1; then
+    grep -v "libc not found" "$out/$module.log" >&2
+    echo "$module did not build" >&2
+    exit 1
+  fi
   echo "  $module: ok"
 done
 # shellcheck disable=SC2086

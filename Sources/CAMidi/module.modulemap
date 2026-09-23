@@ -1,0 +1,5 @@
+module CAMidi [system] {
+  header "CAMidi.h"
+  link "amidi"
+  export *
+}

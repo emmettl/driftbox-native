@@ -429,11 +429,17 @@ each question, and the rest is Android's alone:
    what a callback pays for is its core waking cold. There is room in that, but less than the
    bench promised, and the rack and the scenes will want some of it. Left: one device until the
    app can list them from Java's `AudioManager`, and a stream lost to a device going is handled
-   but not yet seen to be, for want of anything to unplug. Then MIDI: Android's native MIDI
-   answers the MIDI ports. It sends against a timestamp, so clock out needs no scheduler of its
-   own the way WinMM's did. Listing devices and opening a MIDI port can only be done from Java,
-   and those two are all the JNI there is. `HostTime` is `CLOCK_MONOTONIC`, which is what AAudio
-   and the MIDI stamps both count in.
+   but not yet seen to be, for want of anything to unplug.
+   Then MIDI, written but not yet heard. `AMidiInput` and `AMidiOutput` answer the MIDI ports with
+   Android's native MIDI, which needs Android 10, so the build moved from API 28 to 29. Input is a
+   thread asking each port in turn, framed by `MIDIByteStream` in `DriftboxHost`, which is tested
+   everywhere, and stamped with when Android says each message arrived, on `HostTime`'s clock.
+   Output is stamped, and Android's USB driver holds each message until its time, so clock out
+   needs no scheduler of its own the way WinMM's did; that is read from Android's source, and is
+   to be measured once there is something to send to. Finding and opening a device can only be done from
+   Java, so the app hands devices to `AMidiDevices` and Swift does the rest. Left: that Java side,
+   which is the first of step 5's shell; and hearing it, which a loopback can do without hardware,
+   as on Windows: a MIDI device service in the app that sends back what it is sent.
 3. **A third backend under the GPU layer.** OpenGL ES 3.0 covers everything the scenes ask of
    Metal, and every Android device has it. The shaders run to 2,400 lines across 29 scenes, and a
    third copy by hand is where writing them out stops being sensible (see below). `GraphicLab`
