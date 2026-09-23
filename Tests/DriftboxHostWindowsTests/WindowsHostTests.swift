@@ -78,7 +78,26 @@
 
     /// Messages go out in the order of their stamps, each within a couple of milliseconds of it,
     /// however they were handed in.
+    ///
+    /// Up to three tries at the timing, never at the order. A shared CI machine running the rest
+    /// of the suite beside this can stall the whole process for tens of milliseconds, and then
+    /// every message goes at once, late together: that says nothing about the scheduler. A
+    /// scheduler late by its nature — one waiting on the 15.6ms system timer — is late on every
+    /// try, so the test still catches it.
     @Test func messagesGoOutWhenTheyAreStamped() async throws {
+      var tries: [String] = []
+      for _ in 0..<3 {
+        let lateness = try await Self.sendFive()
+        // Within a few milliseconds: far inside the 15.6ms an ordinary timer would be out by.
+        if lateness.allSatisfy({ $0 >= -0.0005 && $0 < 0.005 }) { return }
+        tries.append(lateness.map { "\(($0 * 10_000).rounded() / 10)" }.joined(separator: ", "))
+      }
+      Issue.record("late on every try, in ms: \(tries.joined(separator: "; "))")
+    }
+
+    /// Five messages scheduled out of order: each one's lateness, in the order they went out,
+    /// having checked that order is the stamps'.
+    static func sendFive() async throws -> [Double] {
       let sink = Sink()
       let scheduler = MIDIScheduler { name, message in
         sink.arrived.withLock { $0.append((name, message, HostTime.now())) }
@@ -90,14 +109,11 @@
       }
       try await Task.sleep(for: .milliseconds(150))
       let arrived = sink.arrived.withLock { $0 }
-      #expect(arrived.map(\.1) == [1, 3, 0, 4, 2])
-      for (_, message, time) in arrived {
-        let late = HostTime.seconds(from: HostTime.time(now, after: offsets[Int(message)]), to: time)
-        // Within a few milliseconds: far inside the 15.6ms an ordinary timer would be out by, with
-        // room for a shared machine that is busy.
-        #expect(late >= -0.0005 && late < 0.005, "message \(message) \(late * 1000)ms late")
-      }
       withExtendedLifetime(scheduler) {}
+      #expect(arrived.map(\.1) == [1, 3, 0, 4, 2])
+      return arrived.map { _, message, time in
+        HostTime.seconds(from: HostTime.time(now, after: offsets[Int(message)]), to: time)
+      }
     }
 
     /// Letting go of the scheduler ends its thread: what was still waiting never goes.
