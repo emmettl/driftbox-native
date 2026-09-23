@@ -442,6 +442,8 @@ struct BackendTests {
       #expect(backends == [.direct3D11])
     #elseif canImport(Metal)
       if MTLCreateSystemDefaultDevice() != nil { #expect(backends == [.metal]) }
+    #elseif os(Linux)
+      #expect(backends == [.openGLES])
     #else
       #expect(backends.isEmpty)
     #endif

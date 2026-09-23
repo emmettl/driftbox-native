@@ -464,10 +464,14 @@ each question, and the rest is Android's alone:
    `DriftboxHost`. Its thread waits on a condition against `CLOCK_MONOTONIC`, at urgent audio
    priority and kept to the big cores, and sends a beat of clock 0.1 to 2ms after each tick was
    due. Left: a USB device, measured with a controller, to see its driver keep to the stamps.
-3. **A third backend under the GPU layer.** OpenGL ES 3.0 covers everything the scenes ask of
-   Metal, and every Android device has it. The shaders run to 2,400 lines across 29 scenes, and a
-   third copy by hand is where writing them out stops being sensible (see below). `GraphicLab`
-   sets its type with CoreText and needs another way to set text.
+3. **A third backend under the GPU layer.** ← *here.* `DriftboxGPUGLES` answers `GPUDevice` with
+   OpenGL ES 3.0 through EGL, on the GLSL ES the shader generator already writes. It passes the
+   contract's checks on the phone's Adreno, first time, through `scripts/android-app.sh gpu`, and
+   runs the contract tests themselves in CI on Linux, on Mesa's software rasteriser. Getting there
+   took swift.org's Swift SDK for Android in place of the installer's Android platform, whose
+   standard library had no SIMD types. Left: a surface on a window, which is the app's shell;
+   the scenes on the phone, beginning with Pulse; and `GraphicLab`, which sets its type with
+   CoreText and needs another way to set text.
 4. **The touch interface, designed with iOS.** See below.
 5. **Shipping.** The shell is a `GameActivity`, which hands the window, input and lifecycle to
    native code. Songs open and save through the storage access framework as `.driftbox`, and
