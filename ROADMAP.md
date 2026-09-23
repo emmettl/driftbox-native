@@ -440,16 +440,20 @@ each question, and the rest is Android's alone:
    bench promised, and the rack and the scenes will want some of it. Left: one device until the
    app can list them from Java's `AudioManager`, and a stream lost to a device going is handled
    but not yet seen to be, for want of anything to unplug.
-   Then MIDI, written but not yet heard. `AMidiInput` and `AMidiOutput` answer the MIDI ports with
-   Android's native MIDI, which needs Android 10, so the build moved from API 28 to 29. Input is a
-   thread asking each port in turn, framed by `MIDIByteStream` in `DriftboxHost`, which is tested
-   everywhere, and stamped with when Android says each message arrived, on `HostTime`'s clock.
-   Output is stamped, and Android's USB driver holds each message until its time, so clock out
-   needs no scheduler of its own the way WinMM's did; that is read from Android's source, and is
-   to be measured once there is something to send to. Finding and opening a device can only be done from
-   Java, so the app hands devices to `AMidiDevices` and Swift does the rest. Left: that Java side,
-   which is the first of step 5's shell; and hearing it, which a loopback can do without hardware,
-   as on Windows: a MIDI device service in the app that sends back what it is sent.
+   Then MIDI, heard. `AMidiInput` and `AMidiOutput` answer the MIDI ports with Android's native
+   MIDI, which needs Android 10, so the build moved from API 28 to 29. Input is a thread asking
+   each port in turn, framed by `MIDIByteStream` in `DriftboxHost`, which is tested everywhere,
+   and stamped with the time each packet carries, on `HostTime`'s clock. Finding and opening a
+   device can only be done from Java, so the app does it and hands each device to `AMidiDevices`,
+   and Swift does the rest. `scripts/android-app.sh midi-loopback` tests the ports against
+   Driftbox Loopback, a MIDI device the app publishes that sends back what it is sent: notes,
+   running status, system exclusive and clock all come back as they should, stamps exact.
+   What it found: a stamp is only kept to by a device that keeps to stamps. Android's USB driver
+   does, by its source; a device that is another app is handed a message at once, so a clock sent
+   a tenth of a second ahead arrived a tenth of a second early, and a flush dropped nothing. The
+   roadmap said clock out would need no scheduler of its own, and for another app it does. ← *next:*
+   `AMidiOutput` holds a message until shortly before its time for any device that is not USB,
+   as WinMM's scheduler does, and sends it stamped; a USB device measured with a controller.
 3. **A third backend under the GPU layer.** OpenGL ES 3.0 covers everything the scenes ask of
    Metal, and every Android device has it. The shaders run to 2,400 lines across 29 scenes, and a
    third copy by hand is where writing them out stops being sensible (see below). `GraphicLab`
@@ -457,7 +461,10 @@ each question, and the rest is Android's alone:
 4. **The touch interface, designed with iOS.** See below.
 5. **Shipping.** The shell is a `GameActivity`, which hands the window, input and lifecycle to
    native code. Songs open and save through the storage access framework as `.driftbox`, and
-   Gradle packages the `.so`s SwiftPM builds. The build leaves out Foundation's
+   the SDK's own tools package the `.so`, as `scripts/android-app.sh` has done since step 2's
+   loopback, without Gradle; begun with a plain `Activity` and Java's MIDI devices handed to
+   Swift, and a package of 8MB: Driftbox and the Swift runtime 6.9MB stripped, the NDK's C++
+   library 1.4MB. The build leaves out Foundation's
    internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
    `DriftboxDocument` takes Foundation only to write a WAV. The Play Store, or F-Droid, when
    Driftbox is public.
