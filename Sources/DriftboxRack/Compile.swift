@@ -56,6 +56,8 @@ public struct Plan: Sendable {
   public var params: [PlanParam]
   /// Module id to param id to slot: what `setParam` looks a knob up by.
   public var slots: [String: [String: Int]]
+  /// Module id to inlet id to the slot of its trim, where it has one: what `setTrim` looks a pot up by.
+  public var inputTrims: [String: [String: Int]]
   public var notes: [PlanNote]
 }
 
@@ -432,5 +434,5 @@ public func compile(_ rawPatch: Patch, registry: [String: ModuleDef] = RackModul
   return Plan(
     buffers: buffers, voices: voices, poly: bufferPoly, voiceWidths: voiceWidths, nodes: nodes,
     outputs: outputs,
-    params: params, slots: slots, notes: notes)
+    params: params, slots: slots, inputTrims: inputTrims, notes: notes)
 }

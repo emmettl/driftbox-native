@@ -291,6 +291,36 @@
       patch = next
     }
 
+    /// An inlet's trim: the gain between -1 and 1 it is read at. Unity when it has none.
+    func trim(_ moduleId: String, _ inlet: String) -> Double {
+      patch.modules.first { $0.id == moduleId }?.inputTrims[inlet] ?? 1
+    }
+
+    /// Turn an inlet's trim pot, as a knob turns: one drag is one step of undo, and the sound
+    /// hears it without a rebuild — except where the pot leaves unity or comes back to it. Only
+    /// a pot doing something costs the graph a buffer and a multiply, so those two moments change
+    /// the plan's shape, and are one rebuild each; unity is kept as no trim at all.
+    func setTrim(_ moduleId: String, _ inlet: String, to value: Double) {
+      guard let at = patch.modules.firstIndex(where: { $0.id == moduleId }),
+        RackModules.registry[patch.modules[at].type]?.inlets.contains(where: { $0.id == inlet }) == true
+      else { return }
+      let next = value.isFinite ? max(-1, min(1, value)) : 1
+      let current = patch.modules[at].inputTrims[inlet] ?? 1
+      guard next != current else { return }
+      let key = "trim:\(moduleId)/\(inlet)"
+      if turning != key {
+        record("Set Input Trim")
+        turning = key
+      }
+      patch.modules[at].inputTrims[inlet] = next == 1 ? nil : next
+      if (current != 1) != (next != 1) {
+        rebuild()
+      } else {
+        if live { host.setTrim(moduleId, inlet, next) }
+        save()
+      }
+    }
+
     /// Change one of a module's data slots — a lane of a pattern, a song, a scale — as a gesture
     /// does: the first change of it is what undo goes back to, and it reaches the sound on the
     /// next block without rebuilding anything, so a pattern can be edited while it plays.

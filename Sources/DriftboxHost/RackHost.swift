@@ -255,6 +255,13 @@ public final class RackHost: @unchecked Sendable {
     commands.pointee.send(.param(slot: slot, value: value, voice: voice ?? -1, frame: frame ?? -1))
   }
 
+  /// Turn an inlet's trim pot. Only a pot off unity with something patched to its inlet has a
+  /// slot; turning one onto or off unity is a change to the plan, which a load makes.
+  public func setTrim(_ module: String, _ inlet: String, _ value: Double) {
+    guard let slot = plan?.inputTrims[module]?[inlet] else { return }
+    commands.pointee.send(.param(slot: slot, value: value, voice: -1, frame: -1))
+  }
+
   public func setTransport(tempo: Double, running: Bool, shuffle: Double = 0) {
     commands.pointee.send(.transport(tempo: tempo, running: running, shuffle: shuffle))
   }
