@@ -10,14 +10,15 @@
 // hashes of its GLSL and of itself instead, which is enough to catch GLSL edited without the file
 // being made again, and the file edited by hand.
 //
-// shaders/<Target>/<program>.vert and .frag are one program. glslang compiles each stage to
-// SPIR-V, SPIRV-Cross writes it out in the three languages, and its reflection gives every
-// uniform block's layout — from which the Swift structs the blocks are filled from are written
-// too, so that Swift and the shaders cannot disagree about where a member lives. A layout Swift
-// cannot lay out the same way is refused here, with the reason, rather than drawn wrong.
+// shaders/<Target>/<program>.frag is a program, with <program>.vert, or the target's fullscreen.vert
+// where it has none of its own — which is what the surface scenes, one fragment shader each, share.
+// glslang compiles each stage to SPIR-V, SPIRV-Cross writes it out in the three languages, and its
+// reflection gives every uniform block's layout — from which the Swift structs the blocks are filled
+// from are written too, so that Swift and the shaders cannot disagree about where a member lives. A
+// layout Swift cannot lay out the same way is refused here, with the reason, rather than drawn wrong.
 //
-// The output goes to Sources/<Target>/Generated/Shaders.swift, or Tests/<Target>/... for a test
-// target. The tools come from the Vulkan SDK (VULKAN_SDK, or PATH). Their version is written into
+// The output goes to Sources/<Target>/Generated/ShaderPrograms.swift, or Tests/<Target>/... for a
+// test target. The tools come from the Vulkan SDK (VULKAN_SDK, or PATH). Their version is written into
 // every generated file, and --check refuses to compare against another version, since a different
 // SPIRV-Cross writes different text that means the same thing.
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -135,7 +136,9 @@ function fail(program, message) {
 function compile(dir, name, scratch) {
   const out = {}
   for (const stage of ['vert', 'frag']) {
-    const source = join(dir, `${name}.${stage}`)
+    // A program with no vertex shader of its own covers the screen with the target's.
+    const own = join(dir, `${name}.${stage}`)
+    const source = stage === 'vert' && !existsSync(own) ? join(dir, 'fullscreen.vert') : own
     const spv = join(scratch, `${name}.${stage}.spv`)
     try {
       run(glslang, ['-V', '--quiet', source, '-o', spv])
@@ -159,11 +162,13 @@ function compile(dir, name, scratch) {
 const raw = (text) => `#"""\n${text.replace(/\s+$/, '')}\n"""#`
 
 function generate(target, dir, scratch) {
-  const names = readdirSync(dir).filter((f) => f.endsWith('.vert')).map((f) => f.slice(0, -5)).sort()
+  const names = readdirSync(dir).filter((f) => f.endsWith('.frag')).map((f) => f.slice(0, -5)).sort()
   const programs = []
   const blocks = new Map()
   for (const name of names) {
-    if (!existsSync(join(dir, `${name}.frag`))) fail(name, 'has a .vert and no .frag')
+    if (!existsSync(join(dir, `${name}.vert`)) && !existsSync(join(dir, 'fullscreen.vert'))) {
+      fail(name, 'has no .vert, and there is no fullscreen.vert beside it')
+    }
     const { vert, frag } = compile(dir, name, scratch)
     // Both stages see the same uniform blocks at the same bindings, as a pass sets them once.
     const ubos = new Map()
@@ -247,10 +252,10 @@ const stale = []
 try {
   for (const target of readdirSync(shaders, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)) {
     const home = existsSync(join(root, 'Tests', target)) ? 'Tests' : 'Sources'
-    const out = join(root, home, target, 'Generated', 'Shaders.swift')
+    const out = join(root, home, target, 'Generated', 'ShaderPrograms.swift')
     if (check && !tools) {
       const why = existsSync(out) ? hashesDisagree(lf(readFileSync(out, 'utf8')), join(shaders, target)) : 'it is missing'
-      if (why) stale.push(`${home}/${target}/Generated/Shaders.swift: ${why}`)
+      if (why) stale.push(`${home}/${target}/Generated/ShaderPrograms.swift: ${why}`)
       continue
     }
     const text = generate(target, join(shaders, target), scratch)
@@ -261,7 +266,7 @@ try {
         console.error(`${out} was made with SPIRV-Cross ${made} and this is ${toolVersion()}: compare with that version`)
         process.exit(1)
       }
-      if (current !== text) stale.push(`${home}/${target}/Generated/Shaders.swift`)
+      if (current !== text) stale.push(`${home}/${target}/Generated/ShaderPrograms.swift`)
     } else {
       mkdirSync(dirname(out), { recursive: true })
       writeFileSync(out, text)
