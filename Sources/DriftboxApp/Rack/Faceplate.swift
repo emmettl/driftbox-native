@@ -34,6 +34,8 @@
         case "arp": ArpFace(face: face)
         case "combi": CombinatorFace(face: face)
         case "sampler": SamplerFace(face: face)
+        case "multisampler": MultisamplerFace(face: face)
+        case "audio-track": AudioTrackFace(face: face)
         default: GenericFace(face: face, span: span)
         }
       }

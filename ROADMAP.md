@@ -313,9 +313,11 @@ parity point.
    and every sampler without a file of its own gets its patch's. The host keeps loaded audio
    beside the patch, where the reference keeps it too, and points every graph it builds at it, so
    a structural edit does not lose it.
-   Left: the Multisampler's and the Audio Track's faces, the Combinator's routing editor and MIDI
-   learn, the inlet trims on the back, the rack as an Audio Unit, and the groovebox as a module in
-   it.
+   Then the Multisampler's Key Atlas — a set of recordings dropped on it maps itself by the names
+   the reference reads (Piano_C3_pp, vel064, midi 72), held to its own reading of a spread of
+   names — and the Audio Track, a recording placed at a bar and a step.
+   Left: the Combinator's routing editor and MIDI learn, the inlet trims on the back, the rack as
+   an Audio Unit, and the groovebox as a module in it.
 
 ## Milestone 3 — what only native can do
 

@@ -857,6 +857,33 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
   write(join(fixtures, 'rack'), 'previews.json', `${JSON.stringify({ chords, figures })}\n`)
 }
 
+// How a set of recordings maps itself onto a Multisampler: the note and velocity each file name
+// implies, and the zones a set is given — the reference's `multisample.ts`, which is regular
+// expressions and the rules around them, run over names that exercise both.
+{
+  const { midiNoteFromName, velocityFromName, suggestMultisampleZones, midiNoteName } = await import(
+    join(root, 'driftbox', 'packages', 'app', 'src', 'rack', 'multisample.ts')
+  )
+  const names = [
+    'Piano_C3_pp.wav', 'piano-c#4-ff.aif', 'Bass Db2 mf.wav', 'Strings midi-72.wav', 'note60.wav', 'NOTE_61',
+    'vel064 C4.wav', 'v127_A2.wav', 'sax_Bb3_f.wav', 'Kick.wav', 'C-1.wav', 'G9.wav', 'G#9.wav', 'E4 then E5.wav',
+    'Snare_mp.wav', 'pad (mf) F#2.wav', 'Lead_A4_v100.wav', 'ep-b3-pp.wav', 'Cello_ab2', 'velocity 80 d3', 'mfC4',
+    'harp_C4_P', 'organ-FF-C2', 'bell_c8', 'x_c10_y', 'vibes 3 d', 'Guitar A#-1', 'amp_c', 'midi200', 'v12', 'pf_vel_5',
+  ]
+  const parsed = names.map((name) => [name, midiNoteFromName(name), velocityFromName(name)])
+  const sets = [
+    ['C5.wav', 'C3.wav', 'C4.wav'],
+    ['Piano_C4_ff', 'Piano_C4_pp', 'Piano_C4_mf'],
+    ['one', 'two', 'three'],
+    ['one', 'two', 'three', 'four'],
+    ['Bass_E1_v40', 'Bass_E1_v100', 'Bass_A1', 'Bass_D2_ff', 'Bass_D2', 'kick'],
+    ['solo'],
+  ]
+  const zones = sets.map((set) => suggestMultisampleZones(set.map((name) => ({ name, sampleRate: 48000 }))))
+  const noteNames = Array.from({ length: 128 }, (_, note) => midiNoteName(note))
+  write(join(fixtures, 'rack'), 'multisample.json', json({ parsed, sets, zones, noteNames }))
+}
+
 const AUDIO_TOLERANCE = 1e-12
 
 /** Where two parsed JSON values part by more than rounding, or null when they do not. */

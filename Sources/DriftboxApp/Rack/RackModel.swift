@@ -34,7 +34,11 @@
     /// What each sampler is playing that the patch does not carry: a file, or the patch's break.
     /// The audio itself is the host's; this is what the faces say about it.
     private(set) var samples: [String: SampleInfo] = [:]
-    /// Samplers with a file being read into them.
+    /// Each Multisampler's recordings, zone by zone, and each Audio Track's file: what their faces
+    /// say about audio the host holds.
+    private(set) var recordings: [String: [Recording]] = [:]
+    private(set) var tracks: [String: Recording] = [:]
+    /// Modules with files being read into them.
     private(set) var loading: Set<String> = []
     /// Why the last file could not be loaded, for the face that asked.
     private(set) var loadFailure: (module: String, reason: String)?
@@ -71,6 +75,16 @@
     /// the window would otherwise stop for.
     @ObservationIgnored private var breaks: [String: [Float]] = [:]
     @ObservationIgnored private var rendering: [String: Task<Void, Never>] = [:]
+    /// The host slots each module has audio in, so a module that goes takes its audio with it.
+    @ObservationIgnored private var held: [String: Set<String>] = [:]
+
+    /// A recording, for a face: its name, how long, whether stereo, and its shape.
+    struct Recording: Equatable {
+      var name: String
+      var seconds: Double
+      var stereo = false
+      var peaks: [Double]
+    }
     /// Where the patch is kept between launches; nil for a model made in a test.
     @ObservationIgnored var memory: UserDefaults?
 
@@ -141,6 +155,9 @@
       // Another patch's samples are not this one's, even under the same ids.
       host.clearSamples()
       samples = [:]
+      recordings = [:]
+      tracks = [:]
+      held = [:]
       self.patch = patch
       self.name = name
       selection = []
@@ -391,11 +408,15 @@
     /// Samplers gone from the patch lose their audio; samplers with none get the patch's break,
     /// as the reference gives every one of them on Start.
     private func settleSamples() {
-      let samplers = Set(patch.modules.filter { $0.type == "sampler" }.map(\.id))
-      for id in samples.keys where !samplers.contains(id) {
-        host.setSample(id, "sample", nil)
+      let present = Set(patch.modules.map(\.id))
+      for (id, slots) in held where !present.contains(id) {
+        for slot in slots { host.setSample(id, slot, nil) }
+        held[id] = nil
         samples[id] = nil
+        recordings[id] = nil
+        tracks[id] = nil
       }
+      let samplers = Set(patch.modules.filter { $0.type == "sampler" }.map(\.id))
       guard let id = patch.breakId, let entry = RackBreak.named(id) else { return }
       guard let audio = breaks[id] else {
         guard rendering[id] == nil, samplers.contains(where: { samples[$0] == nil }) else { return }
@@ -410,7 +431,7 @@
         return
       }
       for module in samplers where samples[module] == nil {
-        host.setSample(module, "sample", audio)
+        hold(module, "sample", audio)
         samples[module] = SampleInfo(
           name: entry.name, bars: 1, seconds: 240 / entry.tempo, peaks: SampleMath.waveformPeaks(audio),
           source: .break)
@@ -445,13 +466,84 @@
         guard patch.modules.contains(where: { $0.id == moduleId }), audio.count > 1 else { return }
         let seconds = Double(audio.count) / rate
         let bars = SampleMath.guessBars(seconds, tempo: tempo)
-        host.setSample(moduleId, "sample", audio)
+        hold(moduleId, "sample", audio)
         samples[moduleId] = SampleInfo(
           name: SampleMath.name(url.lastPathComponent), bars: bars, seconds: seconds,
           peaks: SampleMath.waveformPeaks(audio), source: .file)
         setTempo(SampleMath.tempoForBars(seconds, bars))
         endTurn()
         if !running { toggleRunning() }
+      }
+    }
+
+    /// Audio in one of a module's slots, or none, remembered as the module's.
+    private func hold(_ module: String, _ slot: String, _ audio: [Float]?) {
+      host.setSample(module, slot, audio)
+      if audio == nil { held[module]?.remove(slot) } else { held[module, default: []].insert(slot) }
+    }
+
+    /// Files read at the rack's rate, every channel, off the main thread.
+    private func decode(_ urls: [URL]) async -> Result<[[[Float]]], Error> {
+      let rate = host.sampleRate
+      return await Task.detached(priority: .userInitiated) {
+        Result {
+          try urls.map { url in
+            let access = url.startAccessingSecurityScopedResource()
+            defer { if access { url.stopAccessingSecurityScopedResource() } }
+            return try SampleMath.decode(url, sampleRate: rate)
+          }
+        }
+      }.value
+    }
+
+    /// A set of recordings into a Multisampler, mapped by their names — Piano_C3_pp maps itself —
+    /// each mono and loud. The map is the patch's, and undoable; the recordings are the session's.
+    func loadInstrument(_ urls: [URL], into moduleId: String) async {
+      let urls = Array(urls.prefix(128))
+      guard !urls.isEmpty else { return }
+      loading.insert(moduleId)
+      loadFailure = nil
+      defer { loading.remove(moduleId) }
+      switch await decode(urls) {
+      case .failure(let error):
+        loadFailure = (moduleId, error.localizedDescription)
+      case .success(let decoded):
+        guard patch.modules.contains(where: { $0.id == moduleId }) else { return }
+        let audio = decoded.map { SampleMath.normalise(SampleMath.toMono($0)) }
+        let names = urls.map { SampleMath.name($0.lastPathComponent) }
+        let zones = Multisample.zones(names: names, sampleRate: host.sampleRate)
+        for slot in held[moduleId] ?? [] { hold(moduleId, slot, nil) }
+        for (index, recording) in audio.enumerated() { hold(moduleId, "sample\(index)", recording) }
+        recordings[moduleId] = zip(names, audio).map { name, recording in
+          Recording(
+            name: name, seconds: Double(recording.count) / host.sampleRate,
+            peaks: SampleMath.waveformPeaks(recording, buckets: 48))
+        }
+        setData(moduleId, "zones", to: MultisampleZone.pack(zones), name: "Load Instrument")
+        endTurn()
+      }
+    }
+
+    /// A recording into an Audio Track: stereo, or mono on both sides, at its own level, playing
+    /// from where the track is set to start.
+    func loadTrack(_ url: URL, into moduleId: String) async {
+      loading.insert(moduleId)
+      loadFailure = nil
+      defer { loading.remove(moduleId) }
+      switch await decode([url]) {
+      case .failure(let error):
+        loadFailure = (moduleId, error.localizedDescription)
+      case .success(let decoded):
+        guard patch.modules.contains(where: { $0.id == moduleId }), let channels = decoded.first,
+          let left = channels.first
+        else { return }
+        let right = channels.count > 1 ? channels[1] : left
+        hold(moduleId, "left", left)
+        hold(moduleId, "right", right)
+        hold(moduleId, "sampleRate", [Float(host.sampleRate)])
+        tracks[moduleId] = Recording(
+          name: SampleMath.name(url.lastPathComponent), seconds: Double(left.count) / host.sampleRate,
+          stereo: channels.count > 1, peaks: SampleMath.waveformPeaks(SampleMath.toMono([left, right])))
       }
     }
 

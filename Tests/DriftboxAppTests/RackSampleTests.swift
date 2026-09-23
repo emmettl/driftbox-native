@@ -128,6 +128,69 @@
       #expect(model.samples.isEmpty)
     }
 
+    @Test func aTrackStartsAtABarAndAStep() {
+      #expect(AudioTrackFace.position(0) == (1, 1))
+      #expect(AudioTrackFace.position(16) == (2, 1))
+      #expect(AudioTrackFace.position(2000) == (64, 16))
+      #expect(AudioTrackFace.start(bar: 4, step: 16) == 63)
+      #expect(AudioTrackFace.start(bar: 80, step: 20) == 1023)
+      #expect(AudioTrackFace.start(bar: 1, step: 1) == 0)
+    }
+
+    /// Three recordings named for their notes map themselves and play: a note on the keyboard
+    /// sounds the zone it falls in. The map is the patch's; the audio goes with the module.
+    @Test func anInstrumentSetMapsItselfAndPlays() async throws {
+      let urls = try ["Piano_C3.wav", "Piano_C4.wav", "Piano_C5.wav"].map { name in
+        try Self.sine(seconds: 0.5, frequency: 220, rate: 48000, name: name)
+      }
+      defer { for url in urls { try? FileManager.default.removeItem(at: url) } }
+      let model = RackModel()
+      model.open(
+        Patch(
+          modules: [
+            PatchModule(id: "keys", type: "midi"), PatchModule(id: "piano", type: "multisampler"),
+            PatchModule(id: "out", type: "out"),
+          ],
+          cables: [
+            PatchCable(from: PortReference("keys", "pitch"), to: PortReference("piano", "pitch")),
+            PatchCable(from: PortReference("keys", "gate"), to: PortReference("piano", "gate")),
+            PatchCable(from: PortReference("keys", "vel"), to: PortReference("piano", "velocity")),
+            PatchCable(from: PortReference("piano", "out"), to: PortReference("out", "in")),
+          ]), name: "Piano")
+      model.listen()
+      await model.loadInstrument(urls, into: "piano")
+      let zones = MultisampleZone.unpack(try #require(model.patch.modules[1].data["zones"]))
+      #expect(zones.map(\.root) == [48, 60, 72])
+      #expect(model.recordings["piano"]?.map(\.name) == ["Piano_C3", "Piano_C4", "Piano_C5"])
+      #expect(!Self.loud(model, seconds: 0.2))
+      model.noteDown(60)
+      #expect(Self.loud(model, seconds: 0.2))
+      model.undo()
+      #expect(model.patch.modules[1].data["zones"] == nil)
+      model.remove("piano")
+      #expect(model.recordings["piano"] == nil)
+    }
+
+    /// A track plays from its start with the transport, stereo or mono on both sides.
+    @Test func aTrackPlaysWithTheTransport() async throws {
+      let url = try Self.sine(seconds: 1, frequency: 330, rate: 44100)
+      defer { try? FileManager.default.removeItem(at: url) }
+      let model = RackModel()
+      model.open(
+        Patch(
+          modules: [PatchModule(id: "track", type: "audio-track"), PatchModule(id: "out", type: "out")],
+          cables: [PatchCable(from: PortReference("track", "out"), to: PortReference("out", "in"))],
+          tempo: 120),
+        name: "Track")
+      model.listen()
+      await model.loadTrack(url, into: "track")
+      let track = try #require(model.tracks["track"])
+      #expect(track.stereo && abs(track.seconds - 1) < 0.01)
+      #expect(!Self.loud(model, seconds: 0.2), "silent while the transport is stopped")
+      model.toggleRunning()
+      #expect(Self.loud(model, seconds: 0.2))
+    }
+
     static func loud(_ model: RackModel, seconds: Double) -> Bool {
       let frames = Int(48000 * seconds)
       let left = UnsafeMutablePointer<Float>.allocate(capacity: frames)
@@ -141,8 +204,10 @@
     }
 
     /// A stereo sine written to a temporary WAV file.
-    static func sine(seconds: Double, frequency: Double, rate: Double) throws -> URL {
-      let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).wav")
+    static func sine(seconds: Double, frequency: Double, rate: Double, name: String? = nil) throws -> URL {
+      let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+      try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+      let url = folder.appendingPathComponent(name ?? "\(UUID()).wav")
       let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2)!
       let file = try AVAudioFile(forWriting: url, settings: format.settings)
       let frames = AVAudioFrameCount(seconds * rate)
