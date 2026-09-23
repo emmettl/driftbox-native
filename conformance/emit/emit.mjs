@@ -812,6 +812,40 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
 
 const AUDIO_TOLERANCE = 1e-12
 
+/** Where two parsed JSON values part by more than rounding, or null when they do not. */
+function differs(x, y, at = '') {
+  if (typeof x === 'number' && typeof y === 'number') {
+    return Math.abs(x - y) <= 1e-12 * Math.max(1, Math.abs(y)) ? null : `${at}: ${x} against ${y}`
+  }
+  if (typeof x === 'string' && typeof y === 'string') {
+    if (x === y) return null
+    const numbers = /-?\d+(?:\.\d+)?/g
+    const xs = x.match(numbers) ?? []
+    const ys = y.match(numbers) ?? []
+    const same = x.replace(numbers, '#') === y.replace(numbers, '#') && xs.length === ys.length &&
+      xs.every((value, i) => Math.abs(Number(value) - Number(ys[i])) <= 0.1 + 1e-9)
+    return same ? null : `${at}: "${x}" against "${y}"`
+  }
+  if (Array.isArray(x) && Array.isArray(y)) {
+    if (x.length !== y.length) return `${at}: ${x.length} items against ${y.length}`
+    for (let i = 0; i < x.length; i++) {
+      const found = differs(x[i], y[i], `${at}[${i}]`)
+      if (found) return found
+    }
+    return null
+  }
+  if (x && y && typeof x === 'object' && typeof y === 'object' && !Array.isArray(x) && !Array.isArray(y)) {
+    const keys = Object.keys(x)
+    if (keys.join() !== Object.keys(y).join()) return `${at}: keys differ`
+    for (const key of keys) {
+      const found = differs(x[key], y[key], `${at}.${key}`)
+      if (found) return found
+    }
+    return null
+  }
+  return x === y ? null : `${at}: ${JSON.stringify(x)} against ${JSON.stringify(y)}`
+}
+
 function filesUnder(dir, base = dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
     entry.isDirectory() ? filesUnder(join(dir, entry.name), base) : [relative(base, join(dir, entry.name))],
@@ -848,6 +882,12 @@ if (check) {
       for (let i = 0; i < x.length && worst !== Infinity; i++) worst = Math.max(worst, Math.abs(x[i] - y[i]))
       console.log(`  ${name}: differs from the checked-in render by at most ${worst}`)
       if (!(worst <= AUDIO_TOLERANCE)) stale.push(`${name}: ${worst} exceeds ${AUDIO_TOLERANCE}`)
+    } else if (name === 'rack/panels.json') {
+      // The cables' swing is exp and sin, which another Node may round differently in the last
+      // bit, and each curve is written to a tenth, which such a bit can tip. So this one compares
+      // as numbers: within 1e-12 of each other, and a curve's coordinates within a tenth.
+      const worst = differs(JSON.parse(a.toString()), JSON.parse(b.toString()))
+      if (worst) stale.push(`${name}: ${worst}`)
     } else if (!a.equals(b)) {
       stale.push(`${name}: differs`)
     }
