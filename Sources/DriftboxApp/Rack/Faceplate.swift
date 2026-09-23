@@ -26,6 +26,10 @@
         case "tuner": TunerFace(face: face)
         case "meter": MeterFace(face: face)
         case "looper": LooperFace(face: face)
+        case "tracker": TrackerFace(face: face)
+        case "arranger": ArrangerFace(face: face)
+        case "scale-player": ScalePlayerFace(face: face)
+        case "note-echo": NoteEchoFace(face: face)
         default: GenericFace(face: face, span: span)
         }
       }

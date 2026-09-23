@@ -18,6 +18,10 @@
       "tuner": ["reference", "mute"],
       "meter": ["mode", "gain", "release"],
       "looper": ["mode", "clear", "feedback", "dry", "loop"],
+      "tracker": Set(["length", "pattern"] + (1...4).flatMap { ["mute\($0)", "unit\($0)"] }),
+      "arranger": ["length"],
+      "scale-player": ["key", "scale", "filter"],
+      "note-echo": Set(NoteEchoFace.knobs),
     ]
   }
 

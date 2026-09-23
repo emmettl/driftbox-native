@@ -117,4 +117,45 @@ struct RackHostTests {
     #expect((readings["vu"]?.level ?? 0) > 0.1)
     #expect((readings["loop"]?.loopSeconds ?? 0) > 0.09)
   }
+  /// A pattern edited while it plays: the new lane lands on the next block, and the host sounds as
+  /// the renderer does given the same data at the same moment — without the tracker starting again.
+  @Test func dataIsSwappedInWhileItPlays() {
+    let patch = Patch(
+      modules: [
+        PatchModule(id: "clock", type: "transport"),
+        PatchModule(
+          id: "seq", type: "tracker", params: ["length": 8], data: ["lane1": [7, 0, 12, 0, 3, 0, 5, 0]]),
+        PatchModule(id: "out", type: "out"),
+      ],
+      cables: [
+        PatchCable(from: PortReference("clock", "sixteenth"), to: PortReference("seq", "clock")),
+        PatchCable(from: PortReference("seq", "cv1"), to: PortReference("out", "in")),
+      ])
+    let host = RackHost(sampleRate: 48000)
+    host.load(patch)
+    host.setTransport(tempo: 174, running: true)
+    let renderer = RackRenderer(sampleRate: 48000)
+    renderer.patch = patch
+    renderer.setTransport(tempo: 174, running: true)
+
+    let edited: [Double] = [24, 24, 0, 0, 1, 2, 3, 4]
+    var mine = render(host, frames: 128 * 60, callback: 128)
+    host.setData("seq", "lane1", edited)
+    // A slot nobody has, and a module nobody is: nothing, rather than a write somewhere.
+    host.setData("seq", "lane9", edited)
+    host.setData("nobody", "lane1", edited)
+    mine += render(host, frames: 128 * 200, callback: 128)
+
+    var theirs = renderer.render(frames: 128 * 60).left
+    renderer.setData("seq", "lane1", edited.map(Float.init))
+    theirs += renderer.render(frames: 128 * 200).left
+    #expect(mine == theirs)
+    // And the edit is heard: the same render without it goes differently from that block on.
+    let untouched = RackRenderer(sampleRate: 48000)
+    untouched.patch = patch
+    untouched.setTransport(tempo: 174, running: true)
+    let before = untouched.render(frames: 128 * 260).left
+    #expect(Array(mine[..<(128 * 60)]) == Array(before[..<(128 * 60)]))
+    #expect(Array(mine[(128 * 60)...]) != Array(before[(128 * 60)...]))
+  }
 }

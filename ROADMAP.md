@@ -291,10 +291,15 @@ parity point.
    numbers and short buffers are copied into a mirror of its own under a sequence count, and the
    interface takes readings from the mirrors — by the modules' own code, so a live reading is
    exactly the one the conformance-tested module gives.
-   Left: the rest of the hand-built faces (the sequencers' grids, the Arranger, the Chord
-   Player, the Scale Player, the Arp, Note Echo, the Combinator, and the sample players), the
-   inlet trims on the back, the breaks the break-built patches expect, hardware MIDI into the
-   rack, the rack as an Audio Unit, and the groovebox as a module in it.
+   Then the faces that edit what a module plays: the Tracker's lanes, the Arranger's song, the
+   Scale Player's map and the Note Echo's pulses. They write the module's data, which now reaches
+   the sound on the next block while it plays: the host swaps a new buffer into the slot from the
+   render thread, whole, so a module never reads a new pointer with an old count, and frees it
+   with the graph. A drag is one step of undo. The Tracker's lane tags cycle the lane's mode,
+   which the reference's face shows but cannot change.
+   Left: the Chord Player, the Arp, the Combinator and the sample players' faces, the inlet
+   trims on the back, the breaks the break-built patches expect, hardware MIDI into the rack,
+   the rack as an Audio Unit, and the groovebox as a module in it.
 
 ## Milestone 3 — what only native can do
 

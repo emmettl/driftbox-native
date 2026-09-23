@@ -116,6 +116,26 @@
       #expect(!model.canRedo)
     }
 
+    /// A drag across a pattern is one step of undo, and it reaches the sound without the patch
+    /// being rebuilt.
+    @Test func oneDragAcrossAPatternIsOneUndo() {
+      var patch = Self.small()
+      patch.modules.append(PatchModule(id: "seq", type: "tracker", data: ["lane1": [0, 0, 0, 0]]))
+      let model = Self.model(patch)
+      model.setData("seq", "lane1", to: [7, 0, 0, 0])
+      model.setData("seq", "lane1", to: [8, 0, 0, 0])
+      model.setData("seq", "lane1", to: [9, 0, 0, 0])
+      model.endTurn()
+      model.setData("seq", "lane1", to: [9, 0, 0, 0])
+      #expect(model.patch.modules[3].data["lane1"] == [9, 0, 0, 0])
+      #expect(model.undoTitle == "Undo Edit Pattern")
+      model.undo()
+      #expect(model.patch.modules[3].data["lane1"] == [0, 0, 0, 0])
+      #expect(!model.canUndo)
+      model.setData("nobody", "lane1", to: [1])
+      #expect(!model.canUndo)
+    }
+
     @Test func theHistoryIsCapped() {
       let model = Self.model()
       for step in 0..<(RackModel.historyLimit + 10) {

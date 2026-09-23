@@ -223,6 +223,22 @@
       save()
     }
 
+    /// Change one of a module's data slots — a lane of a pattern, a song, a scale — as a gesture
+    /// does: the first change of it is what undo goes back to, and it reaches the sound on the
+    /// next block without rebuilding anything, so a pattern can be edited while it plays.
+    func setData(_ moduleId: String, _ slot: String, to values: [Double], name: String = "Edit Pattern") {
+      guard let at = patch.modules.firstIndex(where: { $0.id == moduleId }) else { return }
+      guard patch.modules[at].data[slot] != values else { return }
+      let key = "data:\(moduleId)/\(slot)"
+      if turning != key {
+        record(name)
+        turning = key
+      }
+      patch.modules[at].data[slot] = values
+      if live { host.setData(moduleId, slot, values) }
+      save()
+    }
+
     /// The turn is over: the next move of the same knob is a new step of undo.
     func endTurn() { turning = nil }
 

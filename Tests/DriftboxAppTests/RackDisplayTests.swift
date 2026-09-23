@@ -47,5 +47,15 @@
       #expect(RackDisplay.loopTime(30) == "0:30.0")
       #expect(RackDisplay.loopTime(61.25) == "1:01.3")
     }
+
+    @Test func theScaleMapIsTheReferencesMask() {
+      let augmented: [Double] = [1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1]
+      #expect(ScalePlayerFace.mask(13, augmented) == augmented)
+      #expect(ScalePlayerFace.mask(13, []) == ScalePlayerFace.mask(0, []))
+      #expect(
+        (0..<13).map { ScalePlayerFace.mask($0, []).reduce(0, +) } == [
+          7, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 12,
+        ])
+    }
   }
 #endif
