@@ -392,10 +392,14 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    the Metal one's test, and on screen in `driftbox-play --window` with the song playing. Then
    `DriftboxGPUMetal`, held to the same contract on the Mac's GPU, a `CAMetalLayer` behind
    `GPUSurface`, `PulseScene` held pixel for pixel to the Metal `Pulse`, and `--window` on the Mac
-   too. Left: the rest of the scenes moved onto the layer — the camera and the geometry helpers
-   out of `canImport(Metal)`, `simd` for `Matrix4`, each scene's MSL turned back into the GLSL it
-   came from — one at a time, each held by the offscreen render every scene already has, and the
-   Metal `Scene` gone at the end.
+   too. Then the nine surface scenes on `GPUSurfaceScene`, their MSL back in GLSL, with cards as
+   instanced quads. Each is held on WARP to drawing and moving, and on the Mac to its Metal scene
+   frame by frame. `GPUScenes` finds them by a song's `visual`, and `driftbox-play --window` shows
+   them on Windows, with the mix's levels and the score's position as the Mac feeds them.
+   `Timeline` moved from the app to `DriftboxSeq` for that. Left: the seventeen geometry scenes,
+   with the camera and the geometry helpers out of `canImport(Metal)`, `simd` for `Matrix4`, and
+   text for Graphic Lab. Then `--window` on the Mac showing the song's scene rather than Pulse,
+   and the Metal `Scene` gone at the end.
 4. **The window, drawn.** ← *here.* The shell first: `DriftboxShell` says what the app asks of a
    window in platform-neutral terms — pointers, keys and scrolling as events in points, a menu bar
    as data with shortcuts on the platform's own modifier, file panels, a loop that keeps drawing
