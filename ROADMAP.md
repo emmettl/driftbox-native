@@ -363,3 +363,67 @@ each step stand on the last. The README's "Platforms" says how it is divided.
 5. **Shipping.** Songs as `.driftbox` — the web app's documents byte for byte, under a name Windows
    can associate without claiming every `.json` — read and written by `DriftboxDocument` on every
    platform; the Swift runtime beside the executable; signing; winget.
+
+## Milestone 5 — Android
+
+This started as a question and was answered by compiling. The Swift 6.4 toolchain for Windows
+ships an Android platform. With it, the four constrained targets compile unchanged for arm64 and
+x86_64 Android, optimised and so with the allocation checks, and without the NDK: the
+`@_extern(c)` branch in `Math.swift` that serves the bare Embedded build serves Android too. At
+link time they need libm, `malloc`, `free` and the `mem*` functions, all of them in Bionic.
+Nothing has been linked or run yet.
+
+So the port is the platform again. Most of it is Milestone 4 over again with a third answer to
+each question, and the rest is Android's alone:
+
+1. **The core on a phone.** The NDK, and a `canImport(Android)` branch beside `ucrt` wherever a
+   host imports its C library. Then the bench from `driftbox-play` built as a plain executable and
+   run over `adb`, since Android will run one without an app around it. The Mac's figures (3.3% of
+   real time flat out, 16% paced) say nothing about a phone's smaller, slower cores, and the rack
+   adds to them. This is measured before anything else is built.
+2. **Audio and MIDI behind the ports.** `DriftboxHostAndroid` answers `AudioRouting` with AAudio
+   in low-latency mode. It takes a callback the same shape as the one WASAPI's thread calls, and it
+   says when its device goes away. Android's native MIDI answers the MIDI ports. It sends against
+   a timestamp, so clock out needs no scheduler of its own the way WinMM's did. Listing devices
+   and opening a MIDI port can only be done from Java, and those two are all the JNI there is.
+   `HostTime` is `CLOCK_MONOTONIC`, which is what AAudio and the MIDI stamps both count in.
+3. **A third backend under the GPU layer.** OpenGL ES 3.0 covers everything the scenes ask of
+   Metal, and every Android device has it. The shaders run to 2,400 lines across 29 scenes, and a
+   third copy by hand is where writing them out stops being sensible (see below). `GraphicLab`
+   sets its type with CoreText and needs another way to set text.
+4. **The touch interface, designed with iOS.** See below.
+5. **Shipping.** The shell is a `GameActivity`, which hands the window, input and lifecycle to
+   native code. Songs open and save through the storage access framework as `.driftbox`, and
+   Gradle packages the `.so`s SwiftPM builds. The build leaves out Foundation's
+   internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
+   `DriftboxDocument` takes Foundation only to write a WAV. The Play Store, or F-Droid, when
+   Driftbox is public.
+
+### The touch interface
+
+A groovebox of four machines and a rack full of cables were laid out for a desktop's screen and
+a pointer. A tablet and a phone need them designed again: what is on screen at once, what a
+finger can hit, what a drag means when there is no hover and no right click, and where the rack's
+cables go at arm's length. That design is the same work on iOS and Android, so it is done once,
+for both, tablets first.
+
+The implementations may well be two, built in parallel: SwiftUI on iOS, where the Mac's views
+are most of the way there, and the drawn layer on Android. What carries across is then everything
+under the views: the layouts' arithmetic (as `RackLayout` already is, though it sits inside
+`DriftboxApp` today), hit targets, each gesture as a small state machine, and undo. That lives
+below the views, in a target both platforms build, and is tested once.
+
+### What Milestone 5 asks of Milestone 4
+
+- **The GPU layer takes a third backend** without its protocol changing. Nothing goes in it that
+  OpenGL ES 3.0 cannot do, which rules out little the scenes use.
+- **The shaders are written once.** Before the HLSL is written, settle on one source and generate
+  the other languages from it offline, for example HLSL through SPIR-V to MSL and GLSL ES. The
+  generated shaders are checked in, and a check fails when they are stale, as `emit --check`
+  does for the fixtures. The offscreen renders hold all three to the same image.
+- **The drawn interface does not assume a mouse.** Hover, right click and a scroll wheel are
+  conveniences on top of what a touch can do, never the only way to it. Sizes are in points, not
+  pixels.
+- **The views' logic moves below the views.** Step 2's move of `Player` out of `DriftboxApp`
+  goes further: whatever an interface decides that is not drawing goes in a target that iOS,
+  Android and the two desktops share.
