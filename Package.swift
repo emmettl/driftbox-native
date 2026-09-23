@@ -17,6 +17,7 @@ let package = Package(
     .library(name: "DriftboxDocument", targets: ["DriftboxDocument"]),
     .library(name: "DriftboxHost", targets: ["DriftboxHost"]),
     .library(name: "DriftboxHostWindows", targets: ["DriftboxHostWindows"]),
+    .library(name: "DriftboxHostAndroid", targets: ["DriftboxHostAndroid"]),
     .library(name: "DriftboxGPU", targets: ["DriftboxGPU"]),
     .library(name: "DriftboxGPUD3D11", targets: ["DriftboxGPUD3D11"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
@@ -38,6 +39,12 @@ let package = Package(
     .target(
       name: "DriftboxHostWindows",
       dependencies: ["DriftboxHost", .target(name: "CWASAPI", condition: .when(platforms: [.windows]))]),
+    // The host on Android: AAudio behind the same ports, the same way. Its choice of cores builds
+    // everywhere, so that it is tested everywhere; the rest compiles to nothing off Android.
+    .systemLibrary(name: "CAAudio"),
+    .target(
+      name: "DriftboxHostAndroid",
+      dependencies: ["DriftboxHost", .target(name: "CAAudio", condition: .when(platforms: [.android]))]),
     // What the scenes ask of a GPU, and the backends that answer it. The shaders are GLSL in
     // `shaders/`, made into every backend's language by `scripts/shaders.mjs` and checked in.
     .target(name: "DriftboxGPU"),
@@ -67,12 +74,13 @@ let package = Package(
     // `@main` and nothing else, so that everything it starts can be reached from a test.
     .executableTarget(name: "Driftbox", dependencies: ["DriftboxApp"]),
     // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine on the
-    // Mac, and a WASAPI stream behind `AudioRouting` on Windows.
+    // Mac, a WASAPI stream behind `AudioRouting` on Windows, and an AAudio one on Android.
     .executableTarget(
       name: "driftbox-play",
       dependencies: [
         "DriftboxHost", "DriftboxEngine", "DriftboxDocument",
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxHostAndroid", condition: .when(platforms: [.android])),
       ]),
 
     // Finds and reads `conformance/fixtures` for every test target.
@@ -90,6 +98,7 @@ let package = Package(
       dependencies: ["DriftboxRack", "DriftboxDocument", "ConformanceSupport"]),
     .testTarget(
       name: "DriftboxHostWindowsTests", dependencies: ["DriftboxHostWindows", "DriftboxHost", "DriftboxSeq"]),
+    .testTarget(name: "DriftboxHostAndroidTests", dependencies: ["DriftboxHostAndroid"]),
     .testTarget(name: "DriftboxGPUTests", dependencies: ["DriftboxGPU", "DriftboxGPUD3D11"]),
     .testTarget(name: "DriftboxScenesTests", dependencies: ["DriftboxScenes", "DriftboxEngine"]),
     .testTarget(
