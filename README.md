@@ -645,3 +645,8 @@ that is worth doing when a second one needs to agree.
 Swift 6.4, Swift Testing, `swift format` (config in `.swift-format`; CI lints with `--strict`).
 macOS 26 and iOS 26 are the floors: the first with `InlineArray`, which needs the runtime
 they ship and cannot be deployed back to an older one.
+
+## Licence
+
+[MIT](LICENSE), as the web app is. Use it, embed it, sell what you build with it: the engine is
+meant to be picked up, and that is the licence that gets least in the way of doing so.
