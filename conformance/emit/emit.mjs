@@ -11,9 +11,11 @@ import './ts-resolve.mjs'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { dirname, join, relative, sep } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
+// `import` takes a URL, and a bare path is one only where it starts with a slash.
+const fileUrl = (...parts) => pathToFileURL(join(...parts)).href
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..')
 const engine = join(root, 'driftbox', 'packages', 'engine', 'src')
@@ -25,20 +27,20 @@ const check = process.argv.includes('--check')
 // something other than "the bytes are the same" — see AUDIO_TOLERANCE.
 const fixtures = check ? mkdtempSync(join(tmpdir(), 'driftbox-fixtures-')) : checkedIn
 
-const { SONGS } = await import(join(engine, 'songs', 'index.ts'))
-const { encodeSong, decodeSong, SONG_FORMAT } = await import(join(engine, 'song-io.ts'))
-const { planSong, planStep, barLengthForSelection } = await import(join(engine, 'schedule.ts'))
-const { bpmAt } = await import(join(engine, 'automation.ts'))
-const pattern = await import(join(engine, 'pattern.ts'))
+const { SONGS } = await import(fileUrl(engine, 'songs', 'index.ts'))
+const { encodeSong, decodeSong, SONG_FORMAT } = await import(fileUrl(engine, 'song-io.ts'))
+const { planSong, planStep, barLengthForSelection } = await import(fileUrl(engine, 'schedule.ts'))
+const { bpmAt } = await import(fileUrl(engine, 'automation.ts'))
+const pattern = await import(fileUrl(engine, 'pattern.ts'))
 const { songBars } = pattern
-const { seededRandom } = await import(join(engine, 'render.ts'))
-const { Ladder } = await import(join(engine, 'dsp', 'ladder.ts'))
+const { seededRandom } = await import(fileUrl(engine, 'render.ts'))
+const { Ladder } = await import(fileUrl(engine, 'dsp', 'ladder.ts'))
 const { ClockFollower, parseClock, clockBytes, scheduleClockStart, scheduleClockStep } = await import(
-  join(engine, 'midi-clock.ts'),
+  fileUrl(engine, 'midi-clock.ts'),
 )
-const { followClock } = await import(join(root, 'driftbox', 'packages', 'app', 'src', 'clock-follow.ts'))
-const { ALL_VOICES, buildVoice } = await import(join(engine, 'kit.ts'))
-const { metronomeClick } = await import(join(engine, 'metronome.ts'))
+const { followClock } = await import(fileUrl(root, 'driftbox', 'packages', 'app', 'src', 'clock-follow.ts'))
+const { ALL_VOICES, buildVoice } = await import(fileUrl(engine, 'kit.ts'))
+const { metronomeClick } = await import(fileUrl(engine, 'metronome.ts'))
 
 /** How many bars of each song's plan are checked in. The whole song is `--full`. */
 const PLAN_BARS = 4
@@ -488,9 +490,9 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
 // Written as float32, which is what every rack buffer is.
 {
   const rack = join(root, 'driftbox', 'packages', 'rack', 'src')
-  const { RackRenderer } = await import(join(rack, 'headless.ts'))
-  const { compile } = await import(join(rack, 'compile.ts'))
-  const { MODULES } = await import(join(rack, 'modules', 'index.ts'))
+  const { RackRenderer } = await import(fileUrl(rack, 'headless.ts'))
+  const { compile } = await import(fileUrl(rack, 'compile.ts'))
+  const { MODULES } = await import(fileUrl(rack, 'modules', 'index.ts'))
   const m = (id, type, params, extra = {}) => ({ id, type, ...(params ? { params } : {}), ...extra })
   const c = (from, to) => ({ from, to })
   const cases = [
@@ -594,7 +596,7 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
   // Each family of modules keeps its cases in a file of its own, `rack-cases-<family>.mjs`, whose
   // default export is a list of cases in the shape below, so the families can be ported apart.
   for (const file of readdirSync(here).filter((name) => /^rack-cases-.+\.mjs$/.test(name)).sort()) {
-    const { default: more } = await import(join(here, file))
+    const { default: more } = await import(fileUrl(here, file))
     cases.push(...more)
   }
   const summary = []
@@ -660,9 +662,9 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
 // encoded again, or refused (null). The Swift codec is held to these byte for byte.
 {
   const rack = join(root, 'driftbox', 'packages', 'rack', 'src')
-  const { encodePatch, decodePatch } = await import(join(rack, 'patch-io.ts'))
-  const { PATCHES } = await import(join(rack, 'patches', 'index.ts'))
-  const { SONG_PATCHES } = await import(join(rack, 'patches', 'songs.ts'))
+  const { encodePatch, decodePatch } = await import(fileUrl(rack, 'patch-io.ts'))
+  const { PATCHES } = await import(fileUrl(rack, 'patches', 'index.ts'))
+  const { SONG_PATCHES } = await import(fileUrl(rack, 'patches', 'songs.ts'))
   const inputs = []
   for (const preset of PATCHES) inputs.push([`factory-${preset.id}`, encodePatch(preset.build())])
   for (const preset of SONG_PATCHES) inputs.push([`song-${preset.id}`, encodePatch(preset.build())])
@@ -695,8 +697,8 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
   )
   // Each factory patch played whole for a second, the transport running at its tempo: every
   // module it uses working together, through the codec, as somebody opening it would hear it.
-  const { RackRenderer } = await import(join(rack, 'headless.ts'))
-  const { MODULES } = await import(join(rack, 'modules', 'index.ts'))
+  const { RackRenderer } = await import(fileUrl(rack, 'headless.ts'))
+  const { MODULES } = await import(fileUrl(rack, 'modules', 'index.ts'))
   const blocks = 375
   const played = []
   for (const preset of PATCHES) {
@@ -742,12 +744,12 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
 {
   const rack = join(root, 'driftbox', 'packages', 'rack', 'src')
   const panels = join(root, 'driftbox', 'packages', 'app', 'src', 'rack')
-  const { MODULES } = await import(join(rack, 'modules', 'index.ts'))
-  const { PATCHES } = await import(join(rack, 'patches', 'index.ts'))
-  const { SONG_PATCHES } = await import(join(rack, 'patches', 'songs.ts'))
-  const layoutKit = await import(join(panels, 'layout.ts'))
-  const { sizeFor } = await import(join(panels, 'faceplates', 'index.ts'))
-  const cable = await import(join(panels, 'cable.ts'))
+  const { MODULES } = await import(fileUrl(rack, 'modules', 'index.ts'))
+  const { PATCHES } = await import(fileUrl(rack, 'patches', 'index.ts'))
+  const { SONG_PATCHES } = await import(fileUrl(rack, 'patches', 'songs.ts'))
+  const layoutKit = await import(fileUrl(panels, 'layout.ts'))
+  const { sizeFor } = await import(fileUrl(panels, 'faceplates', 'index.ts'))
+  const cable = await import(fileUrl(panels, 'cable.ts'))
   const size = sizeFor(MODULES)
   const modules = Object.keys(MODULES).map((type) => ({
     type, ...size(type), summary: layoutKit.portSummary(MODULES[type]), jackRows: layoutKit.rowsForJacks(MODULES[type]),
@@ -795,7 +797,7 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
   write(join(fixtures, 'rack'), 'panels.json', json({ modules, patches }))
   // What the panels say that the sound does not need: each module's shelf, its line of copy, its
   // picture and its selectors' labels, in the picker's order. The app ships this as it is.
-  const { MODULE_LIST } = await import(join(rack, 'modules', 'index.ts'))
+  const { MODULE_LIST } = await import(fileUrl(rack, 'modules', 'index.ts'))
   write(join(fixtures, 'rack'), 'faces.json', json(MODULE_LIST.map((def) => ({
     type: def.type,
     group: def.group ?? null,
@@ -804,7 +806,7 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
     labels: Object.fromEntries(def.params.filter((param) => param.labels).map((param) => [param.id, param.labels])),
   }))))
   // The patches the app ships with, as the picker lists them.
-  const { encodePatch } = await import(join(rack, 'patch-io.ts'))
+  const { encodePatch } = await import(fileUrl(rack, 'patch-io.ts'))
   for (const preset of PATCHES) write(join(fixtures, 'rack', 'documents'), `${preset.id}.patch.json`, encodePatch(preset.build()))
   write(join(fixtures, 'rack'), 'catalogue.json', json(PATCHES.map(({ id, name, blurb, category, accent, play, tip }) =>
     ({ id, name, blurb, category: category ?? null, accent, play: play ?? null, tip: tip ?? null }))))
@@ -846,9 +848,12 @@ function differs(x, y, at = '') {
   return x === y ? null : `${at}: ${JSON.stringify(x)} against ${JSON.stringify(y)}`
 }
 
+/** Relative paths with forward slashes on every platform, so they can be compared by name. */
 function filesUnder(dir, base = dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory() ? filesUnder(join(dir, entry.name), base) : [relative(base, join(dir, entry.name))],
+    entry.isDirectory()
+      ? filesUnder(join(dir, entry.name), base)
+      : [relative(base, join(dir, entry.name)).split(sep).join('/')],
   )
 }
 
