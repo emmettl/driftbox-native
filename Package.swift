@@ -16,6 +16,7 @@ let package = Package(
     .library(name: "DriftboxRack", targets: ["DriftboxRack"]),
     .library(name: "DriftboxDocument", targets: ["DriftboxDocument"]),
     .library(name: "DriftboxHost", targets: ["DriftboxHost"]),
+    .library(name: "DriftboxHostWindows", targets: ["DriftboxHostWindows"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
   ],
   targets: [
@@ -29,6 +30,12 @@ let package = Package(
     // Unconstrained: Foundation and the platform are allowed from here up.
     .target(name: "DriftboxDocument", dependencies: ["DriftboxSeq", "DriftboxEngine", "DriftboxRack"]),
     .target(name: "DriftboxHost", dependencies: ["DriftboxEngine", "DriftboxDocument", "DriftboxRack"]),
+    // The host on Windows: WASAPI and WinMM behind the ports `DriftboxHost` declares. The C target is
+    // only the system headers Swift's WinSDK module leaves out; every call is made from Swift.
+    .systemLibrary(name: "CWASAPI"),
+    .target(
+      name: "DriftboxHostWindows",
+      dependencies: ["DriftboxHost", .target(name: "CWASAPI", condition: .when(platforms: [.windows]))]),
     // The visuals: Metal scenes driven by the engine's events. Empty on a platform without Metal.
     .target(name: "DriftboxScenes", dependencies: ["DriftboxDSP", "DriftboxEngine"]),
 
@@ -48,9 +55,14 @@ let package = Package(
       ]),
     // `@main` and nothing else, so that everything it starts can be reached from a test.
     .executableTarget(name: "Driftbox", dependencies: ["DriftboxApp"]),
-    // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine.
+    // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine on the
+    // Mac, and a WASAPI stream behind `AudioRouting` on Windows.
     .executableTarget(
-      name: "driftbox-play", dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument"]),
+      name: "driftbox-play",
+      dependencies: [
+        "DriftboxHost", "DriftboxEngine", "DriftboxDocument",
+        .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
+      ]),
 
     // Finds and reads `conformance/fixtures` for every test target.
     .target(name: "ConformanceSupport", dependencies: ["DriftboxDocument"], path: "Tests/ConformanceSupport"),
@@ -65,6 +77,8 @@ let package = Package(
     .testTarget(
       name: "DriftboxRackTests",
       dependencies: ["DriftboxRack", "DriftboxDocument", "ConformanceSupport"]),
+    .testTarget(
+      name: "DriftboxHostWindowsTests", dependencies: ["DriftboxHostWindows", "DriftboxHost", "DriftboxSeq"]),
     .testTarget(name: "DriftboxScenesTests", dependencies: ["DriftboxScenes", "DriftboxEngine"]),
     .testTarget(
       name: "DriftboxHostTests",

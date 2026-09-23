@@ -334,3 +334,30 @@ Small now, costly later:
   an "external processor" node and the host fills it in.
 - **Documents carry opaque state for external nodes**, and degrade to a placeholder when the
   plug-in is missing.
+
+## Milestone 4 — Windows
+
+The constrained core, the documents and the hosts were written with no platform in them, and on
+Windows they turned out to be exactly that: they build there, and every conformance test passes,
+the whole mixes against Chromium included. What is left is the platform, in the order that makes
+each step stand on the last. The README's "Platforms" says how it is divided.
+
+1. ~~**The core on Windows.**~~ Done. Three small fixes (the C library's name, a thread clock, the
+   emitter's paths and line endings) and 120 of 120 tests.
+2. **Audio and MIDI behind ports.** ← *here.* `DriftboxHost` declares what a platform's audio and
+   MIDI must do — `AudioRouting`, `MIDIInputPort`, `MIDIOutputPort`, `HostTime`, `RenderSource` —
+   and `DriftboxHostWindows` does it with WASAPI and WinMM, tested against the device and against
+   the clock. `driftbox-play` plays the catalogue through it. Left: the Mac's adapters moved into
+   a target of their own and made to conform, so that `Player`, `RackModel` and `ClockCursor` use
+   the ports and nothing else; then the parts of `Player` that are not views move out of
+   `DriftboxApp`, where they are gated on AVFoundation, into a target every platform shares.
+3. **A GPU layer under the scenes.** The scenes use a small part of Metal: buffers, render
+   pipelines, per-draw constants, indexed draws, depth, blending. That goes behind a protocol with
+   Metal and Direct3D 11 under it, the shaders in HLSL beside their Metal, and the offscreen render
+   every scene already has held to the same image on both.
+4. **The window, drawn.** The interface is drawn on that layer rather than built from a toolkit,
+   which is in keeping with an instrument and keeps what the app depends on small: a window, input,
+   menus, dialogs and settings from Win32, and the grid, knobs, strip, rack and cables as surfaces.
+5. **Shipping.** Songs as `.driftbox` — the web app's documents byte for byte, under a name Windows
+   can associate without claiming every `.json` — read and written by `DriftboxDocument` on every
+   platform; the Swift runtime beside the executable; signing; winget.
