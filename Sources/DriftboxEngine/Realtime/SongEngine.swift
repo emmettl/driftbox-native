@@ -26,6 +26,32 @@ public struct SongEngine: ~Copyable {
   /// Bus and sends for one chunk, stereo each.
   let scratch: UnsafeMutablePointer<Float>
 
+  /// The metronome and the count-in: clicks, from a pool of their own, added after the master so
+  /// nothing in the mix — the pad least of all — can take them away.
+  var clicks: VoicePool
+  let strongClick: FixedVoiceSpec
+  let weakClick: FixedVoiceSpec
+  /// A click's output for one chunk, and the sends it has but never uses.
+  let clickScratch: UnsafeMutablePointer<Float>
+  /// Click on every beat of the song while it plays.
+  public var metronome = false
+  var beatCursor = 0
+
+  /// Bars of clicks before the song moves, when it is started from a stop.
+  public var countInBars = 0
+  /// Frames of count-in left: while there are any, the song waits where it is and only the
+  /// clicks sound.
+  public private(set) var countInLeft = 0
+  var countInNext = 0
+  var countInBeat = 0
+  var countInBeats = 0
+  var countInBeatsPerBar = 4
+
+  /// The bars being looped, or a count of zero for none. In bars rather than frames so an edit,
+  /// which recompiles the song and so moves every frame, keeps the loop where it was.
+  public private(set) var loopStartBar = 0
+  public private(set) var loopBarCount = 0
+
   /// The song being played, owned by whoever loaded it. Nil plays silence.
   public private(set) var song: UnsafeMutablePointer<CompiledSong>?
   /// The engine's clock, in frames since it was made. Never stops, playing or not.
@@ -47,10 +73,16 @@ public struct SongEngine: ~Copyable {
     pad = Kaoss(sampleRate: sampleRate)
     scratch = .allocate(capacity: Self.chunk * 6)
     scratch.initialize(repeating: 0, count: Self.chunk * 6)
+    clicks = VoicePool(sampleRate: sampleRate, capacity: 4)
+    strongClick = clicks.prepare(metronomeClick(strong: true), voiceId: "", at: 0)
+    weakClick = clicks.prepare(metronomeClick(strong: false), voiceId: "", at: 0)
+    clickScratch = .allocate(capacity: Self.chunk * 6)
+    clickScratch.initialize(repeating: 0, count: Self.chunk * 6)
   }
 
   deinit {
     scratch.deallocate()
+    clickScratch.deallocate()
   }
 
   // MARK: - Transport
@@ -63,6 +95,7 @@ public struct SongEngine: ~Copyable {
     passStart = frame
     hitCursor = 0
     bassCursor = 0
+    beatCursor = 0
     if let song {
       delayLeft.update(song.pointee.fx, bpm: song.pointee.bpm, atFrame: frame)
       delayRight.update(song.pointee.fx, bpm: song.pointee.bpm, atFrame: frame)
@@ -75,9 +108,57 @@ public struct SongEngine: ~Copyable {
     isPlaying = true
   }
 
+  /// Play, and if this is a start from a stop, count in first: `countInBars` bars of clicks, at
+  /// the song's tempo and as many beats as the bar it starts in has, before the song moves.
+  @_noAllocation
+  public mutating func start() {
+    if !isPlaying, countInBars > 0, let song {
+      let bar = song.pointee.bar(at: max(0, songFrame()))
+      let steps = max(1, song.pointee.barSteps[bar])
+      let barFrames = song.pointee.barStarts[bar + 1] - song.pointee.barStarts[bar]
+      countInBeatsPerBar = (steps + 3) / 4
+      countInBeat = max(1, barFrames * 4 / steps)
+      countInLeft = countInBeat * countInBeatsPerBar * countInBars
+      countInNext = 0
+      countInBeats = 0
+    }
+    isPlaying = true
+  }
+
   @_noAllocation
   public mutating func stop() {
     isPlaying = false
+    countInLeft = 0
+  }
+
+  /// Loop `bars` bars from `startBar`; zero bars loops nothing. Heard at the next boundary: a
+  /// transport inside the loop goes round at its end, one past it goes back at the next bar.
+  @_noAllocation
+  public mutating func setLoop(startBar: Int, bars: Int) {
+    loopStartBar = max(0, startBar)
+    loopBarCount = max(0, bars)
+  }
+
+  /// Where the loop is in the song playing, in frames, or nil if there is none that fits it.
+  @_noAllocation
+  func loopFrames() -> (start: Int, end: Int)? {
+    guard loopBarCount > 0, let song, loopStartBar < song.pointee.barCount else { return nil }
+    let end = min(song.pointee.barCount, loopStartBar + loopBarCount)
+    return (song.pointee.barStarts[loopStartBar], song.pointee.barStarts[end])
+  }
+
+  /// Where the transport next has to turn round, in song frames: the loop's end, the next bar
+  /// when it is already past the loop, or the end of the pass.
+  @_noAllocation
+  func nextBoundary() -> Int? {
+    guard let song else { return nil }
+    let at = songFrame()
+    if let loop = loopFrames() {
+      if at < loop.end { return loop.end }
+      let bar = song.pointee.bar(at: at)
+      return song.pointee.barStarts[bar + 1]
+    }
+    return song.pointee.passFrames
   }
 
   /// Jump to `songFrame` within the pass. Voices already sounding ring on.
@@ -93,6 +174,10 @@ public struct SongEngine: ~Copyable {
     bassCursor = 0
     while bassCursor < song.pointee.bassCount, song.pointee.bass[bassCursor].frame < target {
       bassCursor += 1
+    }
+    beatCursor = 0
+    while beatCursor < song.pointee.beatCount, song.pointee.beats[beatCursor].frame < target {
+      beatCursor += 1
     }
   }
 
@@ -133,9 +218,37 @@ public struct SongEngine: ~Copyable {
   ) {
     var done = 0
     while done < frames {
-      let count = min(Self.chunk, frames - done)
+      var count = min(Self.chunk, frames - done)
+      // A chunk ends where the count-in does, so the song starts on its first frame, and where
+      // the transport turns round, so a loop's first hit lands on its exact frame.
+      var turning: Int?
+      if countInLeft > 0 {
+        count = min(count, countInLeft)
+      } else if isPlaying, let boundary = nextBoundary() {
+        let until = boundary - songFrame()
+        if until > 0, until <= count {
+          count = until
+          turning = boundary
+        }
+      }
       renderChunk(count: count, left: left + done, right: right + done)
+      if let turning, songFrame() == turning { turn(at: turning) }
       done += count
+    }
+  }
+
+  /// Go round: to the loop's start, or at the end of a pass, to the top.
+  @_noAllocation
+  mutating func turn(at boundary: Int) {
+    guard let song else { return }
+    if let loop = loopFrames(), boundary >= loop.end || boundary < loop.start {
+      seek(toSongFrame: loop.start)
+    } else if boundary >= song.pointee.passFrames {
+      passStart += song.pointee.passFrames
+      hitCursor = 0
+      bassCursor = 0
+      beatCursor = 0
+      events.send(EngineEvent(kind: .pass, frame: passStart, voice: 0, level: 0, frequency: 0, flag: 0))
     }
   }
 
@@ -150,15 +263,47 @@ public struct SongEngine: ~Copyable {
     let toDelayRight = scratch + chunk * 3
     let toReverbLeft = scratch + chunk * 4
     let toReverbRight = scratch + chunk * 5
-    for index in 0..<chunk * 6 { scratch[index] = 0 }
+    for index in 0..<chunk * 6 {
+      scratch[index] = 0
+      clickScratch[index] = 0
+    }
+    let counting = countInLeft > 0
+    let moving = isPlaying && !counting
 
-    if isPlaying, let song {
-      // The song loops: a pass that has run out starts the next one on the frame after.
+    // The count-in's clicks, on a clock of their own: the song is not moving yet.
+    if counting {
+      while countInNext < count {
+        var click = countInBeats % countInBeatsPerBar == 0 ? strongClick : weakClick
+        click.shift(byFrames: frame + countInNext, sampleRate: sampleRate)
+        clicks.start(click)
+        countInBeats += 1
+        countInNext += countInBeat
+      }
+      countInNext -= count
+      countInLeft -= count
+    }
+
+    if moving, let song {
+      // A pass that has run out — because a seek put the transport past its end — starts the
+      // next one here. The usual way round is `turn`, on the boundary's exact frame.
       if frame - passStart >= song.pointee.passFrames {
         passStart += song.pointee.passFrames
         hitCursor = 0
         bassCursor = 0
+        beatCursor = 0
         events.send(EngineEvent(kind: .pass, frame: passStart, voice: 0, level: 0, frequency: 0, flag: 0))
+      }
+      // The metronome: a click on each beat that falls in this chunk, straight whatever the
+      // song's swing, because a click that shuffled would be measuring against itself.
+      let songStart = frame - passStart
+      while beatCursor < song.pointee.beatCount, song.pointee.beats[beatCursor].frame < songStart + count {
+        let beat = song.pointee.beats[beatCursor]
+        if metronome, beat.frame >= songStart {
+          var click = beat.strong ? strongClick : weakClick
+          click.shift(byFrames: passStart + beat.frame, sampleRate: sampleRate)
+          clicks.start(click)
+        }
+        beatCursor += 1
       }
       // Hits due in this chunk are started now; the pool renders each from its own first frame.
       let songEnd = frame - passStart + count
@@ -176,13 +321,20 @@ public struct SongEngine: ~Copyable {
     voices.render(
       firstFrame: frame, frames: count, left: busLeft, right: busRight, delayLeft: toDelayLeft,
       delayRight: toDelayRight, reverbLeft: toReverbLeft, reverbRight: toReverbRight)
+    let clickLeft = clickScratch
+    let clickRight = clickScratch + chunk
+    clicks.render(
+      firstFrame: frame, frames: count, left: clickLeft, right: clickRight,
+      delayLeft: clickScratch + chunk * 2,
+      delayRight: clickScratch + chunk * 3, reverbLeft: clickScratch + chunk * 4,
+      reverbRight: clickScratch + chunk * 5)
 
     for index in 0..<count {
       let at = frame + index
       let time = Double(at) / sampleRate
 
       // 303 notes land on their exact frame.
-      if isPlaying, let song {
+      if moving, let song {
         let songAt = at - passStart
         while bassCursor < song.pointee.bassCount, song.pointee.bass[bassCursor].frame <= songAt {
           let event = song.pointee.bass[bassCursor]
@@ -224,12 +376,12 @@ public struct SongEngine: ~Copyable {
       let inserted = inserts.process(
         left: busLeft[index] * Self.busGain, right: busRight[index] * Self.busGain, frame: at)
       let filtered = pad.process(left: inserted.left, right: inserted.right, frame: at)
-      out[index] = filtered.left * Self.masterGain
-      outRight[index] = filtered.right * Self.masterGain
+      out[index] = filtered.left * Self.masterGain + clickLeft[index]
+      outRight[index] = filtered.right * Self.masterGain + clickRight[index]
     }
     frame += count
     // The engine's clock always runs — tails, the pad and struck voices need it — but a stopped
-    // song stays where it stopped.
-    if !isPlaying { passStart += count }
+    // song stays where it stopped, and a counting-in one where it will start.
+    if !moving { passStart += count }
   }
 }

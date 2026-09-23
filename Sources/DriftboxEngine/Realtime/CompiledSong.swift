@@ -22,6 +22,13 @@ public struct CompiledSong: ~Copyable {
     public var sendReverb: Float
   }
 
+  /// A beat of the song, where the metronome clicks: every fourth step of a bar, straight, and
+  /// the bar's first strong.
+  public struct Beat {
+    public var frame: Int
+    public var strong: Bool
+  }
+
   public let sampleRate: Double
   public let hits: UnsafeMutablePointer<FixedVoiceSpec>
   public let hitCount: Int
@@ -29,6 +36,13 @@ public struct CompiledSong: ~Copyable {
   public let bassCount: Int
   /// Frames in one pass through the arrangement.
   public let passFrames: Int
+  /// Where each bar starts, in frames, and after the last, `passFrames`: `barCount + 1` of them.
+  public let barStarts: UnsafeMutablePointer<Int>
+  public let barCount: Int
+  /// Steps in each bar, for a count-in to know how many beats a bar has.
+  public let barSteps: UnsafeMutablePointer<Int>
+  public let beats: UnsafeMutablePointer<Beat>
+  public let beatCount: Int
   public let fx: FxParams
   public let bpm: Double
   /// The room, as the reverb send's convolvers, one per side.
@@ -41,9 +55,35 @@ public struct CompiledSong: ~Copyable {
   public init(_ song: Song, preparer: HitPreparer) {
     let sampleRate = preparer.sampleRate
     self.sampleRate = sampleRate
-    let plan = song.plan(bars: song.chain.isEmpty ? 1 : song.bars)
+    let bars = song.chain.isEmpty ? 1 : song.bars
+    let plan = song.plan(bars: bars)
     let seconds = plan.last.map { $0.time + $0.stepSeconds } ?? 0
     passFrames = max(1, Int((seconds * sampleRate).rounded()))
+
+    // The plan is every step of every bar in order, so walking the bars' lengths alongside it
+    // says which bar and which step of it each planned step is.
+    var starts: [Int] = []
+    var steps: [Int] = []
+    var clicks: [Beat] = []
+    var at = 0
+    for bar in 0..<bars where at < plan.count {
+      let length = song.barLength(forBar: bar)
+      starts.append(Int((plan[at].time * sampleRate).rounded()))
+      steps.append(length)
+      for index in 0..<length where at + index < plan.count && index % 4 == 0 {
+        clicks.append(Beat(frame: Int((plan[at + index].time * sampleRate).rounded()), strong: index == 0))
+      }
+      at += length
+    }
+    starts.append(passFrames)
+    barCount = steps.count
+    barStarts = .allocate(capacity: starts.count)
+    barStarts.initialize(from: starts, count: starts.count)
+    barSteps = .allocate(capacity: max(1, steps.count))
+    barSteps.initialize(from: steps, count: steps.count)
+    beatCount = clicks.count
+    beats = .allocate(capacity: max(1, clicks.count))
+    beats.initialize(from: clicks, count: clicks.count)
 
     // Nothing in the catalogue moves its effects or its tempo mid-song; a song that does is
     // played at its opening settings, and the render says nothing about it. The offline form
@@ -98,5 +138,20 @@ public struct CompiledSong: ~Copyable {
   deinit {
     hits.deallocate()
     bass.deallocate()
+    barStarts.deallocate()
+    barSteps.deallocate()
+    beats.deallocate()
+  }
+
+  /// The bar playing at `songFrame`.
+  @_noAllocation
+  public func bar(at songFrame: Int) -> Int {
+    var low = 0
+    var high = barCount
+    while low + 1 < high {
+      let middle = (low + high) / 2
+      if barStarts[middle] <= songFrame { low = middle } else { high = middle }
+    }
+    return low
   }
 }

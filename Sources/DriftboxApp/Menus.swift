@@ -13,6 +13,8 @@
     // mirrors it onto the player, rather than the two of them setting it from opposite ends.
     @AppStorage(Defaults.visuals) private var showsVisuals = true
     @AppStorage(Defaults.sendsClock) private var sendsClock = false
+    @AppStorage(Defaults.metronome) private var metronome = false
+    @AppStorage(Defaults.countIn) private var countIn = false
 
     public init(player: Player, files: SongFiles, stage: Stage) {
       self.player = player
@@ -102,6 +104,20 @@
         Button("Previous Pattern") { player.skip(sections: -1) }
           .keyboardShortcut("[", modifiers: .command)
           .disabled(player.song == nil)
+        Divider()
+        Toggle("Metronome", isOn: $metronome)
+          .keyboardShortcut("k", modifiers: .command)
+        Toggle("Count In", isOn: $countIn)
+          .keyboardShortcut("k", modifiers: [.command, .shift])
+        Button("Loop Current Section") {
+          guard let song = player.song, let bar = player.position?.bar else { return }
+          let block = SongStrip.blocks(song).first { bar >= $0.start && bar < $0.start + $0.bars }
+          if let block { player.toggleLoop(start: block.start, bars: block.bars) }
+        }
+        .keyboardShortcut("l", modifiers: .command)
+        .disabled(player.song == nil)
+        Button("Clear Loop") { player.loop = nil }
+          .disabled(player.loop == nil)
         Divider()
         Toggle(
           "Follow MIDI Clock",

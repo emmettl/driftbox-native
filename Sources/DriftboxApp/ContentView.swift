@@ -316,13 +316,14 @@
     var body: some View {
       let position = player.position
       HStack(spacing: 14) {
-        BeatLights(step: player.isPlaying ? position?.step : nil)
+        BeatLights(step: player.isPlaying && !player.countingIn ? position?.step : nil)
         VStack(alignment: .leading, spacing: 0) {
           Text(position.map { String(format: "%03d.%02d", $0.bar + 1, $0.step + 1) } ?? "---.--")
             .font(Theme.mono(14, .semibold).monospacedDigit())
             .foregroundStyle(player.isPlaying ? Theme.ink : Theme.ink.opacity(0.7))
-          Text((position?.pattern?.name ?? "—").uppercased())
-            .font(Theme.mono(8.5, .medium)).tracking(0.8).foregroundStyle(Theme.dim).lineLimit(1)
+          Text(player.countingIn ? "COUNT-IN" : (position?.pattern?.name ?? "—").uppercased())
+            .font(Theme.mono(8.5, .medium)).tracking(0.8)
+            .foregroundStyle(player.countingIn ? Theme.three : Theme.dim).lineLimit(1)
         }
         .frame(width: 84, alignment: .leading)
         if let song = player.song {
@@ -360,6 +361,40 @@
       .padding(.horizontal, 14)
       .frame(height: 38)
       .fixedSize()
+    }
+  }
+
+  /// What helps play along: the loop, when there is one, the metronome and the count-in. Over
+  /// the song strip, where the loop is drawn.
+  struct TransportAids: View {
+    let player: Player
+    @AppStorage(Defaults.metronome) private var metronome = false
+    @AppStorage(Defaults.countIn) private var countIn = false
+
+    var body: some View {
+      HStack(spacing: 4) {
+        Button("click") { metronome.toggle() }
+          .buttonStyle(.chip(on: metronome, tint: Theme.nine, size: 10))
+          .help("Metronome: a click on every beat (⌘K)")
+        Button("1·2·3·4") { countIn.toggle() }
+          .buttonStyle(.chip(on: countIn, tint: Theme.nine, size: 10))
+          .help("Count in a bar of clicks before playing from a stop (⇧⌘K)")
+        if let loop = player.loop {
+          Button {
+            player.loop = nil
+          } label: {
+            Label(
+              loop.bars == 1 ? "\(loop.start + 1)" : "\(loop.start + 1)–\(loop.end)",
+              systemImage: "repeat"
+            )
+            .labelStyle(.titleAndIcon)
+          }
+          .buttonStyle(.chip(on: true, tint: Theme.live, size: 10))
+          .help("Looping bars \(loop.start + 1) to \(loop.end). Click to stop looping.")
+          .transition(.scale.combined(with: .opacity))
+        }
+      }
+      .animation(.spring(response: 0.3, dampingFraction: 0.75), value: player.loop)
     }
   }
 
@@ -457,6 +492,7 @@
         HStack(spacing: 8) {
           FieldLabel("Song")
           Spacer()
+          TransportAids(player: player)
           Text("\(total) bars").font(Theme.mono(9)).foregroundStyle(Theme.dim)
           Menu {
             ForEach(song.patterns, id: \.id) { pattern in
@@ -498,6 +534,22 @@
               }
             }
           }
+          // The loop, as a bracket over the bars it covers.
+          .overlay(alignment: .topLeading) {
+            if let loop = player.loop, total > 0 {
+              let from = SongStrip.x(ofBar: loop.start, blocks: blocks, room: room, gap: gap, total: total)
+              let to = SongStrip.x(
+                ofBar: loop.end, blocks: blocks, room: room, gap: gap, total: total, end: true)
+              RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(Theme.live, lineWidth: 2)
+                .shadow(color: Theme.live.opacity(0.7), radius: 6)
+                .frame(width: max(8, to - from + 4), height: 34)
+                .offset(x: from - 2, y: -2)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
+          }
+          .animation(.spring(response: 0.3, dampingFraction: 0.8), value: player.loop)
         }
         .frame(height: 30)
       }
@@ -516,6 +568,23 @@
       let colour: Int
       /// The machines playing a pattern of their own in this section.
       var clips: [ClipSlot] = []
+    }
+
+    /// Where bar `bar` falls along the strip, sections' gaps and all. The end of a bar that is
+    /// the end of a section is that section's right edge, not the next one's left.
+    static func x(ofBar bar: Int, blocks: [Block], room: Double, gap: Double, total: Int, end: Bool = false)
+      -> Double
+    {
+      var at = 0.0
+      for block in blocks {
+        let width = max(4, room * Double(block.bars) / Double(max(1, total)))
+        let into = bar - block.start
+        if into >= 0, end ? into <= block.bars : into < block.bars {
+          return at + width * Double(into) / Double(block.bars)
+        }
+        at += width + gap
+      }
+      return max(0, at - gap)
     }
 
     static func blocks(_ song: Song) -> [Block] {
@@ -621,6 +690,15 @@
     var body: some View {
       let entry = song.chain[index]
       Button("Play from Here") { player.seek(toBar: start) }
+      let bars = max(1, entry.repeat)
+      let looped = player.loop == Player.LoopRange(start: start, bars: bars)
+      Button(looped ? "Stop Looping This Section" : "Loop This Section") {
+        player.toggleLoop(start: start, bars: bars)
+      }
+      if let loop = player.loop, !looped {
+        Button("Stretch Loop to Here") { player.extendLoop(toStart: start, bars: bars) }
+        Button("Clear Loop (Bars \(loop.start + 1)–\(loop.end))") { player.loop = nil }
+      }
       Divider()
       Menu("Pattern") {
         ForEach(song.patterns, id: \.id) { pattern in

@@ -29,6 +29,21 @@ struct VoiceSpecTests {
     #expect(found.isEmpty, "\(found.count) differences, first: \(found.prefix(5))")
   }
 
+  /// The metronome's two clicks, exactly as the reference describes them.
+  @Test func theClicksAreTheReferencesClicks() throws {
+    let cases = try #require(JSONValue(parsing: try Fixtures.text("voices/metronome.json"))?.array)
+    #expect(cases.count == 2)
+    var found: [String] = []
+    for fixture in cases.compactMap(\.object) {
+      let strong = try #require(fixture["strong"]?.bool)
+      let expected = try #require(fixture["spec"])
+      collectDifferences(
+        between: json(metronomeClick(strong: strong)), and: expected, at: strong ? "strong" : "weak",
+        ignoringKeyOrder: true, into: &found)
+    }
+    #expect(found.isEmpty, "\(found)")
+  }
+
   @Test func theKitIsTheReferencesKit() throws {
     let kit = try #require(JSONValue(parsing: try Fixtures.text("voices/kit.json"))?.array)
     #expect(kit.count == allVoices.count)

@@ -5,7 +5,15 @@ import Synchronization
 /// What the interface can ask the engine to do. Plain bytes, so a ring can carry it.
 public enum Command {
   case play
+  /// Play, counting in first if the engine is stopped and has a count-in set: what a person
+  /// pressing play means. `play` is what an edit or an external clock means.
+  case start
   case stop
+  /// Loop `bars` bars from `startBar`; zero bars clears the loop.
+  case loop(startBar: Int, bars: Int)
+  case metronome(Bool)
+  /// Bars of clicks before the song moves, when it is started from a stop.
+  case countIn(bars: Int)
   case seek(songFrame: Int)
   /// Play this song from its start. The engine hands back the song it was playing through the
   /// `released` ring, for the sender to free.

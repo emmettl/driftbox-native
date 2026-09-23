@@ -12,6 +12,8 @@
     /// before there was a choice.
     static let ignoredMIDI = "midi.ignored"
     static let sendsClock = "clock.sends"
+    static let metronome = "transport.metronome"
+    static let countIn = "transport.countIn"
     static let clockDestination = "clock.destination"
     static let lastSong = "song.last.catalogue"
     static let lastFile = "song.last.file"
@@ -50,9 +52,13 @@
     @AppStorage(Defaults.sendsClock) private var sends = false
     @AppStorage(Defaults.clockDestination) private var destination = ""
     @AppStorage(Defaults.audioOutput) private var output = ""
+    @AppStorage(Defaults.metronome) private var metronome = false
+    @AppStorage(Defaults.countIn) private var countIn = false
 
     func body(content: Content) -> some View {
       content
+        .onChange(of: metronome, initial: true) { _, on in player.metronome = on }
+        .onChange(of: countIn, initial: true) { _, on in player.countsIn = on }
         .onChange(of: output, initial: true) { _, uid in player.outputDevice = uid.isEmpty ? nil : uid }
         .onChange(of: visuals, initial: true) { _, on in player.showsVisuals = on }
         .onChange(of: listens, initial: true) { _, on in player.listensToMIDI = on }

@@ -40,6 +40,8 @@ public final class EngineHost: @unchecked Sendable {
   public let songFrame = Atomic<Int>(-1)
   public let engineFrame = Atomic<Int>(0)
   public let playing = Atomic<Bool>(false)
+  /// Whether the song is waiting on a count-in.
+  public let countingIn = Atomic<Bool>(false)
 
   /// The last `monitorFrames` frames of the mix, mono, for a scene's spectrum: the render thread
   /// writes them after each call and `recentMix` copies them out. No lock — a frame that is
@@ -161,7 +163,11 @@ public final class EngineHost: @unchecked Sendable {
     while let command = commands.pointee.receive() {
       switch command {
       case .play: engine.pointee.play()
+      case .start: engine.pointee.start()
       case .stop: engine.pointee.stop()
+      case .loop(let startBar, let bars): engine.pointee.setLoop(startBar: startBar, bars: bars)
+      case .metronome(let on): engine.pointee.metronome = on
+      case .countIn(let bars): engine.pointee.countInBars = max(0, bars)
       case .seek(let frame): engine.pointee.seek(toSongFrame: frame)
       case .load(let song):
         let previous = engine.pointee.song
@@ -194,5 +200,6 @@ public final class EngineHost: @unchecked Sendable {
     songFrame.store(engine.pointee.songFrame(), ordering: .relaxed)
     engineFrame.store(engine.pointee.frame, ordering: .relaxed)
     playing.store(engine.pointee.isPlaying, ordering: .relaxed)
+    countingIn.store(engine.pointee.countInLeft > 0, ordering: .relaxed)
   }
 }
