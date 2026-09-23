@@ -32,6 +32,8 @@ Metal. Next after this is the rack.
 | `Sources/CWASAPI` | The Windows audio headers Swift's WinSDK module leaves out. Declarations only. |
 | `Sources/DriftboxHostAndroid` | AAudio and native MIDI behind the same ports: the host on Android. |
 | `Sources/CAAudio`, `Sources/CAMidi` | AAudio's and native MIDI's headers, which the Swift SDK's Android module leaves out. Declarations only. |
+| `android/` | The Android app's Java, manifest and resources: so far a harness, and the MIDI devices Java can open. |
+| `Sources/DriftboxAndroid` | The Android app's native library: what its Java calls, and the tests it runs on a phone. |
 | `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |
 | `Sources/DriftboxGPU` | What the scenes ask of a GPU, as a protocol every backend answers the same way. |
 | `Sources/DriftboxGPUD3D11` | That protocol on Direct3D 11: the GPU on Windows. |
@@ -196,14 +198,27 @@ whose device goes away ends and asks to be replaced, as on Windows. There is one
 system's, until the app can list them: that is Java's `AudioManager`.
 
 MIDI is Android's native MIDI, which needs Android 10, so Driftbox builds for API 29. It can play
-through a device but not find or open one: that is Java's `MidiManager`. So the app will open
-devices and hand each to `AMidiDevices`, and `AMidiInput` and `AMidiOutput` open their ports from
+through a device but not find or open one: that is Java's `MidiManager`. So the app opens every
+device and hands each to `AMidiDevices`, and `AMidiInput` and `AMidiOutput` open their ports from
 there. Input is read by a thread that asks every port in turn, since there is no callback, and a
 `MIDIByteStream` per port makes Android's packets back into messages: running status, clock in
-the middle of a note, system exclusive skipped. Output is stamped, and Android's USB driver holds
-each message until its time, so there is no scheduler as there is over WinMM; a device that is
-another app is given the stamp and may or may not keep to it. None of it has met a
-device yet: there is no Java side to open one until there is an app.
+the middle of a note, system exclusive skipped. Output is stamped, and what a stamp means is the
+device's business: Android's USB driver holds a message until then, by its source, but a device
+that is another app is handed it at once.
+
+The app is built without Gradle, by the SDK's own tools, and so far is a harness: it runs a test
+it is named and says what happened.
+
+```bash
+scripts/android-app.sh                  # build and install
+scripts/android-app.sh midi-loopback    # and test the MIDI ports against the app's own loopback
+```
+
+It needs a JDK and the SDK's build-tools and a platform beside the NDK. Driftbox Loopback is a
+MIDI device the app publishes that sends back what it is sent, so the ports are tested with
+nothing plugged in, as on Windows. Notes and clock come back whole and in order, stamps exact; a
+clock sent a tenth of a second ahead comes back a tenth of a second early, and a flush drops
+nothing, which is what a device that is another app does with a stamp.
 
 ## Conformance
 

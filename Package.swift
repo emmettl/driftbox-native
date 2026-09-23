@@ -50,6 +50,14 @@ let package = Package(
         "DriftboxHost", .target(name: "CAAudio", condition: .when(platforms: [.android])),
         .target(name: "CAMidi", condition: .when(platforms: [.android])),
       ]),
+    // The Android app's native library: what `android/`'s Java calls, and the tests it runs on a
+    // phone. Built into libdriftbox.so by `scripts/android-app.sh`; nothing off Android.
+    .target(
+      name: "DriftboxAndroid",
+      dependencies: [
+        "DriftboxHostAndroid", "DriftboxHost", "DriftboxSeq",
+        .target(name: "CAMidi", condition: .when(platforms: [.android])),
+      ]),
     // What the scenes ask of a GPU, and the backends that answer it. The shaders are GLSL in
     // `shaders/`, made into every backend's language by `scripts/shaders.mjs` and checked in.
     .target(name: "DriftboxGPU"),

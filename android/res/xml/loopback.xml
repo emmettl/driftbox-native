@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<devices>
+  <device manufacturer="Driftbox" product="Loopback" tags="loopback">
+    <input-port name="in" />
+    <output-port name="out" />
+  </device>
+</devices>

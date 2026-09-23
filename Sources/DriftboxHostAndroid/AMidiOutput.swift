@@ -7,9 +7,12 @@
   /// Android's `MIDIOutputPort`.
   ///
   /// Android's MIDI takes a timestamp with every message, as CoreMIDI does, on the monotonic clock
-  /// `HostTime` counts in; it is the device's side that holds a message until then, which the USB
-  /// driver does. So there is no scheduler here as there is over WinMM. A flush is Android's own:
-  /// it drops whatever is waiting at the device's side.
+  /// `HostTime` counts in, but it is the device's side that decides what the stamp means. Android's
+  /// USB driver holds a message until then, by its source. A device that is another app is handed
+  /// the message at once, stamp and all: measured against the app's own loopback, a clock sent a
+  /// tenth of a second ahead arrived a tenth of a second early, and a flush dropped nothing. So
+  /// until something here holds messages to their time, as WinMM's scheduler does on Windows, a
+  /// clock is only on time at a device that keeps to its stamps.
   ///
   /// There is no virtual destination. An app can publish a MIDI device of its own on Android, but
   /// only as a Java service, which is the app's to add.
