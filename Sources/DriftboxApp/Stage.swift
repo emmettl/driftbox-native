@@ -22,6 +22,14 @@
     @ObservationIgnored let renderer: SceneRenderer?
     /// The window the visuals go out to.
     @ObservationIgnored public private(set) lazy var output = VisualsWindow(stage: self)
+    /// A scene chosen over the one the song names, or nil for the song's own. Put back to the
+    /// song's own when a different song opens, since that one names its own.
+    public var sceneChoice: String?
+    /// Vibes: the visuals at full strength and the editor put away, the whole window a pad.
+    public var performing = false
+    /// The scene being shown: the one chosen, or the one the song names.
+    var sceneId: String? { sceneChoice ?? player.song?.visual }
+
     /// Whether that window is open. While it is, it draws and the backdrop shows its frames.
     internal(set) public var outputOpen = false
     /// The displays attached, by name, for the menu that sends the visuals to one. Kept here
@@ -49,7 +57,7 @@
     /// Draw one frame, `size` pixels at `pixelRatio` pixels to the point.
     func render(size: SIMD2<Int>, pixelRatio: Float) {
       guard let renderer, size.x > 0, size.y > 0 else { return }
-      try? renderer.show(player.song?.visual)
+      try? renderer.show(sceneId)
       if ring.first.map({ $0.width != size.x || $0.height != size.y }) ?? true {
         ring = (0..<2).compactMap { _ in Self.frame(size, on: renderer.device) }
         next = 0

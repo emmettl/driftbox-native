@@ -57,11 +57,15 @@ let package = Package(
     .testTarget(
       name: "DriftboxEngineTests",
       dependencies: ["DriftboxEngine", "DriftboxSeq", "DriftboxDocument", "ConformanceSupport"]),
-    .testTarget(name: "DriftboxRackTests", dependencies: ["DriftboxRack", "DriftboxDocument", "ConformanceSupport"]),
+    .testTarget(
+      name: "DriftboxRackTests",
+      dependencies: ["DriftboxRack", "DriftboxDocument", "ConformanceSupport"]),
     .testTarget(name: "DriftboxScenesTests", dependencies: ["DriftboxScenes", "DriftboxEngine"]),
     .testTarget(
       name: "DriftboxHostTests",
-      dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxRack", "ConformanceSupport"]),
+      dependencies: [
+        "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxRack", "ConformanceSupport",
+      ]),
     .testTarget(
       name: "DriftboxDocumentTests",
       dependencies: ["DriftboxDocument", "DriftboxSeq", "ConformanceSupport"]),

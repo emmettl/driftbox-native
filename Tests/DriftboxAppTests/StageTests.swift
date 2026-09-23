@@ -2,6 +2,7 @@
   import AppKit
   import DriftboxEngine
   import DriftboxHost
+  import DriftboxScenes
   import DriftboxSeq
   import Foundation
   import Metal
@@ -62,6 +63,44 @@
         guard let renderer = stage.renderer else { return }
         stage.render(size: SIMD2(64, 64), pixelRatio: 1)
         #expect(renderer.sceneType.id == "saturn")
+      }
+    }
+
+    /// A scene chosen over the song's own is the one drawn; the next one goes round the list and
+    /// back to the start; nil is the song's own again.
+    @Test func aChosenSceneIsDrawnAndTheListGoesRound() throws {
+      try withTemporaryDirectory { directory in
+        var song = steadySong()
+        song.visual = "saturn"
+        let (player, _) = try openedPlayer(song, in: directory)
+        let stage = Stage(player: player)
+        #expect(stage.sceneId == "saturn")
+        stage.sceneChoice = "orrery"
+        #expect(stage.sceneId == "orrery")
+        #expect(stage.sceneName == "Orrery")
+        if let renderer = stage.renderer {
+          stage.render(size: SIMD2(64, 64), pixelRatio: 1)
+          #expect(renderer.sceneType.id == "orrery")
+        }
+        let all = Scenes.all.map { $0.id }
+        stage.sceneChoice = all.last
+        stage.cycleScene()
+        #expect(stage.sceneId == all.first)
+        stage.cycleScene(by: -1)
+        #expect(stage.sceneId == all.last)
+        stage.sceneChoice = nil
+        #expect(stage.sceneId == "saturn")
+      }
+    }
+
+    /// The scope's line is the mix: moving while the song plays.
+    @Test func theScopeReadsTheMix() throws {
+      try withTemporaryDirectory { directory in
+        let (player, host) = try openedPlayer(steadySong(), in: directory)
+        renderAudio(host, frames: 4800)
+        let samples = player.recentMix(512)
+        #expect(samples.count == 512)
+        #expect(samples.contains { abs($0) > 0.01 })
       }
     }
 

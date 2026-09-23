@@ -701,6 +701,14 @@
     }
     private var analysedAt = -1
 
+    /// The last `count` frames of the mix, oldest first: what the scope draws.
+    func recentMix(_ count: Int) -> [Float] {
+      guard let host else { return [] }
+      var out = [Float](repeating: 0, count: count)
+      out.withUnsafeMutableBufferPointer { host.recentMix(count, into: $0.baseAddress!) }
+      return out
+    }
+
     /// The loudest sample of the last audio block, each side.
     var peaks: (left: Float, right: Float) {
       guard let host else { return (0, 0) }

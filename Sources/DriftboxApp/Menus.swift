@@ -68,8 +68,13 @@
       }
 
       CommandGroup(after: .toolbar) {
+        // Not ⇧⌘V, which every Mac user knows as Paste and Match Style.
+        Toggle("Vibes", isOn: Binding(get: { stage.performing }, set: { stage.performing = $0 }))
+          .keyboardShortcut("p", modifiers: [.command, .shift])
+          .disabled(player.song == nil)
         Toggle("Visuals Backdrop", isOn: $showsVisuals)
           .keyboardShortcut("v", modifiers: [.command, .control])
+        SceneMenu(player: player, stage: stage)
         // Straight to full screen on a named display, which is the thing a projector wants and
         // otherwise takes opening, dragging across and then going full screen by hand.
         Menu("Visuals Full Screen On") {
