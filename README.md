@@ -565,4 +565,5 @@ that is worth doing when a second one needs to agree.
 ## Conventions
 
 Swift 6.4, Swift Testing, `swift format` (config in `.swift-format`; CI lints with `--strict`).
-macOS 15 and iOS 18 are the floors.
+macOS 26 and iOS 26 are the floors: the first with `InlineArray`, which needs the runtime
+they ship and cannot be deployed back to an older one.
