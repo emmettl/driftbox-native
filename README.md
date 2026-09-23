@@ -124,6 +124,21 @@ a scheduler of its own that holds each message to its stamp on a high-resolution
 a millisecond, and devices are read again every two seconds and known by name. A clock for another
 program on the same machine goes through a loopback port made in Windows MIDI Services.
 
+### Android
+
+No player yet, but the engine runs on a phone. The swift.org toolchain for Windows brings an
+Android platform, and with the NDK and adb beside it:
+
+```bash
+scripts/android-bench.sh
+```
+
+builds `driftbox-play` for arm64 Android, pushes it to `/data/local/tmp` and runs `--bench` once on
+each kind of core the phone has. There is no app and no install: Android runs a plain executable.
+It is linked statically and takes only the essentials of Foundation, because the installer's
+arm64 runtime lacks the pieces the rest of Foundation needs. The script says which pieces, and why
+nothing is lost.
+
 ## Conformance
 
 ```bash
@@ -421,6 +436,15 @@ On Windows the same command plays through WASAPI instead, and says which device 
 the speakers are: 10ms on a laptop's own. The render call costs **8 to 13%** of the audio's time
 there, its longest 2.8ms of a 10ms period — measured by wall time on the performance counter,
 since Windows keeps a thread's own time only to its 15.6ms scheduler tick.
+
+On a phone, a Fairphone 6 with a Snapdragon 7s Gen 3, `--bench` costs **13 to 16%** of real time
+on a big core across the catalogue. That is four and a half times the Mac. On a little core it
+costs **69%**, so a render thread must never land on one. Paced, the big core costs **67%**, its
+longest call 9.7ms of a 10.7ms period. That number is the governor, not the code. With the rest of
+the cluster kept busy so that its clock stays up, the same paced run costs **17.7%** and its
+longest call 2.5ms. So an Android host has to ask for its clock rather than hope for it: AAudio's
+low-latency mode for a real-time thread, and a performance hint giving that thread's target
+duration.
 
 ### Listening
 

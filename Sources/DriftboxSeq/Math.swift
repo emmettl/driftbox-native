@@ -3,6 +3,8 @@
 // if two platforms ever need to agree to the last bit.
 #if canImport(Darwin)
   import Darwin
+#elseif canImport(Android)
+  import Android
 #elseif canImport(Glibc)
   import Glibc
 #elseif canImport(ucrt)
