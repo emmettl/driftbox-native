@@ -21,4 +21,25 @@ final class Native {
 
   /** The GPU contract's checks, on this phone's GPU, through OpenGL ES. Blocks while it draws. */
   static native String gpuCheck();
+
+  /** Play a song document, and draw Pulse from it in whatever window it is given. */
+  static native boolean start(String json);
+
+  /** Stop playing and drawing, and wait until both have. */
+  static native void stop();
+
+  /** The app in view, or out of it: out of it, nothing plays or is drawn until it is back. */
+  static native void setShown(boolean shown);
+
+  /** Draw in this window, of this size, from now on. */
+  static native void surfaceChanged(android.view.Surface surface, int width, int height);
+
+  /** Stop drawing in the window, having let go of it by the time this returns. */
+  static native void surfaceDestroyed();
+
+  /** A finger at x, y, 0...1 from the bottom left, down or lifted. */
+  static native void touch(float x, float y, boolean down);
+
+  /** Once a second, on the main thread: housekeeping, and a line for the log. */
+  static native String tick();
 }

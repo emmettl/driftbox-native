@@ -289,13 +289,24 @@ that is another app is handed it at once. So for every device but USB, `AMidiOut
 message in a scheduler of its own until it is due, and sends it stamped, as WinMM's scheduler
 does on Windows; the two share `MIDIQueue` in `DriftboxHost`, and each waits in its own way.
 
-The app is built without Gradle, by the SDK's own tools, and so far is a harness: it runs a test
-it is named and says what happened.
+The app is built without Gradle, by the SDK's own tools. Opened, it plays a song from the
+catalogue with Pulse drawn from it over the whole screen, at the display's 120 frames a second,
+and the screen is the performance filter's pad, as the window is on Windows. Given a test's name,
+it runs that instead and says what happened.
 
 ```bash
-scripts/android-app.sh                  # build and install
-scripts/android-app.sh midi-loopback    # and test the MIDI ports against the app's own loopback
+scripts/android-app.sh                  # build and install; open it for Pulse, playing acid
+adb shell am start -n app.driftbox/.Main --es song smallhours
+scripts/android-app.sh midi-loopback    # test the MIDI ports against the app's own loopback
+scripts/android-app.sh gpu              # or the GPU contract on the phone's GPU
 ```
+
+Two threads: Java's main thread owns the engine's commands and the audio route, and a render
+thread owns OpenGL, which is current on one thread, and reads the engine's events. A window is
+handed to it as Java makes one, and taken back before Java's `surfaceDestroyed` returns, as Android
+wants. Out of view the app stops the song where it is, lets go of the audio stream and draws
+nothing, since Android then keeps it to the little cores, where the audio's render thread cannot
+keep up; a media playback service, which keeps the big cores, is what playing on unseen will want.
 
 It needs a JDK and the SDK's build-tools and a platform beside the NDK. Driftbox Loopback is a
 MIDI device the app publishes that sends back what it is sent, so the ports are tested with
