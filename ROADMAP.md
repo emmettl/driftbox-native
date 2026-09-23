@@ -323,6 +323,20 @@ parity point.
    Left: the inlet trims on the back, the rack as an Audio Unit, and the groovebox as a module
    in it.
 
+## Help and tutorials
+
+Not yet: worth doing once the app is complete enough that the help would not be rewritten with
+every milestone. Then, everything the web app teaches with, and what a Mac does better:
+
+- **The reference's teaching, ported:** its help dialog, the first-run offer of a tour, the guided
+  tour and tutorial coach that walk a patch being built, and each module's guide. The words carry
+  over; the coach marks become the app's own popovers, pointing at real controls.
+- **A Help Book**, so the Help menu's search finds topics, and finds menu items by name as every
+  Mac app's does; with anchors, so a `?` beside a panel opens the page about it.
+- **Help tags everywhere a control's purpose is not its label**, as most already have.
+- **Tutorials that play**, in the groovebox and the rack: a song or a patch built a step at a
+  time, each step heard before the next, as the reference's coach does.
+
 ## Milestone 3 — what only native can do
 
 Plug-in hosting (Audio Units first, which work on iOS too; VST3 on the Mac), AUv3 export,
