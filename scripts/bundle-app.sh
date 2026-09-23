@@ -13,6 +13,8 @@ cp .build-release/release/Driftbox "$app/Contents/MacOS/Driftbox"
 bundle=$(find .build-release -maxdepth 4 -name "DriftboxKit_DriftboxApp.bundle" | head -1)
 cp -R "$bundle" "$app/Contents/MacOS/"
 cp -R "$bundle" "$app/Contents/Resources/"
+# The icon, where the Finder and the Dock look for one. `scripts/make-icon.swift` draws it.
+cp Sources/DriftboxApp/Resources/AppIcon.icns "$app/Contents/Resources/"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -22,6 +24,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>Driftbox</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>15.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <!-- A song is JSON, and claiming every .json file on the machine would be rude, so songs get a

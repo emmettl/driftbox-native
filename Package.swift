@@ -40,7 +40,9 @@ let package = Package(
     .target(
       name: "DriftboxApp",
       dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq", "DriftboxScenes"],
-      resources: [.copy("Resources/Songs"), .copy("Resources/catalogue.json")]),
+      resources: [
+        .copy("Resources/Songs"), .copy("Resources/catalogue.json"), .copy("Resources/AppIcon.icns"),
+      ]),
     // `@main` and nothing else, so that everything it starts can be reached from a test.
     .executableTarget(name: "Driftbox", dependencies: ["DriftboxApp"]),
     // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine.
