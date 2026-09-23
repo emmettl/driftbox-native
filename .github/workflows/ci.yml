@@ -24,6 +24,10 @@ jobs:
         with:
           node-version: 24
       - run: scripts/check-fixtures.sh
+      # The shaders are GLSL, and every backend's language is made from it and checked in. Without
+      # the Vulkan SDK here, this checks each generated file's hashes: of the GLSL it was made from,
+      # and of itself.
+      - run: node scripts/shaders.mjs --check
       # What is too large to check in, or never the same twice: whole-song plans, and every voice
       # rendered in a real Chromium. Made here from the pinned reference and handed to the Swift
       # job, so those tests run in CI rather than only on a laptop that happened to make them.

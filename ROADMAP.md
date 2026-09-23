@@ -364,17 +364,24 @@ each step stand on the last. The README's "Platforms" says how it is divided.
 
 1. ~~**The core on Windows.**~~ Done. Three small fixes (the C library's name, a thread clock, the
    emitter's paths and line endings) and 120 of 120 tests.
-2. **Audio and MIDI behind ports.** ← *here.* `DriftboxHost` declares what a platform's audio and
+2. **Audio and MIDI behind ports.** Done on Windows. `DriftboxHost` declares what a platform's audio and
    MIDI must do — `AudioRouting`, `MIDIInputPort`, `MIDIOutputPort`, `HostTime`, `RenderSource` —
    and `DriftboxHostWindows` does it with WASAPI and WinMM, tested against the device and against
    the clock. `driftbox-play` plays the catalogue through it. Left: the Mac's adapters moved into
    a target of their own and made to conform, so that `Player`, `RackModel` and `ClockCursor` use
    the ports and nothing else; then the parts of `Player` that are not views move out of
    `DriftboxApp`, where they are gated on AVFoundation, into a target every platform shares.
-3. **A GPU layer under the scenes.** The scenes use a small part of Metal: buffers, render
-   pipelines, per-draw constants, indexed draws, depth, blending. That goes behind a protocol with
-   Metal and Direct3D 11 under it, the shaders in HLSL beside their Metal, and the offscreen render
-   every scene already has held to the same image on both.
+3. **A GPU layer under the scenes.** ← *here.* The scenes use a small part of Metal: buffers,
+   render pipelines, per-draw constants, indexed draws, depth, blending. `DriftboxGPU` says that
+   much and no more, in what Metal, Direct3D 11 and OpenGL ES 3.0 all do alike — sprites as
+   instanced quads, vertex data as attributes — and `DriftboxGPUD3D11` answers it, held to
+   `GPUContractTests` on WARP. The shaders are written once, in GLSL, and `scripts/shaders.mjs`
+   makes Metal, HLSL and GLSL ES from them with the Vulkan SDK's glslang and SPIRV-Cross, and the
+   uniform blocks' Swift structs from its reflection; all of it checked in, and checked for
+   staleness in CI. Left: a Metal backend held to the same contract, which needs a Mac; then the
+   scenes moved onto the layer — `Scene` taking a `GPUDevice`, `SceneInput` and the camera out
+   of `canImport(Metal)`, `simd` for `Matrix4`, each scene's MSL turned back into the GLSL it came
+   from — one at a time, each held by the offscreen render every scene already has.
 4. **The window, drawn.** The interface is drawn on that layer rather than built from a toolkit,
    which is in keeping with an instrument and keeps what the app depends on small: a window, input,
    menus, dialogs and settings from Win32, and the grid, knobs, strip, rack and cables as surfaces.
