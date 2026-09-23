@@ -37,6 +37,12 @@
         colour.destinationRGBBlendFactor = .one
         colour.sourceAlphaBlendFactor = .one
         colour.destinationAlphaBlendFactor = .one
+      case .multiply:
+        colour.isBlendingEnabled = true
+        colour.sourceRGBBlendFactor = .destinationColor
+        colour.destinationRGBBlendFactor = .zero
+        colour.sourceAlphaBlendFactor = .zero
+        colour.destinationAlphaBlendFactor = .one
       }
       colour.rgbBlendOperation = .add
       colour.alphaBlendOperation = .add

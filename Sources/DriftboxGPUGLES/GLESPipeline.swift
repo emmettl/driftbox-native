@@ -68,6 +68,10 @@
         glEnable(GLenum(GL_BLEND))
         glBlendEquation(GLenum(GL_FUNC_ADD))
         glBlendFuncSeparate(GLenum(GL_SRC_ALPHA), GLenum(GL_ONE), GLenum(GL_ONE), GLenum(GL_ONE))
+      case .multiply:
+        glEnable(GLenum(GL_BLEND))
+        glBlendEquation(GLenum(GL_FUNC_ADD))
+        glBlendFuncSeparate(GLenum(GL_DST_COLOR), GLenum(GL_ZERO), GLenum(GL_ZERO), GLenum(GL_ONE))
       }
       applyDepth()
       // The layer's front is counter-clockwise as a triangle appears on the target. Targets are

@@ -45,6 +45,7 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxText` | What the app asks of a platform's type: a line set in a font, and a glyph's coverage. |
 | `Sources/DriftboxTextWindows` | That on DirectWrite: type on Windows. |
 | `Sources/CDirectWrite` | The part of DirectWrite that is called, declared in C, since its own headers are C++. Declarations only. |
+| `Sources/DriftboxCanvas` | A 2D canvas on the GPU layer: Canvas2D's shapes, state, type and blends, the same on every platform. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
 | `Sources/Driftbox` | The executable, which is nothing but `@main`. |
@@ -215,6 +216,23 @@ transcribed in vtable order. COM never changes that order, and a slot in the wro
 first test that reaches it. `TypesetterTests` holds a typesetter to how type behaves rather than to
 one font's numbers: it falls back through its families, scales exactly, kerns AV, measures trailing
 spaces, and stands an I on its baseline.
+
+`DriftboxCanvas` is the rest of drawing type, and of drawing in two dimensions: the part of Canvas2D
+that Driftbox draws with, on the GPU layer.
+- **What it keeps:** Canvas2D's state and its `save` and `restore`. That is a transform, a clip, a
+  fill and a stroke, a line width, a blend (normal or multiply), a font and an alignment.
+- **What it draws:** rectangles, ellipses, stroked lines, `fillText` with `measureText`, and the page
+  drawn onto itself, moved, as `drawImage` of a canvas onto itself does.
+- **How:** every mark is an instanced quad of one program, placed by its own transform.
+  - Rectangles and ellipses are antialiased analytically, glyphs come from an atlas the typesetter
+    fills, and a copy of the page comes from the other of two targets.
+  - The clip is a rectangle each mark carries and the fragment shader honours, so the layer needs no
+    scissor.
+  - The layer gained `GPUBlend.multiply` for it: what is there times the colour drawn.
+
+`CanvasTests` holds it to what Canvas2D draws: coverage at a half-pixel edge, the transform, the
+clip and `restore`, multiply, a round ellipse, a line's width, a page copied onto itself twice, and
+type landing where it is aligned.
 
 **The scenes move across one at a time.** `GPUScene` is a scene on the layer, and Pulse is the
 first: `PulseScene`, its shader the Metal one's GLSL line for line, held on WARP to what the Metal

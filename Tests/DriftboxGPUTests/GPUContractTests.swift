@@ -267,6 +267,27 @@ struct GPUContractTests {
     }
   }
 
+  /// Multiply: what is there times the colour drawn, channel by channel, its alpha left alone and
+  /// the colour's own alpha playing no part.
+  @Test func multiplyMultipliesWhatIsThere() throws {
+    for device in try Backends.all() {
+      var square: (any GPUBuffer)!
+      try bytes(Self.square(z: 0.5)) { square = try device.makeBuffer($0, kind: .vertex) }
+      let pipeline = try device.makePipeline(Self.flat(depth: .none, blend: .multiply))
+      let target = try device.makeTarget(width: 4, height: 4)
+      var uniforms = FlatUniforms()
+      uniforms.colour = SIMD4(0.5, 1, 0.25, 0.3)
+      device.render(into: target, clear: .colour(SIMD4(0.8, 0.6, 0.4, 1))) { pass in
+        pass.setPipeline(pipeline)
+        pass.setUniforms(uniforms, binding: 0)
+        pass.setVertexBuffer(square, slot: 0)
+        pass.draw(vertexCount: 6)
+      }
+      let got = pixel(try device.readPixels(target), 2, 2, width: 4)
+      #expect(close(got, SIMD4(102, 153, 26, 255)), "\(got)")
+    }
+  }
+
   /// Sprites are quads, instanced: each one's centre and colour step per instance, and what lies
   /// outside the circle cut from the quad is left alone.
   @Test func spritesAreInstancedQuads() throws {

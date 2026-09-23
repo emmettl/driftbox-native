@@ -25,6 +25,7 @@ let package = Package(
     .library(name: "DriftboxWin32", targets: ["DriftboxWin32"]),
     .library(name: "DriftboxText", targets: ["DriftboxText"]),
     .library(name: "DriftboxTextWindows", targets: ["DriftboxTextWindows"]),
+    .library(name: "DriftboxCanvas", targets: ["DriftboxCanvas"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
   ],
   targets: [
@@ -88,6 +89,8 @@ let package = Package(
     .target(
       name: "DriftboxTextWindows",
       dependencies: ["DriftboxText", .target(name: "CDirectWrite", condition: .when(platforms: [.windows]))]),
+    // A 2D canvas on the GPU layer, the same on every platform but for the type it is given.
+    .target(name: "DriftboxCanvas", dependencies: ["DriftboxGPU", "DriftboxText"]),
     // The GPU layer on OpenGL ES 3.0: Android's, and Linux's, where Mesa draws it in software for CI.
     // OpenGL ES is libGLESv3 on Android and libGLESv2 on Linux, which carries 3.0 as well.
     .systemLibrary(name: "CGLES"),
@@ -164,6 +167,12 @@ let package = Package(
       name: "DriftboxTextTests",
       dependencies: [
         "DriftboxText", .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
+      ]),
+    .testTarget(
+      name: "DriftboxCanvasTests",
+      dependencies: [
+        "DriftboxCanvas", "DriftboxGPU", "DriftboxText", "DriftboxGPUD3D11", "DriftboxGPUMetal",
+        "DriftboxGPUGLES", .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
       ]),
     .testTarget(
       name: "DriftboxScenesTests",
