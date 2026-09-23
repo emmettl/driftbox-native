@@ -192,10 +192,10 @@ gone native at all.
    drawn as a bracket over the song strip, which the engine turns round on its exact frame and
    holds in bars so an edit keeps it; a metronome; and a count-in. The click is the reference's
    own spec, held to it exactly, and added after the master as it is there, so the pad cannot
-   take it away. Two things turned up in the reference. Its count-in spends the song's first
-   bar on the clicks — it counts transport bars, so bar one is heard as clicks and the song
-   starts at bar two — which is not what a count-in is for; here the song waits at its start
-   for the count-in and then plays from the top. And its comment on the click's levels says
+   take it away. Two things turned up in the reference. Its count-in spent the song's first
+   bar on the clicks — it counted transport bars, so bar one was heard as clicks and the song
+   started at bar two; here the song waits at its start for the count-in and then plays from
+   the top, and the reference now does the same (emmettl/driftbox#303). And its comment on the click's levels says
    they render at 0.70 and 0.50; in Chromium they render at 0.341 and 0.228, which the Swift
    click matches to six places, so the ratio the comment was after holds and the numbers in it
    do not.
@@ -257,12 +257,13 @@ parity point.
    the graph's blocks to the device's.
    The groovebox as a rack module is left: it is the engine behind a faceplate, and comes with
    the host.
-   What the porting found in the reference, and left there (the ports copy it faithfully): the
-   looper's Stop records over the take, because Stop and the idle capture mode are both mode 0; the
-   chord player hangs the audio thread on a NaN or infinite pitch, looping for ever in
-   `scaleNote`; drive and the compressor keep a NaN in their state for good where every other
-   dynamics module resets; and the arranger's trigger is `Math.round` of a millisecond where every
-   other module's is `Math.ceil`.
+   What the porting found in the reference was fixed there (emmettl/driftbox#304) and here
+   together: the looper's Stop recorded over the take, because Stop and the idle capture mode are
+   both mode 0; the chord player hung the audio thread on a NaN or infinite pitch, looping for ever
+   in `scaleNote`; drive and the compressor kept a NaN in their state for good where every other
+   dynamics module resets; and the arranger's trigger was `Math.round` of a millisecond where every
+   other module's is `Math.ceil`. The fixtures cannot feed a NaN, so `RecoveryTests` holds the port
+   to those fixes.
 3. **A host and the panels.** ← *here.* The rack as an Audio Unit beside the groovebox's, then the
    front and back panels — faceplates, jacks, and cables that swing.
 

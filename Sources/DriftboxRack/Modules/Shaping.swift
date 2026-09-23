@@ -96,8 +96,13 @@ public struct DriveModule {
       }
       let shaped = tanhDSP((Double(input[i]) + Double(bias[i])) * amount) * scale
       // One-pole DC blocker: a differentiator with a pole put back just under unity.
-      let blocked = shaped - lastIn + pole * lastOut
+      var blocked = shaped - lastIn + pole * lastOut
       lastIn = shaped
+      // A NaN kept here would be every sample after it; the blocker starts again from rest instead.
+      if !blocked.isFinite {
+        lastIn = 0
+        blocked = 0
+      }
       lastOut = blocked
       out[i] = Float(blocked)
     }
@@ -340,7 +345,7 @@ public struct EQModule {
       let w0 = (2 * Double.pi * frequency) / sampleRate
       let cos = cosDSP(w0)
       let sin = sinDSP(w0)
-      let A = powDSP(10, gainDb / 40)
+      let amplitude = powDSP(10, gainDb / 40)
 
       var n0 = 1.0
       var n1 = 0.0
@@ -352,32 +357,32 @@ public struct EQModule {
         var shape = q
         if !(shape > 0.1) { shape = 0.1 }
         let alpha = sin / (2 * shape)
-        n0 = 1 + alpha * A
+        n0 = 1 + alpha * amplitude
         n1 = -2 * cos
-        n2 = 1 - alpha * A
-        d0 = 1 + alpha / A
+        n2 = 1 - alpha * amplitude
+        d0 = 1 + alpha / amplitude
         d1 = -2 * cos
-        d2 = 1 - alpha / A
+        d2 = 1 - alpha / amplitude
       } else {
         // `Math.SQRT2`.
         let alpha = (sin / 2) * 1.4142135623730951
-        let twoRootA = 2 * sqrtDSP(A) * alpha
-        let plus = A + 1
-        let minus = A - 1
+        let twoRootAmplitude = 2 * sqrtDSP(amplitude) * alpha
+        let plus = amplitude + 1
+        let minus = amplitude - 1
         if band == 0 {
-          n0 = A * (plus - minus * cos + twoRootA)
-          n1 = 2 * A * (minus - plus * cos)
-          n2 = A * (plus - minus * cos - twoRootA)
-          d0 = plus + minus * cos + twoRootA
+          n0 = amplitude * (plus - minus * cos + twoRootAmplitude)
+          n1 = 2 * amplitude * (minus - plus * cos)
+          n2 = amplitude * (plus - minus * cos - twoRootAmplitude)
+          d0 = plus + minus * cos + twoRootAmplitude
           d1 = -2 * (minus + plus * cos)
-          d2 = plus + minus * cos - twoRootA
+          d2 = plus + minus * cos - twoRootAmplitude
         } else {
-          n0 = A * (plus + minus * cos + twoRootA)
-          n1 = -2 * A * (minus + plus * cos)
-          n2 = A * (plus + minus * cos - twoRootA)
-          d0 = plus - minus * cos + twoRootA
+          n0 = amplitude * (plus + minus * cos + twoRootAmplitude)
+          n1 = -2 * amplitude * (minus + plus * cos)
+          n2 = amplitude * (plus + minus * cos - twoRootAmplitude)
+          d0 = plus - minus * cos + twoRootAmplitude
           d1 = 2 * (minus - plus * cos)
-          d2 = plus - minus * cos - twoRootA
+          d2 = plus - minus * cos - twoRootAmplitude
         }
       }
 
@@ -598,6 +603,12 @@ public struct CompressorModule {
       let peak = key < 0 ? -key : key
       let coefficient = peak > envelope ? attackCoefficient : releaseCoefficient
       envelope = peak + (envelope - peak) * coefficient
+      // NaN or infinity kept in the follower would read as silence, or as infinitely loud, for
+      // good: it starts again from rest instead.
+      if !envelope.isFinite {
+        envelope = 0
+        reduction = 0
+      }
 
       let level = envelope > 1e-5 ? 20 * log10DSP(envelope) : -100
       let threshold = Double(thresholdParam[i])
@@ -616,8 +627,11 @@ public struct CompressorModule {
 
       reduction = wanted > reduction ? wanted : wanted + (reduction - wanted) * releaseCoefficient
 
+      if !reduction.isFinite { reduction = 0 }
+
       let gain = powDSP(10, (Double(makeupParam[i]) - reduction) / 20)
-      out[i] = Float(Double(input[i]) * gain)
+      let output = Double(input[i]) * gain
+      out[i] = output.isFinite ? Float(output) : 0
       gainOut[i] = Float(reduction / 20)
     }
   }

@@ -351,7 +351,16 @@ public struct ChordPlayer {
       var inversion = jsRound(Double(params[3][i]))
       if inversion < 0 { inversion = 0 } else if inversion > 4 { inversion = 4 }
 
-      let inputSemitone = Double(pitchIn[i]) * 12
+      // The scale walk steps a semitone at a time and has to arrive: a pitch that is not a number
+      // plays the root, and one past a hundred octaves (1200 semitones) is held there.
+      var inputSemitone = Double(pitchIn[i]) * 12
+      if !inputSemitone.isFinite {
+        inputSemitone = 0
+      } else if inputSemitone > 1200 {
+        inputSemitone = 1200
+      } else if inputSemitone < -1200 {
+        inputSemitone = -1200
+      }
       let rounded = jsRound(inputSemitone)
       let root = Self.corrected(rounded, key, degrees)
       let bend = inputSemitone - rounded

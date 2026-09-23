@@ -15,12 +15,12 @@ struct ControlTests {
     let inletCount: Int, outletCount: Int, paramCount: Int
     var processor: RackProcessor
 
-    init(_ type: String, params values: [Double]) {
+    init(_ type: String, params values: [Double], sampleRate: Double = 48000) {
       let def = RackModules.registry[type]!
       inletCount = def.inlets.reduce(0) { $0 + $1.channels }
       outletCount = def.outlets.reduce(0) { $0 + $1.channels }
       paramCount = def.params.count
-      processor = RackModules.make(type, sampleRate: 48000, id: type)!
+      processor = RackModules.make(type, sampleRate: sampleRate, id: type)!
       func table(_ count: Int) -> UnsafeMutablePointer<UnsafeMutablePointer<Float>> {
         let table = UnsafeMutablePointer<UnsafeMutablePointer<Float>>.allocate(capacity: max(1, count))
         for index in 0..<count {

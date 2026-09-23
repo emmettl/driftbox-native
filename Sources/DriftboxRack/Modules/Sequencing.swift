@@ -361,8 +361,7 @@ public struct ArrangerModule {
   var held = 0.0
 
   init(sampleRate: Double) {
-    // Rounded rather than rounded up, unlike the other modules' triggers: the reference's choice.
-    trigSamples = Int(max(1, jsRound(sampleRate * 0.001)))
+    trigSamples = triggerSamples(sampleRate)
   }
 
   @_noAllocation
