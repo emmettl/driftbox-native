@@ -735,7 +735,116 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
   })))
 }
 
+// The rack's panels: where every module sits and how big it is, where every jack is, and how
+// every cable hangs and swings. All of it is arithmetic in one design space on the web, so all of
+// it can be held to exactly. Only which modules have a hand-built front is read from the faceplate
+// table; what those fronts draw is not run here (see ts-resolve.mjs).
+{
+  const rack = join(root, 'driftbox', 'packages', 'rack', 'src')
+  const panels = join(root, 'driftbox', 'packages', 'app', 'src', 'rack')
+  const { MODULES } = await import(join(rack, 'modules', 'index.ts'))
+  const { PATCHES } = await import(join(rack, 'patches', 'index.ts'))
+  const { SONG_PATCHES } = await import(join(rack, 'patches', 'songs.ts'))
+  const layoutKit = await import(join(panels, 'layout.ts'))
+  const { sizeFor } = await import(join(panels, 'faceplates', 'index.ts'))
+  const cable = await import(join(panels, 'cable.ts'))
+  const size = sizeFor(MODULES)
+  const modules = Object.keys(MODULES).map((type) => ({
+    type, ...size(type), summary: layoutKit.portSummary(MODULES[type]), jackRows: layoutKit.rowsForJacks(MODULES[type]),
+  }))
+  const patches = []
+  for (const [name, build] of [
+    ...PATCHES.map((preset) => [`factory-${preset.id}`, preset.build]),
+    ...SONG_PATCHES.map((preset) => [`song-${preset.id}`, preset.build]),
+  ]) {
+    const patch = build()
+    const laid = layoutKit.layout(patch.modules, size)
+    const jacks = layoutKit.jacks(laid.placements, MODULES)
+    const cables = patch.cables.map(({ from, to }) => {
+      const a = layoutKit.jackAt(jacks, from[0], from[1], 'out')
+      const b = layoutKit.jackAt(jacks, to[0], to[1], 'in')
+      if (!a || !b) return { from, to, drawn: false }
+      const key = `${from.join('.')}>${to.join('.')}`
+      const seed = cable.swingSeed(key)
+      return {
+        from, to, drawn: true, key, seed,
+        sag: cable.sag(a, b),
+        period: cable.swingPeriod(a, b, seed),
+        // Every 100ms through the swing and past its end, turned both ways; a factory patch's
+        // cables only, since a song patch's hang the same way and would only add bulk.
+        swing: name.startsWith('factory-') ? [1, -1].map((direction) =>
+          Array.from({ length: 24 }, (_, i) => cable.swingAngle(i * 100 + 30, a, b, direction, seed))) : null,
+        path: cable.cablePath(a, b, 0.4),
+      }
+    })
+    // Where a module dropped at each point of a coarse grid over the rack would go.
+    const drops = []
+    for (let y = -15; y <= laid.height + 15; y += 30) {
+      for (let x = 10; x < laid.width; x += 115) drops.push(layoutKit.dropIndex(laid.placements, { x, y }))
+    }
+    patches.push({
+      name,
+      rows: laid.rows, width: laid.width, height: laid.height,
+      placements: laid.placements.map(({ id, span, column, row, rows, x, y, width, height }) =>
+        ({ id, span, column, row, rows, x, y, width, height })),
+      jacks: jacks.map(({ module, port, kind, stereo, x, y }) => ({ module, port, kind, stereo, x, y })),
+      cables,
+      drops,
+    })
+  }
+  write(join(fixtures, 'rack'), 'panels.json', json({ modules, patches }))
+  // What the panels say that the sound does not need: each module's shelf, its line of copy, its
+  // picture and its selectors' labels, in the picker's order. The app ships this as it is.
+  const { MODULE_LIST } = await import(join(rack, 'modules', 'index.ts'))
+  write(join(fixtures, 'rack'), 'faces.json', json(MODULE_LIST.map((def) => ({
+    type: def.type,
+    group: def.group ?? null,
+    blurb: def.blurb ?? null,
+    logo: def.logo ?? null,
+    labels: Object.fromEntries(def.params.filter((param) => param.labels).map((param) => [param.id, param.labels])),
+  }))))
+  // The patches the app ships with, as the picker lists them.
+  const { encodePatch } = await import(join(rack, 'patch-io.ts'))
+  for (const preset of PATCHES) write(join(fixtures, 'rack', 'documents'), `${preset.id}.patch.json`, encodePatch(preset.build()))
+  write(join(fixtures, 'rack'), 'catalogue.json', json(PATCHES.map(({ id, name, blurb, category, accent, play, tip }) =>
+    ({ id, name, blurb, category: category ?? null, accent, play: play ?? null, tip: tip ?? null }))))
+}
+
 const AUDIO_TOLERANCE = 1e-12
+
+/** Where two parsed JSON values part by more than rounding, or null when they do not. */
+function differs(x, y, at = '') {
+  if (typeof x === 'number' && typeof y === 'number') {
+    return Math.abs(x - y) <= 1e-12 * Math.max(1, Math.abs(y)) ? null : `${at}: ${x} against ${y}`
+  }
+  if (typeof x === 'string' && typeof y === 'string') {
+    if (x === y) return null
+    const numbers = /-?\d+(?:\.\d+)?/g
+    const xs = x.match(numbers) ?? []
+    const ys = y.match(numbers) ?? []
+    const same = x.replace(numbers, '#') === y.replace(numbers, '#') && xs.length === ys.length &&
+      xs.every((value, i) => Math.abs(Number(value) - Number(ys[i])) <= 0.1 + 1e-9)
+    return same ? null : `${at}: "${x}" against "${y}"`
+  }
+  if (Array.isArray(x) && Array.isArray(y)) {
+    if (x.length !== y.length) return `${at}: ${x.length} items against ${y.length}`
+    for (let i = 0; i < x.length; i++) {
+      const found = differs(x[i], y[i], `${at}[${i}]`)
+      if (found) return found
+    }
+    return null
+  }
+  if (x && y && typeof x === 'object' && typeof y === 'object' && !Array.isArray(x) && !Array.isArray(y)) {
+    const keys = Object.keys(x)
+    if (keys.join() !== Object.keys(y).join()) return `${at}: keys differ`
+    for (const key of keys) {
+      const found = differs(x[key], y[key], `${at}.${key}`)
+      if (found) return found
+    }
+    return null
+  }
+  return x === y ? null : `${at}: ${JSON.stringify(x)} against ${JSON.stringify(y)}`
+}
 
 function filesUnder(dir, base = dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -773,6 +882,12 @@ if (check) {
       for (let i = 0; i < x.length && worst !== Infinity; i++) worst = Math.max(worst, Math.abs(x[i] - y[i]))
       console.log(`  ${name}: differs from the checked-in render by at most ${worst}`)
       if (!(worst <= AUDIO_TOLERANCE)) stale.push(`${name}: ${worst} exceeds ${AUDIO_TOLERANCE}`)
+    } else if (name === 'rack/panels.json') {
+      // The cables' swing is exp and sin, which another Node may round differently in the last
+      // bit, and each curve is written to a tenth, which such a bit can tip. So this one compares
+      // as numbers: within 1e-12 of each other, and a curve's coordinates within a tenth.
+      const worst = differs(JSON.parse(a.toString()), JSON.parse(b.toString()))
+      if (worst) stale.push(`${name}: ${worst}`)
     } else if (!a.equals(b)) {
       stale.push(`${name}: differs`)
     }

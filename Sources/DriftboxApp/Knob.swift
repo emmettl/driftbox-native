@@ -63,13 +63,15 @@
   /// A knob, turned by dragging up and down — every hardware editor settled on that, because a
   /// knob that follows the pointer round a circle is fiddly. Option slows it for fine work, a
   /// double-click puts it back where it started life, and the arrow keys nudge it. The song
-  /// is only changed when the drag ends, so one turn is one undo.
+  /// is only changed when the drag ends, so one turn is one undo; `live`, where it is given, hears
+  /// every value on the way, for something that should sound as it turns.
   struct RotaryKnob: View {
     let spec: KnobSpec
     let value: Double
     var tint: Color = Theme.nine
     var rest: Double?
     var diameter: CGFloat = 40
+    var live: ((Double) -> Void)?
     let commit: (Double) -> Void
 
     @State private var dragging: Double?
@@ -161,7 +163,9 @@
           }
           let fine = NSEvent.modifierFlags.contains(.option)
           let moved = -gesture.translation.height / (fine ? Self.travel * 4 : Self.travel)
-          dragging = max(0, min(1, from + moved))
+          let next = max(0, min(1, from + moved))
+          if next != dragging { live?(next) }
+          dragging = next
         }
         .onEnded { _ in
           if let dragging, dragging != value { commit(dragging) }

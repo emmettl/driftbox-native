@@ -418,6 +418,12 @@
 
     // MARK: - Remembered between launches
 
+    /// The rack, played through the same device as the song, after the song's master: its own
+    /// source on this engine, so choosing an output moves both.
+    public func attach(_ rack: RackModel) {
+      rack.attach(to: audio)
+    }
+
     /// The song that was open when the app last quit, as it was last saved — and stopped at the
     /// top, because sound nobody asked for is the one thing not worth restoring. A document comes
     /// back through a bookmark rather than a path, so one renamed or moved in the Finder since is

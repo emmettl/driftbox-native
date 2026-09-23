@@ -92,6 +92,7 @@ Three levels, in rising cost:
 | Edits | every transform in `pattern.ts`, applied by the reference to a catalogue song: 28 results | exactly |
 | MIDI clock | a synthetic clock stream — jitter, a tempo change, a lost tick, stop, position, continue, a stall — through the reference's follower: what each of 464 messages made of it | exactly |
 | Voices | what each of the 22 voices *describes* — its `VoiceSpec` — over nine panels and both velocities | exactly |
+| Rack panels | every module's size; every factory and song patch's placements, jacks and drop targets; every cable's sag, seed, period, swing through two seconds both ways, and curve | exactly; the curve to the tenth it is written to |
 | Audio | each voice rendered in Chromium, over four panels, and again panned in stereo; nine probes of one node type each; the waveshaper alone | within -100dB of the peak; -90dB through drive; -75dB with square or sawtooth oscillators |
 
 **Documents** go both ways: a catalogue song decodes and encodes back to the same bytes, which
