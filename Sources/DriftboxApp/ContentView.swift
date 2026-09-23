@@ -172,6 +172,23 @@
     @FocusState private var focused: Bool
 
     var body: some View {
+      // Kept out from under the toolbar by padding rather than by the safe area. Left to the safe
+      // area, the scroll view runs up under the toolbar with its content inset down, and clicks
+      // are then placed as if there were no inset: every row answered for the one drawn below it.
+      GeometryReader { outer in
+        list.ignoresSafeArea(.container, edges: .top)
+          .mask {
+            VStack(spacing: 0) {
+              LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 14)
+              Color.black
+            }
+          }
+          .padding(.top, outer.safeAreaInsets.top)
+      }
+      .background(Theme.ground.opacity(0.7).ignoresSafeArea())
+    }
+
+    private var list: some View {
       ScrollViewReader { scroller in
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 2) {
@@ -201,7 +218,6 @@
           withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(id) }
         }
       }
-      .background(Theme.ground.opacity(0.7).ignoresSafeArea())
     }
 
     private func step(_ by: Int) -> KeyPress.Result {
