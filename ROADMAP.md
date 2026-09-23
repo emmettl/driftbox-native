@@ -396,10 +396,15 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    out of `canImport(Metal)`, `simd` for `Matrix4`, each scene's MSL turned back into the GLSL it
    came from — one at a time, each held by the offscreen render every scene already has, and the
    Metal `Scene` gone at the end.
-4. **The window, drawn.** Begun: `DriftboxWin32` has a window, its messages and per-monitor DPI.
-   The interface is drawn on the GPU layer rather than built from a toolkit, which is in keeping
-   with an instrument and keeps what the app depends on small: input, menus, dialogs and settings
-   from Win32, and the grid, knobs, strip, rack and cables as surfaces.
+4. **The window, drawn.** ← *here.* The shell first: `DriftboxShell` says what the app asks of a
+   window in platform-neutral terms — pointers, keys and scrolling as events in points, a menu bar
+   as data with shortcuts on the platform's own modifier, file panels, a loop that keeps drawing
+   through a resize, and `post` — and `DriftboxWin32` answers it, tested against a hidden window.
+   `driftbox-play --window` uses all of it on Windows. Left: the Windows app itself, as a
+   composition root of its own rather than a mode of the player; a settings window; and then the
+   interface, drawn on the GPU layer rather than built from a toolkit, which is in keeping with an
+   instrument and keeps what the app depends on small — the grid, knobs, strip, rack and cables as
+   surfaces, laid out and hit in points so that Android's touch interface can share them.
 5. **Shipping.** The Swift runtime beside the executable; signing; winget; the `.driftbox` file
    association. Songs are already `.driftbox` — the web app's documents byte for byte, under a name
    Windows can associate without claiming every `.json`. `SongFile` in `DriftboxDocument` holds
