@@ -193,6 +193,14 @@ struct ControlTests {
     let slot = try #require(plan.slots["filter"]?["resonance"])
     #expect(plan.params[slot].value == 0.9)
   }
+
+  /// The meter mirrors copy as much as the modules keep: the sizes are written out there, since
+  /// the render path cannot call into another file's statics.
+  @Test func theMirrorsCopyWhatTheModulesKeep() {
+    #expect(MeterMirror.points == VUMeter.points)
+    #expect(MeterMirror.points == Tuner.points)
+    #expect(MeterMirror.history == Tuner.historyLength)
+  }
 }
 
 extension PatchModule {

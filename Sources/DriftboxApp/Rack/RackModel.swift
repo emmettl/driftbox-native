@@ -28,6 +28,9 @@
     /// Cables the compiler had to delay a block to break a cycle, and ones folding stereo to mono.
     private(set) var delayed: Set<String> = []
     private(set) var folded: Set<String> = []
+    /// What the metered modules are showing, by id: refreshed thirty times a second once
+    /// something renders the rack. Only the faceplates that read it redraw when it changes.
+    private(set) var readings: [String: MeterReading] = [:]
 
     // MARK: History
 
@@ -54,6 +57,7 @@
     /// Whether anything renders the host. Until something does, nothing drains its command ring,
     /// so nothing is sent to it; whatever is there is loaded the moment something starts to.
     @ObservationIgnored private(set) var live = false
+    @ObservationIgnored private var metering: Timer?
     /// Where the patch is kept between launches; nil for a model made in a test.
     @ObservationIgnored var memory: UserDefaults?
 
@@ -106,6 +110,14 @@
       live = true
       host.load(patch)
       host.setTransport(tempo: tempo, running: running)
+      metering = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
+        Task { @MainActor in self?.refreshReadings() }
+      }
+    }
+
+    /// Take the host's latest readings.
+    func refreshReadings() {
+      readings = host.readings()
     }
 
     // MARK: Opening
