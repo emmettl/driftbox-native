@@ -70,18 +70,34 @@
         glBlendFuncSeparate(GLenum(GL_SRC_ALPHA), GLenum(GL_ONE), GLenum(GL_ONE), GLenum(GL_ONE))
       }
       applyDepth()
+      // The layer's front is counter-clockwise as a triangle appears on the target. Targets are
+      // drawn here upside down, which turns every triangle over, so in OpenGL's own terms that
+      // front is clockwise.
+      switch descriptor.cull {
+      case .none:
+        glDisable(GLenum(GL_CULL_FACE))
+      case .back:
+        glEnable(GLenum(GL_CULL_FACE))
+        glFrontFace(GLenum(GL_CW))
+        glCullFace(GLenum(GL_BACK))
+      case .front:
+        glEnable(GLenum(GL_CULL_FACE))
+        glFrontFace(GLenum(GL_CW))
+        glCullFace(GLenum(GL_FRONT))
+      }
     }
 
-    /// Depth tested and written, nearer winning, or neither: set again after a clear, which needs
-    /// depth writing on whatever the pipeline wants.
+    /// Depth tested, nearer winning, and written or not; or neither: set again after a clear,
+    /// which needs depth writing on whatever the pipeline wants.
     func applyDepth() {
-      if descriptor.depth {
-        glEnable(GLenum(GL_DEPTH_TEST))
-        glDepthFunc(GLenum(GL_LESS))
-        glDepthMask(GLboolean(GL_TRUE))
-      } else {
+      switch descriptor.depth {
+      case .none:
         glDisable(GLenum(GL_DEPTH_TEST))
         glDepthMask(GLboolean(GL_FALSE))
+      case .test, .testAndWrite:
+        glEnable(GLenum(GL_DEPTH_TEST))
+        glDepthFunc(GLenum(GL_LESS))
+        glDepthMask(GLboolean(descriptor.depth == .testAndWrite ? GL_TRUE : GL_FALSE))
       }
     }
 

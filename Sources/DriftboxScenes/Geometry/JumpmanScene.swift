@@ -249,7 +249,7 @@ public final class JumpmanScene: GPUGeometryScene {
     // A sprite per cell rather than a point: every cell's data steps per instance, and the six
     // vertices of each are its quad.
     pixelPipeline = try pipeline(
-      .jumpman, primitive: .triangles, blend: .none, depth: true,
+      .jumpman, primitive: .triangles, blend: .none, depth: .testAndWrite,
       vertexBuffers: [
         .single(.float3, location: 0, perInstance: true),
         .single(.float3, location: 1, perInstance: true),

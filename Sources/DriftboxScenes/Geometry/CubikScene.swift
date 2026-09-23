@@ -63,7 +63,7 @@ public final class CubikScene: GPUGeometryScene {
     ink = try buffer(inks)
     // The cube's corners step per vertex; where it stands, its band and its ink per instance.
     pipelineState = try pipeline(
-      .cubik, blend: .none, depth: true,
+      .cubik, blend: .none, depth: .testAndWrite,
       vertexBuffers: [
         .single(.float3, location: 0), .single(.float3, location: 1),
         .single(.float2, location: 2, perInstance: true), .single(.float, location: 3, perInstance: true),

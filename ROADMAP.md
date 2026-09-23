@@ -413,15 +413,14 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    - Sized points are sprites: instanced quads, sized in pixels by `sprite.glsl`.
    - Each scene is held on WARP to drawing and moving through the Metal scene test's six seconds,
      and on the Mac to its Metal scene frame by frame.
+   - Pipelines cull and test depth as three does: `GPUCull` against three's counter-clockwise
+     front, which Longhand culls to (the Metal Longhand culled against Metal's clockwise front and
+     kept its tubes' far walls), and `GPUDepth.test` for three's `depthWrite={false}`, which
+     Convoy's dust and Machine's sparks use. Both are in the contract tests.
 
    Left:
    - Graphic Lab, which sets type through Core Text every frame. It needs a text and canvas port
      with a Windows implementation first, and that design is still open.
-   - A cull mode in `GPUPipelineDescriptor`. Longhand discards back faces in its fragment shader
-     meanwhile; `gl_FrontFacing` means the same on every backend.
-   - A depth test without depth writes, which Convoy's dust and Machine's sparks had in Metal.
-     Convoy's dust needs no depth at all, since it is in front of everything; Machine sorts its
-     sparks back to front.
    - `--window` on the Mac showing the song's scene rather than Pulse, and the Metal `Scene`
      gone at the end.
 4. **The window, drawn.** ← *here.* The shell first: `DriftboxShell` says what the app asks of a

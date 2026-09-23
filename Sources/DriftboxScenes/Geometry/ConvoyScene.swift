@@ -137,21 +137,18 @@ public final class ConvoyScene: GPUGeometryScene {
     dustMesh = try (buffer(motes), buffer(speeds))
 
     roadPipeline = try pipeline(
-      .convoyRoad, primitive: .triangles, blend: .none, depth: true,
+      .convoyRoad, primitive: .triangles, blend: .none, depth: .testAndWrite,
       vertexBuffers: [.single(.float3, location: 0), .single(.float2, location: 1)])
     flatFillPipeline = try pipeline(
-      .convoyFlat, primitive: .triangles, blend: .normal, depth: true,
+      .convoyFlat, primitive: .triangles, blend: .normal, depth: .testAndWrite,
       vertexBuffers: [.single(.float3, location: 0)])
     flatLinePipeline = try pipeline(
-      .convoyFlat, primitive: .lines, blend: .normal, depth: true,
+      .convoyFlat, primitive: .lines, blend: .normal, depth: .testAndWrite,
       vertexBuffers: [.single(.float3, location: 0)])
-    // A sprite per mote rather than a point, and no depth at all where three's
-    // `depthWrite={false}` has depth tested but not written — which the GPU layer has no
-    // pipeline for. It draws the same pixels: the dust stands at z 0.5, in front of every
-    // other thing in the scene, so the test it would have been given always passes, and it
-    // never wrote depth for one mote to hide another.
+    // A sprite per mote rather than a point, with depth tested and not written, as three's
+    // `depthWrite={false}` has it: so a mote never hides another.
     dustPipeline = try pipeline(
-      .convoyDust, primitive: .triangles, blend: .additive, depth: false,
+      .convoyDust, primitive: .triangles, blend: .additive, depth: .test,
       vertexBuffers: [
         .single(.float3, location: 0, perInstance: true),
         .single(.float, location: 1, perInstance: true),

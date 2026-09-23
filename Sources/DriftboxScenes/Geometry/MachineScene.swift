@@ -167,17 +167,10 @@ public final class MachineScene: GPUGeometryScene {
   /// material's flat value, since there are no maps of any kind in this scene to vary it.
   /// The shaders are `machineSolid.*`, `machineSpark.*` and the `machine.glsl` they share.
   var solidPipeline: (any GPUPipeline)!
-  /// The sparks are depth tested against the machine, as three's additive points material is.
-  /// three writes no depth for them, so one spark never punches a hole in the next; the layer's
-  /// depth is tested and written or neither, so here they are handed over farthest first
-  /// instead — each is then nearer than every spark already drawn, and passes over them just
-  /// as it would with no depth written. Additive blending does not care about the order.
+  /// The sparks are depth tested against the machine, as three's additive points material is,
+  /// and write no depth, so one spark never punches a hole in the next.
   var sparkPipeline: (any GPUPipeline)!
   var sparkBuffer: (any GPUBuffer)!
-  /// The sparks as they are drawn this frame: farthest first, as above.
-  var sparkDrawn = [SIMD3<Float>](repeating: SIMD3(0, -20, 0), count: MachineScene.sparks)
-  var sparkOrder = Array(0..<MachineScene.sparks)
-  var sparkDepth = [Float](repeating: 0, count: MachineScene.sparks)
 
   var bands = [Float](repeating: 0, count: MachineScene.bandCount)
   var onKick = Onset(rise: 1.48, refractory: 0.2, rates: SIMD2(30, 2.1), floor: 0.065)
@@ -225,15 +218,15 @@ public final class MachineScene: GPUGeometryScene {
           indexCount: mesh.indices.count, parts: slots))
     }
 
-    sparkBuffer = try buffer(sparkDrawn)
+    sparkBuffer = try buffer(sparkPosition)
     spark.uColour = machineInk(0xffb14a)
 
     solidPipeline = try pipeline(
-      .machineSolid, blend: .none, depth: true,
+      .machineSolid, blend: .none, depth: .testAndWrite,
       vertexBuffers: [.single(.float3, location: 0), .single(.float3, location: 1), Self.partLayout])
     // A sprite rather than a point: the layer has no points with a size.
     sparkPipeline = try pipeline(
-      .machineSpark, blend: .additive, depth: true,
+      .machineSpark, blend: .additive, depth: .test,
       vertexBuffers: [.single(.float3, location: 0, perInstance: true)])
 
     uniforms.uAmbient = machineInk(0x9c9181) * 0.42
@@ -332,7 +325,7 @@ public final class MachineScene: GPUGeometryScene {
     // rather than into every point on the CPU.
     spark.modelViewMatrix =
       camera.viewMatrix * Matrix4.model(position: .zero, rotation: SIMD3(0, spin, 0))
-    orderSparks()
+    uploadSparks()
 
     layout()
     for kind in Kind.allCases where !parts[kind.rawValue].isEmpty {
@@ -340,17 +333,9 @@ public final class MachineScene: GPUGeometryScene {
     }
   }
 
-  /// The sparks, farthest from the eye first, into their buffer: see `sparkPipeline`.
-  private func orderSparks() {
-    let modelView = spark.modelViewMatrix
-    for i in 0..<Self.sparks {
-      sparkDepth[i] = (modelView * SIMD4(sparkPosition[i], 1)).z
-    }
-    let depth = sparkDepth
-    // Further away is further down z, so the least z is drawn first.
-    sparkOrder.sort { depth[$0] < depth[$1] }
-    for (slot, index) in sparkOrder.enumerated() { sparkDrawn[slot] = sparkPosition[index] }
-    try? sparkDrawn.withUnsafeBytes { try sparkBuffer.update($0) }
+  /// The sparks as they are this frame, into their buffer.
+  private func uploadSparks() {
+    try? sparkPosition.withUnsafeBytes { try sparkBuffer.update($0) }
   }
 
   /// Every part, rebuilt from the frame's state. The whole machine is walked rather than only

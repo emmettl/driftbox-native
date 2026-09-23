@@ -64,7 +64,7 @@
 
     static func attributesAndUniforms(_ device: GLESDevice, _ failures: inout [String]) throws {
       let target = try device.makeTarget(width: 16, height: 16)
-      let pipeline = try device.makePipeline(flat(depth: false, blend: .none))
+      let pipeline = try device.makePipeline(flat(depth: .none, blend: .none))
       let buffer = try vertices(device, square(z: 0.5))
       var uniforms = FlatUniforms()
       uniforms.colour = SIMD4(1, 0.5, 0, 1)
@@ -83,7 +83,7 @@
     }
 
     static func nearerWins(_ device: GLESDevice, _ failures: inout [String]) throws {
-      let pipeline = try device.makePipeline(flat(depth: true, blend: .none))
+      let pipeline = try device.makePipeline(flat(depth: .testAndWrite, blend: .none))
       let near = try vertices(device, corners(z: 0.3))
       let far = try vertices(device, corners(z: 0.7))
       let indices = try [UInt32(0), 1, 2, 0, 2, 3].withUnsafeBytes { try device.makeBuffer($0, kind: .index) }
@@ -114,7 +114,7 @@
         (GPUBlend.none, SIMD4(255, 0, 0, 128)), (.normal, SIMD4(128, 0, 51, 255)),
         (.additive, SIMD4(128, 0, 102, 255)),
       ] {
-        let pipeline = try device.makePipeline(flat(depth: false, blend: blend))
+        let pipeline = try device.makePipeline(flat(depth: .none, blend: blend))
         let target = try device.makeTarget(width: 4, height: 4)
         var uniforms = FlatUniforms()
         uniforms.colour = SIMD4(1, 0, 0, 0.5)
@@ -199,7 +199,7 @@
     }
 
     static func bufferWrittenAgain(_ device: GLESDevice, _ failures: inout [String]) throws {
-      let pipeline = try device.makePipeline(flat(depth: false, blend: .none))
+      let pipeline = try device.makePipeline(flat(depth: .none, blend: .none))
       let buffer = try vertices(device, square(z: 0.5).map { SIMD4($0.x - 3, $0.y, $0.z, $0.w) })
       try square(z: 0.5).withUnsafeBytes { try buffer.update($0) }
       let target = try device.makeTarget(width: 4, height: 4)
@@ -221,7 +221,7 @@
 
     // MARK: - As GPUContractTests has them
 
-    static func flat(depth: Bool, blend: GPUBlend) -> GPUPipelineDescriptor {
+    static func flat(depth: GPUDepth, blend: GPUBlend) -> GPUPipelineDescriptor {
       GPUPipelineDescriptor(
         program: .flat, blend: blend, depth: depth,
         vertexBuffers: [GPUVertexLayout(stride: 16, attributes: [.init(location: 0, format: .float3)])])

@@ -7,6 +7,7 @@
     let descriptor: GPUPipelineDescriptor
     let state: any MTLRenderPipelineState
     let depthState: any MTLDepthStencilState
+    let cull: MTLCullMode
     let primitive: MTLPrimitiveType
 
     init(device: MetalDevice, descriptor: GPUPipelineDescriptor) throws {
@@ -67,12 +68,20 @@
       }
 
       let depth = MTLDepthStencilDescriptor()
-      depth.depthCompareFunction = descriptor.depth ? .less : .always
-      depth.isDepthWriteEnabled = descriptor.depth
+      depth.depthCompareFunction = descriptor.depth == .none ? .always : .less
+      depth.isDepthWriteEnabled = descriptor.depth == .testAndWrite
       guard let depthState = device.device.makeDepthStencilState(descriptor: depth) else {
         throw GPUError("\(program.name): no depth state")
       }
       self.depthState = depthState
+      // The layer's front is three's, counter-clockwise as it appears; the pass says so, since
+      // Metal's own default is clockwise.
+      cull =
+        switch descriptor.cull {
+        case .none: .none
+        case .back: .back
+        case .front: .front
+        }
 
       primitive =
         switch descriptor.primitive {
@@ -120,7 +129,8 @@
 
   /// A pass's draws, into whatever `MetalDevice.render` began. Metal keeps what is set on an
   /// encoder across a change of pipeline, as the contract asks; the pass keeps only what a draw
-  /// needs and the encoder does not hold, the pipeline's primitive.
+  /// needs and the encoder does not hold, the pipeline's primitive. Depth and culling are the
+  /// encoder's in Metal rather than the pipeline's, so each change of pipeline sets them.
   final class MetalPass: GPUPass {
     private let device: MetalDevice
     private let encoder: any MTLRenderCommandEncoder
@@ -135,6 +145,8 @@
       let pipeline = pipeline as! MetalPipeline
       encoder.setRenderPipelineState(pipeline.state)
       encoder.setDepthStencilState(pipeline.depthState)
+      encoder.setFrontFacing(.counterClockwise)
+      encoder.setCullMode(pipeline.cull)
       primitive = pipeline.primitive
     }
 
