@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// The trench run, after Atari's vector Star Wars cabinet.
 ///
 /// The trench IS the station's equatorial groove. That sentence is the whole scene. A dive

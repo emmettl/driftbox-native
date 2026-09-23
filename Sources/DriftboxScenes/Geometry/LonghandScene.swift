@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Longhand. Most Driftbox scenes treat a touch as a force: material bends, turns or gathers
 /// under the finger, then returns to what it was. This one makes the opposite promise. The
 /// empty stave belongs to the player. Every drag lays a piece of luminous tubing into the

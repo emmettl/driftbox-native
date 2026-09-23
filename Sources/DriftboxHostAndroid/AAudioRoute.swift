@@ -77,6 +77,16 @@
       mixer.remove(context)
     }
 
+    /// Whether latency is let go of for the sake of never breaking: sixteen bursts of buffer at
+    /// once, rather than one grown a burst at a time after underruns. For an app out of view, where
+    /// nobody hears how late the sound is, only whether it breaks. Measured on a Fairphone 6 with
+    /// the screen off: the render thread's cost went from half of each burst to three quarters,
+    /// with nothing drawn keeping the cores awake; a stream left to grow its buffer
+    /// underran 246 times in six seconds before it had enough, and one of sixteen bursts once.
+    public var relaxed = false {
+      didSet { if relaxed != oldValue { output?.relax(relaxed) } }
+    }
+
     /// Lets the stream's buffer out by a burst if it has underrun since last asked, and says so
     /// through `onChange`. Call it now and then; once a second is plenty.
     public func tune() {
@@ -87,9 +97,8 @@
     /// Whether the route has let go of its device until `resume`.
     public private(set) var suspended = false
 
-    /// Let go of the device, and play through nothing, until `resume`: for an app out of view,
-    /// which Android moves to its little cores, where a render thread cannot keep up, and where a
-    /// stream kept open would only render silence late.
+    /// Let go of the device, and play through nothing, until `resume`: for a song paused while
+    /// another app has the audio, where a stream kept open would only hold on to it.
     public func suspend() {
       suspended = true
       apply()
@@ -130,6 +139,7 @@
             ? Int32(AAUDIO_UNSPECIFIED) : Int32(target.id) ?? Int32(AAUDIO_UNSPECIFIED),
           mixer: mixer, sampleRate: sampleRate, cores: cores
         ) { [changed] in changed?() }
+        if relaxed { output?.relax(true) }
         current = target
         error = nil
       } catch {

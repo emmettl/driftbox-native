@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Endless Convoy.
 ///
 /// Side-on like an early cabinet game, but not pixel art and not a battle. A procession of

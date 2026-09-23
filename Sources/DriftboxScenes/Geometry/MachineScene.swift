@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// A production line seen from close enough to feel its weight.
 ///
 /// The set already has landscapes, bodies, boards, journeys and isolated objects. What it did

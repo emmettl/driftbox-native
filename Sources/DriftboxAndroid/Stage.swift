@@ -43,18 +43,24 @@
       route.detach(host.renderSource.context)
     }
 
-    /// The app in view, or out of it. Out of it, Android keeps it to the little cores, so the song
-    /// stops where it is, the audio stream is let go of, and nothing is drawn; back in view, all
-    /// three start again.
-    func setShown(_ shown: Bool) {
-      if shown {
+    /// Draw, or draw nothing: the app in view, or out of it. The song plays on either way, since the
+    /// app's playback service keeps the process on the big cores while it is out of view.
+    func setDrawing(_ drawing: Bool) {
+      renderer.paused.store(!drawing, ordering: .releasing)
+      // Unseen, nobody hears how late the sound is, only whether it breaks.
+      route.relaxed = !drawing
+    }
+
+    /// Play, or pause: the song stops where it is and the audio stream is let go of, as for a call
+    /// or another app's playing, until it plays again.
+    func setPlaying(_ playing: Bool) {
+      if playing {
         route.resume()
         host.send(.play)
       } else {
         host.send(.stop)
         route.suspend()
       }
-      renderer.paused.store(!shown, ordering: .releasing)
     }
 
     /// The next scene there is, as the Scene menu's next does on Windows.

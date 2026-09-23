@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Little fluffy clouds.
 ///
 /// Every other scene in this box is a dark room with glowing lines in it. That is nine scenes

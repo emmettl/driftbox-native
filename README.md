@@ -335,7 +335,8 @@ catalogue with the scene the song names drawn from it over the whole screen, and
 the performance filter's pad, as the window is on Windows; two fingers tapped step on to the next
 scene. A scene is drawn at no more than two pixels to a point, a Mac's Retina display's, and
 scaled up to the screen: on a Fairphone 6, which has three, every scene but Frost then keeps the
-display's 120 frames a second, and Frost 98. Given a test's name, the app runs that instead and
+display's 120 frames a second, and Frost 98. That is all of them but Graphic Lab, which sets its
+type through CoreText. Given a test's name, the app runs that instead and
 says what happened.
 
 ```bash
@@ -349,9 +350,12 @@ scripts/android-app.sh scenes           # or every scene drawn, checked and time
 Two threads: Java's main thread owns the engine's commands and the audio route, and a render
 thread owns OpenGL, which is current on one thread, and reads the engine's events. A window is
 handed to it as Java makes one, and taken back before Java's `surfaceDestroyed` returns, as Android
-wants. Out of view the app stops the song where it is, lets go of the audio stream and draws
-nothing, since Android then keeps it to the little cores, where the audio's render thread cannot
-keep up; a media playback service, which keeps the big cores, is what playing on unseen will want.
+wants. Out of view, or with the screen off, the song plays on and nothing is drawn: a media
+playback service, with a notification to stop it from, keeps the process on the big cores, which
+Android otherwise takes away from an app out of view. There the render thread costs half as much
+again as in view, with no drawing to keep the cores awake, so the stream's buffer goes to sixteen
+bursts at once, 32ms, and back to one in view. On a Fairphone 6, twenty seconds with the screen
+off underran once, as it went off. A call, or another app's playing, pauses it, as media does.
 
 It needs a JDK and the SDK's build-tools and a platform beside the NDK. Driftbox Loopback is a
 MIDI device the app publishes that sends back what it is sent, so the ports are tested with

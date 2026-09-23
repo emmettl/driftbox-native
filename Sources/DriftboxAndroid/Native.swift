@@ -75,9 +75,14 @@
     }
   }
 
-  @_cdecl("Java_app_driftbox_Native_setShown")
-  public func nativeSetShown(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ shown: jboolean) {
-    MainActor.assumeIsolated { stage?.setShown(shown != 0) }
+  @_cdecl("Java_app_driftbox_Native_setDrawing")
+  public func nativeSetDrawing(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ drawing: jboolean) {
+    MainActor.assumeIsolated { stage?.setDrawing(drawing != 0) }
+  }
+
+  @_cdecl("Java_app_driftbox_Native_setPlaying")
+  public func nativeSetPlaying(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ playing: jboolean) {
+    MainActor.assumeIsolated { stage?.setPlaying(playing != 0) }
   }
 
   @_cdecl("Java_app_driftbox_Native_surfaceChanged")

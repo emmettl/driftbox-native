@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Cübik/Olympic: a white room made from the four inks on the single sleeve. The field is
 /// one instanced buffer and one draw call, and its cubes do not simply jump as one loudness
 /// meter — concentric rings are assigned to logarithmic frequency bands, while the low end

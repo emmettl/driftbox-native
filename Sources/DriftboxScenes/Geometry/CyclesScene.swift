@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Light cycles. Sunset already owns "glowing grid to a horizon", so this one is shot from
 /// ABOVE — the game-board view rather than the chase — which is also the only way to read
 /// the shape of a trail, and the trail is the whole point of a light cycle.

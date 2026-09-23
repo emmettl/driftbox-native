@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Still water, for the darkwave one. Undertow is 82bpm with no snare anywhere, a rimshot,
 /// and more reverb than anything else in the set — a record that is mostly the space around
 /// the hits. Every other scene reads the mix as a LEVEL; this one reads EVENTS. A hit drops

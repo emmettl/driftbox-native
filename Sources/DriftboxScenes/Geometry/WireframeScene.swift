@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Flying down a wireframe corridor. The Rez one. Hard thin lines, no fill, cyan and
 /// magenta, everything snapping on the beat: sixty-four hexagonal ribs and the rails joining
 /// them, in one line list moved entirely in the vertex shader, surging on every kick.

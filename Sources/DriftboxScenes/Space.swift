@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// three's perspective camera, as far as the scenes use it: a position, a roll about z, and
 /// a projection. The matrices are what a three vertex shader calls `projectionMatrix` and
 /// `modelViewMatrix` (with the model at the origin), except that depth lands in 0...1, as the GPU

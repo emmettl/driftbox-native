@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// The web. Tempest 2000. Not another tunnel: this is a well that narrows to a point and
 /// does not move at all — you look into it, and things travel up the lanes toward you, which
 /// is why it is built from spokes rather than ribs. Sixteen lanes, sixteen logarithmic
