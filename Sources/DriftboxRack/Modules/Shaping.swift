@@ -96,8 +96,13 @@ public struct DriveModule {
       }
       let shaped = tanhDSP((Double(input[i]) + Double(bias[i])) * amount) * scale
       // One-pole DC blocker: a differentiator with a pole put back just under unity.
-      let blocked = shaped - lastIn + pole * lastOut
+      var blocked = shaped - lastIn + pole * lastOut
       lastIn = shaped
+      // A NaN kept here would be every sample after it; the blocker starts again from rest instead.
+      if !blocked.isFinite {
+        lastIn = 0
+        blocked = 0
+      }
       lastOut = blocked
       out[i] = Float(blocked)
     }
@@ -598,6 +603,12 @@ public struct CompressorModule {
       let peak = key < 0 ? -key : key
       let coefficient = peak > envelope ? attackCoefficient : releaseCoefficient
       envelope = peak + (envelope - peak) * coefficient
+      // NaN or infinity kept in the follower would read as silence, or as infinitely loud, for
+      // good: it starts again from rest instead.
+      if !envelope.isFinite {
+        envelope = 0
+        reduction = 0
+      }
 
       let level = envelope > 1e-5 ? 20 * log10DSP(envelope) : -100
       let threshold = Double(thresholdParam[i])
@@ -616,8 +627,11 @@ public struct CompressorModule {
 
       reduction = wanted > reduction ? wanted : wanted + (reduction - wanted) * releaseCoefficient
 
+      if !reduction.isFinite { reduction = 0 }
+
       let gain = powDSP(10, (Double(makeupParam[i]) - reduction) / 20)
-      out[i] = Float(Double(input[i]) * gain)
+      let output = Double(input[i]) * gain
+      out[i] = output.isFinite ? Float(output) : 0
       gainOut[i] = Float(reduction / 20)
     }
   }

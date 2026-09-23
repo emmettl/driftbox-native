@@ -323,8 +323,8 @@ public struct Looper {
       var outL = inL * dry
       var outR = inR * dry
 
-      // As the reference has it, Stop (mode 0) matches the idle capture mode 0 and so records too.
-      if captureMode == mode {
+      // Capturing only while a capture is running: Stop is mode 0 and so is "not capturing".
+      if captureMode != 0 && captureMode == mode {
         if position < maximum {
           left[position] = Float(inL)
           right[position] = Float(inR)
