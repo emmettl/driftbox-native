@@ -360,9 +360,11 @@ each step stand on the last. The README's "Platforms" says how it is divided.
 4. **The window, drawn.** The interface is drawn on that layer rather than built from a toolkit,
    which is in keeping with an instrument and keeps what the app depends on small: a window, input,
    menus, dialogs and settings from Win32, and the grid, knobs, strip, rack and cables as surfaces.
-5. **Shipping.** Songs as `.driftbox` — the web app's documents byte for byte, under a name Windows
-   can associate without claiming every `.json` — read and written by `DriftboxDocument` on every
-   platform; the Swift runtime beside the executable; signing; winget.
+5. **Shipping.** The Swift runtime beside the executable; signing; winget; the `.driftbox` file
+   association. Songs are already `.driftbox` — the web app's documents byte for byte, under a name
+   Windows can associate without claiming every `.json`. `SongFile` in `DriftboxDocument` holds
+   the rule for every platform: saved as `.driftbox`; `.song.json` and the web's `.json` still
+   opened, and saved back under the name they came with.
 
 ## Milestone 5 — Android
 

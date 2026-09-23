@@ -30,14 +30,15 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <!-- A song is JSON, and claiming every .json file on the machine would be rude, so songs get a
        type of their own under the bundle identifier which conforms to JSON, so that whatever
        could read one still can. Declaring it is what lets a double-click in the Finder and a drop
-       on the dock icon reach the app at all. -->
+       on the dock icon reach the app at all. .driftbox first, which makes it what Save proposes;
+       .song.json after it, for songs saved before there was one. -->
   <key>UTExportedTypeDeclarations</key>
   <array><dict>
     <key>UTTypeIdentifier</key><string>app.driftbox.native.song</string>
     <key>UTTypeDescription</key><string>Driftbox Song</string>
     <key>UTTypeConformsTo</key><array><string>public.json</string></array>
     <key>UTTypeTagSpecification</key><dict>
-      <key>public.filename-extension</key><array><string>song.json</string></array>
+      <key>public.filename-extension</key><array><string>driftbox</string><string>song.json</string></array>
     </dict>
   </dict></array>
   <key>CFBundleDocumentTypes</key>

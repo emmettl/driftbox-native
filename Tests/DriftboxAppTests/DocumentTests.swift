@@ -112,11 +112,11 @@
         let player = Player(host: EngineHost(sampleRate: 48000))
         let asked = Asked()
         let files = files(player, asking: asked)
-        asked.answer = directory.appendingPathComponent("Fresh.song.json")
+        asked.answer = directory.appendingPathComponent("Fresh.driftbox")
 
         player.new()
         #expect(files.save())
-        #expect(asked.names == ["Untitled.song.json"])
+        #expect(asked.names == ["Untitled.driftbox"])
         #expect(player.fileURL == asked.answer)
         #expect(!player.isEdited)
 

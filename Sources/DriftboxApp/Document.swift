@@ -6,10 +6,12 @@
   import UniformTypeIdentifiers
 
   extension UTType {
-    /// The song document's own type, declared in the bundle's Info.plist so that the Finder knows
-    /// which application owns one. A loose build has no plist at all, so this falls back to what a
-    /// song is underneath, which is JSON.
-    static let song = UTType("app.driftbox.native.song") ?? .json
+    /// The song document's own type, `.driftbox`, declared in the bundle's Info.plist so that the
+    /// Finder knows which application owns one. A loose build has no plist at all, so this falls
+    /// back to the extension alone, and past that to what a song is underneath, which is JSON.
+    static let song =
+      UTType("app.driftbox.native.song")
+      ?? UTType(filenameExtension: SongFile.fileExtension, conformingTo: .json) ?? .json
   }
 
   /// What the File menu means, once: the panels, the exports, and what Save does when the song
@@ -46,6 +48,7 @@
     func openPanel() {
       guard confirmDiscard() else { return }
       let panel = NSOpenPanel()
+      // `.json` too, for songs saved before `.driftbox` and for the web app's downloads.
       panel.allowedContentTypes = [.song, .json]
       panel.allowsMultipleSelection = false
       guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -97,7 +100,7 @@
     @discardableResult
     func saveAs() -> Bool {
       guard player.song != nil else { return true }
-      guard let url = askWhereToSave(player.documentName + ".song.json") else { return false }
+      guard let url = askWhereToSave(SongFile.fileName(for: player.documentName)) else { return false }
       player.save(to: url)
       NSDocumentController.shared.noteNewRecentDocumentURL(url)
       return !player.isEdited
@@ -105,7 +108,7 @@
 
     private static func savePanel(named name: String) -> URL? {
       let panel = NSSavePanel()
-      panel.allowedContentTypes = [.json]
+      panel.allowedContentTypes = [.song]
       panel.nameFieldStringValue = name
       guard panel.runModal() == .OK else { return nil }
       return panel.url
