@@ -335,8 +335,12 @@ parity point.
    do; and the `groovebox` module takes them from the host's buses 0 to 3 through a strip of level,
    pan and mute onto a stereo outlet each, metering each machine after its strip, held to the
    reference's samples and its meters' arithmetic.
-   Left: the host playing the retained song into the rack, in time with its transport, and the
-   app — opening a groovebox song in the rack, the module's face, and saving both.
+   Then the rack plays its patch's song beside itself, as rack mode does: an engine of its own whose
+   mix is added to the rack's, whose machines reach the `groovebox` module on the host's buses,
+   whose patched machines leave its mix, and which starts from the top and stops with the rack's
+   transport, at the patch's tempo or the song's, with the song's swing, keeping its beat through
+   an edit. Left: the app — opening a groovebox song in the rack, the module's face, and saving
+   both.
 
 ## Help and tutorials
 

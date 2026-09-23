@@ -16,6 +16,7 @@ public struct SectionOutputs {
   /// Bit `n` set: machine `n` is left out of the song's mix.
   public var diverted: UInt8
 
+  @_noAllocation
   public init(buffers: UnsafeMutablePointer<UnsafeMutablePointer<Float>>, diverted: UInt8 = 0) {
     self.buffers = buffers
     self.diverted = diverted

@@ -3,6 +3,7 @@
   import DriftboxDocument
   import DriftboxHost
   import DriftboxRack
+  import DriftboxSeq
   import Foundation
   import Observation
 
@@ -164,7 +165,8 @@
       guard !live else { return }
       live = true
       host.load(patch)
-      host.setTransport(tempo: tempo, running: running)
+      sendSong()
+      host.setTransport(tempo: tempo, running: running, shuffle: swing)
       metering = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
         Task { @MainActor in self?.refreshReadings() }
       }
@@ -193,7 +195,7 @@
       redoStack = []
       turning = nil
       rebuild()
-      if live { host.setTransport(tempo: tempo, running: running) }
+      if live { host.setTransport(tempo: tempo, running: running, shuffle: swing) }
     }
 
     func open(_ entry: PatchEntry) {
@@ -230,6 +232,7 @@
       let plan: Plan
       if live {
         host.load(patch)
+        sendSong()
         plan = host.plan!
       } else {
         plan = compile(patch)
@@ -760,7 +763,37 @@
 
     // MARK: Transport
 
-    var tempo: Double { patch.tempo ?? 120 }
+    /// The patch's own tempo, else its song's, else 120: what the transport runs at.
+    var tempo: Double { patch.tempo ?? song?.bpm ?? 120 }
+    /// The song's swing, which the rack's transport shuffles by, as the reference's rack mode does.
+    var swing: Double { song?.swing ?? 0 }
+
+    // MARK: The song
+
+    /// The groovebox song the patch carries, if this build can read it: kept decoded, and decoded
+    /// again only when its text changes.
+    var song: Song? {
+      if decodedText != patch.groovebox {
+        decodedText = patch.groovebox
+        decoded = patch.groovebox.flatMap(SongCodec.decode)
+      }
+      return decoded
+    }
+    @ObservationIgnored private var decodedText: String?
+    @ObservationIgnored private var decoded: Song?
+    /// The song the host was last given, so an edit to the rack alone sends it nothing.
+    @ObservationIgnored private var sentSong: Song?
+
+    /// Hand the host the patch's song, at the patch's tempo when it sets one, if it is not the one
+    /// it has: the rack plays it beside itself, its machines on the `groovebox` module's buses.
+    private func sendSong() {
+      guard live else { return }
+      var next = song
+      if let tempo = patch.tempo { next?.bpm = tempo }
+      guard next != sentSong else { return }
+      sentSong = next
+      host.setSong(next)
+    }
 
     func setTempo(_ bpm: Double) {
       // To a hundredth, which is how a tempo worked out from a loop's length is kept.
@@ -771,13 +804,16 @@
         turning = "tempo"
       }
       patch.tempo = bpm
-      if live { host.setTransport(tempo: bpm, running: running) }
+      if live {
+        sendSong()
+        host.setTransport(tempo: bpm, running: running, shuffle: swing)
+      }
       save()
     }
 
     func toggleRunning() {
       running.toggle()
-      if live { host.setTransport(tempo: tempo, running: running) }
+      if live { host.setTransport(tempo: tempo, running: running, shuffle: swing) }
     }
 
     // MARK: Keys
