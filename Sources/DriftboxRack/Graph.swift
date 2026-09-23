@@ -64,6 +64,11 @@ public struct RackGraph: ~Copyable {
 
   let nodes: UnsafeMutablePointer<NodeRuntime>
   let nodeCount: Int
+  /// The metered modules' mirrors, the runtime each copies, and the module ids, in that order.
+  let mirrors: UnsafeMutablePointer<MeterMirror>
+  let mirrorNodes: UnsafeMutablePointer<Int>
+  let mirrorCount: Int
+  public let meterIds: [String]
   let outputs: UnsafeMutablePointer<OutputRuntime>
   let outputCount: Int
 
@@ -164,6 +169,8 @@ public struct RackGraph: ~Copyable {
 
     // Nodes: one per voice of each polyphonic module, one for the rest.
     var runtimes: [NodeRuntime] = []
+    // Which module each runtime is, for the ones a faceplate reads from.
+    var runtimeIds: [String] = []
     var missing: [String] = []
     var dataTables: [String: (table: UnsafeMutablePointer<DataBuffer>, slots: [String])] = [:]
     var revision = 0
@@ -244,6 +251,7 @@ public struct RackGraph: ~Copyable {
           missing.append(node.type)
           continue
         }
+        runtimeIds.append(id)
         runtimes.append(
           NodeRuntime(
             processor: processor, inlets: Slots(base: table(inlets), count: inlets.count),
@@ -260,6 +268,21 @@ public struct RackGraph: ~Copyable {
     }
     nodes = table(runtimes)
     nodeCount = runtimes.count
+
+    // A mirror for each metered module, on its first voice: what its faceplate reads from.
+    var mirrors: [MeterMirror] = []
+    var mirrorNodes: [Int] = []
+    var meterIds: [String] = []
+    for (index, runtime) in runtimes.enumerated() where runtime.voice.voice == 0 {
+      guard let mirror = MeterMirror.make(for: runtime.processor, sampleRate: sampleRate) else { continue }
+      mirrors.append(mirror)
+      mirrorNodes.append(index)
+      meterIds.append(runtimeIds[index])
+    }
+    self.mirrors = table(mirrors)
+    self.mirrorNodes = table(mirrorNodes)
+    mirrorCount = mirrors.count
+    self.meterIds = meterIds
 
     // Every voice of every terminal outlet.
     var outs: [OutputRuntime] = []
@@ -296,6 +319,7 @@ public struct RackGraph: ~Copyable {
 
   deinit {
     for index in 0..<nodeCount { nodes[index].processor.release() }
+    for index in 0..<mirrorCount { mirrors[index].release() }
     for pointer in owned { pointer.deallocate() }
   }
 
@@ -392,9 +416,23 @@ public struct RackGraph: ~Copyable {
       samples: UnsafePointer(copy), count: samples.count, revision: dataRevision)
   }
 
-  /// What the modules that show anything are showing, by module id.
-  public func meters() -> [(id: String, reading: MeterReading)] {
-    []
+  /// Copy what every metered module shows into its mirror. Cheap and allocation-free, so a host
+  /// can do it from the render thread every few blocks.
+  @_noAllocation
+  public mutating func snapshotMeters() {
+    for index in 0..<mirrorCount { mirrors[index].take(from: nodes[mirrorNodes[index]].processor) }
+  }
+
+  /// What the mirrors hold, by module id: as of the last snapshot, and on any thread, since
+  /// nothing here reads a processor.
+  public func meterReadings() -> [(id: String, reading: MeterReading)] {
+    (0..<mirrorCount).map { (meterIds[$0], mirrors[$0].reading()) }
+  }
+
+  /// What the modules that show anything are showing now, by module id.
+  public mutating func meters() -> [(id: String, reading: MeterReading)] {
+    snapshotMeters()
+    return meterReadings()
   }
 
   /// One block of `frames` frames into `left` and `right`, with the host's input buses.

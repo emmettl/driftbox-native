@@ -67,4 +67,54 @@ struct RackHostTests {
     #expect(host.frame.load(ordering: .relaxed) == 1408)
     host.collect()
   }
+  /// What the faceplates read: copied off the render thread every eight blocks, and the same as
+  /// the modules themselves report when asked directly after the same blocks.
+  @Test func theMetersAreReadAsTheModulesThemselvesShowThem() throws {
+    let patch = Patch(
+      modules: [
+        PatchModule(id: "osc", type: "vco", params: ["shape": 2]),
+        PatchModule(id: "tune", type: "tuner"),
+        PatchModule(id: "vu", type: "meter"),
+        PatchModule(id: "loop", type: "looper", params: ["mode": 1]),
+        PatchModule(id: "out", type: "out"),
+      ],
+      cables: [
+        PatchCable(from: PortReference("osc", "out"), to: PortReference("tune", "in")),
+        PatchCable(from: PortReference("tune", "thru"), to: PortReference("vu", "in")),
+        PatchCable(from: PortReference("vu", "thru"), to: PortReference("loop", "in")),
+        PatchCable(from: PortReference("loop", "out"), to: PortReference("out", "in")),
+      ])
+    let host = RackHost(sampleRate: 48000)
+    #expect(host.readings().isEmpty)
+    host.load(patch)
+    // Forty blocks, in callbacks of an awkward size: five snapshots.
+    _ = render(host, frames: 40 * 128, callback: 333)
+    let readings = host.readings()
+    #expect(Set(readings.keys) == ["tune", "vu", "loop"])
+
+    var graph = RackGraph(plan: compile(patch), sampleRate: 48000)
+    let left = UnsafeMutablePointer<Float>.allocate(capacity: 128)
+    let right = UnsafeMutablePointer<Float>.allocate(capacity: 128)
+    defer {
+      left.deallocate()
+      right.deallocate()
+    }
+    for _ in 0..<40 { graph.process(left: left, right: right) }
+    for (id, direct) in graph.meters() {
+      let live = try #require(readings[id])
+      #expect(live.level == direct.level, "\(id)")
+      #expect(live.peak == direct.peak, "\(id)")
+      #expect(live.envelope == direct.envelope, "\(id)")
+      #expect(live.waveform == direct.waveform, "\(id)")
+      #expect(live.frequency == direct.frequency, "\(id)")
+      #expect(live.clarity == direct.clarity, "\(id)")
+      #expect(live.loopPosition == direct.loopPosition, "\(id)")
+      #expect(live.loopSeconds == direct.loopSeconds, "\(id)")
+    }
+    // And they say something: a triangle at C2 is 65.4Hz, and the looper has been recording.
+    let tuned = try #require(readings["tune"]?.frequency)
+    #expect(abs(tuned - 65.406) < 0.5, "\(tuned)")
+    #expect((readings["vu"]?.level ?? 0) > 0.1)
+    #expect((readings["loop"]?.loopSeconds ?? 0) > 0.09)
+  }
 }

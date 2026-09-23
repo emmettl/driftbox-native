@@ -282,10 +282,19 @@ parity point.
    picker of every shelf, with each module's picture and line of copy exported from the
    reference's definitions; the factory patches are in the header; edits undo one turn of a knob
    at a time; and the patch is kept between launches.
-   Left: the hand-built faceplates (the VCO's big tune knob, the tuner's needle, the looper's
-   buttons, the sequencers' grids and the rest), the inlet trims on the back, the breaks the
-   break-built patches expect, hardware MIDI into the rack, the rack as an Audio Unit, and the
-   groovebox as a module in it.
+   Then the first of the hand-built faces, one for one with the reference's: the VCO (its tune
+   knob big, its pulse width asleep off a pulse), the Ladder (pink where it squelches), the Out's
+   channel strip, the MIDI module saying what it last heard, and the three that meter — the
+   Chromatic Tuner's note and needle, the VU Meter's moving coil, lights and scope, and the Loop
+   Station's screen and transport. What they show comes off the render thread without it
+   allocating: every eight blocks, as the reference's worklet posts them, each metered module's
+   numbers and short buffers are copied into a mirror of its own under a sequence count, and the
+   interface takes readings from the mirrors — by the modules' own code, so a live reading is
+   exactly the one the conformance-tested module gives.
+   Left: the rest of the hand-built faces (the sequencers' grids, the Arranger, the Chord
+   Player, the Scale Player, the Arp, Note Echo, the Combinator, and the sample players), the
+   inlet trims on the back, the breaks the break-built patches expect, hardware MIDI into the
+   rack, the rack as an Audio Unit, and the groovebox as a module in it.
 
 ## Milestone 3 — what only native can do
 

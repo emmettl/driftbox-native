@@ -2,10 +2,10 @@
   import DriftboxRack
   import SwiftUI
 
-  /// A module's front: its name and what its jacks add up to, then a control for every param a
-  /// hand could set, in cells of one size, three across on a half-width module and seven on a
-  /// full one — the reference's generic faceplate, which is what every module has until it has
-  /// one of its own.
+  /// A module's front: the panel every module has — its ground, its edge, lit when selected and
+  /// dimmed when bypassed — and in it either the module's own hand-built face or the reference's
+  /// generic one: its name and what its jacks add up to, then a control for every param a hand
+  /// could set, in cells of one size, three across on a half-width module and seven on a full one.
   struct Faceplate: View {
     let model: RackModel
     let module: PatchModule
@@ -16,30 +16,18 @@
     @State private var hovering = false
 
     var body: some View {
+      let face = FaceContext(model: model, module: module, def: def)
       VStack(alignment: .leading, spacing: 6) {
-        title
-        let shown = def.params.filter { !$0.hidden }
-        let columns = Array(
-          repeating: GridItem(.fixed(RackLayout.cellWidth), spacing: 0), count: RackLayout.columns(for: span))
-        LazyVGrid(columns: columns, alignment: .leading, spacing: 0) {
-          ForEach(shown, id: \.id) { param in
-            ParamControl(
-              def: param, value: model.value(module, param),
-              labels: ModuleFace.byType[def.type]?.labels[param.id],
-              tint: tint
-            ) { value, final in
-              if final {
-                model.set(module.id, param.id, to: value)
-              } else {
-                model.turn(module.id, param.id, to: value)
-              }
-            } end: {
-              model.endTurn()
-            }
-            .frame(width: RackLayout.cellWidth, height: RackLayout.cellHeight)
-          }
+        switch def.type {
+        case "vco": VcoFace(face: face)
+        case "ladder": LadderFace(face: face)
+        case "out": OutFace(face: face)
+        case "midi": MidiFace(face: face)
+        case "tuner": TunerFace(face: face)
+        case "meter": MeterFace(face: face)
+        case "looper": LooperFace(face: face)
+        default: GenericFace(face: face, span: span)
         }
-        Spacer(minLength: 0)
       }
       .padding(.vertical, 10)
       .padding(.horizontal, 12)
@@ -59,34 +47,109 @@
           .strokeBorder(selected ? Theme.nine : Color.white.opacity(hovering ? 0.16 : 0.09), lineWidth: 1)
           .shadow(color: selected ? Theme.nine.opacity(0.45) : .clear, radius: 8)
       }
+      .overlay(alignment: .topTrailing) {
+        if module.bypassed {
+          Text("bypassed").font(Theme.mono(8.5)).foregroundStyle(Theme.three)
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .background(Capsule().fill(Theme.ground).strokeBorder(Theme.three.opacity(0.5)))
+            .offset(x: -10, y: -7)
+        }
+      }
       .opacity(module.bypassed ? 0.55 : 1)
       .onHover { hovering = $0 }
       .animation(.easeOut(duration: 0.15), value: selected)
     }
+  }
 
-    private var tint: Color { ModuleFace.accent(ModuleFace.byType[def.type]?.group) }
+  /// What a face is given: the module, its definition, and a way to read and turn its knobs —
+  /// the reference's `FaceplateProps`, and nothing else, so a face cannot reach past its module.
+  @MainActor
+  struct FaceContext {
+    let model: RackModel
+    let module: PatchModule
+    let def: ModuleDef
 
-    private var title: some View {
-      HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Text(def.name.uppercased())
+    var tint: Color { ModuleFace.accent(ModuleFace.byType[def.type]?.group) }
+    var reading: MeterReading? { model.readings[module.id] }
+
+    func param(_ id: String) -> ParamDef? { def.params.first { $0.id == id } }
+
+    func value(_ id: String) -> Double {
+      guard let param = param(id) else { return 0 }
+      return model.value(module, param)
+    }
+
+    func set(_ id: String, _ value: Double) { model.set(module.id, id, to: value) }
+
+    /// The control for one param, as the generic face draws it, in a cell of the usual size.
+    @ViewBuilder
+    func control(
+      _ id: String, tint: Color? = nil, diameter: CGFloat = 34, options: [String]? = nil
+    ) -> some View {
+      if let param = param(id) {
+        ParamControl(
+          def: param, value: value(id), labels: options ?? ModuleFace.byType[def.type]?.labels[id],
+          tint: tint ?? self.tint, diameter: diameter
+        ) { value, final in
+          if final { model.set(module.id, id, to: value) } else { model.turn(module.id, id, to: value) }
+        } end: {
+          model.endTurn()
+        }
+        .frame(width: RackLayout.cellWidth, height: max(RackLayout.cellHeight, diameter + 28))
+      }
+    }
+  }
+
+  /// A face's title: the name, a model mark in the module's colour where it has one, and a word
+  /// at the right about what it is doing.
+  struct PanelTitle<Trailing: View>: View {
+    let name: String
+    var mark: String?
+    var markTint: Color = Theme.three
+    @ViewBuilder var trailing: () -> Trailing
+
+    var body: some View {
+      HStack(alignment: .center, spacing: 8) {
+        Text(name.uppercased())
           .font(.system(size: 11, weight: .semibold)).tracking(0.8)
           .foregroundStyle(Theme.ink)
           .lineLimit(1)
-        if def.type == "midi" {
-          Text(model.lastNote.map(RackKeyboard.name) ?? "keys")
-            .font(Theme.mono(10, .semibold)).foregroundStyle(model.lastNote == nil ? Theme.dim : Theme.nine)
-        }
-        if module.bypassed {
-          Text("bypassed").font(Theme.mono(8.5)).foregroundStyle(Theme.three)
-            .padding(.horizontal, 5).padding(.vertical, 1)
-            .background(Capsule().strokeBorder(Theme.three.opacity(0.5)))
+          .minimumScaleFactor(0.8)
+          .layoutPriority(1)
+        if let mark {
+          Text(mark).font(Theme.mono(8)).tracking(1.1).foregroundStyle(markTint)
         }
         Spacer(minLength: 4)
-        Text(RackLayout.portSummary(def))
-          .font(Theme.mono(9)).foregroundStyle(Theme.dim.opacity(0.8)).lineLimit(1)
+        trailing()
       }
       .frame(height: RackLayout.title - 10, alignment: .center)
       .overlay(alignment: .bottom) { Rectangle().fill(Theme.edge).frame(height: 1).offset(y: 4) }
+    }
+  }
+
+  extension PanelTitle where Trailing == Text {
+    init(name: String, mark: String? = nil, markTint: Color = Theme.three, words: String) {
+      self.init(name: name, mark: mark, markTint: markTint) {
+        Text(words).font(Theme.mono(9)).foregroundStyle(Theme.dim.opacity(0.8))
+      }
+    }
+  }
+
+  /// The face every module has until it has its own.
+  struct GenericFace: View {
+    let face: FaceContext
+    let span: Int
+
+    var body: some View {
+      PanelTitle(name: face.def.name, words: RackLayout.portSummary(face.def))
+      let columns = Array(
+        repeating: GridItem(.fixed(RackLayout.cellWidth), spacing: 0), count: RackLayout.columns(for: span))
+      LazyVGrid(columns: columns, alignment: .leading, spacing: 0) {
+        ForEach(face.def.params.filter { !$0.hidden }, id: \.id) { param in
+          face.control(param.id)
+        }
+      }
+      Spacer(minLength: 0)
     }
   }
 
@@ -97,6 +160,7 @@
     let value: Double
     let labels: [String]?
     let tint: Color
+    var diameter: CGFloat = 34
     /// A value, and whether it is the last of a gesture.
     let change: (Double, Bool) -> Void
     let end: () -> Void
@@ -110,7 +174,7 @@
           spec: KnobSpec(
             label: def.name, format: { [def] fraction in Self.display(def, def.min + fraction * span) }),
           value: span == 0 ? 0 : max(0, min(1, (value - def.min) / span)), tint: tint,
-          rest: span == 0 ? nil : (def.defaultValue - def.min) / span, diameter: 34,
+          rest: span == 0 ? nil : (def.defaultValue - def.min) / span, diameter: diameter,
           live: { change(def.min + $0 * span, false) },
           commit: { fraction in
             change(def.min + fraction * span, true)
@@ -160,16 +224,16 @@
     /// three orders of magnitude inside ten are seconds, a range across ±12 is signed semitones.
     static func display(_ def: ParamDef, _ value: Double) -> String {
       if def.max > 1000 {
-        return value >= 1000 ? String(format: "%.2fk", value / 1000) : "\(Int(value.rounded()))"
+        return value >= 1000 ? RackDisplay.fixed(value / 1000, 2) + "k" : "\(Int(RackDisplay.jsRound(value)))"
       }
       if def.max <= 10, def.min >= 0.0001, def.max / max(def.min, 1e-6) > 100 {
-        return value < 0.1 ? "\(Int((value * 1000).rounded()))ms" : String(format: "%.2fs", value)
+        return value < 0.1 ? "\(Int(RackDisplay.jsRound(value * 1000)))ms" : RackDisplay.fixed(value, 2) + "s"
       }
       if def.min <= -12, def.max >= 12 {
         let whole = Int(value.rounded())
         return whole > 0 ? "+\(whole)" : "\(whole)"
       }
-      return String(format: "%.2f", value)
+      return RackDisplay.fixed(value, 2)
     }
   }
 
