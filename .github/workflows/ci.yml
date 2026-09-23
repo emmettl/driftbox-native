@@ -56,3 +56,27 @@ jobs:
         run: swift test
       - name: Audio targets stay constrained
         run: scripts/check-constrained.sh
+
+  # The Windows host is the one target Linux cannot build, so it is built and tested here, over
+  # everything else as well: the core is meant to be platform-free, and this is where that is kept.
+  # Release, because a debug build does not link on Windows yet (see the README's "Windows").
+  windows:
+    name: Windows
+    needs: fixtures
+    runs-on: windows-latest
+    env:
+      DRIFTBOX_REQUIRE_GENERATED: 1
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v6
+        with:
+          name: generated-fixtures
+          path: conformance/generated
+      - uses: compnerd/gha-setup-swift@bbae8ce86bac5a3449f3992b3d88bc4ca25f2057  # main, pinned
+        with:
+          swift-version: swift-6.4-release
+          swift-build: 6.4-RELEASE
+      - name: Build
+        run: swift build -c release --build-tests --build-system native -Xswiftc -enable-testing
+      - name: Test
+        run: swift test -c release --skip-build --build-system native
