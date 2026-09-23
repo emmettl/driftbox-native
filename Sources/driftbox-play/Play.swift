@@ -1,9 +1,16 @@
 #if canImport(AVFoundation)
+  import AppKit
   import AVFoundation
   import DriftboxDocument
   import DriftboxEngine
+  import DriftboxGPU
+  import DriftboxGPUMetal
   import DriftboxHost
+  import DriftboxScenes
   import Foundation
+  import ImageIO
+  import QuartzCore
+  import UniformTypeIdentifiers
 
   /// Somewhere for an instantiation callback to leave what it made.
   final class Made: @unchecked Sendable {
@@ -42,9 +49,11 @@
       let startBar = option("--start-bar") ?? 0
       // --bench: no audio device; run the engine as fast as it goes and say how fast that is.
       let bench = arguments.firstIndex(of: "--bench").map { arguments.remove(at: $0) } != nil
+      // --window: Pulse too, through the GPU layer on Metal, in a window of its own.
+      let windowed = arguments.firstIndex(of: "--window").map { arguments.remove(at: $0) } != nil
       guard arguments.count == 1 else {
         FileHandle.standardError.write(
-          Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n] [--bench]\n".utf8))
+          Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n] [--bench] [--window]\n".utf8))
         exit(64)
       }
       let text = String(decoding: try Data(contentsOf: URL(fileURLWithPath: arguments[0])), as: UTF8.self)
@@ -104,18 +113,132 @@
           format: "playing %@ (%.0f seconds a pass) at %.0f Hz", arguments[0], length,
           unit.outputFormat(forBus: 0).sampleRate))
       let until = seconds.map { Date().addingTimeInterval($0) }
+      if windowed, let host = driftbox.host {
+        let name = URL(fileURLWithPath: arguments[0]).lastPathComponent
+        try MainActor.assumeIsolated {
+          try watch(
+            host, bpm: song.bpm, title: "Driftbox — \(SongFile.name(fromFileName: name))", until: until,
+            report: { report(driftbox, peak) })
+        }
+        audio.stop()
+        return
+      }
       if until == nil { print("ctrl-c to stop") }
       while until.map({ Date() < $0 }) ?? true {
         Thread.sleep(forTimeInterval: 1)
-        let load = driftbox.host?.takeLoad() ?? (fraction: 0, longestMilliseconds: 0, calls: 0)
-        print(
-          String(
-            format:
-              "  peak %.3f  song frame %d  render %.1f%% of the audio's time, longest call %.2fms, %d calls",
-            peak.take(), driftbox.host?.songFrame.load(ordering: .relaxed) ?? -1, load.fraction * 100,
-            load.longestMilliseconds, load.calls))
+        report(driftbox, peak)
       }
       audio.stop()
+    }
+
+    /// What reaches the output, and what making it costs: proof of life, once a second.
+    static func report(_ driftbox: DriftboxAudioUnit, _ peak: Peak) {
+      let load = driftbox.host?.takeLoad() ?? (fraction: 0, longestMilliseconds: 0, calls: 0)
+      print(
+        String(
+          format:
+            "  peak %.3f  song frame %d  render %.1f%% of the audio's time, longest call %.2fms, %d calls",
+          peak.take(), driftbox.host?.songFrame.load(ordering: .relaxed) ?? -1, load.fraction * 100,
+          load.longestMilliseconds, load.calls))
+    }
+
+    /// The song, seen, as on Windows: Pulse in a window, from what the engine reports having
+    /// played, drawn through the GPU layer on Metal once per refresh of the display — taking the
+    /// layer's next drawable waits for one, which is what paces the loop — until the window is
+    /// closed or the time is up.
+    @MainActor
+    static func watch(
+      _ host: EngineHost, bpm: Double, title: String, until: Date?, report: () -> Void
+    ) throws {
+      let app = NSApplication.shared
+      app.setActivationPolicy(.regular)
+      app.finishLaunching()
+      let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 960, height: 540),
+        styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+      window.title = title
+      window.isReleasedWhenClosed = false
+      let layer = CAMetalLayer()
+      let view = NSView()
+      view.wantsLayer = true
+      view.layer = layer
+      window.contentView = view
+      window.center()
+      window.makeKeyAndOrderFront(nil)
+      app.activate()
+
+      func pixels() -> (width: Int, height: Int) {
+        let size = view.convertToBacking(view.bounds.size)
+        layer.contentsScale = window.backingScaleFactor
+        return (max(1, Int(size.width)), max(1, Int(size.height)))
+      }
+      let device = try MetalDevice()
+      var size = pixels()
+      let surface = try device.makeSurface(layer: layer, width: size.width, height: size.height)
+      let scene = try PulseScene(device: device)
+      let presenter = try Presenter(device: device)
+      var frame = try device.makeTarget(width: size.width, height: size.height)
+
+      // As the scene tests do: with DRIFTBOX_SCENE_SHOTS set to a directory, each second's frame
+      // is written there as it was presented, for looking at a run nobody watched.
+      let shots = ProcessInfo.processInfo.environment["DRIFTBOX_SCENE_SHOTS"]
+      var shot = 0
+      let began = HostTime.now()
+      var reported = began
+      var events: [EngineEvent] = []
+      while window.isVisible, until.map({ Date() < $0 }) ?? true {
+        while let event = app.nextEvent(matching: .any, until: .distantPast, inMode: .default, dequeue: true)
+        {
+          app.sendEvent(event)
+        }
+        let now = pixels()
+        if now != size {
+          size = now
+          try surface.resize(width: size.width, height: size.height)
+          frame = try device.makeTarget(width: size.width, height: size.height)
+        }
+        events.removeAll(keepingCapacity: true)
+        while let event = host.nextEvent() { events.append(event) }
+        host.collect()
+        let input = SceneInput(
+          time: HostTime.seconds(from: began, to: HostTime.now()),
+          peakLeft: Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
+          peakRight: Float(bitPattern: host.peakRight.load(ordering: .relaxed)), events: events,
+          running: host.playing.load(ordering: .relaxed), bpm: bpm,
+          pixelRatio: Float(window.backingScaleFactor))
+        scene.draw(input, into: frame, on: device)
+        let target = try surface.target()
+        presenter.present(frame, into: target, on: device)
+        let second = HostTime.seconds(from: reported, to: HostTime.now()) >= 1
+        if second, let shots {
+          shot += 1
+          try png(try device.readPixels(target), width: target.width, height: target.height)
+            .write(to: URL(fileURLWithPath: shots).appendingPathComponent("pulse-\(shot).png"))
+        }
+        try surface.present()
+        if second {
+          reported = HostTime.now()
+          report()
+        }
+      }
+      window.close()
+    }
+
+    /// BGRA pixels, rows from the top, as a PNG.
+    static func png(_ pixels: [UInt8], width: Int, height: Int) throws -> Data {
+      let data = NSMutableData()
+      guard let provider = CGDataProvider(data: Data(pixels) as CFData),
+        let image = CGImage(
+          width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
+          space: CGColorSpaceCreateDeviceRGB(),
+          bitmapInfo: CGBitmapInfo(
+            rawValue: CGImageAlphaInfo.noneSkipFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue),
+          provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent),
+        let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)
+      else { throw GPUError("could not make a PNG") }
+      CGImageDestinationAddImage(destination, image, nil)
+      guard CGImageDestinationFinalize(destination) else { throw GPUError("could not write a PNG") }
+      return data as Data
     }
   }
 #elseif os(Windows)

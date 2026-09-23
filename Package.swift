@@ -54,6 +54,8 @@ let package = Package(
     // What the scenes ask of a GPU, and the backends that answer it. The shaders are GLSL in
     // `shaders/`, made into every backend's language by `scripts/shaders.mjs` and checked in.
     .target(name: "DriftboxGPU"),
+    // Metal on the Mac and iOS; nothing anywhere else.
+    .target(name: "DriftboxGPUMetal", dependencies: ["DriftboxGPU"]),
     .target(
       name: "DriftboxGPUD3D11", dependencies: ["DriftboxGPU"],
       linkerSettings: [
@@ -91,6 +93,7 @@ let package = Package(
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostAndroid", condition: .when(platforms: [.android])),
         .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxGPUMetal", condition: .when(platforms: [.macOS])),
         .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
       ]),
 
@@ -111,10 +114,13 @@ let package = Package(
       name: "DriftboxHostWindowsTests", dependencies: ["DriftboxHostWindows", "DriftboxHost", "DriftboxSeq"]),
     .testTarget(name: "DriftboxHostAndroidTests", dependencies: ["DriftboxHostAndroid"]),
     .testTarget(
-      name: "DriftboxGPUTests", dependencies: ["DriftboxGPU", "DriftboxGPUD3D11", "DriftboxWin32"]),
+      name: "DriftboxGPUTests",
+      dependencies: ["DriftboxGPU", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxWin32"]),
     .testTarget(
       name: "DriftboxScenesTests",
-      dependencies: ["DriftboxScenes", "DriftboxEngine", "DriftboxGPU", "DriftboxGPUD3D11"]),
+      dependencies: [
+        "DriftboxScenes", "DriftboxEngine", "DriftboxGPU", "DriftboxGPUD3D11", "DriftboxGPUMetal",
+      ]),
     .testTarget(
       name: "DriftboxHostTests",
       dependencies: [

@@ -389,11 +389,13 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    uniform blocks' Swift structs from its reflection; all of it checked in, and checked for
    staleness in CI. Then surfaces — a window's swap chain behind `GPUSurface`, and `Presenter` —
    and the first scene across: `PulseScene` on `GPUScene`, its shader the Metal one's GLSL, held to
-   the Metal one's test, and on screen in `driftbox-play --window` with the song playing. Left: a
-   Metal backend held to the same contract, which needs a Mac; then the rest of the scenes moved
-   onto the layer — the camera and the geometry helpers out of `canImport(Metal)`, `simd` for
-   `Matrix4`, each scene's MSL turned back into the GLSL it came from — one at a time, each held by
-   the offscreen render every scene already has, and the Metal `Scene` gone at the end.
+   the Metal one's test, and on screen in `driftbox-play --window` with the song playing. Then
+   `DriftboxGPUMetal`, held to the same contract on the Mac's GPU, a `CAMetalLayer` behind
+   `GPUSurface`, `PulseScene` held pixel for pixel to the Metal `Pulse`, and `--window` on the Mac
+   too. Left: the rest of the scenes moved onto the layer — the camera and the geometry helpers
+   out of `canImport(Metal)`, `simd` for `Matrix4`, each scene's MSL turned back into the GLSL it
+   came from — one at a time, each held by the offscreen render every scene already has, and the
+   Metal `Scene` gone at the end.
 4. **The window, drawn.** Begun: `DriftboxWin32` has a window, its messages and per-monitor DPI.
    The interface is drawn on the GPU layer rather than built from a toolkit, which is in keeping
    with an instrument and keeps what the app depends on small: input, menus, dialogs and settings
