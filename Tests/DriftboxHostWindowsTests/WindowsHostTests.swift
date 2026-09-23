@@ -176,6 +176,13 @@
       #expect(WinMMOutput.packed([0x40]) == nil)
     }
 
+    /// What goes out packed comes back in as the bytes it was.
+    @Test func shortMessagesUnpackAsTheyWerePacked() throws {
+      for bytes: [UInt8] in [[0x90, 60, 127], [0xB3, 7, 100], [0xE0, 0, 64], [0xF8, 0, 0]] {
+        #expect(WinMMInput.bytes(try #require(WinMMOutput.packed(bytes))) == bytes)
+      }
+    }
+
     @Test func thereIsNoVirtualSource() {
       let out = WinMMOutput()
       #expect(!out.offersVirtualSource)

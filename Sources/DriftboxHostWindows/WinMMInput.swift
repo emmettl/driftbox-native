@@ -15,6 +15,7 @@
       var ordered: [String] = []
       var ignoring: Set<String> = []
       var onNote: (@Sendable (Int, Double) -> Void)?
+      var onMessage: (@Sendable ([UInt8]) -> Void)?
       var onClock: (@Sendable (ClockMessage, Double) -> Void)?
       var onSourcesChange: (@Sendable ([String]) -> Void)?
     }
@@ -39,6 +40,11 @@
     public var onNote: (@Sendable (Int, Double) -> Void)? {
       get { state.withLock { $0.onNote } }
       set { state.withLock { $0.onNote = newValue } }
+    }
+
+    public var onMessage: (@Sendable ([UInt8]) -> Void)? {
+      get { state.withLock { $0.onMessage } }
+      set { state.withLock { $0.onMessage = newValue } }
     }
 
     public var onClock: (@Sendable (ClockMessage, Double) -> Void)? {
@@ -112,15 +118,20 @@
       port.input?.receive(UInt32(truncatingIfNeeded: packed), from: port.name)
     }
 
+    /// A WinMM short message as its three bytes: status in the low byte, then the data.
+    static func bytes(_ packed: UInt32) -> [UInt8] {
+      [UInt8(packed & 0xFF), UInt8((packed >> 8) & 0x7F), UInt8((packed >> 16) & 0x7F)]
+    }
+
     private func receive(_ packed: UInt32, from source: String) {
-      let (onNote, onClock) = state.withLock { state in
-        state.ignoring.contains(source) ? (nil, nil) : (state.onNote, state.onClock)
+      let (onNote, onMessage, onClock) = state.withLock { state in
+        state.ignoring.contains(source) ? (nil, nil, nil) : (state.onNote, state.onMessage, state.onClock)
       }
-      guard onNote != nil || onClock != nil else { return }
-      let status = UInt8(packed & 0xFF)
-      let data1 = UInt8((packed >> 8) & 0xFF)
-      let data2 = UInt8((packed >> 16) & 0xFF)
-      switch MIDIMessage(status: status, data1, data2) {
+      guard onNote != nil || onMessage != nil || onClock != nil else { return }
+      let bytes = Self.bytes(packed)
+      // A channel message whole, as the Mac passes it on, before what Driftbox makes of it.
+      if (0x80..<0xF0).contains(bytes[0]) { onMessage?(bytes) }
+      switch MIDIMessage(status: bytes[0], bytes[1], bytes[2]) {
       case .note(let note, let velocity): onNote?(note, velocity)
       case .clock(let clock): onClock?(clock, HostTime.milliseconds())
       case nil: break

@@ -1,11 +1,13 @@
 import DriftboxSeq
 
 /// Every MIDI source a platform has, as the rest of Driftbox hears them. Notes go to `onNote`
-/// (note number, velocity 0...1 — 0 is a release); clock messages, stamped in milliseconds, to
-/// `onClock`; the list of sources, whenever a device comes or goes, to `onSourcesChange`. All
-/// three may be called on any thread.
+/// (note number, velocity 0...1 — 0 is a release); every channel message — notes with their
+/// channel, controllers, pressure, bend — as its three bytes to `onMessage`; clock messages,
+/// stamped in milliseconds, to `onClock`; the list of sources, whenever a device comes or goes, to
+/// `onSourcesChange`. All may be called on any thread.
 public protocol MIDIInputPort: AnyObject, Sendable {
   var onNote: (@Sendable (Int, Double) -> Void)? { get set }
+  var onMessage: (@Sendable ([UInt8]) -> Void)? { get set }
   var onClock: (@Sendable (ClockMessage, Double) -> Void)? { get set }
   var onSourcesChange: (@Sendable ([String]) -> Void)? { get set }
   /// Every source there is, whether it is being listened to or not.
