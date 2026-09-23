@@ -451,9 +451,12 @@ each question, and the rest is Android's alone:
    What it found: a stamp is only kept to by a device that keeps to stamps. Android's USB driver
    does, by its source; a device that is another app is handed a message at once, so a clock sent
    a tenth of a second ahead arrived a tenth of a second early, and a flush dropped nothing. The
-   roadmap said clock out would need no scheduler of its own, and for another app it does. ← *next:*
-   `AMidiOutput` holds a message until shortly before its time for any device that is not USB,
-   as WinMM's scheduler does, and sends it stamped; a USB device measured with a controller.
+   roadmap said clock out would need no scheduler of its own, and for another app it does.
+   So now `AMidiOutput` holds every message for a device that is not USB in a scheduler of its
+   own until it is due, and sends it stamped, as WinMM's does; the two share `MIDIQueue` in
+   `DriftboxHost`. Its thread waits on a condition against `CLOCK_MONOTONIC`, at urgent audio
+   priority and kept to the big cores, and sends a beat of clock 0.1 to 2ms after each tick was
+   due. Left: a USB device, measured with a controller, to see its driver keep to the stamps.
 3. **A third backend under the GPU layer.** OpenGL ES 3.0 covers everything the scenes ask of
    Metal, and every Android device has it. The shaders run to 2,400 lines across 29 scenes, and a
    third copy by hand is where writing them out stops being sensible (see below). `GraphicLab`

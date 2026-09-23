@@ -15,12 +15,6 @@
   ///
   /// The thread holds the `Core` and nothing else, so letting go of the scheduler is what ends it.
   final class MIDIScheduler: Sendable {
-    struct Item {
-      var time: UInt64
-      var destination: String
-      var message: UInt32
-    }
-
     private let core: Core
 
     init(deliver: @escaping @Sendable (String, UInt32) -> Void) {
@@ -34,21 +28,17 @@
 
     /// Send `message` to `destination` at `time`.
     func schedule(_ message: UInt32, to destination: String, at time: UInt64) {
-      core.queue.withLock { items in
-        // Stamps arrive in order almost always, so the place for one is nearly always the end.
-        let at = items.lastIndex { $0.time <= time }.map { $0 + 1 } ?? 0
-        items.insert(Item(time: time, destination: destination, message: message), at: at)
-      }
+      core.queue.withLock { $0.add(message, to: destination, at: time) }
       SetEvent(core.wake)
     }
 
     /// Forget whatever has not gone to `destination` yet.
     func drop(_ destination: String) {
-      core.queue.withLock { $0.removeAll { $0.destination == destination } }
+      core.queue.withLock { $0.drop(destination) }
     }
 
     private final class Core: @unchecked Sendable {
-      let queue = Mutex<[Item]>([])
+      let queue = Mutex(MIDIQueue<UInt32>())
       private let running = Atomic<Bool>(true)
       /// Handles, made once and closed once the thread has finished with them.
       let wake: HANDLE?
@@ -88,12 +78,7 @@
         var handles: [HANDLE?] = [wake, timer]
         while running.load(ordering: .acquiring) {
           let now = HostTime.now()
-          let (due, next) = queue.withLock { items -> ([Item], UInt64?) in
-            let count = items.firstIndex { $0.time > now } ?? items.count
-            let due = Array(items[..<count])
-            items.removeFirst(count)
-            return (due, items.first?.time)
-          }
+          let (due, next) = queue.withLock { queue in (queue.takeDue(at: now), queue.next) }
           for item in due { deliver(item.destination, item.message) }
           if let next {
             // Relative, in hundreds of nanoseconds, which the timer takes as a negative number.
