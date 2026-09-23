@@ -17,10 +17,10 @@ jobs:
     name: Fixtures match the reference
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - run: scripts/check-fixtures.sh
@@ -31,7 +31,7 @@ jobs:
         run: |
           node --no-warnings conformance/emit/emit.mjs --full
           node --no-warnings conformance/emit/emit-audio.mjs
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: generated-fixtures
           path: conformance/generated
@@ -45,8 +45,8 @@ jobs:
     env:
       DRIFTBOX_REQUIRE_GENERATED: 1
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v6
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: generated-fixtures
           path: conformance/generated
@@ -67,15 +67,41 @@ jobs:
     env:
       DRIFTBOX_REQUIRE_GENERATED: 1
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v6
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: generated-fixtures
           path: conformance/generated
-      - uses: compnerd/gha-setup-swift@bbae8ce86bac5a3449f3992b3d88bc4ca25f2057  # main, pinned
+      # Sometimes the installer succeeds and leaves the toolchain off PATH, and the action's own
+      # version check then fails to find `swift`: compnerd/gha-setup-swift#58, open upstream. So
+      # the action may fail, the next step puts the toolchain back if that is all that went wrong,
+      # and the step after says whether Swift is really there. Nothing the action does after its
+      # version check matters to a 6.4 toolchain. Drop all three once #58 is released.
+      - uses: compnerd/gha-setup-swift@bbae8ce86bac5a3449f3992b3d88bc4ca25f2057  # v0.5.0, pinned
+        id: swift
+        continue-on-error: true
         with:
           swift-version: swift-6.4.0-release
           swift-build: 6.4.0-RELEASE
+      - name: Find the toolchain if the installer left it off PATH
+        if: steps.swift.outcome == 'failure'
+        shell: pwsh
+        run: |
+          if (Get-Command swift -ErrorAction SilentlyContinue) { exit 0 }
+          if (-not $env:SDKROOT -or $env:SDKROOT -notmatch '\\Platforms\\') {
+            Write-Host "::error::Swift is not on PATH and SDKROOT does not say where it was installed"
+            exit 1
+          }
+          $root = $env:SDKROOT.Substring(0, $env:SDKROOT.IndexOf('\Platforms\'))
+          $found = @(Get-ChildItem -Path "$root\Toolchains\*\usr\bin\swift.exe" -ErrorAction SilentlyContinue)
+          if ($found.Count -ne 1) {
+            Write-Host "::error::Expected one Swift toolchain under $root\Toolchains, found $($found.Count)"
+            exit 1
+          }
+          Write-Host "::warning::The Swift installer left its toolchain off PATH; adding $($found[0].DirectoryName)"
+          $found[0].DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Swift is installed
+        run: swift --version
       - name: Build
         run: swift build -c release --build-tests --build-system native -Xswiftc -enable-testing
       - name: Test
