@@ -22,13 +22,22 @@ public protocol GPUScene: AnyObject {
 public enum GPUScenes {
   // Tables of types, made once and never changed, as `Scenes` has them: nothing about them can
   // race, which the compiler cannot see because a scene's type is not itself `Sendable`.
-  nonisolated(unsafe) public static let all: [any GPUScene.Type] = [PulseScene.self] + surfaces
+  nonisolated(unsafe) public static let all: [any GPUScene.Type] =
+    [PulseScene.self] + surfaces + geometry
   nonisolated(unsafe) public static let fallback: any GPUScene.Type = PulseScene.self
 
   /// The web's material studies, in the order `Scenes.surfaces` has them.
   static let surfaces: [GPUSurfaceScene.Type] = [
     OrreryScene.self, SwitchbackScene.self, DaydreamScene.self, SmallHoursScene.self,
     PaperCitiesScene.self, WeaveScene.self, FrostScene.self, HothouseScene.self, NightBusScene.self,
+  ]
+  /// The web's three.js scenes, in the order `Scenes.geometry` has them: all but Graphic Lab,
+  /// which draws a canvas of text through Core Text and waits on a way to do that elsewhere.
+  static let geometry: [GPUGeometryScene.Type] = [
+    WireframeScene.self, SunsetScene.self, WebScene.self, SaturnScene.self, LifeformsScene.self,
+    CubikScene.self, StillwaterScene.self, CyclesScene.self, CloudsScene.self, LonghandScene.self,
+    DefconScene.self, DancersScene.self, ConvoyScene.self, MachineScene.self, JumpmanScene.self,
+    TrenchScene.self,
   ]
 
   public static func type(for id: String?) -> any GPUScene.Type {

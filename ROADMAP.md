@@ -406,10 +406,24 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    instanced quads. Each is held on WARP to drawing and moving, and on the Mac to its Metal scene
    frame by frame. `GPUScenes` finds them by a song's `visual`, and `driftbox-play --window` shows
    them on Windows, with the mix's levels and the score's position as the Mac feeds them.
-   `Timeline` moved from the app to `DriftboxSeq` for that. Left: the seventeen geometry scenes,
-   with the camera and the geometry helpers out of `canImport(Metal)`, `simd` for `Matrix4`, and
-   text for Graphic Lab. Then `--window` on the Mac showing the song's scene rather than Pulse,
-   and the Metal `Scene` gone at the end.
+   `Timeline` moved from the app to `DriftboxSeq` for that. Then sixteen of the seventeen geometry
+   scenes on `GPUGeometryScene`:
+   - The camera and the geometry helpers are out of `canImport(Metal)`, on `Matrix4` rather than
+     `simd`, and the Metal scenes use the same code through a bridge.
+   - Sized points are sprites: instanced quads, sized in pixels by `sprite.glsl`.
+   - Each scene is held on WARP to drawing and moving through the Metal scene test's six seconds,
+     and on the Mac to its Metal scene frame by frame.
+
+   Left:
+   - Graphic Lab, which sets type through Core Text every frame. It needs a text and canvas port
+     with a Windows implementation first, and that design is still open.
+   - A cull mode in `GPUPipelineDescriptor`. Longhand discards back faces in its fragment shader
+     meanwhile; `gl_FrontFacing` means the same on every backend.
+   - A depth test without depth writes, which Convoy's dust and Machine's sparks had in Metal.
+     Convoy's dust needs no depth at all, since it is in front of everything; Machine sorts its
+     sparks back to front.
+   - `--window` on the Mac showing the song's scene rather than Pulse, and the Metal `Scene`
+     gone at the end.
 4. **The window, drawn.** ← *here.* The shell first: `DriftboxShell` says what the app asks of a
    window in platform-neutral terms — pointers, keys and scrolling as events in points, a menu bar
    as data with shortcuts on the platform's own modifier, file panels, a loop that keeps drawing

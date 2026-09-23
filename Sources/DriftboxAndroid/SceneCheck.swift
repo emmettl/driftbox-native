@@ -6,7 +6,7 @@
   import DriftboxScenes
 
   /// Every scene on the GPU layer, on the phone's own GPU: each one draws, is not black, and moves
-  /// when the music does, as `SurfaceSceneTests` holds them on the other backends, with its input.
+  /// when the music does, as `GPUSceneTests` holds them on the other backends.
   /// Their shaders are compiled here by a phone's OpenGL ES driver, which is not Mesa's; and each is
   /// timed at the size the app draws it for this screen, and at every pixel of the screen, which is
   /// what says whether it keeps up with the display.
@@ -64,8 +64,9 @@
       return "\(tenths / 10).\(tenths % 10)ms"
     }
 
-    /// A few seconds of playing, as `SurfaceSceneTests` has it: running, on the beat, the bands up,
-    /// a finger down for a while.
+    /// A few seconds of playing: running, on the beat, the bands up, a finger down for a while. The
+    /// input the surface scenes' test had; `GPUSceneTests` now plays the Metal scene test's six
+    /// seconds instead, and this could too.
     static func playing(at time: Double) -> SceneInput {
       let swell = Float(0.5 + 0.4 * sin(time * 3))
       return SceneInput(
