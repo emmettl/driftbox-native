@@ -11,28 +11,30 @@
   import DriftboxSeq
   import Synchronization
 
-  /// A song, played and seen: the engine through AAudio, and Pulse drawn from what it played on
-  /// the phone's screen, as `driftbox-play --window` does on Windows and the Mac, with the whole
-  /// screen a pad for the performance filter.
+  /// A song, played and seen: the engine through AAudio, and the scene it names drawn from what it
+  /// played on the phone's screen, as `driftbox-play --window` does on Windows and the Mac, with
+  /// the whole screen a pad for the performance filter.
   ///
   /// Two threads. Java's main thread, which calls in, owns the engine's commands and the audio route,
   /// both of which are the main actor's; and a render thread of the `Renderer`'s own owns everything
-  /// OpenGL, since a context is current on one thread, and reads the engine's events.
+  /// OpenGL, since a context is current on one thread, and reads the engine's events and its mix.
   @MainActor
-  final class PulseStage {
+  final class Stage {
     private let host: EngineHost
     private let route: AAudioRoute
     private let lost = Flag()
     private let renderer: Renderer
 
-    init?(json: String) {
+    /// `json` played, with the scene called `scene` drawn from it, or the one the song names, on
+    /// a screen of `density` pixels to a point.
+    init?(json: String, scene: String?, density: Float) {
       guard let song = SongCodec.decode(json) else { return nil }
       host = EngineHost(sampleRate: 48000)
       route = AAudioRoute(hop: { [lost] _ in lost.raise() })
       host.load(song)
       host.send(.play)
       route.attach(host.renderSource)
-      renderer = Renderer(host: host, bpm: song.bpm)
+      renderer = Renderer(host: host, song: song, scene: scene ?? song.visual, density: density)
     }
 
     /// Stop drawing and playing, and wait until both have.
@@ -55,6 +57,11 @@
       renderer.paused.store(!shown, ordering: .releasing)
     }
 
+    /// The next scene there is, as the Scene menu's next does on Windows.
+    func nextScene() {
+      renderer.steps.add(1, ordering: .releasing)
+    }
+
     func show(window: OpaquePointer, width: Int, height: Int) {
       renderer.change(to: Renderer.Window(handle: window, width: width, height: height))
     }
@@ -64,7 +71,7 @@
     }
 
     /// A finger at `x, y`, 0...1 from the bottom left, or lifted: the performance filter's pad, and
-    /// Pulse drawing the finger where it is.
+    /// the scene feeling the finger where it is.
     func touch(x: Float, y: Float, down: Bool) {
       if down {
         host.send(.pad(x: Double(x), y: Double(y)))
@@ -95,8 +102,22 @@
     func take() -> Bool { raised.exchange(false, ordering: .acquiringAndReleasing) }
   }
 
-  /// The render thread: an OpenGL ES device, Pulse, and the window it draws in when there is one.
+  /// The render thread: an OpenGL ES device, a scene, and the window it draws in when there is one.
   final class Renderer: @unchecked Sendable {
+    /// What a scene is drawn at on a screen `width` by `height` pixels of `density` pixels to a
+    /// point: no more than two pixels to a point, as a Mac's Retina display draws it, and scaled up
+    /// to the screen as it is shown. A phone's screen is denser than that, and the scenes are soft
+    /// enough not to show it: measured on a Fairphone 6, at its own 3, Frost took 21ms a frame
+    /// at every pixel, and two others more than the display's 8.3.
+    static func drawn(width: Int, height: Int, density: Float) -> (width: Int, height: Int, pixelRatio: Float)
+    {
+      let scale = min(1, 2 / max(density, 1))
+      return (
+        max(1, Int((Float(width) * scale).rounded())), max(1, Int((Float(height) * scale).rounded())),
+        max(density, 1) * scale
+      )
+    }
+
     struct Window: @unchecked Sendable {
       var handle: OpaquePointer
       var width: Int
@@ -110,19 +131,25 @@
     }
 
     private let host: EngineHost
-    private let bpm: Double
+    private let song: Song
+    private let firstScene: String?
+    private let density: Float
     private let changes = Mutex(Change())
     private let running = Atomic<Bool>(true)
     /// Set while the app is out of view: a window kept, but nothing drawn in it.
     let paused = Atomic<Bool>(false)
+    /// Scenes to step on by, asked for and not yet taken.
+    let steps = Atomic<Int>(0)
     private let frames = Atomic<Int>(0)
     private let said = Mutex("starting")
     let touch = Mutex<SIMD2<Float>?>(nil)
     private var thread = pthread_t()
 
-    init(host: EngineHost, bpm: Double) {
+    init(host: EngineHost, song: Song, scene: String?, density: Float) {
       self.host = host
-      self.bpm = bpm
+      self.song = song
+      firstScene = scene
+      self.density = density
       pthread_create(
         &thread, nil,
         { context in
@@ -155,12 +182,12 @@
 
     private func run() {
       let device: GLESDevice
-      let scene: PulseScene
       let presenter: Presenter
+      var scene: any GPUScene
       do {
         device = try GLESDevice()
-        scene = try PulseScene(device: device)
         presenter = try Presenter(device: device)
+        scene = try GPUScenes.type(for: firstScene).init(device: device)
       } catch {
         said.withLock { $0 = "no GPU: \(error)" }
         drainChanges()
@@ -168,29 +195,53 @@
       }
       var surface: (any GPUSurface)?
       var frame: (any GPUTarget)?
+      var pixelRatio = density
+      var size = ""
       var seen = 0
       let began = HostTime.now()
+      let timeline = Timeline(song: song)
       var events: [EngineEvent] = []
+      // The mix's spectrum, as the other players keep it: worked out again only when new audio has
+      // arrived, since the smoothing is per analysis and would otherwise follow the display's rate.
+      let analyser = Analyser()
+      var monitor = [Float](repeating: 0, count: Analyser.size)
+      var analysedAt = -1
+      func say() { said.withLock { $0 = "of \(type(of: scene).name) \(size) on \(device.renderer)" } }
+      say()
       while running.load(ordering: .acquiring) {
         let (window, ticket) = changes.withLock { ($0.window, $0.asked) }
         if ticket != seen {
           surface = nil
           frame = nil
+          size = "with no window"
           if let window {
             do {
               surface = try device.makeSurface(
                 window: window.handle, width: window.width, height: window.height)
-              frame = try device.makeTarget(width: window.width, height: window.height)
-              said.withLock { $0 = "drawing \(window.width) by \(window.height) on \(device.renderer)" }
+              let drawn = Self.drawn(width: window.width, height: window.height, density: density)
+              frame = try device.makeTarget(width: drawn.width, height: drawn.height)
+              pixelRatio = drawn.pixelRatio
+              size = "at \(drawn.width) by \(drawn.height) on a screen \(window.width) by \(window.height)"
             } catch {
               surface = nil
-              said.withLock { $0 = "no surface: \(error)" }
+              size = "with no surface: \(error)"
             }
-          } else {
-            said.withLock { $0 = "with no window" }
           }
+          say()
           seen = ticket
           changes.withLock { $0.done = ticket }
+        }
+        let step = steps.exchange(0, ordering: .acquiringAndReleasing)
+        if step != 0 {
+          let all = GPUScenes.all
+          let at = all.firstIndex { $0.id == type(of: scene).id } ?? 0
+          let next = all[(at + step) % all.count]
+          do {
+            scene = try next.init(device: device)
+          } catch {
+            size = "and could not show \(next.name): \(error)"
+          }
+          say()
         }
         guard let surface, let frame, !paused.load(ordering: .acquiring) else {
           pause(0.01)
@@ -198,18 +249,29 @@
         }
         events.removeAll(keepingCapacity: true)
         while let event = host.nextEvent() { events.append(event) }
+        if host.mixWritten != analysedAt {
+          analysedAt = host.mixWritten
+          monitor.withUnsafeMutableBufferPointer { buffer in
+            host.recentMix(Analyser.size, into: buffer.baseAddress!)
+            analyser.update(UnsafeBufferPointer(buffer))
+          }
+        }
+        let songFrame = host.songFrame.load(ordering: .relaxed)
         let input = SceneInput(
           time: HostTime.seconds(from: began, to: HostTime.now()),
           peakLeft: Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
           peakRight: Float(bitPattern: host.peakRight.load(ordering: .relaxed)), events: events,
-          touch: touch.withLock { $0 }, running: host.playing.load(ordering: .relaxed), bpm: bpm)
+          touch: touch.withLock { $0 }, running: host.playing.load(ordering: .relaxed), bpm: song.bpm,
+          scoreBeat: songFrame < 0 ? nil : timeline.scoreBeat(at: Double(songFrame) / host.sampleRate),
+          levels: analyser.levels(), wideLevels: analyser.wideLevels(), bands: analyser.bands(16),
+          pixelRatio: pixelRatio)
         scene.draw(input, into: frame, on: device)
         do {
           presenter.present(frame, into: try surface.target(), on: device)
           try surface.present()
           frames.add(1, ordering: .relaxed)
         } catch {
-          said.withLock { $0 = "could not show a frame: \(error)" }
+          said.withLock { $0 = "that could not be shown: \(error)" }
           pause(0.1)
         }
       }

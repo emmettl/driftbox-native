@@ -5,6 +5,7 @@
 #     scripts/android-app.sh                    # build and install; it opens on Pulse, playing acid
 #     scripts/android-app.sh midi-loopback      # and run the MIDI ports against Driftbox Loopback
 #     scripts/android-app.sh gpu                # or the GPU contract on the phone's GPU
+#     scripts/android-app.sh scenes             # or every scene drawn, checked and timed
 #
 # No Gradle: the SDK's own tools, in the order Gradle would call them. Beyond what
 # `android-env.sh` needs, a JDK (JAVA_HOME, or the newest under Programs/Java), and the Android

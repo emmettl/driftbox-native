@@ -290,15 +290,19 @@ message in a scheduler of its own until it is due, and sends it stamped, as WinM
 does on Windows; the two share `MIDIQueue` in `DriftboxHost`, and each waits in its own way.
 
 The app is built without Gradle, by the SDK's own tools. Opened, it plays a song from the
-catalogue with Pulse drawn from it over the whole screen, at the display's 120 frames a second,
-and the screen is the performance filter's pad, as the window is on Windows. Given a test's name,
-it runs that instead and says what happened.
+catalogue with the scene the song names drawn from it over the whole screen, and the screen is
+the performance filter's pad, as the window is on Windows; two fingers tapped step on to the next
+scene. A scene is drawn at no more than two pixels to a point, a Mac's Retina display's, and
+scaled up to the screen: on a Fairphone 6, which has three, every scene but Frost then keeps the
+display's 120 frames a second, and Frost 98. Given a test's name, the app runs that instead and
+says what happened.
 
 ```bash
 scripts/android-app.sh                  # build and install; open it for Pulse, playing acid
-adb shell am start -n app.driftbox/.Main --es song smallhours
+adb shell am start -n app.driftbox/.Main --es song smallhours --es scene hothouse
 scripts/android-app.sh midi-loopback    # test the MIDI ports against the app's own loopback
 scripts/android-app.sh gpu              # or the GPU contract on the phone's GPU
+scripts/android-app.sh scenes           # or every scene drawn, checked and timed there
 ```
 
 Two threads: Java's main thread owns the engine's commands and the audio route, and a render

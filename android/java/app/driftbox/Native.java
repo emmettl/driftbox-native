@@ -22,8 +22,17 @@ final class Native {
   /** The GPU contract's checks, on this phone's GPU, through OpenGL ES. Blocks while it draws. */
   static native String gpuCheck();
 
-  /** Play a song document, and draw Pulse from it in whatever window it is given. */
-  static native boolean start(String json);
+  /** Every scene drawn, checked, and timed on a screen width by height at density. Blocks. */
+  static native String sceneCheck(int width, int height, float density);
+
+  /**
+   * Play a song document, and draw a scene from it in whatever window it is given: the one called
+   * {@code scene}, or the one the song names when that is null.
+   */
+  static native boolean start(String json, String scene, float density);
+
+  /** Show the next scene there is. */
+  static native void nextScene();
 
   /** Stop playing and drawing, and wait until both have. */
   static native void stop();
