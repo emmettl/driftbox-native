@@ -24,6 +24,7 @@
     public var body: some View {
       VStack(spacing: 0) {
         RackHeader(model: model, octave: octave)
+        if let notice = model.notice { NoticeBar(notice: notice) }
         RackStage(model: model)
       }
       .background(Theme.ground)
@@ -155,6 +156,25 @@
     }
   }
 
+  /// What the rack is holding when it is not a patch built here: whether a song is in it whole.
+  struct NoticeBar: View {
+    let notice: DocumentNotice
+
+    var body: some View {
+      HStack(alignment: .firstTextBaseline, spacing: 10) {
+        Text(notice.label.uppercased()).font(Theme.mono(8.5, .semibold)).tracking(0.8)
+          .foregroundStyle(Theme.three)
+        Text("\(notice.retained) \(notice.guidance)")
+          .font(.system(size: 11)).foregroundStyle(Theme.dim)
+          .fixedSize(horizontal: false, vertical: true)
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, 16).padding(.vertical, 7)
+      .background(Theme.panel.opacity(0.6))
+      .overlay(alignment: .bottom) { Rectangle().fill(Theme.edge).frame(height: 1) }
+    }
+  }
+
   /// The factory patches, by kind, and what is open now.
   struct PatchMenu: View {
     let model: RackModel
@@ -178,6 +198,21 @@
         if !others.isEmpty {
           Section("More") {
             ForEach(others) { entry in Button(entry.name) { model.open(entry) } }
+          }
+        }
+        // A groovebox song, whole, played beside the rack with its machines on a Groovebox source.
+        if let player = model.groovebox {
+          Section("Groovebox Songs") {
+            if let song = player.song, !player.linkedToRack {
+              Button("\(player.documentName), from the Groovebox Window") {
+                model.openSong(song, name: player.documentName)
+              }
+            }
+            ForEach(player.entries) { entry in
+              Button(entry.name) {
+                if let song = Catalogue.song(entry.id) { model.openSong(song, name: entry.name) }
+              }
+            }
           }
         }
       } label: {

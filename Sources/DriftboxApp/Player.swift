@@ -428,11 +428,33 @@
       return true
     }
 
+    // MARK: - The rack's song
+
+    /// The rack's song, open here to be edited: each edit goes straight back to the rack, which
+    /// plays it on in place, and the link ends when anything else is opened here.
+    private var rackLink: (edited: (Song) -> Void, ended: () -> Void)?
+    var linkedToRack: Bool { rackLink != nil }
+
+    /// Open the rack's `song`, called `name`, to edit it for the rack. Not remembered as the song
+    /// to open next time, since it lives in the rack; and not played here, since the rack is
+    /// playing it.
+    func link(_ song: Song, name: String, edited: @escaping (Song) -> Void, ended: @escaping () -> Void) {
+      if isPlaying { stop() }
+      take(
+        song, as: CatalogueEntry(id: "rack", name: name, blurb: "In the rack", visual: song.visual ?? ""),
+        from: nil, remembered: false)
+      rackLink = (edited, ended)
+    }
+
+    /// Let the rack's song go, keeping it here as a song of its own.
+    func unlinkRack() { rackLink = nil }
+
     // MARK: - Remembered between launches
 
     /// The rack, played through the same device as the song, after the song's master: its own
     /// source on this engine, so choosing an output moves both.
     public func attach(_ rack: RackModel) {
+      rack.groovebox = self
       rack.attach(to: audio)
       rack.midiSources = midiSources
       self.rack = rack
@@ -501,12 +523,17 @@
 
     /// Everything that puts a different song in the window: the undo history is the old song's and
     /// goes with it, and what arrives is unedited whatever the thing it replaced was.
-    private func take(_ loaded: Song, as entry: CatalogueEntry, from url: URL?) {
+    private func take(_ loaded: Song, as entry: CatalogueEntry, from url: URL?, remembered: Bool = true) {
+      // Whatever was linked to the rack is let go of, before anything else arrives.
+      if let link = rackLink {
+        rackLink = nil
+        link.ended()
+      }
       current = entry
       fileURL = url
       editing = nil
       loop = nil
-      remember(entry, at: url)
+      if remembered { remember(entry, at: url) }
       undoManager?.removeAllActions()
       refreshUndo()
       song = loaded
@@ -861,6 +888,7 @@
       load(edited)
       send(.seek(songFrame: position))
       if isPlaying { startEngine() }
+      rackLink?.edited(edited)
     }
 
     // MARK: - Where the song is

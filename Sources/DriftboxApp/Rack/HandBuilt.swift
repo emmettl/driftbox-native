@@ -28,6 +28,7 @@
       "sampler": ["slices", "slice", "start", "loop", "reverse"],
       "multisampler": Set(MultisamplerFace.knobs),
       "audio-track": ["start", "level"],
+      "groovebox": Set(GrooveboxFace.machines.flatMap { ["\($0.1)-level", "\($0.1)-pan", "\($0.1)-mute"] }),
     ]
   }
 
