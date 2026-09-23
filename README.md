@@ -27,9 +27,11 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxEngine` | The instruments, mixer and effects behind one `render`. **Constrained.** |
 | `Sources/DriftboxRack` | The modular rack: the patch compiler, the graph, the modules. **Constrained.** |
 | `Sources/DriftboxDocument` | The song codec, migrations, shareable URLs, the catalogue. |
-| `Sources/DriftboxHost` | The engine and rack hosts, the rings to and from the render thread, and the ports every platform's audio and MIDI sits behind. The Mac's adapters too, for now. |
+| `Sources/DriftboxHost` | The engine and rack hosts, the rings to and from the render thread, the ports every platform's audio and MIDI sits behind, and the mixer every platform's output renders through. The Mac's adapters too, for now. |
 | `Sources/DriftboxHostWindows` | WASAPI and WinMM behind those ports: the host on Windows. |
 | `Sources/CWASAPI` | The Windows audio headers Swift's WinSDK module leaves out. Declarations only. |
+| `Sources/DriftboxHostAndroid` | AAudio behind the same ports: the host on Android, audio only so far. |
+| `Sources/CAAudio` | AAudio's header, which the Swift SDK's Android module leaves out. Declarations only. |
 | `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |
 | `Sources/DriftboxGPU` | What the scenes ask of a GPU, as a protocol every backend answers the same way. |
 | `Sources/DriftboxGPUD3D11` | That protocol on Direct3D 11: the GPU on Windows. |
@@ -70,9 +72,10 @@ written down once, in `DriftboxHost`, and each platform answers it in a target o
 
 ```
 the app            views, and the one place that picks a platform's adapters
-adapters           DriftboxHostWindows: WASAPI, WinMM      the Mac's: AVAudioEngine, CoreMIDI
+adapters           DriftboxHostWindows: WASAPI, WinMM      DriftboxHostAndroid: AAudio
+                   the Mac's: AVAudioEngine, CoreMIDI
 ports              DriftboxHost: AudioRouting, MIDIInputPort, MIDIOutputPort, HostTime, RenderSource
-hosts              DriftboxHost: EngineHost, RackHost, the rings
+hosts              DriftboxHost: EngineHost, RackHost, the rings, the Mixer
 constrained core   DSP, Seq, Engine, Rack
 ```
 
@@ -92,10 +95,12 @@ output converts, on both platforms), and no virtual MIDI source that a platform 
 by hand. A device renders a `RenderSource` — a C function and a context pointer — rather than a
 protocol or a closure, so that a platform's audio callback calls into Driftbox without retaining,
 releasing or dispatching through a witness table. `EngineHost` and `RackHost` each hand one out.
-On Windows the sources are summed through a table swapped whole behind one atomic pointer, and the
-old table is freed only once the render thread has finished a buffer since.
+On Windows and Android the sources are summed by `DriftboxHost`'s `Mixer`, through a table swapped
+whole behind one atomic pointer, and the old table is freed only once the render thread has
+finished a buffer since.
 
-**Where it stands.** `DriftboxHostWindows` is built on the ports and tested against them.
+**Where it stands.** `DriftboxHostWindows` is built on the ports and tested against them, and so
+is `DriftboxHostAndroid`'s audio, played through a phone.
 The Mac's adapters — `AudioRoute`, `DriftboxAudioUnit`, `MIDIInput`, `MIDIOutput` — are older than
 the ports, still in `DriftboxHost`, and not yet behind them; `Player` and `RackModel` use them
 directly. Moving them into a target of their own that conforms is the next step, and needs a Mac to
@@ -168,18 +173,27 @@ program on the same machine goes through a loopback port made in Windows MIDI Se
 
 ### Android
 
-No player yet, but the engine runs on a phone. The swift.org toolchain for Windows brings an
-Android platform, and with the NDK and adb beside it:
+No app yet, but the engine plays through a phone, and times itself there. The swift.org toolchain
+for Windows brings an Android platform, and with the NDK and adb beside it:
 
 ```bash
-scripts/android-bench.sh
+scripts/android-play.sh                    # acid through the phone's speaker, for twenty seconds
+scripts/android-play.sh song.json --seconds 60
+scripts/android-bench.sh                   # --bench, once on each kind of core the phone has
 ```
 
-builds `driftbox-play` for arm64 Android, pushes it to `/data/local/tmp` and runs `--bench` once on
-each kind of core the phone has. There is no app and no install: Android runs a plain executable.
-It is linked statically and takes only the essentials of Foundation, because the installer's
-arm64 runtime lacks the pieces the rest of Foundation needs. The script says which pieces, and why
-nothing is lost.
+Each builds `driftbox-play` for arm64 Android with `android-build.sh` and pushes it to
+`/data/local/tmp`. There is no app and no install: Android runs a plain executable. It is linked
+statically and takes only the essentials of Foundation, because the installer's arm64 runtime
+lacks the pieces the rest of Foundation needs. The build script says which pieces, and why nothing
+is lost.
+
+Audio is AAudio: low-latency mode, exclusive if the device will give it, float stereo at 48 kHz.
+The buffer starts at one burst and grows a burst at a time if the stream underruns. AAudio makes
+the render thread; Driftbox keeps it to the big cores, since left to the scheduler it underran a
+hundred times a second, and reports each callback's work to a performance hint session. A stream
+whose device goes away ends and asks to be replaced, as on Windows. There is one device, the
+system's, until the app can list them: that is Java's `AudioManager`. MIDI is not there yet.
 
 ## Conformance
 
@@ -482,11 +496,13 @@ since Windows keeps a thread's own time only to its 15.6ms scheduler tick.
 On a phone, a Fairphone 6 with a Snapdragon 7s Gen 3, `--bench` costs **13 to 16%** of real time
 on a big core across the catalogue. That is four and a half times the Mac. On a little core it
 costs **69%**, so a render thread must never land on one. Paced, the big core costs **67%**, its
-longest call 9.7ms of a 10.7ms period. That number is the governor, not the code. With the rest of
-the cluster kept busy so that its clock stays up, the same paced run costs **17.7%** and its
-longest call 2.5ms. So an Android host has to ask for its clock rather than hope for it: AAudio's
-low-latency mode for a real-time thread, and a performance hint giving that thread's target
-duration.
+longest call 9.7ms of a 10.7ms period. That number is the phone, not the code: with the rest of
+the cluster kept busy, the same paced run costs **17.7%** and its longest call 2.5ms. It is not the
+clock, either, though that was the first guess. Played through AAudio, in 2ms bursts, the render
+costs about **60%** of each burst whether a performance hint holds the cluster at 2.2 GHz or lets
+it fall to 0.6; with the other big cores kept busy it costs **15 to 18%**. What a callback pays
+for is its core waking cold from idle. It is still in time: the heaviest song played for thirty
+seconds without an underrun, its longest call 3.4ms, the speaker 4.8ms behind the render.
 
 ### Listening
 

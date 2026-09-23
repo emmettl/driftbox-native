@@ -27,45 +27,6 @@
     }
   }
 
-  struct MixerTests {
-    /// One call of the mixer, as a render thread makes it, into buffers that start out dirty.
-    func mix(_ mixer: Mixer, frames: Int) -> (left: [Float], right: [Float]) {
-      let buffers = (0..<4).map { _ in UnsafeMutablePointer<Float>.allocate(capacity: frames) }
-      defer { for buffer in buffers { buffer.deallocate() } }
-      for buffer in buffers { buffer.initialize(repeating: 9, count: frames) }
-      mixer.render(
-        frames: frames, left: buffers[0], right: buffers[1], scratchLeft: buffers[2], scratchRight: buffers[3]
-      )
-      return (
-        Array(UnsafeBufferPointer(start: buffers[0], count: frames)),
-        Array(UnsafeBufferPointer(start: buffers[1], count: frames))
-      )
-    }
-
-    @Test func sourcesAreSummed() {
-      let mixer = Mixer()
-      let a = Counter(level: 0.25)
-      let b = Counter(level: 0.5)
-      mixer.add(a.source)
-      mixer.add(b.source)
-      let mixed = mix(mixer, frames: 64)
-      #expect(mixed.left.allSatisfy { $0 == 0.75 })
-      #expect(mixed.right.allSatisfy { $0 == -0.75 })
-      #expect(a.frames.load(ordering: .relaxed) == 64)
-    }
-
-    @Test func aSourceRemovedIsNotCalledAgain() {
-      let mixer = Mixer()
-      let a = Counter()
-      mixer.add(a.source)
-      mixer.remove(a.source.context)
-      let mixed = mix(mixer, frames: 16)
-      #expect(mixed.left.allSatisfy { $0 == 0 })
-      #expect(a.frames.load(ordering: .relaxed) == 0)
-      #expect(mixer.sources.isEmpty)
-    }
-  }
-
   /// Against whatever this machine has. A machine with no audio device at all — a CI runner — has
   /// nothing to play through, which the route says rather than failing.
   @MainActor

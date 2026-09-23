@@ -196,6 +196,97 @@
       route.detach(host.renderSource.context)
     }
   }
+#elseif os(Android)
+  import Android
+  import DriftboxDocument
+  import DriftboxEngine
+  import DriftboxHost
+  import DriftboxHostAndroid
+  import FoundationEssentials
+  import Synchronization
+
+  /// Raised from AAudio's thread when the stream's device goes away, and seen by the loop below,
+  /// which is this program's main actor: a phone has no run loop until there is an app.
+  final class Flag: Sendable {
+    private let raised = Atomic<Bool>(false)
+    func raise() { raised.store(true, ordering: .releasing) }
+    func take() -> Bool { raised.exchange(false, ordering: .acquiringAndReleasing) }
+  }
+
+  /// Plays a song through the phone: the engine rendered by an AAudio stream, through the
+  /// platform-neutral `AudioRouting`, as on Windows. Only the essentials of Foundation, which is
+  /// what lets it link on Android without the rest.
+  ///
+  ///     driftbox-play song.json --seconds 20 --start-bar 8
+  @main
+  struct Play {
+    @MainActor
+    static func main() throws {
+      var arguments = Array(CommandLine.arguments.dropFirst())
+      func option(_ name: String) -> Double? {
+        guard let index = arguments.firstIndex(of: name), index + 1 < arguments.count else { return nil }
+        defer { arguments.removeSubrange(index...index + 1) }
+        return Double(arguments[index + 1])
+      }
+      let seconds = option("--seconds")
+      let startBar = option("--start-bar") ?? 0
+      let bench = arguments.firstIndex(of: "--bench").map { arguments.remove(at: $0) } != nil
+      guard arguments.count == 1 else {
+        print("usage: driftbox-play <song.json> [--seconds s] [--start-bar n] [--bench]")
+        exit(64)
+      }
+      let text = String(decoding: try Data(contentsOf: URL(fileURLWithPath: arguments[0])), as: UTF8.self)
+      guard let song = SongCodec.decode(text) else {
+        print("\(arguments[0]) is not a song")
+        exit(65)
+      }
+
+      if bench {
+        runBench(song, named: arguments[0])
+        return
+      }
+
+      let lost = Flag()
+      let route = AAudioRoute(hop: { _ in lost.raise() })
+      route.onChange = { [unowned route] in
+        print(
+          route.current.map { "  playing through \($0.name): \(route.details ?? "")" }
+            ?? "  no sound: \(route.error ?? "no device")")
+      }
+      let host = EngineHost(sampleRate: route.sampleRate)
+      host.load(song)
+      if startBar > 0, let last = song.plan(bars: Int(startBar)).last {
+        host.send(.seek(songFrame: Int((last.time + last.stepSeconds) * route.sampleRate)))
+      }
+      host.send(.play)
+      route.attach(host.renderSource)
+      route.onChange?()
+
+      print("playing \(arguments[0]) (\(Int(SongRenderer.seconds(of: song))) seconds a pass)")
+      if seconds == nil { print("ctrl-c to stop") }
+      var elapsed = 0.0
+      var xruns = route.xruns
+      while seconds.map({ elapsed < $0 }) ?? true {
+        var second = timespec(tv_sec: 1, tv_nsec: 0)
+        nanosleep(&second, nil)
+        elapsed += 1
+        if lost.take() { route.apply() }
+        route.tune()
+        let load = host.takeLoad()
+        let peak = max(
+          Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
+          Float(bitPattern: host.peakRight.load(ordering: .relaxed)))
+        let now = route.xruns
+        print(
+          "  peak \(fixed(Double(peak), 3))  song frame \(host.songFrame.load(ordering: .relaxed))"
+            + "  render \(fixed(load.fraction * 100, 1))% of the audio's time,"
+            + " longest call \(fixed(load.longestMilliseconds, 2))ms, \(load.calls) calls,"
+            + " \(now - xruns) underruns, \(fixed(route.latency * 1000, 1))ms to the speaker")
+        xruns = now
+      }
+      route.detach(host.renderSource.context)
+    }
+  }
 #else
   import DriftboxDocument
   #if canImport(FoundationEssentials)
@@ -203,15 +294,11 @@
   #else
     import Foundation
   #endif
-  #if canImport(Android)
-    import Android
-  #elseif canImport(Glibc)
+  #if canImport(Glibc)
     import Glibc
   #endif
 
-  /// No player here yet — Linux and Android have no route behind the ports — but the bench needs
-  /// no device, and this is how the engine is timed on a phone before there is an app around it.
-  /// Only the essentials of Foundation, which is what lets it link on Android without the rest.
+  /// No player here yet — Linux has no route behind the ports — but the bench needs no device.
   ///
   ///     driftbox-play song.json --bench
   @main

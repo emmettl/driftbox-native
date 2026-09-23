@@ -56,7 +56,7 @@ private func pause(_ seconds: Double) {
 }
 
 /// `x` to `places` decimal places, as `%.nf` prints it.
-private func fixed(_ x: Double, _ places: Int) -> String {
+func fixed(_ x: Double, _ places: Int) -> String {
   var scale = 1
   for _ in 0..<places { scale *= 10 }
   let scaled = Int((abs(x) * Double(scale)).rounded())

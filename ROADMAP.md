@@ -408,18 +408,29 @@ each question, and the rest is Android's alone:
    platform has it, and `scripts/android-bench.sh`, which builds the bench for arm64 and runs it
    over `adb` on each kind of core. On a Fairphone 6, a mid-range phone, a big core renders the
    catalogue at 13 to 16% of real time, four and a half times the Mac. A little core cannot keep
-   up at all. Paced like a device, the big core costs 67%, but only because the governor lets its
-   clock fall between calls; held up, the paced cost is 17.7%. Making the engine and loading a
+   up at all. Paced like a device, the big core costs 67%, but only because its core goes idle
+   between calls; with the cluster kept busy, the paced cost is 17.7%. (This said the governor's
+   clock at first. Step 2 found the clock makes no difference.) Making the engine and loading a
    song there takes about four seconds before the first render, which an app switching songs
    would feel; where that goes is not yet looked at. The rack's load is not measured yet.
-2. **Audio and MIDI behind the ports.** ← *next.* `DriftboxHostAndroid` answers `AudioRouting`
-   with AAudio in low-latency mode. It takes a callback the same shape as the one WASAPI's thread
-   calls, and it says when its device goes away. Step 1 says what else it must do: keep the
-   render thread's clock up with a performance hint giving its target duration, and keep it off
-   the little cores. Android's native MIDI answers the MIDI ports. It sends against a timestamp,
-   so clock out needs no scheduler of its own the way WinMM's did. Listing devices and opening a
-   MIDI port can only be done from Java, and those two are all the JNI there is. `HostTime` is
-   `CLOCK_MONOTONIC`, which is what AAudio and the MIDI stamps both count in.
+2. **Audio and MIDI behind the ports.** ← *here.* Audio is done. `DriftboxHostAndroid` answers
+   `AudioRouting` with AAudio: low-latency, exclusive, a buffer that starts at one burst and grows
+   a burst at a time on underruns, and a stream that asks to be replaced when its device goes.
+   `Mixer` moved into `DriftboxHost` for it, so Windows and Android sum their sources the same
+   way, tested everywhere. `scripts/android-play.sh` plays a song through the phone. The render
+   thread is kept to the big cores, which is what keeps it in time: left to the scheduler it
+   underran a hundred times a second, and kept to them the heaviest song played thirty seconds
+   without one, 4.8ms from render to speaker. It also reports to a performance hint session.
+   That was meant to hold the clock up, and it does when its target is tight. But the render
+   costs 60% of each 2ms burst at any clock, against 15 to 18% when the other big cores are busy:
+   what a callback pays for is its core waking cold. There is room in that, but less than the
+   bench promised, and the rack and the scenes will want some of it. Left: one device until the
+   app can list them from Java's `AudioManager`, and a stream lost to a device going is handled
+   but not yet seen to be, for want of anything to unplug. Then MIDI: Android's native MIDI
+   answers the MIDI ports. It sends against a timestamp, so clock out needs no scheduler of its
+   own the way WinMM's did. Listing devices and opening a MIDI port can only be done from Java,
+   and those two are all the JNI there is. `HostTime` is `CLOCK_MONOTONIC`, which is what AAudio
+   and the MIDI stamps both count in.
 3. **A third backend under the GPU layer.** OpenGL ES 3.0 covers everything the scenes ask of
    Metal, and every Android device has it. The shaders run to 2,400 lines across 29 scenes, and a
    third copy by hand is where writing them out stops being sensible (see below). `GraphicLab`
