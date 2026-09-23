@@ -25,6 +25,8 @@ public struct SongEngine: ~Copyable {
 
   /// Bus and sends for one chunk, stereo each.
   let scratch: UnsafeMutablePointer<Float>
+  /// Each machine's dry sound for one chunk, left and right in turn, when a host asks for them.
+  let sectionScratch: UnsafeMutablePointer<Float>
 
   /// The metronome and the count-in: clicks, from a pool of their own, added after the master so
   /// nothing in the mix — the pad least of all — can take them away.
@@ -73,6 +75,8 @@ public struct SongEngine: ~Copyable {
     pad = Kaoss(sampleRate: sampleRate)
     scratch = .allocate(capacity: Self.chunk * 6)
     scratch.initialize(repeating: 0, count: Self.chunk * 6)
+    sectionScratch = .allocate(capacity: Self.chunk * 8)
+    sectionScratch.initialize(repeating: 0, count: Self.chunk * 8)
     clicks = VoicePool(sampleRate: sampleRate, capacity: 4)
     strongClick = clicks.prepare(metronomeClick(strong: true), voiceId: "", at: 0)
     weakClick = clicks.prepare(metronomeClick(strong: false), voiceId: "", at: 0)
@@ -82,6 +86,7 @@ public struct SongEngine: ~Copyable {
 
   deinit {
     scratch.deallocate()
+    sectionScratch.deallocate()
     clickScratch.deallocate()
   }
 
@@ -216,6 +221,16 @@ public struct SongEngine: ~Copyable {
   public mutating func render(
     frames: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>
   ) {
+    render(frames: frames, left: left, right: right, sections: nil)
+  }
+
+  /// The same, and each machine's dry sound into `sections`, overwritten too; a machine
+  /// `sections` diverts is left out of the mix in `left` and `right`.
+  @_noAllocation
+  public mutating func render(
+    frames: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>,
+    sections: SectionOutputs?
+  ) {
     var done = 0
     while done < frames {
       var count = min(Self.chunk, frames - done)
@@ -231,7 +246,7 @@ public struct SongEngine: ~Copyable {
           turning = boundary
         }
       }
-      renderChunk(count: count, left: left + done, right: right + done)
+      renderChunk(count: count, left: left + done, right: right + done, sections: sections, at: done)
       if let turning, songFrame() == turning { turn(at: turning) }
       done += count
     }
@@ -254,7 +269,8 @@ public struct SongEngine: ~Copyable {
 
   @_noAllocation
   private mutating func renderChunk(
-    count: Int, left out: UnsafeMutablePointer<Float>, right outRight: UnsafeMutablePointer<Float>
+    count: Int, left out: UnsafeMutablePointer<Float>, right outRight: UnsafeMutablePointer<Float>,
+    sections: SectionOutputs?, at offset: Int
   ) {
     let chunk = Self.chunk
     let busLeft = scratch
@@ -267,6 +283,8 @@ public struct SongEngine: ~Copyable {
       scratch[index] = 0
       clickScratch[index] = 0
     }
+    let diverted = sections?.diverted ?? 0
+    if sections != nil { for index in 0..<chunk * 8 { sectionScratch[index] = 0 } }
     let counting = countInLeft > 0
     let moving = isPlaying && !counting
 
@@ -320,7 +338,8 @@ public struct SongEngine: ~Copyable {
     }
     voices.render(
       firstFrame: frame, frames: count, left: busLeft, right: busRight, delayLeft: toDelayLeft,
-      delayRight: toDelayRight, reverbLeft: toReverbLeft, reverbRight: toReverbRight)
+      delayRight: toDelayRight, reverbLeft: toReverbLeft, reverbRight: toReverbRight,
+      sections: sections == nil ? nil : sectionScratch, stride: chunk, diverted: diverted)
     let clickLeft = clickScratch
     let clickRight = clickScratch + chunk
     clicks.render(
@@ -357,8 +376,17 @@ public struct SongEngine: ~Copyable {
       }
       let a = bassA.next(time: time)
       let b = bassB.next(time: time)
-      busLeft[index] += a + b
-      busRight[index] += a + b
+      // The 303s are machines 2 and 3, mono into both sides, as they reach the mix.
+      if sections != nil {
+        sectionScratch[4 * chunk + index] += a
+        sectionScratch[5 * chunk + index] += a
+        sectionScratch[6 * chunk + index] += b
+        sectionScratch[7 * chunk + index] += b
+      }
+      let heardA = diverted & 4 == 0 ? a : 0
+      let heardB = diverted & 8 == 0 ? b : 0
+      busLeft[index] += heardA + heardB
+      busRight[index] += heardA + heardB
       toDelayLeft[index] += a * bassA.sendDelay + b * bassB.sendDelay
       toDelayRight[index] += a * bassA.sendDelay + b * bassB.sendDelay
       toReverbLeft[index] += a * bassA.sendReverb + b * bassB.sendReverb
@@ -378,6 +406,13 @@ public struct SongEngine: ~Copyable {
       let filtered = pad.process(left: inserted.left, right: inserted.right, frame: at)
       out[index] = filtered.left * Self.masterGain + clickLeft[index]
       outRight[index] = filtered.right * Self.masterGain + clickRight[index]
+    }
+    if let sections {
+      for buffer in 0..<8 {
+        let from = sectionScratch + buffer * chunk
+        let to = sections.buffers[buffer] + offset
+        for index in 0..<count { to[index] = from[index] }
+      }
     }
     frame += count
     // The engine's clock always runs — tails, the pad and struck voices need it — but a stopped

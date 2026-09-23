@@ -188,7 +188,8 @@ public struct VoicePool: ~Copyable {
   public mutating func render(
     firstFrame: Int, frames: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>,
     delayLeft: UnsafeMutablePointer<Float>, delayRight: UnsafeMutablePointer<Float>,
-    reverbLeft: UnsafeMutablePointer<Float>, reverbRight: UnsafeMutablePointer<Float>
+    reverbLeft: UnsafeMutablePointer<Float>, reverbRight: UnsafeMutablePointer<Float>,
+    sections: UnsafeMutablePointer<Float>? = nil, stride: Int = 0, diverted: UInt8 = 0
   ) {
     for slot in 0..<capacity where slots[slot].active {
       let base = slot * perSlot
@@ -216,8 +217,17 @@ public struct VoicePool: ~Copyable {
         let outRight = Float(sample * slots[slot].spec.panRight * level)
 
         let at = frame - firstFrame
-        left[at] += outLeft
-        right[at] += outRight
+        // Its machine's own output, when there are any, and the mix unless the machine is
+        // diverted from it. The sends are the song's whichever it is.
+        let section = Int(slots[slot].spec.section)
+        if let sections, section >= 0 {
+          sections[section * 2 * stride + at] += outLeft
+          sections[(section * 2 + 1) * stride + at] += outRight
+        }
+        if section < 0 || diverted & (1 << UInt8(section)) == 0 {
+          left[at] += outLeft
+          right[at] += outRight
+        }
         let toDelay = slots[slot].spec.sendDelay
         if toDelay > 0 {
           delayLeft[at] += outLeft * toDelay
@@ -317,6 +327,7 @@ public struct HitPreparer: Sendable {
     fixed.sendDelay = Float(sends.delay)
     fixed.sendReverb = Float(sends.reverb)
     fixed.voiceIndex = allVoices.firstIndex { $0.id == voiceId } ?? 0
+    fixed.section = SectionOutputs.section(ofVoice: voiceId)
 
     fixed.gain = spec.gain
     if let drive = spec.drive, drive > 0 { fixed.driveCurve = Int(jsRound(drive * 20)) }
