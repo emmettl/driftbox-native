@@ -21,6 +21,7 @@ let package = Package(
     .library(name: "DriftboxGPU", targets: ["DriftboxGPU"]),
     .library(name: "DriftboxGPUD3D11", targets: ["DriftboxGPUD3D11"]),
     .library(name: "DriftboxShell", targets: ["DriftboxShell"]),
+    .library(name: "DriftboxGPUGLES", targets: ["DriftboxGPUGLES"]),
     .library(name: "DriftboxWin32", targets: ["DriftboxWin32"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
   ],
@@ -57,7 +58,7 @@ let package = Package(
     .target(
       name: "DriftboxAndroid",
       dependencies: [
-        "DriftboxHostAndroid", "DriftboxHost", "DriftboxSeq",
+        "DriftboxHostAndroid", "DriftboxHost", "DriftboxSeq", "DriftboxGPU", "DriftboxGPUGLES",
         .target(name: "CAMidi", condition: .when(platforms: [.android])),
       ]),
     // What the scenes ask of a GPU, and the backends that answer it. The shaders are GLSL in
@@ -75,6 +76,18 @@ let package = Package(
     // the same on every platform, and the Windows shell that answers it with Win32.
     .target(name: "DriftboxShell"),
     .target(name: "DriftboxWin32", dependencies: ["DriftboxShell"]),
+    // The GPU layer on OpenGL ES 3.0: Android's, and Linux's, where Mesa draws it in software for CI.
+    // OpenGL ES is libGLESv3 on Android and libGLESv2 on Linux, which carries 3.0 as well.
+    .systemLibrary(name: "CGLES"),
+    .target(
+      name: "DriftboxGPUGLES",
+      dependencies: [
+        "DriftboxGPU", .target(name: "CGLES", condition: .when(platforms: [.android, .linux])),
+      ],
+      linkerSettings: [
+        .linkedLibrary("GLESv3", .when(platforms: [.android])),
+        .linkedLibrary("GLESv2", .when(platforms: [.linux])),
+      ]),
     // The visuals: scenes driven by the engine's events, moving from Metal onto the GPU layer. On a
     // platform without Metal, the ones that have moved.
     .target(name: "DriftboxScenes", dependencies: ["DriftboxDSP", "DriftboxEngine", "DriftboxGPU"]),
@@ -127,7 +140,9 @@ let package = Package(
     .testTarget(name: "DriftboxHostAndroidTests", dependencies: ["DriftboxHostAndroid"]),
     .testTarget(
       name: "DriftboxGPUTests",
-      dependencies: ["DriftboxGPU", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxWin32"]),
+      dependencies: [
+        "DriftboxGPU", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxGPUGLES", "DriftboxWin32",
+      ]),
     .testTarget(
       name: "DriftboxShellTests",
       dependencies: [

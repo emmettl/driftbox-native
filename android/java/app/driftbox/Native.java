@@ -18,4 +18,7 @@ final class Native {
 
   /** Sends through Driftbox Loopback and says what came back. Blocks for about a second. */
   static native String midiLoopback();
+
+  /** The GPU contract's checks, on this phone's GPU, through OpenGL ES. Blocks while it draws. */
+  static native String gpuCheck();
 }

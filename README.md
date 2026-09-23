@@ -38,6 +38,8 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxGPU` | What the scenes ask of a GPU, as a protocol every backend answers the same way. |
 | `Sources/DriftboxGPUD3D11` | That protocol on Direct3D 11: the GPU on Windows. |
 | `Sources/DriftboxGPUMetal` | That protocol on Metal: the GPU on the Mac and iOS. |
+| `Sources/DriftboxGPUGLES` | That protocol on OpenGL ES 3.0: the GPU on Android, and on Linux for CI. |
+| `Sources/CGLES` | EGL's and OpenGL ES 3.0's headers. Declarations only. |
 | `Sources/DriftboxShell` | What the app asks of a window — input, menus, file panels, a loop — the same on every platform. |
 | `Sources/DriftboxWin32` | That on Windows: the Windows shell. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
@@ -114,8 +116,8 @@ build. After it, `driftbox-play` is one program on both platforms rather than tw
 ### The GPU
 
 The scenes' GPU is a port of the same kind: `DriftboxGPU` says what they may ask of one, and a
-backend answers it on each platform — Direct3D 11 on Windows and Metal on the Mac now, OpenGL ES 3.0
-to come.
+backend answers it on each platform — Direct3D 11 on Windows, Metal on the Mac, OpenGL ES 3.0 on
+Android.
 What it offers is what all three do the same way, and nothing more: buffers, textures, pipelines
 under three.js's three blends and depth, per-draw uniforms, and vertex attributes stepping per
 vertex or per instance. There are no sized points, since Direct3D cannot size one, so a sprite is
@@ -126,8 +128,19 @@ conventions every backend keeps: clip space y up with depth 0...1, a target's fi
 depth, the blends to the byte, instanced sprites, textures, buffers written again — and runs
 against every backend the platform has. Direct3D runs it on WARP, Windows' software rasteriser,
 so the pixels are the same on every machine and CI needs no graphics card; Metal runs it on the
-Mac's own GPU. A test that the platform's backend is among those tested stops a platform passing
-the contract by testing nothing.
+Mac's own GPU; OpenGL ES runs it on Linux, on Mesa's software rasteriser, surfaceless, for WARP's
+reasons. A phone cannot run Swift Testing from here, so `scripts/android-app.sh gpu` runs the same
+checks, with the same programs, on the phone's own GPU. A test that the platform's backend is among
+those tested stops a platform passing the contract by testing nothing.
+
+OpenGL's framebuffers start at the bottom, where the layer's targets start at the top. So the
+OpenGL ES backend draws every target upside down, turning each vertex shader's y over as it
+compiles it: a target's first row in memory is then its top, read back in order, sampled from the
+top left, with `gl_FragCoord` counting down from the top as it does in Metal and Direct3D. A window
+is the one thing that is not a target, and is turned over on the way to it. OpenGL ES 3.0 has no
+BGRA texture, so a BGRA texture is stored as given and read through a swizzle that swaps red and
+blue, and a target is swapped as it is read back; and its GLSL cannot bind a uniform block or a
+sampler in the shader, so each is bound by name when the program links.
 
 Metal has one table of buffers where the other two have uniform blocks and vertex buffers apart:
 the shaders read block `n` at `buffer(n)`, so the Metal backend binds vertex buffer slot `n` at
@@ -226,8 +239,9 @@ program on the same machine goes through a loopback port made in Windows MIDI Se
 
 ### Android
 
-No app yet, but the engine plays through a phone, and times itself there. The swift.org toolchain
-for Windows brings an Android platform, and with the NDK and adb beside it:
+The engine plays through a phone, and times itself there. It is built with the swift.org toolchain
+for Windows and swift.org's Swift SDK for Android, the same version, with the NDK and adb beside
+them:
 
 ```bash
 scripts/android-play.sh                    # acid through the phone's speaker, for twenty seconds
@@ -237,9 +251,9 @@ scripts/android-bench.sh                   # --bench, once on each kind of core 
 
 Each builds `driftbox-play` for arm64 Android with `android-build.sh` and pushes it to
 `/data/local/tmp`. There is no app and no install: Android runs a plain executable. It is linked
-statically and takes only the essentials of Foundation, because the installer's arm64 runtime
-lacks the pieces the rest of Foundation needs. The build script says which pieces, and why nothing
-is lost.
+statically. swift.org's SDK rather than the Android platform the Windows installer brings, whose
+standard library has no SIMD types and whose arm64 runtime cannot link Foundation; the build sets
+the SDK up the first time, as its own script would, and `android-env.sh` says how.
 
 Audio is AAudio: low-latency mode, exclusive if the device will give it, float stereo at 48 kHz.
 The buffer starts at one burst and grows a burst at a time if the stream underruns. AAudio makes

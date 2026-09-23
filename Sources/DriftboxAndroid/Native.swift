@@ -26,6 +26,11 @@
     env.java(MIDILoopback.run(devices: midiDevices))
   }
 
+  @_cdecl("Java_app_driftbox_Native_gpuCheck")
+  public func nativeGPUCheck(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?) -> jstring? {
+    env.java(GPUCheck.run())
+  }
+
   extension UnsafeMutablePointer where Pointee == JNIEnv? {
     /// A Java string as a Swift one; empty for null.
     func string(_ java: jstring?) -> String {

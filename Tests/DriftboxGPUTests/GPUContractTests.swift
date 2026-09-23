@@ -6,6 +6,8 @@ import Testing
 #elseif canImport(Metal)
   import DriftboxGPUMetal
   import Metal
+#elseif os(Linux)
+  import DriftboxGPUGLES
 #endif
 
 /// What every backend must do the same way, held to one set of tests: whichever backends this
@@ -14,13 +16,17 @@ import Testing
 ///
 /// Direct3D runs on WARP, Windows' software rasteriser, so that the pixels are the same on every
 /// machine and there is a device on one with no graphics card, as a CI runner has none. Metal runs
-/// on the machine's own GPU, where it has one.
+/// on the machine's own GPU, where it has one. OpenGL ES runs on Linux, on Mesa's software
+/// rasteriser for the same reasons as WARP; on a phone, the app checks the same things against the
+/// phone's own GPU (`scripts/android-app.sh gpu`).
 enum Backends {
   static func all() throws -> [any GPUDevice] {
     #if os(Windows)
       return [try D3D11Device(driver: .software)]
     #elseif canImport(Metal)
       return MTLCreateSystemDefaultDevice() == nil ? [] : [try MetalDevice()]
+    #elseif os(Linux)
+      return [try GLESDevice()]
     #else
       return []
     #endif
@@ -436,6 +442,8 @@ struct BackendTests {
       #expect(backends == [.direct3D11])
     #elseif canImport(Metal)
       if MTLCreateSystemDefaultDevice() != nil { #expect(backends == [.metal]) }
+    #elseif os(Linux)
+      #expect(backends == [.openGLES])
     #else
       #expect(backends.isEmpty)
     #endif
