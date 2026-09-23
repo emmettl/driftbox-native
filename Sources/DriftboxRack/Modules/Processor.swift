@@ -36,6 +36,8 @@ public enum RackProcessor {
   case sequencing(SequencingProcessor)
   case players(PlayerProcessor)
   case filters(FilterProcessor)
+  /// A plug-in, rendered by the host.
+  case external(ExternalProcessor)
 
   @_noAllocation
   mutating func process(inlets: Slots, outlets: Slots, params: Slots, context: ProcessContext) {
@@ -89,6 +91,7 @@ public enum RackProcessor {
     case .filters(var family):
       family.process(inlets, outlets, params, context)
       self = .filters(family)
+    case .external(let module): module.process(inlets, outlets, params, context)
     }
   }
 
@@ -117,6 +120,7 @@ public enum RackProcessor {
     case .sequencing(var family): family.release()
     case .players(var family): family.release()
     case .filters(var family): family.release()
+    case .external(let module): module.release()
     default: break
     }
   }

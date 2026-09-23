@@ -8,7 +8,7 @@ public enum RackModules {
   public static let all: [ModuleDef] =
     [out, vco, noise, vca, mixer, ladder, svf, adsr, lfo, offset, sampleHold, delay]
     + shapingDefs + spaceDefs + controlDefs + sourceDefs + sequencingDefs + playerDefs
-    + filterDefs
+    + filterDefs + [plugin]
 
   public static let registry: [String: ModuleDef] = {
     var byType: [String: ModuleDef] = [:]
@@ -34,6 +34,7 @@ public enum RackModules {
     case "offset": .offset
     case "sample-hold": .sampleHold(SampleHold())
     case "delay": .delay(Delay(sampleRate: sampleRate))
+    case "plugin": .external(ExternalProcessor())
     default:
       makeShaping(type, sampleRate: sampleRate, id: id, voice: voice).map { .shaping($0) }
         ?? makeSpace(type, sampleRate: sampleRate, id: id, voice: voice).map { .space($0) }

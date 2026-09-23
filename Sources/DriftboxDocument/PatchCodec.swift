@@ -134,6 +134,13 @@ public enum PatchCodec {
       out.position = [x, y]
     }
     out.bypassed = object["bypassed"]?.bool == true
+    if let plugin = object["plugin"]?.object, let format = plugin["format"]?.string, !format.isEmpty,
+      let id = plugin["id"]?.string, !id.isEmpty
+    {
+      out.plugin = PluginReference(
+        format: format, id: id, name: plugin["name"]?.string ?? "", vendor: plugin["vendor"]?.string ?? "",
+        state: plugin["state"]?.string)
+    }
     return out
   }
 
@@ -198,6 +205,16 @@ public enum PatchCodec {
     if !module.inputTrims.isEmpty { out["inputTrims"] = numbers(module.inputTrims) }
     if let position = module.position { out["pos"] = .array(position.map { .number($0) }) }
     if module.bypassed { out["bypassed"] = .bool(true) }
+    // Native only: the reference keeps a module of a type it does not know, but not this.
+    if let plugin = module.plugin {
+      var object = JSONObject()
+      object["format"] = .string(plugin.format)
+      object["id"] = .string(plugin.id)
+      object["name"] = .string(plugin.name)
+      object["vendor"] = .string(plugin.vendor)
+      if let state = plugin.state { object["state"] = .string(state) }
+      out["plugin"] = .object(object)
+    }
     return .object(out)
   }
 

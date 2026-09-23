@@ -57,11 +57,13 @@ public struct PatchModule: Equatable, Sendable {
   public var data: KeyedList<[Double]>
   /// Where it sits in the rack, for the panels; nothing in the sound reads it.
   public var position: [Double]?
+  /// The plug-in a `plugin` module hosts, kept whether or not this machine has it.
+  public var plugin: PluginReference?
 
   public init(
     id: String, type: String, version: Int? = nil, params: KeyedList<Double> = [:],
     inputTrims: KeyedList<Double> = [:], bypassed: Bool = false, data: KeyedList<[Double]> = [:],
-    position: [Double]? = nil
+    position: [Double]? = nil, plugin: PluginReference? = nil
   ) {
     self.id = id
     self.type = type
@@ -71,6 +73,30 @@ public struct PatchModule: Equatable, Sendable {
     self.bypassed = bypassed
     self.data = data
     self.position = position
+    self.plugin = plugin
+  }
+}
+
+/// A plug-in, as a patch remembers it: which one, in its format's own terms, what it is called,
+/// and its state as the plug-in last gave it. The state is the plug-in's business and opaque here,
+/// so a patch opened where the plug-in is missing keeps it whole for a machine that has it.
+public struct PluginReference: Equatable, Sendable {
+  /// `audio-unit`, for now the only one.
+  public var format: String
+  /// The format's own identifier: for an Audio Unit its type, subtype and manufacturer codes,
+  /// as `aufx dely appl`.
+  public var id: String
+  public var name: String
+  public var vendor: String
+  /// Base64, as the host wrote it; nil for a plug-in never asked.
+  public var state: String?
+
+  public init(format: String, id: String, name: String, vendor: String, state: String? = nil) {
+    self.format = format
+    self.id = id
+    self.name = name
+    self.vendor = vendor
+    self.state = state
   }
 }
 

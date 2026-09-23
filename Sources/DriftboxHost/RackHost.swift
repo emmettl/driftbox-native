@@ -17,6 +17,24 @@ public enum RackCommand {
   /// with an old count. Ignored unless `graph` is the one playing.
   case data(
     graph: UnsafeMutablePointer<RackGraph>, entry: UnsafeMutablePointer<DataBuffer>, buffer: DataBuffer)
+  /// A `plugin` module's processor, put in on a block boundary. Ignored unless `graph` is playing.
+  case external(
+    graph: UnsafeMutablePointer<RackGraph>, entry: UnsafeMutablePointer<ExternalSlot>, slot: ExternalSlot)
+}
+
+/// A processor from outside the rack for a `plugin` module to run — a plug-in — as the host is
+/// given it: the render function and its context, and the object that keeps the context alive,
+/// which the host holds for as long as any graph might call it.
+public struct RackExternal {
+  public var render: ExternalRender
+  public var context: UnsafeMutableRawPointer
+  public var owner: AnyObject
+
+  public init(render: ExternalRender, context: UnsafeMutableRawPointer, owner: AnyObject) {
+    self.render = render
+    self.context = context
+    self.owner = owner
+  }
 }
 
 /// A single-producer, single-consumer ring of rack commands, as `CommandRing` is for the engine.
@@ -117,8 +135,11 @@ public final class RackHost: @unchecked Sendable {
   /// by module and slot. Kept here so every graph built after it is loaded plays it too, without
   /// a copy: each graph's slot points at the one buffer, which lives while any graph does.
   private var samples: [String: [String: SampleBuffer]] = [:]
-  /// The sample buffers each graph points at, released with it.
-  private var retained: [UnsafeMutablePointer<RackGraph>: [SampleBuffer]] = [:]
+  /// The sample buffers and plug-ins each graph points at, released with it.
+  private var retained: [UnsafeMutablePointer<RackGraph>: [AnyObject]] = [:]
+  /// The processors `plugin` modules run, by module: like the samples, kept here so that every
+  /// graph built after one arrives runs the same instance, its state intact through any edit.
+  private var externals: [String: RackExternal] = [:]
 
   /// One sample's frames, owned, freed when the last graph pointing at it has gone.
   final class SampleBuffer {
@@ -258,7 +279,33 @@ public final class RackHost: @unchecked Sendable {
         retained[graph, default: []].append(buffer)
       }
     }
+    for (module, external) in externals {
+      guard let entry = graph.pointee.externalEntry(module: module) else { continue }
+      entry.pointee = ExternalSlot(render: external.render, context: external.context)
+      retained[graph, default: []].append(external.owner)
+    }
     commands.pointee.send(.load(graph))
+  }
+
+  /// Give a `plugin` module its processor, or take it away (nil, and the module is silent): kept
+  /// for every graph after this one, and put into the one playing on its next block. The one it
+  /// replaces is let go of once no graph that might call it is left.
+  public func setExternal(_ module: String, _ external: RackExternal?) {
+    externals[module] = external
+    guard let graph = latest, let entry = graph.pointee.externalEntry(module: module) else { return }
+    if let external { retained[graph, default: []].append(external.owner) }
+    commands.pointee.send(
+      .external(
+        graph: graph, entry: entry,
+        slot: external.map { ExternalSlot(render: $0.render, context: $0.context) } ?? .empty))
+  }
+
+  /// The processors the host holds for `plugin` modules, by module.
+  public var externalModules: [String] { Array(externals.keys) }
+
+  /// Every processor the host holds let go of: for a different patch, whose modules may share ids.
+  public func clearExternals() {
+    for module in externals.keys { setExternal(module, nil) }
   }
 
   /// Give a module audio the patch does not carry, or take it away (nil): kept for every graph
@@ -419,6 +466,8 @@ public final class RackHost: @unchecked Sendable {
         current.pointee?.pointee.setTransport(tempo: tempo, running: running, shuffle: shuffle)
       case .data(let graph, let entry, let buffer):
         if current.pointee == graph { entry.pointee = buffer }
+      case .external(let graph, let entry, let slot):
+        if current.pointee == graph { entry.pointee = slot }
       case .hosting(let on, let diverted):
         hosting.pointee = (on, diverted)
       }

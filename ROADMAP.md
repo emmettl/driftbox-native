@@ -270,7 +270,7 @@ parity point.
    dynamics module resets; and the arranger's trigger was `Math.round` of a millisecond where every
    other module's is `Math.ceil`. The fixtures cannot feed a NaN, so `RecoveryTests` holds the port
    to those fixes.
-3. **A host and the panels.** ← *here.* The rack has a window of its own (⌘3), playing through
+3. ~~**A host and the panels.**~~ Done. The rack has a window of its own (⌘3), playing through
    the same device as the song. Its front is every module's generic faceplate — a knob for a
    range, buttons for a choice of three, a stepper past that — sized and stacked exactly as the
    reference's `layout.ts` and faceplate table do it; its back is the bays, the jacks and the
@@ -364,6 +364,18 @@ every milestone. Then, everything the web app teaches with, and what a Mac does 
 
 Plug-in hosting (Audio Units first, which work on iOS too; VST3 on the Mac), AUv3 export,
 external displays, performance capture to video.
+
+1. **Plug-in hosting.** ← *here.* Begun: the rack's `plugin` module, which the reference has
+   no counterpart to and keeps as a placeholder. In the constrained graph it is a slot holding a C
+   function and a context, which the host fills, so nothing of any plug-in format reaches the
+   audio targets; empty, or with the plug-in missing, it is silent. `RackHost` keeps each module's
+   processor as it keeps loaded samples, so every graph an edit builds runs the same instance
+   with its state intact, and swaps one in or out on a block boundary. On the Mac,
+   `HostedAudioUnit` readies an Audio Unit effect in stereo at the rack's rate and renders it on
+   the rack's thread through its own render block, with the rack's tempo, beat and transport for
+   a unit that keeps time. A patch keeps the unit's component and its document state, in base64,
+   whether or not the machine opening it has the unit. Next, the app: choosing a unit, its face,
+   and its own interface in a window.
 
 ### What the later milestones ask of the first
 
