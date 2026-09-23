@@ -3,6 +3,9 @@ import Testing
 
 #if os(Windows)
   import DriftboxGPUD3D11
+#elseif canImport(Metal)
+  import DriftboxGPUMetal
+  import Metal
 #endif
 
 /// What every backend must do the same way, held to one set of tests: whichever backends this
@@ -10,11 +13,14 @@ import Testing
 /// that passes draws a scene as every other does.
 ///
 /// Direct3D runs on WARP, Windows' software rasteriser, so that the pixels are the same on every
-/// machine and there is a device on one with no graphics card, as a CI runner has none.
+/// machine and there is a device on one with no graphics card, as a CI runner has none. Metal runs
+/// on the machine's own GPU, where it has one.
 enum Backends {
   static func all() throws -> [any GPUDevice] {
     #if os(Windows)
       return [try D3D11Device(driver: .software)]
+    #elseif canImport(Metal)
+      return MTLCreateSystemDefaultDevice() == nil ? [] : [try MetalDevice()]
     #else
       return []
     #endif
@@ -385,3 +391,53 @@ struct PresenterTests {
     }
   }
 #endif
+
+#if canImport(Metal) && canImport(QuartzCore)
+  import QuartzCore
+
+  /// A layer's drawables, drawn into as any target is and read back from the one about to be
+  /// shown: never on screen, since the layer is in no window, but real drawables for all that.
+  struct MetalSurfaceTests {
+    @Test func aSurfaceIsDrawnIntoAndFollowsItsLayer() throws {
+      guard MTLCreateSystemDefaultDevice() != nil else { return }
+      let device = try MetalDevice()
+      let layer = CAMetalLayer()
+      let surface = try device.makeSurface(layer: layer, width: 320, height: 200)
+      #expect(surface.width == 320 && surface.height == 200)
+
+      let target = try surface.target()
+      #expect(target.width == 320 && target.height == 200)
+      #expect(try surface.target() === target, "one target a frame, however often it is asked for")
+      device.render(into: target, clear: .colour(SIMD4(0.2, 0.4, 0.6, 1))) { _ in }
+      #expect(
+        close(pixel(try device.readPixels(target), 20, 12, width: 320), SIMD4(51, 102, 153, 255), within: 1))
+      try surface.present()
+      #expect(try surface.target() !== target, "and a new one the next")
+      try surface.present()
+
+      try surface.resize(width: 16, height: 16)
+      let resized = try surface.target()
+      #expect(resized.width == 16 && resized.height == 16)
+      let frame = try device.makeTarget(width: 16, height: 16)
+      device.render(into: frame, clear: .colour(SIMD4(0, 1, 0, 1))) { _ in }
+      try Presenter(device: device).present(frame, into: resized, on: device)
+      #expect(close(pixel(try device.readPixels(resized), 8, 8, width: 16), SIMD4(0, 255, 0, 255)))
+      try surface.present()
+    }
+  }
+#endif
+
+/// The backends this platform should have, there: a platform whose backend is missing from the
+/// contract tests would pass them all by testing nothing.
+struct BackendTests {
+  @Test func thisPlatformsBackendIsTested() throws {
+    let backends = try Backends.all().map(\.backend)
+    #if os(Windows)
+      #expect(backends == [.direct3D11])
+    #elseif canImport(Metal)
+      if MTLCreateSystemDefaultDevice() != nil { #expect(backends == [.metal]) }
+    #else
+      #expect(backends.isEmpty)
+    #endif
+  }
+}

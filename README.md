@@ -37,6 +37,7 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |
 | `Sources/DriftboxGPU` | What the scenes ask of a GPU, as a protocol every backend answers the same way. |
 | `Sources/DriftboxGPUD3D11` | That protocol on Direct3D 11: the GPU on Windows. |
+| `Sources/DriftboxGPUMetal` | That protocol on Metal: the GPU on the Mac and iOS. |
 | `Sources/DriftboxWin32` | The Windows shell: a window and its messages, so far. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
@@ -112,7 +113,8 @@ build. After it, `driftbox-play` is one program on both platforms rather than tw
 ### The GPU
 
 The scenes' GPU is a port of the same kind: `DriftboxGPU` says what they may ask of one, and a
-backend answers it on each platform — Direct3D 11 on Windows now, Metal and OpenGL ES 3.0 to come.
+backend answers it on each platform — Direct3D 11 on Windows and Metal on the Mac now, OpenGL ES 3.0
+to come.
 What it offers is what all three do the same way, and nothing more: buffers, textures, pipelines
 under three.js's three blends and depth, per-draw uniforms, and vertex attributes stepping per
 vertex or per instance. There are no sized points, since Direct3D cannot size one, so a sprite is
@@ -122,7 +124,15 @@ conventions every backend keeps: clip space y up with depth 0...1, a target's fi
 `GPUContractTests` holds a backend to those conventions — which way up a target reads back,
 depth, the blends to the byte, instanced sprites, textures, buffers written again — and runs
 against every backend the platform has. Direct3D runs it on WARP, Windows' software rasteriser,
-so the pixels are the same on every machine and CI needs no graphics card.
+so the pixels are the same on every machine and CI needs no graphics card; Metal runs it on the
+Mac's own GPU. A test that the platform's backend is among those tested stops a platform passing
+the contract by testing nothing.
+
+Metal has one table of buffers where the other two have uniform blocks and vertex buffers apart:
+the shaders read block `n` at `buffer(n)`, so the Metal backend binds vertex buffer slot `n` at
+`buffer(16 + n)`. It writes buffers and textures again with a blit on its one queue, so a draw
+already asked for reads what was there and the next reads what was written — what Direct3D's
+`UpdateSubresource` does, and what writing their memory from the CPU would not.
 
 **The shaders are written once, in GLSL**, the language the web's scenes were written in, so a scene
 still reads like the one it came from. They live in `shaders/<Target>/<program>.vert` and `.frag`.
@@ -153,20 +163,23 @@ that waits for the display. A backend makes one from its own platform's kind of 
 into it and showing it are the same everywhere. `Presenter` shows a finished frame in one, fitted
 or cropped. On Windows the window is `DriftboxWin32`'s — the Windows shell, so far a window and its
 messages, aware of each monitor's DPI — and the surface a flip-model swap chain, tested on a real
-one for a window that is never shown.
+one for a window that is never shown. On the Mac it is a `CAMetalLayer`'s drawables, not
+framebuffer-only so that a frame can be sampled and read back as Direct3D's can, tested on a layer
+in no window.
 
 **The scenes move across one at a time.** `GPUScene` is a scene on the layer, and Pulse is the
 first: `PulseScene`, its shader the Metal one's GLSL line for line, held on WARP to what the Metal
-one's test holds it to. It stands beside the Metal `Pulse` until the Metal backend can carry it.
-On Windows it is on screen:
+one's test holds it to. On the Mac, where both can be drawn, it is held to the Metal `Pulse` itself,
+pixel for pixel at five moments, within two in a channel. It is on screen on both:
 
 ```bash
 driftbox-play conformance/fixtures/documents/acid.song.json --window
 ```
 
-The song through WASAPI and Pulse through Direct3D, drawn once per refresh from the events the
-engine reports playing. With `DRIFTBOX_SCENE_SHOTS` set to a directory, as for the scene tests on
-the Mac, each second's frame is written there as it was presented.
+The song through WASAPI and Pulse through Direct3D on Windows, and through the engine's Audio Unit
+and Metal on the Mac, drawn once per refresh from the events the engine reports playing. With
+`DRIFTBOX_SCENE_SHOTS` set to a directory, as for the scene tests, each second's frame is written
+there as it was presented: a BMP on Windows, a PNG on the Mac.
 
 ### Windows
 
