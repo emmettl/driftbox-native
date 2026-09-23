@@ -27,7 +27,9 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxEngine` | The instruments, mixer and effects behind one `render`. **Constrained.** |
 | `Sources/DriftboxRack` | The modular rack: the patch compiler, the graph, the modules. **Constrained.** |
 | `Sources/DriftboxDocument` | The song codec, migrations, shareable URLs, the catalogue. |
-| `Sources/DriftboxHost` | The audio unit, the rings to and from the render thread, MIDI. |
+| `Sources/DriftboxHost` | The engine and rack hosts, the rings to and from the render thread, and the ports every platform's audio and MIDI sits behind. The Mac's adapters too, for now. |
+| `Sources/DriftboxHostWindows` | WASAPI and WinMM behind those ports: the host on Windows. |
+| `Sources/CWASAPI` | The Windows audio headers Swift's WinSDK module leaves out. Declarations only. |
 | `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |
 | `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
 | `Sources/Driftbox` | The executable, which is nothing but `@main`. |
@@ -57,6 +59,70 @@ The script finds `~/Library/Developer/Toolchains/swift-latest.xctoolchain`, or t
 
 The one thing the DSP takes from outside is `exp` and `tanh` from the C library
 (`Sources/DriftboxDSP/Math.swift`). See "Exactness" below.
+
+## Platforms
+
+The Mac is the first platform, not the only one. What the rest of Driftbox asks of a platform is
+written down once, in `DriftboxHost`, and each platform answers it in a target of its own:
+
+```
+the app            views, and the one place that picks a platform's adapters
+adapters           DriftboxHostWindows: WASAPI, WinMM      the Mac's: AVAudioEngine, CoreMIDI
+ports              DriftboxHost: AudioRouting, MIDIInputPort, MIDIOutputPort, HostTime, RenderSource
+hosts              DriftboxHost: EngineHost, RackHost, the rings
+constrained core   DSP, Seq, Engine, Rack
+```
+
+Dependencies point down and never across: nothing platform-neutral imports a platform, and no
+adapter knows another exists. `Package.swift` says so too — `DriftboxHostWindows` depends on its
+C headers only when building for Windows, and its sources compile to nothing anywhere else.
+
+**The ports** are small on purpose, and nothing crosses them that is not the same on every
+platform. A device is an ID and a name — CoreAudio's UID, Windows' endpoint ID — because that is
+what a choice of one is remembered by. A MIDI port is a name for the same reason. A time is a
+`HostTime`, the machine's monotonic clock, which is what each platform's MIDI stamps against. What
+is *not* in them is as deliberate: no sample rate setting (the engine runs at 48 kHz and the
+output converts, on both platforms), and no virtual MIDI source that a platform cannot publish
+(Windows cannot, so `offersVirtualSource` says so rather than pretending).
+
+**The render thread** crosses the one boundary where the constrained targets' rule has to be kept
+by hand. A device renders a `RenderSource` — a C function and a context pointer — rather than a
+protocol or a closure, so that a platform's audio callback calls into Driftbox without retaining,
+releasing or dispatching through a witness table. `EngineHost` and `RackHost` each hand one out.
+On Windows the sources are summed through a table swapped whole behind one atomic pointer, and the
+old table is freed only once the render thread has finished a buffer since.
+
+**Where it stands.** `DriftboxHostWindows` is built on the ports and tested against them.
+The Mac's adapters — `AudioRoute`, `DriftboxAudioUnit`, `MIDIInput`, `MIDIOutput` — are older than
+the ports, still in `DriftboxHost`, and not yet behind them; `Player` and `RackModel` use them
+directly. Moving them into a target of their own that conforms is the next step, and needs a Mac to
+build. After it, `driftbox-play` is one program on both platforms rather than two branches.
+
+### Windows
+
+Swift 6.4 from swift.org, and the Visual Studio Build Tools with the C++ compiler and a Windows
+SDK. Build in a shell that has run `vcvars64.bat`, with `SDKROOT` pointing at the toolchain's
+`Windows.sdk`.
+
+```bash
+swift build -c release --build-tests --build-system native -Xswiftc -enable-testing
+swift test -c release --skip-build --build-system native
+swift build -c release --product driftbox-play
+```
+
+In release, because a debug build does not link there yet: the specialisations `@_noAllocation`
+makes even at `-Onone` collide with the same ones `swiftSwiftOnoneSupport.dll` exports.
+
+Audio is WASAPI in shared mode, event driven, float stereo at 48 kHz converted to the device's
+format by Windows. Everything WASAPI is made, used and released on the stream's own thread at
+Pro Audio priority, so the interface's thread keeps whichever COM apartment it needs. The route
+follows devices through `IMMNotificationClient` — a COM object built by hand in Swift, as nothing
+builds one — and a stream whose device goes away ends and asks to be replaced.
+
+MIDI is WinMM, which sends at once and says nothing when devices change. So clock out goes through
+a scheduler of its own that holds each message to its stamp on a high-resolution timer, to within
+a millisecond, and devices are read again every two seconds and known by name. A clock for another
+program on the same machine goes through a loopback port made in Windows MIDI Services.
 
 ## Conformance
 
@@ -350,6 +416,11 @@ also runs the same calls paced as a device paces them, one every 10.7ms with a s
 and they cost **16%** that way — five times the loop — because a core woken every ten
 milliseconds does its first millisecond of work cold and slow. That is the number to budget
 for, and it is fine.
+
+On Windows the same command plays through WASAPI instead, and says which device and how far behind
+the speakers are: 10ms on a laptop's own. The render call costs **8 to 13%** of the audio's time
+there, its longest 2.8ms of a 10ms period — measured by wall time on the performance counter,
+since Windows keeps a thread's own time only to its 15.6ms scheduler tick.
 
 ### Listening
 

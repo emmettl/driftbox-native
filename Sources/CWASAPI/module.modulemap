@@ -1,0 +1,7 @@
+module CWASAPI [system] {
+  header "CWASAPI.h"
+  link "ole32"
+  link "avrt"
+  link "winmm"
+  export *
+}

@@ -141,9 +141,81 @@
       audio.stop()
     }
   }
+#elseif os(Windows)
+  import DriftboxDocument
+  import DriftboxEngine
+  import DriftboxHost
+  import DriftboxHostWindows
+  import Foundation
+
+  /// Plays a song through the speakers: the engine rendered by a WASAPI stream, through the
+  /// platform-neutral `AudioRouting`. Everything below the route is the same on every platform;
+  /// once the Mac's route is one too, this is the whole of the player and the branch above goes.
+  ///
+  ///     driftbox-play conformance/fixtures/documents/acid.song.json --seconds 20 --start-bar 8
+  @main
+  struct Play {
+    @MainActor
+    static func main() throws {
+      var arguments = Array(CommandLine.arguments.dropFirst())
+      func option(_ name: String) -> Double? {
+        guard let index = arguments.firstIndex(of: name), index + 1 < arguments.count else { return nil }
+        defer { arguments.removeSubrange(index...index + 1) }
+        return Double(arguments[index + 1])
+      }
+      let seconds = option("--seconds")
+      let startBar = option("--start-bar") ?? 0
+      guard arguments.count == 1 else {
+        FileHandle.standardError.write(
+          Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n]\n".utf8))
+        exit(64)
+      }
+      let text = String(decoding: try Data(contentsOf: URL(fileURLWithPath: arguments[0])), as: UTF8.self)
+      guard let song = SongCodec.decode(text) else {
+        FileHandle.standardError.write(Data("\(arguments[0]) is not a song\n".utf8))
+        exit(65)
+      }
+
+      let route = WASAPIRoute()
+      route.onChange = { [unowned route] in
+        print(
+          route.current.map { "  playing through \($0.name)" } ?? "  no sound: \(route.error ?? "no device")")
+      }
+      let host = EngineHost(sampleRate: route.sampleRate)
+      host.load(song)
+      if startBar > 0, let last = song.plan(bars: Int(startBar)).last {
+        host.send(.seek(songFrame: Int((last.time + last.stepSeconds) * route.sampleRate)))
+      }
+      host.send(.play)
+      route.attach(host.renderSource)
+      route.onChange?()
+
+      print(
+        String(
+          format: "playing %@ (%.0f seconds a pass) at %.0f Hz, %.1fms from render to speaker", arguments[0],
+          SongRenderer.seconds(of: song), route.sampleRate, route.latency * 1000))
+      let until = seconds.map { Date().addingTimeInterval($0) }
+      if until == nil { print("ctrl-c to stop") }
+      while until.map({ Date() < $0 }) ?? true {
+        // The main run loop rather than a sleep: word of a device change arrives on it.
+        RunLoop.main.run(until: Date().addingTimeInterval(1))
+        let load = host.takeLoad()
+        let peak = max(
+          Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
+          Float(bitPattern: host.peakRight.load(ordering: .relaxed)))
+        print(
+          String(
+            format:
+              "  peak %.3f  song frame %d  render %.1f%% of the audio's time, longest call %.2fms, %d calls",
+            peak, host.songFrame.load(ordering: .relaxed), load.fraction * 100, load.longestMilliseconds,
+            load.calls))
+      }
+      route.detach(host.renderSource.context)
+    }
+  }
 #else
   @main
   struct Play {
-    static func main() { print("driftbox-play needs AVFoundation") }
+    static func main() { print("driftbox-play needs AVFoundation or WASAPI") }
   }
 #endif

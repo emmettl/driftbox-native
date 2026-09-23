@@ -145,14 +145,10 @@ public final class EngineHost: @unchecked Sendable {
     #if canImport(Darwin)
       return clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
     #elseif os(Windows)
-      // Kernel plus user time, in 100ns units — but only as fine as the scheduler's tick.
-      var creation = FILETIME()
-      var exit = FILETIME()
-      var kernel = FILETIME()
-      var user = FILETIME()
-      GetThreadTimes(GetCurrentThread(), &creation, &exit, &kernel, &user)
-      func ticks(_ t: FILETIME) -> UInt64 { UInt64(t.dwHighDateTime) << 32 | UInt64(t.dwLowDateTime) }
-      return (ticks(kernel) + ticks(user)) * 100
+      // Wall time on the performance counter. Windows keeps a thread's own time only to the
+      // scheduler's tick, 15.6ms, which is longer than a whole render call; and a render thread
+      // at Pro Audio priority is seldom off the processor, so its wall time is near enough its own.
+      return UInt64(Double(HostTime.now()) / HostTime.ticksPerSecond * 1e9)
     #else
       var spec = timespec()
       clock_gettime(CLOCK_THREAD_CPUTIME_ID, &spec)
