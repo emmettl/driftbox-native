@@ -8,7 +8,7 @@ import PackageDescription
 
 let package = Package(
   name: "DriftboxKit",
-  platforms: [.macOS(.v15), .iOS(.v18)],
+  platforms: [.macOS(.v26), .iOS(.v26)],
   products: [
     .library(name: "DriftboxDSP", targets: ["DriftboxDSP"]),
     .library(name: "DriftboxSeq", targets: ["DriftboxSeq"]),
@@ -49,6 +49,14 @@ let package = Package(
       name: "DriftboxHostAndroid",
       dependencies: [
         "DriftboxHost", .target(name: "CAAudio", condition: .when(platforms: [.android])),
+        .target(name: "CAMidi", condition: .when(platforms: [.android])),
+      ]),
+    // The Android app's native library: what `android/`'s Java calls, and the tests it runs on a
+    // phone. Built into libdriftbox.so by `scripts/android-app.sh`; nothing off Android.
+    .target(
+      name: "DriftboxAndroid",
+      dependencies: [
+        "DriftboxHostAndroid", "DriftboxHost", "DriftboxSeq",
         .target(name: "CAMidi", condition: .when(platforms: [.android])),
       ]),
     // What the scenes ask of a GPU, and the backends that answer it. The shaders are GLSL in

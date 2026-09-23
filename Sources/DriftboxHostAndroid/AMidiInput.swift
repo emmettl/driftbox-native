@@ -11,8 +11,9 @@
   /// Android's native MIDI has no callback for arriving bytes; a port is asked whether it has any.
   /// So a thread of its own asks every open port in turn, a millisecond apart when nothing came,
   /// and frames what it gets with a `MIDIByteStream` per port. The callbacks are called on that
-  /// thread. A clock message is stamped with when Android says it arrived, which is on the same
-  /// clock as `HostTime` there, so the millisecond of asking does not reach the tempo.
+  /// thread. A clock message is stamped with the time its packet carries, on the same clock as
+  /// `HostTime` there, so the millisecond of asking does not reach the tempo: for a USB device
+  /// that is when it arrived, and for another app, whatever that app stamped it with.
   public final class AMidiInput: MIDIInputPort, @unchecked Sendable {
     private let core: Core
     private let devices: AMidiDevices

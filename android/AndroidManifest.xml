@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Android app, so far a harness: an activity that runs a test it is named when started, the
+     MIDI devices Java can open handed to Swift, and a MIDI device of its own that sends back what
+     it is sent. Built without Gradle by scripts/android-app.sh. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="app.driftbox">
+
+  <uses-feature android:name="android.software.midi" android:required="true" />
+
+  <application android:label="Driftbox" android:hasCode="true" android:extractNativeLibs="false">
+    <activity android:name=".Main" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+
+    <!-- Driftbox Loopback: whatever goes into its one input comes back out of its one output. -->
+    <service android:name=".LoopbackService"
+        android:permission="android.permission.BIND_MIDI_DEVICE_SERVICE"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.media.midi.MidiDeviceService" />
+      </intent-filter>
+      <meta-data android:name="android.media.midi.MidiDeviceService"
+          android:resource="@xml/loopback" />
+    </service>
+  </application>
+</manifest>

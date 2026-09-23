@@ -46,6 +46,18 @@
       for watcher in watchers { watcher.changed(devices) }
     }
 
+    /// A Java `MidiDevice`, open, made native and added. False if Android would not make it native.
+    /// On a thread Java is attached to, which a native method called from Java always is.
+    @discardableResult
+    public func add(
+      java device: jobject, env: UnsafeMutablePointer<JNIEnv?>, id: Int32, name: String
+    ) -> Bool {
+      var native: OpaquePointer?
+      guard AMidiDevice_fromJava(env, device, &native) == AMEDIA_OK, let native else { return false }
+      add(native, id: id, name: name)
+      return true
+    }
+
     /// The device Java knows as `id` has gone. Its ports are closed before it is released.
     public func remove(id: Int32) {
       let (gone, devices, watchers) = state.withLock { state in

@@ -95,7 +95,7 @@ struct GPUContractTests {
     for device in try Backends.all() {
       let target = try device.makeTarget(width: 16, height: 16)
       let pipeline = try device.makePipeline(GPUPipelineDescriptor(program: .gradient))
-      try device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
+      device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
         pass.setPipeline(pipeline)
         pass.draw(vertexCount: 3)
       }
@@ -121,7 +121,7 @@ struct GPUContractTests {
       // Half size and half a screen left: the square covers the left half of the target's middle.
       uniforms.transform = Matrix4(
         SIMD4(0.5, 0, 0, 0), SIMD4(0, 0.5, 0, 0), SIMD4(0, 0, 1, 0), SIMD4(-0.5, 0, 0, 1))
-      try device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
+      device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
         pass.setPipeline(pipeline)
         pass.setUniforms(uniforms, binding: 0)
         pass.setVertexBuffer(buffer, slot: 0)
@@ -146,7 +146,7 @@ struct GPUContractTests {
       try bytes([UInt32(0), 1, 2, 0, 2, 3]) { indices = try device.makeBuffer($0, kind: .index) }
       for nearFirst in [true, false] {
         let target = try device.makeTarget(width: 8, height: 8)
-        try device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
+        device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
           pass.setPipeline(pipeline)
           for (buffer, colour) in nearFirst
             ? [(near!, SIMD4<Float>(1, 0, 0, 1)), (far!, SIMD4<Float>(0, 1, 0, 1))]
@@ -178,7 +178,7 @@ struct GPUContractTests {
         let target = try device.makeTarget(width: 4, height: 4)
         var uniforms = FlatUniforms()
         uniforms.colour = SIMD4(1, 0, 0, 0.5)
-        try device.render(into: target, clear: .colour(background)) { pass in
+        device.render(into: target, clear: .colour(background)) { pass in
           pass.setPipeline(pipeline)
           pass.setUniforms(uniforms, binding: 0)
           pass.setVertexBuffer(square, slot: 0)
@@ -212,7 +212,7 @@ struct GPUContractTests {
       var uniforms = SpriteUniforms()
       uniforms.radius = SIMD2(0.25, 0.25)
       let target = try device.makeTarget(width: 32, height: 32)
-      try device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
+      device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
         pass.setPipeline(pipeline)
         pass.setUniforms(uniforms, binding: 0)
         pass.setVertexBuffer(buffer, slot: 0)
@@ -241,7 +241,7 @@ struct GPUContractTests {
       let target = try device.makeTarget(width: 16, height: 16)
       var uniforms = PresentUniforms()
       uniforms.scale = SIMD2(1, 1)
-      try device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
+      device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
         pass.setPipeline(pipeline)
         pass.setUniforms(uniforms, binding: 0)
         pass.setTexture(texture, binding: 1)
@@ -257,11 +257,11 @@ struct GPUContractTests {
       // And a target's colour, drawn in one pass and read in the next, the same way.
       let frame = try device.makeTarget(width: 16, height: 16)
       let gradient = try device.makePipeline(GPUPipelineDescriptor(program: .gradient))
-      try device.render(into: frame, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
+      device.render(into: frame, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
         pass.setPipeline(gradient)
         pass.draw(vertexCount: 3)
       }
-      try device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
+      device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
         pass.setPipeline(pipeline)
         pass.setUniforms(uniforms, binding: 0)
         pass.setTexture(frame.colour, binding: 1)
@@ -284,7 +284,7 @@ struct GPUContractTests {
       let target = try device.makeTarget(width: 4, height: 4)
       var uniforms = FlatUniforms()
       uniforms.colour = SIMD4(0, 1, 0, 1)
-      try device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
+      device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
         pass.setPipeline(pipeline)
         pass.setUniforms(uniforms, binding: 0)
         pass.setVertexBuffer(buffer, slot: 0)
