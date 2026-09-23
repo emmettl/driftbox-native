@@ -92,7 +92,7 @@
       draw(encoder, pipeline: gridPipeline, mesh: gridMesh, uniforms: &grid)
     }
 
-    private func draw<T>(
+    private func draw<T: BitwiseCopyable>(
       _ encoder: MTLRenderCommandEncoder, pipeline: MTLRenderPipelineState,
       mesh: (positions: MTLBuffer, uvs: MTLBuffer, indices: MTLBuffer, count: Int), uniforms: inout T
     ) {
