@@ -479,16 +479,21 @@ each question, and the rest is Android's alone:
    contract's checks on the phone's Adreno, first time, through `scripts/android-app.sh gpu`, and
    runs the contract tests themselves in CI on Linux, on Mesa's software rasteriser. Getting there
    took swift.org's Swift SDK for Android in place of the installer's Android platform, whose
-   standard library had no SIMD types. Left: a surface on a window, which is the app's shell;
-   the scenes on the phone, beginning with Pulse; and `GraphicLab`, which sets its type with
-   CoreText and needs another way to set text.
+   standard library had no SIMD types. Then Pulse on the phone's screen: a surface on an Android
+   window, which turns the frame right way up on its way to the screen, and the app opening on a
+   song with Pulse drawn from it at the display's 120 frames a second and the screen for a pad.
+   Drawing kept the audio's cores awake, and the render thread's cost fell from 60% of each burst
+   to 25 to 40%, as step 2 said it would. Left: the other scenes, which want more of the layer
+   than Pulse does; and `GraphicLab`, which sets its type with CoreText and needs another way to
+   set text.
 4. **The touch interface, designed with iOS.** See below.
 5. **Shipping.** The shell is a `GameActivity`, which hands the window, input and lifecycle to
    native code. Songs open and save through the storage access framework as `.driftbox`, and
    the SDK's own tools package the `.so`, as `scripts/android-app.sh` has done since step 2's
    loopback, without Gradle; begun with a plain `Activity` and Java's MIDI devices handed to
    Swift, and a package of 8MB: Driftbox and the Swift runtime 6.9MB stripped, the NDK's C++
-   library 1.4MB. The build leaves out Foundation's
+   library 1.4MB. Out of view the app stops, since Android keeps it to the little cores: playing
+   on unseen wants a media playback service, which keeps the big ones. The build leaves out Foundation's
    internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
    `DriftboxDocument` takes Foundation only to write a WAV. The Play Store, or F-Droid, when
    Driftbox is public.

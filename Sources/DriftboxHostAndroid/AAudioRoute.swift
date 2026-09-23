@@ -84,8 +84,31 @@
     }
 
     /// Point a stream at the device it should be playing through, and make sure it is.
+    /// Whether the route has let go of its device until `resume`.
+    public private(set) var suspended = false
+
+    /// Let go of the device, and play through nothing, until `resume`: for an app out of view,
+    /// which Android moves to its little cores, where a render thread cannot keep up, and where a
+    /// stream kept open would only render silence late.
+    public func suspend() {
+      suspended = true
+      apply()
+    }
+
+    public func resume() {
+      suspended = false
+      apply()
+    }
+
     public func apply() {
       defer { onChange?() }
+      guard !suspended else {
+        output?.stop()
+        output = nil
+        current = nil
+        error = nil
+        return
+      }
       guard let target = AudioDevices.pick(chosen: chosen, among: devices, systemDefault: systemDefault)
       else {
         output?.stop()

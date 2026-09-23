@@ -1,6 +1,11 @@
 import DriftboxGPU
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// The glass and ironwork occupy a single surface. Leaves are instanced cards: a leaf shader
 /// runs only where that leaf is drawn, instead of evaluating every leaf at every pixel.
 public final class HothouseScene: GPUSurfaceScene {
