@@ -44,19 +44,21 @@ echo "using $("$swiftc" --version 2>&1 | head -1), NDK $(basename "$ndk")"
 
 # Everything below the app and the player, in the order they depend on each other.
 core="DriftboxDSP DriftboxSeq DriftboxEngine DriftboxRack DriftboxDocument DriftboxHost DriftboxHostAndroid"
-# Sources/CAAudio and Sources/CAMidi are where the NDK module maps are found.
-common="-target $target -sdk $sdk -sysroot $llvm/sysroot -I $sdk/usr/include -I Sources/CAAudio -I Sources/CAMidi"
+# Sources/CAAudio, CAMidi and CGLES are where the NDK module maps are found.
+common="-target $target -sdk $sdk -sysroot $llvm/sysroot -I $sdk/usr/include -I Sources/CAAudio -I Sources/CAMidi -I Sources/CGLES"
 
-# Each module named, compiled whole into $out/<module>.o with its interface beside it.
+# Each module named, compiled whole into $out/<module>.o with its interface beside it: its sources,
+# and any a caller names in `extra_<module>`.
 compile() {
   for module in "$@"; do
     # Gone first, so that a module that fails cannot leave the last build's in its place.
     rm -f "$out/$module.o" "$out/$module.swiftmodule"
+    extra="$(eval echo "\${extra_$module:-}")"
     # shellcheck disable=SC2086
     if ! "$swiftc" $common -enable-experimental-feature Extern -wmo -O -parse-as-library -swift-version 6 \
       -module-name "$module" -I "$out" \
       -emit-module -emit-module-path "$out/$module.swiftmodule" -c -o "$out/$module.o" \
-      $(find "Sources/$module" -name '*.swift' | sort) >"$out/$module.log" 2>&1; then
+      $(find "Sources/$module" -name '*.swift' | sort) $extra >"$out/$module.log" 2>&1; then
       grep -v "libc not found" "$out/$module.log" >&2
       echo "$module did not build" >&2
       exit 1

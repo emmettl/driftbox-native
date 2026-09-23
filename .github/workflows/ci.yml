@@ -48,7 +48,13 @@ jobs:
     container: swift:6.4-bookworm
     env:
       DRIFTBOX_REQUIRE_GENERATED: 1
+      # The GPU layer's OpenGL ES backend runs its contract tests on Mesa's software rasteriser,
+      # with no display: Linux's WARP.
+      EGL_PLATFORM: surfaceless
+      LIBGL_ALWAYS_SOFTWARE: 1
     steps:
+      - name: Mesa, for OpenGL ES
+        run: apt-get update && apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:

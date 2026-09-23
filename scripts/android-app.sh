@@ -4,6 +4,7 @@
 #
 #     scripts/android-app.sh                    # build and install
 #     scripts/android-app.sh midi-loopback      # and run the MIDI ports against Driftbox Loopback
+#     scripts/android-app.sh gpu                # or the GPU contract on the phone's GPU
 #
 # No Gradle: the SDK's own tools, in the order Gradle would call them. Beyond what
 # `android-env.sh` needs, a JDK (JAVA_HOME, or the newest under Programs/Java), and the Android
@@ -26,11 +27,13 @@ app="$out/app"
 rm -rf "$app"
 mkdir -p "$app/classes" "$app/dex" "$app/stage/lib/arm64-v8a"
 
-# The native library: everything the player has, and the app's own module on top.
+# The native library: everything the player has, the GPU layer on OpenGL ES, and the app's own
+# module on top. The app checks the GPU contract with the contract tests' own programs.
+extra_DriftboxAndroid=Tests/DriftboxGPUTests/Generated/ShaderPrograms.swift
 # shellcheck disable=SC2086
-compile $core DriftboxAndroid
-link "$app/stage/lib/arm64-v8a/libdriftbox.so" "$out/DriftboxAndroid.o" -emit-library \
-  -Xlinker -soname=libdriftbox.so
+compile $core DriftboxGPU DriftboxGPUGLES DriftboxAndroid
+link "$app/stage/lib/arm64-v8a/libdriftbox.so" "$out/DriftboxGPU.o" "$out/DriftboxGPUGLES.o" \
+  "$out/DriftboxAndroid.o" -lGLESv3 -emit-library -Xlinker -soname=libdriftbox.so
 cp "$libcxx" "$app/stage/lib/arm64-v8a/"
 # Symbols are half of what the libraries weigh, and the NDK's libc++ comes with all of its own.
 for library in "$app"/stage/lib/arm64-v8a/*.so; do "$llvm/bin/llvm-strip.exe" --strip-unneeded "$library"; done

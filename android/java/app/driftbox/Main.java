@@ -10,6 +10,8 @@ import android.widget.TextView;
  * screen and in the log under "Driftbox":
  *
  * <pre>adb shell am start -n app.driftbox/.Main --es run midi-loopback</pre>
+ *
+ * or {@code gpu}, for the GPU contract on this phone's GPU.
  */
 public final class Main extends Activity {
   static final String TAG = "Driftbox";
@@ -24,13 +26,17 @@ public final class Main extends Activity {
     setContentView(text);
     midi = new Midi(this);
     String run = getIntent().getStringExtra("run");
-    if ("midi-loopback".equals(run)) {
+    if ("midi-loopback".equals(run) || "gpu".equals(run)) {
       new Thread(() -> {
         String report;
         try {
-          report = midi.await("Driftbox Loopback", 5000)
-              ? Native.midiLoopback()
-              : "FAIL Driftbox Loopback never arrived";
+          if ("gpu".equals(run)) {
+            report = Native.gpuCheck();
+          } else {
+            report = midi.await("Driftbox Loopback", 5000)
+                ? Native.midiLoopback()
+                : "FAIL Driftbox Loopback never arrived";
+          }
         } catch (InterruptedException e) {
           report = "FAIL interrupted";
         }
