@@ -73,7 +73,7 @@ struct RackConformanceTests {
   /// The cases load at all: a parameterised test over none of them would pass, and say nothing.
   @Test func everyCaseLoads() throws {
     let cases = try Self.cases()
-    #expect(cases.count == 104)
+    #expect(cases.count == 107)
     #expect(Self.names.count == cases.count)
   }
 

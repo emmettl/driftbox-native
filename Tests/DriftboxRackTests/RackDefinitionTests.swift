@@ -8,10 +8,7 @@ import Testing
 /// patch even when every render case passes.
 struct RackDefinitionTests {
   /// The reference's modules this build does not have yet, each for a stated reason.
-  static let notYet: Set<String> = [
-    // The groovebox as a rack module: the engine behind a faceplate, which comes with the host.
-    "groovebox"
-  ]
+  static let notYet: Set<String> = []
 
   @Test func everyDefinitionIsTheReferences() throws {
     let modules = try #require(JSONValue(parsing: try Fixtures.text("rack/modules.json"))?.array)

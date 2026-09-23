@@ -1,5 +1,5 @@
-// The sources: wavetable, voice, sampler, multisampler, audio input and audio track, rendered by
-// the reference. Cases are [name, patch, blocks, events?, hostBuses?] — see emit.mjs.
+// The sources: wavetable, voice, sampler, multisampler, audio input, audio track and the
+// groovebox, rendered by the reference. Cases are [name, patch, blocks, events?, hostBuses?] — see emit.mjs.
 
 const m = (id, type, params, extra = {}) => ({ id, type, ...(params ? { params } : {}), ...extra })
 const c = (from, to) => ({ from, to })
@@ -217,6 +217,49 @@ export default [
     modules: [m('mic', 'audio-input'), m('osc', 'vco'), m('mix', 'mixer', { level2: 0.3 }), m('out', 'out')],
     cables: [c(['mic', 'out'], ['mix', 'in1']), c(['osc', 'out'], ['mix', 'in2']), c(['mix', 'out'], ['out', 'in'])],
   }, 8, [], 4],
+
+  // --- Groovebox ---------------------------------------------------------------------------------
+  // The four machines from the host's buses 0 to 3, each through its strip onto its own stereo
+  // outlet and an Out of its own: levels, pans either way and hard, and a mute, moved as it plays.
+  ['sources-groovebox-strips', {
+    modules: [
+      m('song', 'groovebox', {
+        'tr808-level': 0.8, 'tr808-pan': -0.6, 'tr909-level': 0.5, 'tr909-pan': 0.4,
+        '303-a-pan': 1, '303-b-level': 0.3, '303-b-mute': 0,
+      }, { version: 2 }),
+      m('o808', 'out', { level: 0.5 }), m('o909', 'out', { level: 0.5 }),
+      m('oa', 'out', { level: 0.5 }), m('ob', 'out', { level: 0.5 }),
+    ],
+    cables: [
+      c(['song', 'tr808-out'], ['o808', 'in']), c(['song', 'tr909-out'], ['o909', 'in']),
+      c(['song', '303-a-out'], ['oa', 'in']), c(['song', '303-b-out'], ['ob', 'in']),
+    ],
+  }, 24, [
+    [6, 'param', 'song', '303-b-mute', 1], [10, 'param', 'song', 'tr909-pan', -1],
+    [14, 'param', 'song', 'tr808-level', 0.1], [18, 'param', 'song', '303-b-mute', 0],
+  ], 5],
+  // Patches from before its outlets were stereo cabled each side on its own: the aliases still find
+  // their channels, the 909's right into a mono VCA and 303 A's left into an Out.
+  ['sources-groovebox-aliases', {
+    modules: [
+      m('song', 'groovebox', null, { version: 2 }), m('amp', 'vca', { gain: 0.7 }),
+      m('mix', 'mixer', { level1: 0.8, level2: 0.6 }), m('out', 'out'),
+    ],
+    cables: [
+      c(['song', 'tr909-r'], ['amp', 'in']), c(['amp', 'out'], ['mix', 'in1']),
+      c(['song', '303.a-l'], ['mix', 'in2']), c(['mix', 'out'], ['out', 'in']),
+    ],
+  }, 12, [], 4],
+  // No song, so no buses from the host: every outlet is silent, beside a VCO that is not.
+  ['sources-groovebox-absent', {
+    modules: [
+      m('song', 'groovebox', null, { version: 2 }), m('osc', 'vco'),
+      m('mix', 'mixer', { level2: 0.3 }), m('out', 'out'),
+    ],
+    cables: [
+      c(['song', 'tr808-out'], ['mix', 'in1']), c(['osc', 'out'], ['mix', 'in2']), c(['mix', 'out'], ['out', 'in']),
+    ],
+  }, 8],
 
   // --- Audio track -------------------------------------------------------------------------------
   // A stereo recording at 44.1 kHz placed one sixteenth in, played once when the transport reaches it.

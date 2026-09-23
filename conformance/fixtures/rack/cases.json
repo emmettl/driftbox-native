@@ -69767,6 +69767,1175 @@
   }
  },
  {
+  "name": "sources-groovebox-strips",
+  "patch": {
+   "modules": [
+    {
+     "id": "song",
+     "type": "groovebox",
+     "params": {
+      "tr808-level": 0.8,
+      "tr808-pan": -0.6,
+      "tr909-level": 0.5,
+      "tr909-pan": 0.4,
+      "303-a-pan": 1,
+      "303-b-level": 0.3,
+      "303-b-mute": 0
+     },
+     "version": 2
+    },
+    {
+     "id": "o808",
+     "type": "out",
+     "params": {
+      "level": 0.5
+     }
+    },
+    {
+     "id": "o909",
+     "type": "out",
+     "params": {
+      "level": 0.5
+     }
+    },
+    {
+     "id": "oa",
+     "type": "out",
+     "params": {
+      "level": 0.5
+     }
+    },
+    {
+     "id": "ob",
+     "type": "out",
+     "params": {
+      "level": 0.5
+     }
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "song",
+      "tr808-out"
+     ],
+     "to": [
+      "o808",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "tr909-out"
+     ],
+     "to": [
+      "o909",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "303-a-out"
+     ],
+     "to": [
+      "oa",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "303-b-out"
+     ],
+     "to": [
+      "ob",
+      "in"
+     ]
+    }
+   ]
+  },
+  "blocks": 24,
+  "events": [
+   [
+    6,
+    "param",
+    "song",
+    "303-b-mute",
+    1
+   ],
+   [
+    10,
+    "param",
+    "song",
+    "tr909-pan",
+    -1
+   ],
+   [
+    14,
+    "param",
+    "song",
+    "tr808-level",
+    0.1
+   ],
+   [
+    18,
+    "param",
+    "song",
+    "303-b-mute",
+    0
+   ]
+  ],
+  "hostBuses": 5,
+  "plan": {
+   "buffers": 17,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "song",
+     "type": "groovebox",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "outletConnected": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+     ],
+     "params": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "o808",
+     "type": "out",
+     "inlets": [
+      1,
+      2
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      9,
+      10
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      12,
+      13,
+      14,
+      15
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "o909",
+     "type": "out",
+     "inlets": [
+      3,
+      4
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      11,
+      12
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      16,
+      17,
+      18,
+      19
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "oa",
+     "type": "out",
+     "inlets": [
+      5,
+      6
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      13,
+      14
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      20,
+      21,
+      22,
+      23
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "ob",
+     "type": "out",
+     "inlets": [
+      7,
+      8
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      15,
+      16
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      24,
+      25,
+      26,
+      27
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 9,
+     "right": 10,
+     "pan": 13,
+     "mute": 14,
+     "solo": 15
+    },
+    {
+     "buffer": 11,
+     "right": 12,
+     "pan": 17,
+     "mute": 18,
+     "solo": 19
+    },
+    {
+     "buffer": 13,
+     "right": 14,
+     "pan": 21,
+     "mute": 22,
+     "solo": 23
+    },
+    {
+     "buffer": 15,
+     "right": 16,
+     "pan": 25,
+     "mute": 26,
+     "solo": 27
+    }
+   ],
+   "params": [
+    {
+     "value": 0.8,
+     "stepped": false
+    },
+    {
+     "value": -0.6,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0.4,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sources-groovebox-aliases",
+  "patch": {
+   "modules": [
+    {
+     "id": "song",
+     "type": "groovebox",
+     "version": 2
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "params": {
+      "gain": 0.7
+     }
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level1": 0.8,
+      "level2": 0.6
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "song",
+      "tr909-r"
+     ],
+     "to": [
+      "amp",
+      "in"
+     ]
+    },
+    {
+     "from": [
+      "amp",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    },
+    {
+     "from": [
+      "song",
+      "303.a-l"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    }
+   ]
+  },
+  "blocks": 12,
+  "events": [],
+  "hostBuses": 4,
+  "plan": {
+   "buffers": 13,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "song",
+     "type": "groovebox",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "outletConnected": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+     ],
+     "params": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "amp",
+     "type": "vca",
+     "inlets": [
+      4,
+      0
+     ],
+     "inletConnected": [
+      true,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      9
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      12,
+      13
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      9,
+      5,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      10
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      14,
+      15,
+      16,
+      17
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      10,
+      10
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      11,
+      12
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      18,
+      19,
+      20,
+      21
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 11,
+     "right": 12,
+     "pan": 19,
+     "mute": 20,
+     "solo": 21
+    }
+   ],
+   "params": [
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.8,
+     "stepped": false
+    },
+    {
+     "value": 0.6,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "name": "sources-groovebox-absent",
+  "patch": {
+   "modules": [
+    {
+     "id": "song",
+     "type": "groovebox",
+     "version": 2
+    },
+    {
+     "id": "osc",
+     "type": "vco"
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "params": {
+      "level2": 0.3
+     }
+    },
+    {
+     "id": "out",
+     "type": "out"
+    }
+   ],
+   "cables": [
+    {
+     "from": [
+      "song",
+      "tr808-out"
+     ],
+     "to": [
+      "mix",
+      "in1"
+     ]
+    },
+    {
+     "from": [
+      "osc",
+      "out"
+     ],
+     "to": [
+      "mix",
+      "in2"
+     ]
+    },
+    {
+     "from": [
+      "mix",
+      "out"
+     ],
+     "to": [
+      "out",
+      "in"
+     ]
+    }
+   ]
+  },
+  "blocks": 8,
+  "events": [],
+  "hostBuses": 0,
+  "plan": {
+   "buffers": 13,
+   "voices": 1,
+   "voiceWidths": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nodes": [
+    {
+     "id": "song",
+     "type": "groovebox",
+     "inlets": [],
+     "inletConnected": [],
+     "inletTrims": [],
+     "outlets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "outletConnected": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "params": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "osc",
+     "type": "vco",
+     "inlets": [
+      0,
+      0
+     ],
+     "inletConnected": [
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      9
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      12,
+      13,
+      14
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "mix",
+     "type": "mixer",
+     "inlets": [
+      1,
+      9,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "inletConnected": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "inletTrims": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "outlets": [
+      10
+     ],
+     "outletConnected": [
+      true
+     ],
+     "params": [
+      15,
+      16,
+      17,
+      18
+     ],
+     "poly": true,
+     "voices": 1,
+     "voiceLanes": 1
+    },
+    {
+     "id": "out",
+     "type": "out",
+     "inlets": [
+      10,
+      10
+     ],
+     "inletConnected": [
+      true,
+      true
+     ],
+     "inletTrims": [
+      null,
+      null
+     ],
+     "outlets": [
+      11,
+      12
+     ],
+     "outletConnected": [
+      false,
+      false
+     ],
+     "params": [
+      19,
+      20,
+      21,
+      22
+     ],
+     "poly": false,
+     "voices": 1,
+     "voiceLanes": 1
+    }
+   ],
+   "outputs": [
+    {
+     "buffer": 11,
+     "right": 12,
+     "pan": 20,
+     "mute": 21,
+     "solo": 22
+    }
+   ],
+   "params": [
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0.5,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.3,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 1,
+     "stepped": false
+    },
+    {
+     "value": 0.7,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": false
+    },
+    {
+     "value": 0,
+     "stepped": true
+    },
+    {
+     "value": 0,
+     "stepped": true
+    }
+   ],
+   "notes": [
+    {
+     "kind": "mono-fold",
+     "module": "mix"
+    }
+   ]
+  }
+ },
+ {
   "name": "sources-audio-track",
   "patch": {
    "modules": [

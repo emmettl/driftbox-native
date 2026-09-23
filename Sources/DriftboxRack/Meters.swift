@@ -19,6 +19,8 @@ public enum MeterMirror {
   case vu(VUMeter)
   case tuner(Tuner)
   case looper(LooperShot)
+  /// Four machines' readings, which are four entries in what a host reads rather than one.
+  case groovebox(GrooveboxModule)
 
   /// A mirror for `processor`, or nil for one that shows nothing.
   static func make(for processor: RackProcessor, sampleRate: Double) -> MeterMirror? {
@@ -26,6 +28,7 @@ public enum MeterMirror {
     case .control(.meter): .vu(VUMeter(sampleRate: sampleRate))
     case .control(.tuner): .tuner(Tuner(sampleRate: sampleRate))
     case .space(.looper): .looper(LooperShot(sampleRate: sampleRate))
+    case .sources(.groovebox): .groovebox(GrooveboxModule(sampleRate: sampleRate))
     default: nil
     }
   }
@@ -59,17 +62,27 @@ public enum MeterMirror {
     case (.looper(var mirror), .space(.looper(let source))):
       mirror.take(from: source)
       self = .looper(mirror)
+    case (.groovebox(var mirror), .sources(.groovebox(let source))):
+      mirror.squares = source.squares
+      mirror.blockFrames = source.blockFrames
+      mirror.peaks = source.peaks
+      mirror.envelopes = source.envelopes
+      for point in 0..<4 * 48 { mirror.waveforms[point] = source.waveforms[point] }
+      self = .groovebox(mirror)
     default:
       break
     }
   }
 
-  /// The reading, as the module itself would give it.
-  public func reading() -> MeterReading {
+  /// What module `id` is showing, as the module itself would give it: one reading under its id,
+  /// or the groovebox's four under `id:tr808` and the other machines', as the reference keys them.
+  public func readings(id: String) -> [(id: String, reading: MeterReading)] {
     switch self {
-    case .vu(let mirror): mirror.meter()
-    case .tuner(let mirror): mirror.meter()
-    case .looper(let mirror): mirror.meter()
+    case .vu(let mirror): [(id, mirror.meter())]
+    case .tuner(let mirror): [(id, mirror.meter())]
+    case .looper(let mirror): [(id, mirror.meter())]
+    case .groovebox(let mirror):
+      GrooveboxModule.sections.enumerated().map { ("\(id):\($1)", mirror.reading($0)) }
     }
   }
 
@@ -78,6 +91,7 @@ public enum MeterMirror {
     case .vu(let mirror): mirror.waveform.deallocate()
     case .tuner(let mirror): mirror.release()
     case .looper(let mirror): mirror.waveform.deallocate()
+    case .groovebox(let mirror): mirror.release()
     }
   }
 }

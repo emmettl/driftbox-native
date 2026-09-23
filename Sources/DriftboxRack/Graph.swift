@@ -433,7 +433,7 @@ public struct RackGraph: ~Copyable {
   /// What the mirrors hold, by module id: as of the last snapshot, and on any thread, since
   /// nothing here reads a processor.
   public func meterReadings() -> [(id: String, reading: MeterReading)] {
-    (0..<mirrorCount).map { (meterIds[$0], mirrors[$0].reading()) }
+    (0..<mirrorCount).flatMap { mirrors[$0].readings(id: meterIds[$0]) }
   }
 
   /// What the modules that show anything are showing now, by module id.
