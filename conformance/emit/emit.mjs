@@ -810,6 +810,51 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
     ({ id, name, blurb, category: category ?? null, accent, play: play ?? null, tip: tip ?? null }))))
 }
 
+// What the Chord Player's and the Arp's faces preview: the chord a setting voices, and the
+// figure an Arp setting walks, over a grid of settings. Written compactly — a chord as its notes,
+// a figure as `label:octave` steps — because the grid is large and the values are small.
+{
+  const faces = join(root, 'driftbox', 'packages', 'app', 'src', 'rack', 'faceplates')
+  const { chordPreview } = await import(join(faces, 'chord-player-display.ts'))
+  const { arpInsertPreview } = await import(join(faces, 'arp-display.ts'))
+  const chords = []
+  const flags = [
+    {}, { alter: true }, { open: true }, { octUp: true, octDown: true }, { color: true }, { open: true, color: true, alter: true },
+  ]
+  const custom = [1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1]
+  for (const key of [0, 7]) {
+    for (let scale = 0; scale <= 13; scale++) {
+      for (let notes = 1; notes <= 5; notes++) {
+        for (const inversion of [0, 1, 3]) {
+          for (const flag of flags) {
+            const options = {
+              key, scale, custom: scale === 13 ? custom : undefined, notes, inversion,
+              open: false, octUp: false, octDown: false, color: false, alter: false, ...flag,
+            }
+            chords.push([key, scale, notes, inversion, Object.keys(flag).sort().join('+'), chordPreview(options).join(' ')])
+          }
+        }
+      }
+    }
+  }
+  const figures = []
+  for (const source of [0, 1]) {
+    for (const chord of [0, 2, 4, 7]) {
+      for (const octaves of [1, 3]) {
+        for (let mode = 0; mode <= 5; mode++) {
+          for (const shift of [0, -1]) {
+            for (let insert = 0; insert <= 4; insert++) {
+              const steps = arpInsertPreview({ source, chord, octaves, mode, shift, insert })
+              figures.push([source, chord, octaves, mode, shift, insert, steps.map((step) => `${step.label}:${step.octave}`).join(' ')])
+            }
+          }
+        }
+      }
+    }
+  }
+  write(join(fixtures, 'rack'), 'previews.json', `${JSON.stringify({ chords, figures })}\n`)
+}
+
 const AUDIO_TOLERANCE = 1e-12
 
 /** Where two parsed JSON values part by more than rounding, or null when they do not. */

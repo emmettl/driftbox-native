@@ -22,6 +22,9 @@
       "arranger": ["length"],
       "scale-player": ["key", "scale", "filter"],
       "note-echo": Set(NoteEchoFace.knobs),
+      "chord-player": Set(ChordPlayerFace.knobs + ["alter"]),
+      "arp": Set(ArpFace.knobs),
+      "combi": Set((1...4).flatMap { ["rotary\($0)", "button\($0)"] }),
     ]
   }
 
