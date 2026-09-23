@@ -107,6 +107,29 @@ public final class RackHost: @unchecked Sendable {
   private var copies: [UnsafeMutablePointer<RackGraph>: [UnsafeMutablePointer<Float>]] = [:]
   /// Revisions for swapped data, far above any a graph numbers its own from.
   private var dataRevision = 1 << 40
+
+  /// Audio a module plays that the patch does not carry — a sample loaded from a file, a break —
+  /// by module and slot. Kept here so every graph built after it is loaded plays it too, without
+  /// a copy: each graph's slot points at the one buffer, which lives while any graph does.
+  private var samples: [String: [String: SampleBuffer]] = [:]
+  /// The sample buffers each graph points at, released with it.
+  private var retained: [UnsafeMutablePointer<RackGraph>: [SampleBuffer]] = [:]
+
+  /// One sample's frames, owned, freed when the last graph pointing at it has gone.
+  final class SampleBuffer {
+    let frames: UnsafeMutablePointer<Float>
+    let count: Int
+
+    init(_ samples: [Float]) {
+      count = samples.count
+      frames = .allocate(capacity: max(1, count))
+      samples.withUnsafeBufferPointer { source in
+        if let base = source.baseAddress { frames.initialize(from: base, count: count) }
+      }
+    }
+
+    deinit { frames.deallocate() }
+  }
   private let lock = Mutex<Void>(())
 
   /// The plan the interface last loaded: what a knob's name is looked up in.
@@ -174,7 +197,40 @@ public final class RackHost: @unchecked Sendable {
     graph.initialize(to: RackGraph(plan: compiled, sampleRate: sampleRate, frames: blockFrames))
     lock.withLock { _ in owned.append(graph) }
     latest = graph
+    // The samples this host holds, pointed at before the graph is handed over: nothing else can be
+    // reading it yet.
+    for (module, slots) in samples {
+      for (slot, buffer) in slots {
+        guard let entry = graph.pointee.dataEntry(module: module, slot: slot) else { continue }
+        dataRevision += 1
+        entry.pointee = DataBuffer(
+          samples: UnsafePointer(buffer.frames), count: buffer.count, revision: dataRevision)
+        retained[graph, default: []].append(buffer)
+      }
+    }
     commands.pointee.send(.load(graph))
+  }
+
+  /// Give a module audio the patch does not carry, or take it away (nil): kept for every graph
+  /// after this one, and swapped into the one playing on its next block.
+  public func setSample(_ module: String, _ slot: String, _ frames: [Float]?) {
+    let buffer = frames.map(SampleBuffer.init)
+    samples[module, default: [:]][slot] = buffer
+    if samples[module]?.isEmpty == true { samples[module] = nil }
+    guard let graph = latest, let entry = graph.pointee.dataEntry(module: module, slot: slot) else { return }
+    dataRevision += 1
+    if let buffer { retained[graph, default: []].append(buffer) }
+    commands.pointee.send(
+      .data(
+        graph: graph, entry: entry,
+        buffer: DataBuffer(
+          samples: buffer.map { UnsafePointer($0.frames) }, count: buffer?.count ?? 0, revision: dataRevision)
+      ))
+  }
+
+  /// Every sample the host holds forgotten: for a different patch, whose modules may share ids.
+  public func clearSamples() {
+    for (module, slots) in samples { for slot in slots.keys { setSample(module, slot, nil) } }
   }
 
   /// Replace one of a module's data slots — a pattern, a song, a scale — on the next block, without
@@ -227,6 +283,7 @@ public final class RackHost: @unchecked Sendable {
       graph.deinitialize(count: 1)
       graph.deallocate()
       for pointer in copies.removeValue(forKey: graph) ?? [] { pointer.deallocate() }
+      retained[graph] = nil
     }
   }
 

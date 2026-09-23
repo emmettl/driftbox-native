@@ -31,6 +31,13 @@
     /// What the metered modules are showing, by id: refreshed thirty times a second once
     /// something renders the rack. Only the faceplates that read it redraw when it changes.
     private(set) var readings: [String: MeterReading] = [:]
+    /// What each sampler is playing that the patch does not carry: a file, or the patch's break.
+    /// The audio itself is the host's; this is what the faces say about it.
+    private(set) var samples: [String: SampleInfo] = [:]
+    /// Samplers with a file being read into them.
+    private(set) var loading: Set<String> = []
+    /// Why the last file could not be loaded, for the face that asked.
+    private(set) var loadFailure: (module: String, reason: String)?
 
     // MARK: History
 
@@ -60,6 +67,10 @@
     /// so nothing is sent to it; whatever is there is loaded the moment something starts to.
     @ObservationIgnored private(set) var live = false
     @ObservationIgnored private var metering: Timer?
+    /// Each break rendered once, at the host's rate, off the main thread: a fifth of a second
+    /// the window would otherwise stop for.
+    @ObservationIgnored private var breaks: [String: [Float]] = [:]
+    @ObservationIgnored private var rendering: [String: Task<Void, Never>] = [:]
     /// Where the patch is kept between launches; nil for a model made in a test.
     @ObservationIgnored var memory: UserDefaults?
 
@@ -127,6 +138,9 @@
     /// Put a different patch in the rack. Its history is the old one's, so it starts afresh.
     func open(_ patch: Patch, name: String) {
       allNotesOff()
+      // Another patch's samples are not this one's, even under the same ids.
+      host.clearSamples()
+      samples = [:]
       self.patch = patch
       self.name = name
       selection = []
@@ -163,6 +177,7 @@
 
     /// Compile what is there and hand it to the host; and work out which cables to draw as what.
     private func rebuild() {
+      settleSamples()
       let plan: Plan
       if live {
         host.load(patch)
@@ -371,12 +386,91 @@
       rebuild()
     }
 
+    // MARK: Samples
+
+    /// Samplers gone from the patch lose their audio; samplers with none get the patch's break,
+    /// as the reference gives every one of them on Start.
+    private func settleSamples() {
+      let samplers = Set(patch.modules.filter { $0.type == "sampler" }.map(\.id))
+      for id in samples.keys where !samplers.contains(id) {
+        host.setSample(id, "sample", nil)
+        samples[id] = nil
+      }
+      guard let id = patch.breakId, let entry = RackBreak.named(id) else { return }
+      guard let audio = breaks[id] else {
+        guard rendering[id] == nil, samplers.contains(where: { samples[$0] == nil }) else { return }
+        let rate = host.sampleRate
+        rendering[id] = Task { [weak self] in
+          let audio = await Task.detached(priority: .userInitiated) { entry.render(sampleRate: rate) }.value
+          guard let self else { return }
+          breaks[id] = audio
+          rendering[id] = nil
+          settleSamples()
+        }
+        return
+      }
+      for module in samplers where samples[module] == nil {
+        host.setSample(module, "sample", audio)
+        samples[module] = SampleInfo(
+          name: entry.name, bars: 1, seconds: 240 / entry.tempo, peaks: SampleMath.waveformPeaks(audio),
+          source: .break)
+      }
+    }
+
+    /// Once every break being rendered has arrived.
+    func breaksReady() async {
+      while let task = rendering.values.first { await task.value }
+    }
+
+    /// Read an audio file into a sampler: at the rack's rate, mono, its loudest sample 0.9. The
+    /// rack's tempo becomes the one at which the file is a whole number of bars — whichever of one,
+    /// two, four or eight is nearest the tempo it had — and the transport starts, as the reference
+    /// does, so the loop is heard in time at once.
+    func load(_ url: URL, into moduleId: String) async {
+      loading.insert(moduleId)
+      loadFailure = nil
+      defer { loading.remove(moduleId) }
+      let rate = host.sampleRate
+      let decoded = await Task.detached(priority: .userInitiated) { () -> Result<[Float], Error> in
+        let access = url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        return Result {
+          SampleMath.normalise(SampleMath.toMono(try SampleMath.decode(url, sampleRate: rate)))
+        }
+      }.value
+      switch decoded {
+      case .failure(let error):
+        loadFailure = (moduleId, error.localizedDescription)
+      case .success(let audio):
+        guard patch.modules.contains(where: { $0.id == moduleId }), audio.count > 1 else { return }
+        let seconds = Double(audio.count) / rate
+        let bars = SampleMath.guessBars(seconds, tempo: tempo)
+        host.setSample(moduleId, "sample", audio)
+        samples[moduleId] = SampleInfo(
+          name: SampleMath.name(url.lastPathComponent), bars: bars, seconds: seconds,
+          peaks: SampleMath.waveformPeaks(audio), source: .file)
+        setTempo(SampleMath.tempoForBars(seconds, bars))
+        endTurn()
+        if !running { toggleRunning() }
+      }
+    }
+
+    /// The loop taken to be a different number of bars: the tempo follows.
+    func setSampleBars(_ moduleId: String, _ bars: Int) {
+      guard var info = samples[moduleId], bars > 0 else { return }
+      info.bars = bars
+      samples[moduleId] = info
+      setTempo(SampleMath.tempoForBars(info.seconds, bars))
+      endTurn()
+    }
+
     // MARK: Transport
 
     var tempo: Double { patch.tempo ?? 120 }
 
     func setTempo(_ bpm: Double) {
-      let bpm = max(20, min(300, bpm.rounded()))
+      // To a hundredth, which is how a tempo worked out from a loop's length is kept.
+      let bpm = max(20, min(300, (bpm * 100).rounded() / 100))
       guard bpm != tempo else { return }
       if turning != "tempo" {
         record("Set Tempo")

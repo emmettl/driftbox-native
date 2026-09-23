@@ -33,6 +33,7 @@
         case "chord-player": ChordPlayerFace(face: face)
         case "arp": ArpFace(face: face)
         case "combi": CombinatorFace(face: face)
+        case "sampler": SamplerFace(face: face)
         default: GenericFace(face: face, span: span)
         }
       }

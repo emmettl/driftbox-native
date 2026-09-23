@@ -306,9 +306,16 @@ parity point.
    otherwise: notes through a keyboard of their own on each channel, so two controllers do not
    steal each other's voices, and the mod wheel, bend, pressure, expression, breath and sustain
    to the modules listening on that channel — the reference's decoding, byte for byte.
-   Left: the sample players' faces, the Combinator's routing editor and MIDI learn, the inlet
-   trims on the back, the breaks the break-built patches expect, the rack as an Audio Unit, and
-   the groovebox as a module in it.
+   Then samples: a file dropped on a Sampler, or chosen, is read at the rack's own rate — so,
+   unlike the reference, which reads everything at 44.1kHz, it plays at its own pitch — mono and
+   loud, and the tempo becomes the one at which it is whole bars. The breaks the factory patches
+   are built around are rendered from the 909 as the reference renders them, off the main thread,
+   and every sampler without a file of its own gets its patch's. The host keeps loaded audio
+   beside the patch, where the reference keeps it too, and points every graph it builds at it, so
+   a structural edit does not lose it.
+   Left: the Multisampler's and the Audio Track's faces, the Combinator's routing editor and MIDI
+   learn, the inlet trims on the back, the rack as an Audio Unit, and the groovebox as a module in
+   it.
 
 ## Milestone 3 — what only native can do
 

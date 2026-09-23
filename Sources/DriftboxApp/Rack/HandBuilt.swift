@@ -25,6 +25,7 @@
       "chord-player": Set(ChordPlayerFace.knobs + ["alter"]),
       "arp": Set(ArpFace.knobs),
       "combi": Set((1...4).flatMap { ["rotary\($0)", "button\($0)"] }),
+      "sampler": ["slices", "slice", "start", "loop", "reverse"],
     ]
   }
 
