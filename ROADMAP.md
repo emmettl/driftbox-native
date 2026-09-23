@@ -487,9 +487,13 @@ each question, and the rest is Android's alone:
    window, which turns the frame right way up on its way to the screen, and the app opening on a
    song with Pulse drawn from it at the display's 120 frames a second and the screen for a pad.
    Drawing kept the audio's cores awake, and the render thread's cost fell from 60% of each burst
-   to 25 to 40%, as step 2 said it would. Left: the other scenes, which want more of the layer
-   than Pulse does; and `GraphicLab`, which sets its type with CoreText and needs another way to
-   set text.
+   to 25 to 40%, as step 2 said it would. Then every scene on the layer: the nine surface scenes
+   and Pulse, each the one its song names, fed the mix's spectrum as on Windows, and each passing
+   `scripts/android-app.sh scenes` on the Adreno — drawn, not black, moving. At every pixel of the
+   phone's screen Frost took 21ms a frame and two more over the display's 8.3; drawn at two
+   pixels to a point, as a Retina Mac draws them, and scaled up, nine keep 120 frames a second and
+   Frost 98. Left: the scenes still on Metal alone, which move to the layer on every platform at
+   once; and `GraphicLab`, which sets its type with CoreText and needs another way to set text.
 4. **The touch interface, designed with iOS.** See below.
 5. **Shipping.** The shell is a `GameActivity`, which hands the window, input and lifecycle to
    native code. Songs open and save through the storage access framework as `.driftbox`, and

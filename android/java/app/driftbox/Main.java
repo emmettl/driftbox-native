@@ -18,14 +18,15 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * The app, so far: a song played, with Pulse drawn from it over the whole screen, and the screen a
- * pad for the performance filter. Which song is an extra, a catalogue id:
+ * The app, so far: a song played, with the scene it names drawn from it over the whole screen, and
+ * the screen a pad for the performance filter. Two fingers tapped step on to the next scene. Which
+ * song and which scene are extras, a catalogue id and a scene's:
  *
- * <pre>adb shell am start -n app.driftbox/.Main --es song smallhours</pre>
+ * <pre>adb shell am start -n app.driftbox/.Main --es song smallhours --es scene hothouse</pre>
  *
  * Or a harness, started with a test's name, which runs it and says what happened, on screen and in
- * the log under "Driftbox": {@code --es run midi-loopback}, or {@code gpu} for the GPU contract on
- * this phone's GPU.
+ * the log under "Driftbox": {@code --es run midi-loopback}, {@code gpu} for the GPU contract on this
+ * phone's GPU, or {@code scenes} for every scene drawn, checked and timed.
  */
 public final class Main extends Activity {
   static final String TAG = "Driftbox";
@@ -38,11 +39,11 @@ public final class Main extends Activity {
     super.onCreate(state);
     midi = new Midi(this);
     String run = getIntent().getStringExtra("run");
-    if ("midi-loopback".equals(run) || "gpu".equals(run)) {
+    if ("midi-loopback".equals(run) || "gpu".equals(run) || "scenes".equals(run)) {
       test(run);
     } else {
       String song = getIntent().getStringExtra("song");
-      play(song == null ? "acid" : song);
+      play(song == null ? "acid" : song, getIntent().getStringExtra("scene"));
     }
   }
 
@@ -71,7 +72,7 @@ public final class Main extends Activity {
 
   // MARK: - Pulse
 
-  private void play(String song) {
+  private void play(String song, String scene) {
     String json;
     try {
       json = asset("songs/" + song + ".song.json");
@@ -80,7 +81,7 @@ public final class Main extends Activity {
       finish();
       return;
     }
-    if (!Native.start(json)) {
+    if (!Native.start(json, scene, getResources().getDisplayMetrics().density)) {
       Log.e(TAG, song + " is not a song");
       finish();
       return;
@@ -108,6 +109,14 @@ public final class Main extends Activity {
     view.setOnTouchListener(
         (touched, event) -> {
           int action = event.getActionMasked();
+          // A second finger down, while the first is: the next scene. The first stays the pad's.
+          if (action == MotionEvent.ACTION_POINTER_DOWN && event.getPointerCount() == 2) {
+            Native.nextScene();
+            return true;
+          }
+          if (action == MotionEvent.ACTION_POINTER_DOWN || action == MotionEvent.ACTION_POINTER_UP) {
+            return true;
+          }
           boolean down = action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL;
           // 0...1 from the bottom left, as the engine's pad and Pulse both take it.
           float x = Math.max(0, Math.min(1, event.getX() / touched.getWidth()));
@@ -150,6 +159,10 @@ public final class Main extends Activity {
       try {
         if ("gpu".equals(run)) {
           report = Native.gpuCheck();
+        } else if ("scenes".equals(run)) {
+          android.util.DisplayMetrics screen = new android.util.DisplayMetrics();
+          getWindowManager().getDefaultDisplay().getRealMetrics(screen);
+          report = Native.sceneCheck(screen.widthPixels, screen.heightPixels, screen.density);
         } else {
           report = midi.await("Driftbox Loopback", 5000)
               ? Native.midiLoopback()

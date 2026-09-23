@@ -32,22 +32,37 @@
     env.java(GPUCheck.run())
   }
 
-  // Pulse on the screen: all of these on Java's main thread, which is the main actor's.
+  @_cdecl("Java_app_driftbox_Native_sceneCheck")
+  public func nativeSceneCheck(
+    _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ width: jint, _ height: jint, _ density: jfloat
+  ) -> jstring? {
+    env.java(SceneCheck.run(width: Int(width), height: Int(height), density: density))
+  }
+
+  // A song on the screen: all of these on Java's main thread, which is the main actor's.
 
   /// The song playing and being drawn, if one is.
-  @MainActor var stage: PulseStage?
+  @MainActor var stage: Stage?
   /// The window it is drawn in, held from Java's surface until the render thread has let go of it.
   @MainActor var window: OpaquePointer?
 
   @_cdecl("Java_app_driftbox_Native_start")
-  public func nativeStart(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ json: jstring?) -> jboolean
-  {
+  public func nativeStart(
+    _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ json: jstring?, _ scene: jstring?,
+    _ density: jfloat
+  ) -> jboolean {
     let text = env.string(json)
+    let named = scene == nil ? nil : env.string(scene)
     return MainActor.assumeIsolated {
       stage?.stop()
-      stage = PulseStage(json: text)
+      stage = Stage(json: text, scene: named, density: density)
       return stage == nil ? jboolean(JNI_FALSE) : jboolean(JNI_TRUE)
     }
+  }
+
+  @_cdecl("Java_app_driftbox_Native_nextScene")
+  public func nativeNextScene(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?) {
+    MainActor.assumeIsolated { stage?.nextScene() }
   }
 
   @_cdecl("Java_app_driftbox_Native_stop")
