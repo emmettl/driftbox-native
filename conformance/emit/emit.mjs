@@ -817,8 +817,8 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
 // a figure as `label:octave` steps — because the grid is large and the values are small.
 {
   const faces = join(root, 'driftbox', 'packages', 'app', 'src', 'rack', 'faceplates')
-  const { chordPreview } = await import(join(faces, 'chord-player-display.ts'))
-  const { arpInsertPreview } = await import(join(faces, 'arp-display.ts'))
+  const { chordPreview } = await import(fileUrl(faces, 'chord-player-display.ts'))
+  const { arpInsertPreview } = await import(fileUrl(faces, 'arp-display.ts'))
   const chords = []
   const flags = [
     {}, { alter: true }, { open: true }, { octUp: true, octDown: true }, { color: true }, { open: true, color: true, alter: true },
@@ -862,7 +862,7 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
 // expressions and the rules around them, run over names that exercise both.
 {
   const { midiNoteFromName, velocityFromName, suggestMultisampleZones, midiNoteName } = await import(
-    join(root, 'driftbox', 'packages', 'app', 'src', 'rack', 'multisample.ts')
+    fileUrl(root, 'driftbox', 'packages', 'app', 'src', 'rack', 'multisample.ts')
   )
   const names = [
     'Piano_C3_pp.wav', 'piano-c#4-ff.aif', 'Bass Db2 mf.wav', 'Strings midi-72.wav', 'note60.wav', 'NOTE_61',
