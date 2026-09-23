@@ -238,7 +238,9 @@ there. Input is read by a thread that asks every port in turn, since there is no
 `MIDIByteStream` per port makes Android's packets back into messages: running status, clock in
 the middle of a note, system exclusive skipped. Output is stamped, and what a stamp means is the
 device's business: Android's USB driver holds a message until then, by its source, but a device
-that is another app is handed it at once.
+that is another app is handed it at once. So for every device but USB, `AMidiOutput` holds each
+message in a scheduler of its own until it is due, and sends it stamped, as WinMM's scheduler
+does on Windows; the two share `MIDIQueue` in `DriftboxHost`, and each waits in its own way.
 
 The app is built without Gradle, by the SDK's own tools, and so far is a harness: it runs a test
 it is named and says what happened.
@@ -250,9 +252,10 @@ scripts/android-app.sh midi-loopback    # and test the MIDI ports against the ap
 
 It needs a JDK and the SDK's build-tools and a platform beside the NDK. Driftbox Loopback is a
 MIDI device the app publishes that sends back what it is sent, so the ports are tested with
-nothing plugged in, as on Windows. Notes and clock come back whole and in order, stamps exact; a
-clock sent a tenth of a second ahead comes back a tenth of a second early, and a flush drops
-nothing, which is what a device that is another app does with a stamp.
+nothing plugged in, as on Windows. Notes and clock come back whole and in order, stamps exact. A
+clock sent ahead goes out when it is due: a beat of it, tick by tick, 0.1 to 2ms after each tick
+was due, and a flush drops what has not gone. Without the scheduler it came back a tenth of a
+second early, the moment it was sent, and a flush dropped nothing.
 
 ## Conformance
 

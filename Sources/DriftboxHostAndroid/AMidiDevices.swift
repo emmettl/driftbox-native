@@ -15,6 +15,8 @@
       let id: Int32
       let name: String
       let handle: OpaquePointer
+      /// Whether it is on USB, whose driver holds a message to its stamp; other devices do not.
+      let usb: Bool
     }
 
     private struct Watcher {
@@ -40,7 +42,10 @@
     public func add(_ device: OpaquePointer, id: Int32, name: String) {
       let (devices, watchers) = state.withLock { state in
         let taken = Set(state.devices.map(\.name))
-        state.devices.append(Device(id: id, name: MIDIPortNaming.unique(name, among: taken), handle: device))
+        state.devices.append(
+          Device(
+            id: id, name: MIDIPortNaming.unique(name, among: taken), handle: device,
+            usb: AMidiDevice_getType(device) == AMIDI_DEVICE_TYPE_USB))
         return (state.devices, state.watchers)
       }
       for watcher in watchers { watcher.changed(devices) }

@@ -104,6 +104,9 @@
       let running = Atomic<Bool>(true)
 
       func run() {
+        // Android's THREAD_PRIORITY_URGENT_AUDIO, as the output's scheduler has: a clock read late
+        // is a tempo read wrong.
+        _ = setpriority(PRIO_PROCESS, id_t(gettid()), -19)
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 1024)
         defer { buffer.deallocate() }
         while running.load(ordering: .acquiring) {
