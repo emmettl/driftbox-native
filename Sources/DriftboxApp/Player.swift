@@ -421,9 +421,8 @@
       guard let data = try? Data(contentsOf: url),
         let loaded = SongCodec.decode(String(decoding: data, as: UTF8.self))
       else { return false }
-      // A document's name is its file's, stripped of both halves of `.song.json`.
-      var name = url.deletingPathExtension().lastPathComponent
-      if name.hasSuffix(".song") { name.removeLast(5) }
+      // A document's name is its file's, less whichever of a song's endings it has.
+      let name = SongFile.name(fromFileName: url.lastPathComponent)
       let entry = CatalogueEntry(id: url.path, name: name, blurb: "", visual: loaded.visual ?? "")
       take(loaded, as: entry, from: url)
       return true
@@ -531,8 +530,7 @@
         isEdited = false
         // Saving under a new name renames the window with it, as a document's title follows its
         // file rather than whatever it was called when it was opened.
-        var name = url.deletingPathExtension().lastPathComponent
-        if name.hasSuffix(".song") { name.removeLast(5) }
+        let name = SongFile.name(fromFileName: url.lastPathComponent)
         current = CatalogueEntry(
           id: url.path, name: name, blurb: current?.blurb ?? "", visual: current?.visual ?? "")
         // Saved somewhere new, it comes back from there.
