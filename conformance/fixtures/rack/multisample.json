@@ -1,0 +1,557 @@
+{
+ "parsed": [
+  [
+   "Piano_C3_pp.wav",
+   48,
+   0.16
+  ],
+  [
+   "piano-c#4-ff.aif",
+   61,
+   0.94
+  ],
+  [
+   "Bass Db2 mf.wav",
+   37,
+   0.62
+  ],
+  [
+   "Strings midi-72.wav",
+   72,
+   null
+  ],
+  [
+   "note60.wav",
+   60,
+   null
+  ],
+  [
+   "NOTE_61",
+   61,
+   null
+  ],
+  [
+   "vel064 C4.wav",
+   60,
+   0.5039370078740157
+  ],
+  [
+   "v127_A2.wav",
+   45,
+   1
+  ],
+  [
+   "sax_Bb3_f.wav",
+   58,
+   0.78
+  ],
+  [
+   "Kick.wav",
+   null,
+   null
+  ],
+  [
+   "C-1.wav",
+   0,
+   null
+  ],
+  [
+   "G9.wav",
+   127,
+   null
+  ],
+  [
+   "G#9.wav",
+   null,
+   null
+  ],
+  [
+   "E4 then E5.wav",
+   76,
+   null
+  ],
+  [
+   "Snare_mp.wav",
+   null,
+   0.43
+  ],
+  [
+   "pad (mf) F#2.wav",
+   42,
+   0.62
+  ],
+  [
+   "Lead_A4_v100.wav",
+   69,
+   0.7874015748031497
+  ],
+  [
+   "ep-b3-pp.wav",
+   59,
+   0.16
+  ],
+  [
+   "Cello_ab2",
+   44,
+   null
+  ],
+  [
+   "velocity 80 d3",
+   50,
+   0.6299212598425197
+  ],
+  [
+   "mfC4",
+   null,
+   null
+  ],
+  [
+   "harp_C4_P",
+   60,
+   0.3
+  ],
+  [
+   "organ-FF-C2",
+   36,
+   0.94
+  ],
+  [
+   "bell_c8",
+   108,
+   null
+  ],
+  [
+   "x_c10_y",
+   null,
+   null
+  ],
+  [
+   "vibes 3 d",
+   null,
+   null
+  ],
+  [
+   "Guitar A#-1",
+   10,
+   null
+  ],
+  [
+   "amp_c",
+   null,
+   null
+  ],
+  [
+   "midi200",
+   127,
+   null
+  ],
+  [
+   "v12",
+   null,
+   0.09448818897637795
+  ],
+  [
+   "pf_vel_5",
+   null,
+   0.03937007874015748
+  ]
+ ],
+ "sets": [
+  [
+   "C5.wav",
+   "C3.wav",
+   "C4.wav"
+  ],
+  [
+   "Piano_C4_ff",
+   "Piano_C4_pp",
+   "Piano_C4_mf"
+  ],
+  [
+   "one",
+   "two",
+   "three"
+  ],
+  [
+   "one",
+   "two",
+   "three",
+   "four"
+  ],
+  [
+   "Bass_E1_v40",
+   "Bass_E1_v100",
+   "Bass_A1",
+   "Bass_D2_ff",
+   "Bass_D2",
+   "kick"
+  ],
+  [
+   "solo"
+  ]
+ ],
+ "zones": [
+  [
+   {
+    "root": 72,
+    "low": 67,
+    "high": 127,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 48,
+    "low": 0,
+    "high": 54,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 60,
+    "low": 55,
+    "high": 66,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   }
+  ],
+  [
+   {
+    "root": 60,
+    "low": 0,
+    "high": 127,
+    "velocityLow": 0.6666666666666666,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 60,
+    "low": 0,
+    "high": 127,
+    "velocityLow": 0,
+    "velocityHigh": 0.3333333333333333,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 60,
+    "low": 0,
+    "high": 127,
+    "velocityLow": 0.3333333333333333,
+    "velocityHigh": 0.6666666666666666,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   }
+  ],
+  [
+   {
+    "root": 59,
+    "low": 0,
+    "high": 59,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 60,
+    "low": 60,
+    "high": 60,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 61,
+    "low": 61,
+    "high": 127,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   }
+  ],
+  [
+   {
+    "root": 59,
+    "low": 0,
+    "high": 59,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 60,
+    "low": 60,
+    "high": 60,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 61,
+    "low": 61,
+    "high": 61,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 62,
+    "low": 62,
+    "high": 127,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   }
+  ],
+  [
+   {
+    "root": 28,
+    "low": 0,
+    "high": 30,
+    "velocityLow": 0,
+    "velocityHigh": 0.5,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 28,
+    "low": 0,
+    "high": 30,
+    "velocityLow": 0.5,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 33,
+    "low": 31,
+    "high": 35,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 38,
+    "low": 36,
+    "high": 50,
+    "velocityLow": 0,
+    "velocityHigh": 0.5,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 38,
+    "low": 36,
+    "high": 50,
+    "velocityLow": 0.5,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   },
+   {
+    "root": 63,
+    "low": 51,
+    "high": 127,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   }
+  ],
+  [
+   {
+    "root": 60,
+    "low": 0,
+    "high": 127,
+    "velocityLow": 0,
+    "velocityHigh": 1,
+    "loopStart": 0.1,
+    "loopEnd": 0.9,
+    "loop": false,
+    "sampleRate": 48000
+   }
+  ]
+ ],
+ "noteNames": [
+  "C-1",
+  "C♯-1",
+  "D-1",
+  "D♯-1",
+  "E-1",
+  "F-1",
+  "F♯-1",
+  "G-1",
+  "G♯-1",
+  "A-1",
+  "A♯-1",
+  "B-1",
+  "C0",
+  "C♯0",
+  "D0",
+  "D♯0",
+  "E0",
+  "F0",
+  "F♯0",
+  "G0",
+  "G♯0",
+  "A0",
+  "A♯0",
+  "B0",
+  "C1",
+  "C♯1",
+  "D1",
+  "D♯1",
+  "E1",
+  "F1",
+  "F♯1",
+  "G1",
+  "G♯1",
+  "A1",
+  "A♯1",
+  "B1",
+  "C2",
+  "C♯2",
+  "D2",
+  "D♯2",
+  "E2",
+  "F2",
+  "F♯2",
+  "G2",
+  "G♯2",
+  "A2",
+  "A♯2",
+  "B2",
+  "C3",
+  "C♯3",
+  "D3",
+  "D♯3",
+  "E3",
+  "F3",
+  "F♯3",
+  "G3",
+  "G♯3",
+  "A3",
+  "A♯3",
+  "B3",
+  "C4",
+  "C♯4",
+  "D4",
+  "D♯4",
+  "E4",
+  "F4",
+  "F♯4",
+  "G4",
+  "G♯4",
+  "A4",
+  "A♯4",
+  "B4",
+  "C5",
+  "C♯5",
+  "D5",
+  "D♯5",
+  "E5",
+  "F5",
+  "F♯5",
+  "G5",
+  "G♯5",
+  "A5",
+  "A♯5",
+  "B5",
+  "C6",
+  "C♯6",
+  "D6",
+  "D♯6",
+  "E6",
+  "F6",
+  "F♯6",
+  "G6",
+  "G♯6",
+  "A6",
+  "A♯6",
+  "B6",
+  "C7",
+  "C♯7",
+  "D7",
+  "D♯7",
+  "E7",
+  "F7",
+  "F♯7",
+  "G7",
+  "G♯7",
+  "A7",
+  "A♯7",
+  "B7",
+  "C8",
+  "C♯8",
+  "D8",
+  "D♯8",
+  "E8",
+  "F8",
+  "F♯8",
+  "G8",
+  "G♯8",
+  "A8",
+  "A♯8",
+  "B8",
+  "C9",
+  "C♯9",
+  "D9",
+  "D♯9",
+  "E9",
+  "F9",
+  "F♯9",
+  "G9"
+ ]
+}

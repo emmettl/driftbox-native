@@ -26,6 +26,8 @@
       "arp": Set(ArpFace.knobs),
       "combi": Set((1...4).flatMap { ["rotary\($0)", "button\($0)"] }),
       "sampler": ["slices", "slice", "start", "loop", "reverse"],
+      "multisampler": Set(MultisamplerFace.knobs),
+      "audio-track": ["start", "level"],
     ]
   }
 
