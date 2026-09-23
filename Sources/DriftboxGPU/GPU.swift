@@ -61,6 +61,21 @@ public protocol GPUTarget: AnyObject {
   var colour: any GPUTexture { get }
 }
 
+/// Somewhere on screen to draw: a window's swap chain, a view's layer. Made by a backend from
+/// whatever its platform calls a window, which is why making one is not in `GPUDevice`; drawn into
+/// and shown through this, which is the same everywhere.
+public protocol GPUSurface: AnyObject {
+  var width: Int { get }
+  var height: Int { get }
+  /// Follow the window to a new size, in pixels. The next target is that size.
+  func resize(width: Int, height: Int) throws
+  /// The target this frame is drawn into. Drawn into and presented once per frame.
+  func target() throws -> any GPUTarget
+  /// Show what has been drawn, at the display's next refresh, waiting for it if the one before
+  /// is still showing: what paces a loop that draws a frame, presents, and draws the next.
+  func present() throws
+}
+
 public protocol GPUPipeline: AnyObject {
   var descriptor: GPUPipelineDescriptor { get }
 }

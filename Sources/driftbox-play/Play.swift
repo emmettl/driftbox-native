@@ -121,8 +121,12 @@
 #elseif os(Windows)
   import DriftboxDocument
   import DriftboxEngine
+  import DriftboxGPU
+  import DriftboxGPUD3D11
   import DriftboxHost
   import DriftboxHostWindows
+  import DriftboxScenes
+  import DriftboxWin32
   import Foundation
 
   /// Plays a song through the speakers: the engine rendered by a WASAPI stream, through the
@@ -130,6 +134,9 @@
   /// once the Mac's route is one too, this is the whole of the player and the branch above goes.
   ///
   ///     driftbox-play conformance/fixtures/documents/acid.song.json --seconds 20 --start-bar 8
+  ///     driftbox-play conformance/fixtures/documents/acid.song.json --window
+  ///
+  /// `--window` shows it too: Pulse, drawn through the GPU layer on Direct3D, in a window of its own.
   @main
   struct Play {
     @MainActor
@@ -143,9 +150,10 @@
       let seconds = option("--seconds")
       let startBar = option("--start-bar") ?? 0
       let bench = arguments.firstIndex(of: "--bench").map { arguments.remove(at: $0) } != nil
+      let windowed = arguments.firstIndex(of: "--window").map { arguments.remove(at: $0) } != nil
       guard arguments.count == 1 else {
         FileHandle.standardError.write(
-          Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n] [--bench]\n".utf8))
+          Data("usage: driftbox-play <song.json> [--seconds s] [--start-bar n] [--bench] [--window]\n".utf8))
         exit(64)
       }
       let text = String(decoding: try Data(contentsOf: URL(fileURLWithPath: arguments[0])), as: UTF8.self)
@@ -178,22 +186,107 @@
           format: "playing %@ (%.0f seconds a pass) at %.0f Hz, %.1fms from render to speaker", arguments[0],
           SongRenderer.seconds(of: song), route.sampleRate, route.latency * 1000))
       let until = seconds.map { Date().addingTimeInterval($0) }
-      if until == nil { print("ctrl-c to stop") }
-      while until.map({ Date() < $0 }) ?? true {
-        // The main run loop rather than a sleep: word of a device change arrives on it.
-        RunLoop.main.run(until: Date().addingTimeInterval(1))
-        let load = host.takeLoad()
-        let peak = max(
-          Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
-          Float(bitPattern: host.peakRight.load(ordering: .relaxed)))
-        print(
-          String(
-            format:
-              "  peak %.3f  song frame %d  render %.1f%% of the audio's time, longest call %.2fms, %d calls",
-            peak, host.songFrame.load(ordering: .relaxed), load.fraction * 100, load.longestMilliseconds,
-            load.calls))
+      if windowed {
+        let name = URL(fileURLWithPath: arguments[0]).lastPathComponent
+        try watch(host, bpm: song.bpm, title: "Driftbox — \(SongFile.name(fromFileName: name))", until: until)
+      } else {
+        if until == nil { print("ctrl-c to stop") }
+        while until.map({ Date() < $0 }) ?? true {
+          // The main run loop rather than a sleep: word of a device change arrives on it.
+          RunLoop.main.run(until: Date().addingTimeInterval(1))
+          report(host)
+        }
       }
       route.detach(host.renderSource.context)
+    }
+
+    /// What reaches the output, and what making it costs: proof of life, once a second.
+    static func report(_ host: EngineHost) {
+      let load = host.takeLoad()
+      let peak = max(
+        Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
+        Float(bitPattern: host.peakRight.load(ordering: .relaxed)))
+      print(
+        String(
+          format:
+            "  peak %.3f  song frame %d  render %.1f%% of the audio's time, longest call %.2fms, %d calls",
+          peak, host.songFrame.load(ordering: .relaxed), load.fraction * 100, load.longestMilliseconds,
+          load.calls))
+    }
+
+    /// BGRA pixels, rows from the top, as a 32-bit BMP: the one image format that needs nothing
+    /// but its own header, which is all a frame kept for looking at wants.
+    static func bitmap(_ pixels: [UInt8], width: Int, height: Int) -> Data {
+      var data = Data()
+      func put<T: FixedWidthInteger>(_ value: T) {
+        withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) }
+      }
+      data.append(contentsOf: Array("BM".utf8))
+      put(UInt32(54 + pixels.count))
+      put(UInt32(0))
+      put(UInt32(54))
+      put(UInt32(40))
+      put(Int32(width))
+      put(Int32(-height))  // negative: rows from the top, as the pixels are
+      put(UInt16(1))
+      put(UInt16(32))
+      for _ in 0..<6 { put(UInt32(0)) }
+      data.append(contentsOf: pixels)
+      return data
+    }
+
+    /// The song, seen: Pulse in a window, from what the engine reports having played, drawn once
+    /// per refresh of the display — presenting waits for it, which is what paces the loop — until
+    /// the window is closed or the time is up.
+    @MainActor
+    static func watch(_ host: EngineHost, bpm: Double, title: String, until: Date?) throws {
+      let window = try Win32Window(title: title, width: 960, height: 540)
+      let device = try D3D11Device()
+      let surface = try device.makeSurface(window: window.handle, width: window.width, height: window.height)
+      let scene = try PulseScene(device: device)
+      let presenter = try Presenter(device: device)
+      var frame = try device.makeTarget(width: window.width, height: window.height)
+      var resized: (width: Int, height: Int)?
+      window.onResize = { resized = ($0, $1) }
+
+      // As the scene tests do on the Mac: with DRIFTBOX_SCENE_SHOTS set to a directory, each
+      // second's frame is written there as it was presented, for looking at a run nobody watched.
+      let shots = ProcessInfo.processInfo.environment["DRIFTBOX_SCENE_SHOTS"]
+      var shot = 0
+      let began = HostTime.now()
+      var reported = began
+      var events: [EngineEvent] = []
+      while window.pump(), until.map({ Date() < $0 }) ?? true {
+        if let size = resized {
+          resized = nil
+          try surface.resize(width: size.width, height: size.height)
+          frame = try device.makeTarget(width: size.width, height: size.height)
+        }
+        events.removeAll(keepingCapacity: true)
+        while let event = host.nextEvent() { events.append(event) }
+        host.collect()
+        let input = SceneInput(
+          time: HostTime.seconds(from: began, to: HostTime.now()),
+          peakLeft: Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
+          peakRight: Float(bitPattern: host.peakRight.load(ordering: .relaxed)), events: events,
+          running: host.playing.load(ordering: .relaxed), bpm: bpm, pixelRatio: 1)
+        scene.draw(input, into: frame, on: device)
+        let target = try surface.target()
+        presenter.present(frame, into: target, on: device)
+        let second = HostTime.seconds(from: reported, to: HostTime.now()) >= 1
+        if second, let shots {
+          shot += 1
+          try bitmap(try device.readPixels(target), width: target.width, height: target.height)
+            .write(to: URL(fileURLWithPath: shots).appendingPathComponent("pulse-\(shot).bmp"))
+        }
+        try surface.present()
+        // Word of a device change, which the audio route hops to the main queue with.
+        RunLoop.main.run(mode: .default, before: Date())
+        if second {
+          reported = HostTime.now()
+          report(host)
+        }
+      }
     }
   }
 #elseif os(Android)

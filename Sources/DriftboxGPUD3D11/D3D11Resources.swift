@@ -45,12 +45,9 @@
     let height: Int
     private unowned let device: D3D11Device
 
-    init(device: D3D11Device, width: Int, height: Int, pixels: UnsafeRawBufferPointer?, renderTarget: Bool)
-      throws
-    {
-      self.device = device
-      self.width = width
-      self.height = height
+    convenience init(
+      device: D3D11Device, width: Int, height: Int, pixels: UnsafeRawBufferPointer?, renderTarget: Bool
+    ) throws {
       var description = D3D11_TEXTURE2D_DESC()
       description.Width = UINT(width)
       description.Height = UINT(height)
@@ -69,6 +66,16 @@
           device.device, &description, pixels?.baseAddress == nil ? nil : data, &texture)
       }
       guard made >= 0, let texture else { throw D3D11.error("no texture", made) }
+      try self.init(device: device, owning: texture, width: width, height: height)
+    }
+
+    /// A texture made elsewhere — a swap chain's back buffer — whose reference this now holds.
+    init(device: D3D11Device, owning texture: UnsafeMutablePointer<ID3D11Texture2D>, width: Int, height: Int)
+      throws
+    {
+      self.device = device
+      self.width = width
+      self.height = height
       var view: UnsafeMutablePointer<ID3D11ShaderResourceView>?
       let viewed = device.device.pointee.lpVtbl.pointee.CreateShaderResourceView(
         device.device, D3D11.resource(texture), nil, &view)
@@ -103,11 +110,17 @@
     let depthView: UnsafeMutablePointer<ID3D11DepthStencilView>
     var colour: any GPUTexture { colourTexture }
 
-    init(device: D3D11Device, width: Int, height: Int) throws {
-      self.width = width
-      self.height = height
-      colourTexture = try D3D11Texture(
+    convenience init(device: D3D11Device, width: Int, height: Int) throws {
+      let colour = try D3D11Texture(
         device: device, width: width, height: height, pixels: nil, renderTarget: true)
+      try self.init(device: device, colour: colour)
+    }
+
+    /// A target drawing into `colour`, with a depth buffer of its own the same size.
+    init(device: D3D11Device, colour: D3D11Texture) throws {
+      width = colour.width
+      height = colour.height
+      colourTexture = colour
       var renderView: UnsafeMutablePointer<ID3D11RenderTargetView>?
       let viewed = device.device.pointee.lpVtbl.pointee.CreateRenderTargetView(
         device.device, D3D11.resource(colourTexture.texture), nil, &renderView)

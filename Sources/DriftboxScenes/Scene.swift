@@ -3,59 +3,6 @@
   import Metal
   import simd
 
-  /// What a scene hears and feels, once per frame it draws.
-  public struct SceneInput {
-    /// Seconds since the scene started.
-    public var time: Double
-    /// The loudest sample of the last audio block, 0...1, each side.
-    public var peakLeft: Float
-    public var peakRight: Float
-    /// Hits and notes since the last frame, from the engine's events ring.
-    public var events: [EngineEvent]
-    /// Where the pad is being touched, 0...1 from the bottom left, or nil.
-    public var touch: SIMD2<Float>?
-    /// Which bar and step the transport is on, for scenes that count.
-    public var bar: Int
-    public var step: Int
-    /// Whether the transport is running: scenes that travel stand still when it is not.
-    public var running: Bool
-    /// The transport's tempo, so a scene can dance on the record rather than near it.
-    public var bpm: Double
-    /// Where the song is in quarter notes from the top, when it is somewhere.
-    public var scoreBeat: Double?
-    /// The mix's bass, mids and highs, 0...1, from the `Analyser`'s eight bands.
-    public var levels: (bass: Float, mid: Float, high: Float)
-    /// The backing scale of what is being drawn into, for anything sized in points.
-    public var pixelRatio: Float
-    /// The spectrum in sixteen bands of constant ratio, for a scene with one lane each.
-    public var bands: [Float]
-    /// The web's other reading of the same spectrum — the bottom few bins and the top half —
-    /// for the scenes written against `readLevels`.
-    public var wideLevels: (bass: Float, high: Float)
-
-    public init(
-      time: Double, peakLeft: Float = 0, peakRight: Float = 0, events: [EngineEvent] = [],
-      touch: SIMD2<Float>? = nil, bar: Int = 0, step: Int = 0, running: Bool = false, bpm: Double = 120,
-      scoreBeat: Double? = nil, levels: (bass: Float, mid: Float, high: Float) = (0, 0, 0),
-      wideLevels: (bass: Float, high: Float) = (0, 0), bands: [Float] = [], pixelRatio: Float = 1
-    ) {
-      self.time = time
-      self.peakLeft = peakLeft
-      self.peakRight = peakRight
-      self.events = events
-      self.touch = touch
-      self.bar = bar
-      self.step = step
-      self.running = running
-      self.bpm = bpm
-      self.scoreBeat = scoreBeat
-      self.levels = levels
-      self.wideLevels = wideLevels
-      self.bands = bands
-      self.pixelRatio = pixelRatio
-    }
-  }
-
   /// A scene: what a song is seen with. It keeps the id the web app's scene of the same intent
   /// has, so a song's `visual` hint resolves here too, and the accent colour the pad's cursor
   /// draws in. What it draws is its own affair.

@@ -313,3 +313,75 @@ struct GPUContractTests {
     [SIMD4(-1, -1, z, 1), SIMD4(1, -1, z, 1), SIMD4(1, 1, z, 1), SIMD4(-1, 1, z, 1)]
   }
 }
+
+struct PresenterTests {
+  @Test func aFrameFitsWithoutDistortion() {
+    #expect(Presenter.fit(SIMD2(1920, 1080), in: SIMD2(1080, 1080)) == SIMD2(1, 0.5625))
+    #expect(Presenter.fit(SIMD2(1080, 1920), in: SIMD2(1080, 1080)) == SIMD2(0.5625, 1))
+    #expect(Presenter.fit(SIMD2(100, 50), in: SIMD2(200, 100)) == SIMD2(1, 1))
+    #expect(Presenter.fit(.zero, in: SIMD2(1, 1)) == .zero)
+  }
+
+  @Test func aFrameCoversByCroppingTheOverhang() {
+    #expect(Presenter.cover(SIMD2(1920, 1080), in: SIMD2(1080, 1080)) == SIMD2(Float(1920) / 1080, 1))
+    #expect(Presenter.cover(SIMD2(1080, 1920), in: SIMD2(1080, 1080)) == SIMD2(1, Float(1920) / 1080))
+  }
+
+  /// A wide frame presented in a square is letterboxed: black above and below, the frame between.
+  @Test func aWideFrameIsLetterboxedInASquare() throws {
+    for device in try Backends.all() {
+      let frame = try device.makeTarget(width: 32, height: 16)
+      device.render(into: frame, clear: .colour(SIMD4(1, 1, 1, 1))) { _ in }
+      let square = try device.makeTarget(width: 32, height: 32)
+      try Presenter(device: device).present(frame, into: square, on: device)
+      let read = try device.readPixels(square)
+      #expect(close(pixel(read, 16, 2, width: 32), SIMD4(0, 0, 0, 255)), "a bar above")
+      #expect(close(pixel(read, 16, 16, width: 32), SIMD4(255, 255, 255, 255)), "the frame between")
+      #expect(close(pixel(read, 16, 29, width: 32), SIMD4(0, 0, 0, 255)), "a bar below")
+
+      try Presenter(device: device).present(frame, into: square, on: device, filling: true)
+      #expect(
+        close(pixel(try device.readPixels(square), 16, 2, width: 32), SIMD4(255, 255, 255, 255)), "filled")
+    }
+  }
+}
+
+#if os(Windows)
+  import DriftboxWin32
+
+  /// A window's swap chain, drawn into as any target is and read back from the buffer about to
+  /// be shown: never on screen, since the window is never shown, but a real swap chain for all that.
+  @MainActor
+  struct SurfaceTests {
+    @Test func aSurfaceIsDrawnIntoAndFollowsItsWindow() throws {
+      let window = try Win32Window(title: "Driftbox test", width: 320, height: 200, visible: false)
+      defer { window.close() }
+      #expect(window.width > 0 && window.height > 0)
+      let device = try D3D11Device(driver: .software)
+      let surface = try device.makeSurface(window: window.handle, width: window.width, height: window.height)
+      #expect(surface.width == window.width && surface.height == window.height)
+
+      // A frame's target is let go of before the window resizes, as a loop's local one is.
+      do {
+        let target = try surface.target()
+        #expect(target.width == window.width && target.height == window.height)
+        device.render(into: target, clear: .colour(SIMD4(0.2, 0.4, 0.6, 1))) { _ in }
+        let read = try device.readPixels(target)
+        #expect(close(pixel(read, 20, 12, width: target.width), SIMD4(51, 102, 153, 255), within: 1))
+        try surface.present()
+        // And one held on to says so, rather than DXGI's "invalid call".
+        #expect(throws: GPUError.self) { try surface.resize(width: 64, height: 64) }
+      }
+
+      try surface.resize(width: 16, height: 16)
+      let target = try surface.target()
+      #expect(target.width == 16 && target.height == 16)
+      let frame = try device.makeTarget(width: 16, height: 16)
+      device.render(into: frame, clear: .colour(SIMD4(0, 1, 0, 1))) { _ in }
+      try Presenter(device: device).present(frame, into: target, on: device)
+      #expect(close(pixel(try device.readPixels(target), 8, 8, width: 16), SIMD4(0, 255, 0, 255)))
+      try surface.present()
+      window.pump()
+    }
+  }
+#endif

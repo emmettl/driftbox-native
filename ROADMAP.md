@@ -381,13 +381,17 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    `GPUContractTests` on WARP. The shaders are written once, in GLSL, and `scripts/shaders.mjs`
    makes Metal, HLSL and GLSL ES from them with the Vulkan SDK's glslang and SPIRV-Cross, and the
    uniform blocks' Swift structs from its reflection; all of it checked in, and checked for
-   staleness in CI. Left: a Metal backend held to the same contract, which needs a Mac; then the
-   scenes moved onto the layer — `Scene` taking a `GPUDevice`, `SceneInput` and the camera out
-   of `canImport(Metal)`, `simd` for `Matrix4`, each scene's MSL turned back into the GLSL it came
-   from — one at a time, each held by the offscreen render every scene already has.
-4. **The window, drawn.** The interface is drawn on that layer rather than built from a toolkit,
-   which is in keeping with an instrument and keeps what the app depends on small: a window, input,
-   menus, dialogs and settings from Win32, and the grid, knobs, strip, rack and cables as surfaces.
+   staleness in CI. Then surfaces — a window's swap chain behind `GPUSurface`, and `Presenter` —
+   and the first scene across: `PulseScene` on `GPUScene`, its shader the Metal one's GLSL, held to
+   the Metal one's test, and on screen in `driftbox-play --window` with the song playing. Left: a
+   Metal backend held to the same contract, which needs a Mac; then the rest of the scenes moved
+   onto the layer — the camera and the geometry helpers out of `canImport(Metal)`, `simd` for
+   `Matrix4`, each scene's MSL turned back into the GLSL it came from — one at a time, each held by
+   the offscreen render every scene already has, and the Metal `Scene` gone at the end.
+4. **The window, drawn.** Begun: `DriftboxWin32` has a window, its messages and per-monitor DPI.
+   The interface is drawn on the GPU layer rather than built from a toolkit, which is in keeping
+   with an instrument and keeps what the app depends on small: input, menus, dialogs and settings
+   from Win32, and the grid, knobs, strip, rack and cables as surfaces.
 5. **Shipping.** The Swift runtime beside the executable; signing; winget; the `.driftbox` file
    association. Songs are already `.driftbox` — the web app's documents byte for byte, under a name
    Windows can associate without claiming every `.json`. `SongFile` in `DriftboxDocument` holds

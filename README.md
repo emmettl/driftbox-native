@@ -35,6 +35,7 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |
 | `Sources/DriftboxGPU` | What the scenes ask of a GPU, as a protocol every backend answers the same way. |
 | `Sources/DriftboxGPUD3D11` | That protocol on Direct3D 11: the GPU on Windows. |
+| `Sources/DriftboxWin32` | The Windows shell: a window and its messages, so far. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
 | `Sources/Driftbox` | The executable, which is nothing but `@main`. |
@@ -131,7 +132,7 @@ node scripts/shaders.mjs --check   # fail if what is checked in is stale
 
 glslang compiles the GLSL to SPIR-V, and SPIRV-Cross writes that out as Metal, HLSL and GLSL ES.
 Both come with the Vulkan SDK, which only whoever edits a shader needs. What comes out is checked
-in as Swift, in each target's `Generated/Shaders.swift`: the programs in every language, and a
+in as Swift, in each target's `Generated/ShaderPrograms.swift`: the programs in every language, and a
 Swift struct for every uniform block, written from SPIRV-Cross's reflection member by member at the
 offsets the shaders read. Swift and std140 disagree in two places — a scalar after a `vec3`, and an
 array of anything smaller than a `vec4` — and a block that falls into either is refused by the
@@ -144,6 +145,26 @@ everything again and compares it whole.
 
 Apple's `simd` exists only on Apple's platforms, so `DriftboxGPU` has a `Matrix4` of its own, the
 same memory as `simd_float4x4`.
+
+**On screen**, a `GPUSurface` is a window's swap chain: the frame's target, a resize, and a present
+that waits for the display. A backend makes one from its own platform's kind of window; drawing
+into it and showing it are the same everywhere. `Presenter` shows a finished frame in one, fitted
+or cropped. On Windows the window is `DriftboxWin32`'s — the Windows shell, so far a window and its
+messages, aware of each monitor's DPI — and the surface a flip-model swap chain, tested on a real
+one for a window that is never shown.
+
+**The scenes move across one at a time.** `GPUScene` is a scene on the layer, and Pulse is the
+first: `PulseScene`, its shader the Metal one's GLSL line for line, held on WARP to what the Metal
+one's test holds it to. It stands beside the Metal `Pulse` until the Metal backend can carry it.
+On Windows it is on screen:
+
+```bash
+driftbox-play conformance/fixtures/documents/acid.song.json --window
+```
+
+The song through WASAPI and Pulse through Direct3D, drawn once per refresh from the events the
+engine reports playing. With `DRIFTBOX_SCENE_SHOTS` set to a directory, as for the scene tests on
+the Mac, each second's frame is written there as it was presented.
 
 ### Windows
 

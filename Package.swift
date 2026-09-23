@@ -20,6 +20,7 @@ let package = Package(
     .library(name: "DriftboxHostAndroid", targets: ["DriftboxHostAndroid"]),
     .library(name: "DriftboxGPU", targets: ["DriftboxGPU"]),
     .library(name: "DriftboxGPUD3D11", targets: ["DriftboxGPUD3D11"]),
+    .library(name: "DriftboxWin32", targets: ["DriftboxWin32"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
   ],
   targets: [
@@ -54,8 +55,11 @@ let package = Package(
         .linkedLibrary("d3d11", .when(platforms: [.windows])),
         .linkedLibrary("d3dcompiler", .when(platforms: [.windows])),
       ]),
-    // The visuals: Metal scenes driven by the engine's events. Empty on a platform without Metal.
-    .target(name: "DriftboxScenes", dependencies: ["DriftboxDSP", "DriftboxEngine"]),
+    // The Windows shell: a window and its messages, so far.
+    .target(name: "DriftboxWin32"),
+    // The visuals: scenes driven by the engine's events, moving from Metal onto the GPU layer. On a
+    // platform without Metal, the ones that have moved.
+    .target(name: "DriftboxScenes", dependencies: ["DriftboxDSP", "DriftboxEngine", "DriftboxGPU"]),
 
     // A song document in, a WAV file out: something to listen to.
     .executableTarget(name: "driftbox-render", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
@@ -78,9 +82,11 @@ let package = Package(
     .executableTarget(
       name: "driftbox-play",
       dependencies: [
-        "DriftboxHost", "DriftboxEngine", "DriftboxDocument",
+        "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxGPU", "DriftboxScenes",
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostAndroid", condition: .when(platforms: [.android])),
+        .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
       ]),
 
     // Finds and reads `conformance/fixtures` for every test target.
@@ -99,8 +105,11 @@ let package = Package(
     .testTarget(
       name: "DriftboxHostWindowsTests", dependencies: ["DriftboxHostWindows", "DriftboxHost", "DriftboxSeq"]),
     .testTarget(name: "DriftboxHostAndroidTests", dependencies: ["DriftboxHostAndroid"]),
-    .testTarget(name: "DriftboxGPUTests", dependencies: ["DriftboxGPU", "DriftboxGPUD3D11"]),
-    .testTarget(name: "DriftboxScenesTests", dependencies: ["DriftboxScenes", "DriftboxEngine"]),
+    .testTarget(
+      name: "DriftboxGPUTests", dependencies: ["DriftboxGPU", "DriftboxGPUD3D11", "DriftboxWin32"]),
+    .testTarget(
+      name: "DriftboxScenesTests",
+      dependencies: ["DriftboxScenes", "DriftboxEngine", "DriftboxGPU", "DriftboxGPUD3D11"]),
     .testTarget(
       name: "DriftboxHostTests",
       dependencies: [
