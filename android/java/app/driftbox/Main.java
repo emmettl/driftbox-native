@@ -1,6 +1,12 @@
 package app.driftbox;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -19,8 +25,10 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * The app, so far: a song played, with the scene it names drawn from it over the whole screen, and
- * the screen a pad for the performance filter. Two fingers tapped step on to the next scene. Which
- * song and which scene are extras, a catalogue id and a scene's:
+ * the screen a pad for the performance filter. Two fingers tapped step on to the next scene. Out of
+ * view, or with the screen off, the song plays on, through {@link Playback}; it pauses for a call
+ * or another app's playing, as media does. Which song and which scene are extras, a catalogue id
+ * and a scene's:
  *
  * <pre>adb shell am start -n app.driftbox/.Main --es song smallhours --es scene hothouse</pre>
  *
@@ -33,6 +41,18 @@ public final class Main extends Activity {
   private Midi midi;
   private final Handler handler = new Handler(Looper.getMainLooper());
   private boolean playing;
+  private AudioFocusRequest focus;
+  /** The one there is while a song plays, for the notification's Stop to reach. Main thread only. */
+  private static Main current;
+
+  /** The notification's Stop: the song and everything playing it ended, and the app with them. */
+  static void stopPlaying() {
+    if (current != null) {
+      current.finish();
+    } else {
+      Native.stop();
+    }
+  }
 
   @Override
   protected void onCreate(Bundle state) {
@@ -47,26 +67,29 @@ public final class Main extends Activity {
     }
   }
 
-  // Out of sight, the app leaves Android's top-app cpuset for one with only the little cores, where
-  // the audio's render thread cannot keep up: so the song stops where it is, the audio stream is let
-  // go of and nothing is drawn, and all of it starts again on the way back. Playing on unseen wants
-  // a media playback service, which keeps the big cores.
+  // Out of sight, nothing is drawn; the song plays on, the Playback service keeping the process on
+  // the big cores for it.
   @Override
   protected void onStop() {
-    if (playing) Native.setShown(false);
+    if (playing) Native.setDrawing(false);
     super.onStop();
   }
 
   @Override
   protected void onStart() {
     super.onStart();
-    if (playing) Native.setShown(true);
+    if (playing) Native.setDrawing(true);
   }
 
   @Override
   protected void onDestroy() {
     handler.removeCallbacksAndMessages(null);
-    if (playing) Native.stop();
+    if (playing) {
+      getSystemService(AudioManager.class).abandonAudioFocusRequest(focus);
+      stopService(new Intent(this, Playback.class));
+      Native.stop();
+      current = null;
+    }
     super.onDestroy();
   }
 
@@ -87,7 +110,30 @@ public final class Main extends Activity {
       return;
     }
     playing = true;
+    current = this;
     Log.i(TAG, "playing " + song);
+    // Started now, while the app is in view, which is the only time Android allows it.
+    startForegroundService(new Intent(this, Playback.class).putExtra("song", song));
+    if (Build.VERSION.SDK_INT >= 33
+        && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+      // Without it the song still plays; Android only keeps its notification out of sight.
+      requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, 0);
+    }
+    // Paused for a call or for another app's playing, and played again after the first.
+    focus = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+        .setAudioAttributes(new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            .build())
+        .setOnAudioFocusChangeListener(change -> {
+          if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+            Native.setPlaying(false);
+          } else if (change == AudioManager.AUDIOFOCUS_GAIN) {
+            Native.setPlaying(true);
+          }
+        }, handler)
+        .build();
+    getSystemService(AudioManager.class).requestAudioFocus(focus);
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     SurfaceView view = new SurfaceView(this);
     view.getHolder().addCallback(
@@ -132,10 +178,21 @@ public final class Main extends Activity {
     handler.postDelayed(new Runnable() {
       @Override
       public void run() {
-        Log.i(TAG, Native.tick());
+        Log.i(TAG, Native.tick() + ", in the " + cpuset() + " cpuset");
         handler.postDelayed(this, 1000);
       }
     }, 1000);
+  }
+
+  /** Which of Android's cpusets the process is in, which says which cores it may run on. */
+  private static String cpuset() {
+    try (InputStream in = new java.io.FileInputStream("/proc/self/cpuset")) {
+      byte[] bytes = new byte[64];
+      int read = in.read(bytes);
+      return read > 0 ? new String(bytes, 0, read, StandardCharsets.UTF_8).trim() : "unknown";
+    } catch (IOException e) {
+      return "unknown";
+    }
   }
 
   private String asset(String path) throws IOException {

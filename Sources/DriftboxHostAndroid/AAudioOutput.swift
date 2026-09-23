@@ -126,6 +126,16 @@
       return true
     }
 
+    /// Sixteen bursts of buffer at once, or back to the one a stream starts with. See
+    /// `AAudioRoute.relaxed`.
+    func relax(_ relaxed: Bool) {
+      let room = Int(AAudioStream_getBufferCapacityInFrames(stream))
+      let wanted = relaxed ? min(shape.framesPerBurst * 16, room) : shape.framesPerBurst
+      let set = Int(AAudioStream_setBufferSizeInFrames(stream, Int32(wanted)))
+      if set > 0 { shape.bufferFrames = set }
+      xrunsTuned = xruns
+    }
+
     /// Stop, and wait until AAudio has finished calling back. The owner must: a stream let go of
     /// while running keeps playing.
     func stop() {

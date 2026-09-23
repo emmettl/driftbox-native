@@ -514,8 +514,9 @@ each question, and the rest is Android's alone:
    the SDK's own tools package the `.so`, as `scripts/android-app.sh` has done since step 2's
    loopback, without Gradle; begun with a plain `Activity` and Java's MIDI devices handed to
    Swift, and a package of 8MB: Driftbox and the Swift runtime 6.9MB stripped, the NDK's C++
-   library 1.4MB. Out of view the app stops, since Android keeps it to the little cores: playing
-   on unseen wants a media playback service, which keeps the big ones. The build leaves out Foundation's
+   library 1.4MB. Out of view it plays on through a media playback service, which keeps the big
+   cores Android would otherwise take away, with a buffer of sixteen bursts while nothing is
+   drawn, and pauses when audio focus is lost. The build leaves out Foundation's
    internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
    `DriftboxDocument` takes Foundation only to write a WAV. The Play Store, or F-Droid, when
    Driftbox is public.

@@ -37,8 +37,11 @@ final class Native {
   /** Stop playing and drawing, and wait until both have. */
   static native void stop();
 
-  /** The app in view, or out of it: out of it, nothing plays or is drawn until it is back. */
-  static native void setShown(boolean shown);
+  /** Draw, or draw nothing: the app in view, or out of it. */
+  static native void setDrawing(boolean drawing);
+
+  /** Play, or pause where the song is and let go of the audio stream until playing again. */
+  static native void setPlaying(boolean playing);
 
   /** Draw in this window, of this size, from now on. */
   static native void surfaceChanged(android.view.Surface surface, int width, int height);
