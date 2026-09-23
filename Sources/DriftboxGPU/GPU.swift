@@ -181,13 +181,18 @@ public enum GPUCull: Sendable {
   case front
 }
 
-/// three.js's blending modes, the ones the scenes use.
+/// three.js's blending modes, the ones the scenes use, and the canvas's multiply.
 public enum GPUBlend: Sendable {
   case none
   /// Straight alpha over what is there.
   case normal
   /// Added to what is there, weighted by alpha.
   case additive
+  /// What is there, multiplied by the colour drawn, its alpha left as it was. Alpha plays no part
+  /// in the multiplication, so a shader drawing a straight-alpha colour this way gives the colour
+  /// mixed toward white by how little it covers: `mix(1, colour, alpha)`, which is the canvas's
+  /// `multiply` over an opaque page.
+  case multiply
 }
 
 public enum GPUVertexFormat: Sendable, Equatable {

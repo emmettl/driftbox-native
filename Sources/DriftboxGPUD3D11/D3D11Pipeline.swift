@@ -89,6 +89,12 @@
         target.DestBlend = D3D11_BLEND_ONE
         target.SrcBlendAlpha = D3D11_BLEND_ONE
         target.DestBlendAlpha = D3D11_BLEND_ONE
+      case .multiply:
+        target.BlendEnable = true
+        target.SrcBlend = D3D11_BLEND_DEST_COLOR
+        target.DestBlend = D3D11_BLEND_ZERO
+        target.SrcBlendAlpha = D3D11_BLEND_ZERO
+        target.DestBlendAlpha = D3D11_BLEND_ONE
       }
       target.BlendOp = D3D11_BLEND_OP_ADD
       target.BlendOpAlpha = D3D11_BLEND_OP_ADD

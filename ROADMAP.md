@@ -425,9 +425,9 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    Left:
    - Graphic Lab, which sets type through Core Text every frame. Decided: only glyphs are a
      platform's, and the canvas is drawn on the GPU layer, where the Windows app's interface will
-     draw too. Done so far: `DriftboxText`'s `Typesetter` and DirectWrite behind it. Next, a canvas
-     on the layer (a glyph atlas, rectangles, strokes, clips, transforms, a multiply blend, and a
-     sheet drawn onto itself), then Graphic Lab on it, and a Core Text typesetter for the Mac.
+     draw too. Done so far: `DriftboxText`'s `Typesetter` with DirectWrite behind it, and
+     `DriftboxCanvas`, the part of Canvas2D Graphic Lab draws with, on the layer. Next, Graphic Lab
+     on the canvas, and a Core Text typesetter for the Mac.
    - `--window` on the Mac showing the song's scene rather than Pulse, and the Metal `Scene`
      gone at the end.
 4. **The window, drawn.** ← *here.* The shell first: `DriftboxShell` says what the app asks of a
