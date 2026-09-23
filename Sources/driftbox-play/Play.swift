@@ -261,7 +261,8 @@
   ///     driftbox-play conformance/fixtures/documents/acid.song.json --seconds 20 --start-bar 8
   ///     driftbox-play conformance/fixtures/documents/acid.song.json --window
   ///
-  /// `--window` shows it too: Pulse, drawn through the GPU layer on Direct3D, in a window of its own.
+  /// `--window` shows it too: the song's scene, drawn through the GPU layer on Direct3D, in a window
+  /// of its own — or Pulse, while the one it names has yet to move across to the layer.
   @main
   struct Play {
     @MainActor
@@ -371,21 +372,38 @@
       return data
     }
 
-    /// The song, seen: Pulse in a window, from what the engine reports having played, drawn once
-    /// per refresh of the display — presenting waits for it, which is what paces the loop — until
-    /// the window is closed or the time is up. The window is the shell's: a menu to open another
-    /// song and to play and stop it, and the whole of it a pad for the performance filter, as vibes
-    /// mode is on the Mac, with Pulse drawing the finger where it is.
+    /// The song, seen: its scene in a window, from what the engine reports having played and the
+    /// mix it has made, drawn once per refresh of the display — presenting waits for it, which is
+    /// what paces the loop — until the window is closed or the time is up. The window is the
+    /// shell's: menus to open another song, to play and stop it and to change the scene, and the
+    /// whole of it a pad for the performance filter, as vibes mode is on the Mac, with the scene
+    /// feeling the finger where it is.
     @MainActor
     static func watch(_ host: EngineHost, song: Song, in window: Win32Window, until: Date?) throws {
       let device = try D3D11Device()
       let surface = try device.makeSurface(window: window.handle, width: window.width, height: window.height)
-      let scene = try PulseScene(device: device)
+      var scene: any GPUScene = try GPUScenes.type(for: song.visual).init(device: device)
       let presenter = try Presenter(device: device)
       var frame = try device.makeTarget(width: window.width, height: window.height)
       var resized: (width: Int, height: Int)?
       var bpm = song.bpm
+      var timeline = Timeline(song: song)
       var touch: SIMD2<Float>?
+      print("  showing \(type(of: scene).name)")
+
+      func show(_ next: any GPUScene.Type) {
+        do {
+          scene = try next.init(device: device)
+          print("  showing \(next.name)")
+        } catch {
+          print("  could not show \(next.name): \(error)")
+        }
+      }
+      func step(by offset: Int) {
+        let all = GPUScenes.all
+        let at = all.firstIndex { $0.id == type(of: scene).id } ?? 0
+        show(all[(at + offset + all.count) % all.count])
+      }
 
       window.menuBar = MenuBar([
         Menu(
@@ -399,6 +417,14 @@
           [
             .command("Play or Stop", id: "toggle", shortcut: Shortcut(.space, [])),
             .command("Return to Start", id: "start", shortcut: Shortcut(.return)),
+          ]),
+        Menu(
+          "View",
+          [
+            .command("Next Scene", id: "next-scene", shortcut: Shortcut(.right)),
+            .command("Previous Scene", id: "previous-scene", shortcut: Shortcut(.left)),
+            .separator,
+            .submenu(Menu("Scene", GPUScenes.all.map { .command($0.name, id: "scene:\($0.id)") })),
           ]),
       ])
       window.onEvent = { [unowned window] event in
@@ -414,6 +440,8 @@
           host.send(.seek(songFrame: 0))
           host.send(.play)
           bpm = next.bpm
+          timeline = Timeline(song: next)
+          show(GPUScenes.type(for: next.visual))
           window.title = "Driftbox — \(SongFile.name(fromFileName: url.lastPathComponent))"
         case .command("exit"):
           window.close()
@@ -421,6 +449,12 @@
           host.send(host.playing.load(ordering: .relaxed) ? .stop : .play)
         case .command("start"):
           host.send(.seek(songFrame: 0))
+        case .command("next-scene"):
+          step(by: 1)
+        case .command("previous-scene"):
+          step(by: -1)
+        case .command(let id) where id.hasPrefix("scene:"):
+          show(GPUScenes.type(for: String(id.dropFirst("scene:".count))))
         case .pointer(let pointer):
           // The window as the pad: 0...1 from the bottom left, as the engine and Pulse both take it.
           let size = SIMD2(Float(window.width), Float(window.height)) / window.scale
@@ -451,6 +485,11 @@
       let began = HostTime.now()
       var reported = began
       var events: [EngineEvent] = []
+      // The mix's spectrum, as the Mac's player keeps it: worked out again only when new audio has
+      // arrived, since the smoothing is per analysis and would otherwise follow the display's rate.
+      let analyser = Analyser()
+      var monitor = [Float](repeating: 0, count: Analyser.size)
+      var analysedAt = -1
       try window.run {
         if let until, Date() >= until {
           window.close()
@@ -464,19 +503,31 @@
         events.removeAll(keepingCapacity: true)
         while let event = host.nextEvent() { events.append(event) }
         host.collect()
+        if host.mixWritten != analysedAt {
+          analysedAt = host.mixWritten
+          monitor.withUnsafeMutableBufferPointer { buffer in
+            host.recentMix(Analyser.size, into: buffer.baseAddress!)
+            analyser.update(UnsafeBufferPointer(buffer))
+          }
+        }
+        let songFrame = host.songFrame.load(ordering: .relaxed)
         let input = SceneInput(
           time: HostTime.seconds(from: began, to: HostTime.now()),
           peakLeft: Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
           peakRight: Float(bitPattern: host.peakRight.load(ordering: .relaxed)), events: events, touch: touch,
-          running: host.playing.load(ordering: .relaxed), bpm: bpm, pixelRatio: window.scale)
+          running: host.playing.load(ordering: .relaxed), bpm: bpm,
+          scoreBeat: songFrame < 0 ? nil : timeline.scoreBeat(at: Double(songFrame) / host.sampleRate),
+          levels: analyser.levels(), wideLevels: analyser.wideLevels(), bands: analyser.bands(16),
+          pixelRatio: window.scale)
         scene.draw(input, into: frame, on: device)
         let target = try surface.target()
         presenter.present(frame, into: target, on: device)
         let second = HostTime.seconds(from: reported, to: HostTime.now()) >= 1
         if second, let shots {
           shot += 1
+          let name = "\(type(of: scene).id)-\(shot).bmp"
           try bitmap(try device.readPixels(target), width: target.width, height: target.height)
-            .write(to: URL(fileURLWithPath: shots).appendingPathComponent("pulse-\(shot).bmp"))
+            .write(to: URL(fileURLWithPath: shots).appendingPathComponent(name))
         }
         // Nothing else turns a loop here: Foundation's would take the window's own messages — its
         // shortcuts among them — before the window saw them.

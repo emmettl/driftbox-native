@@ -224,7 +224,8 @@ function generate(target, dir, scratch) {
 const hash = (text) => createHash('sha256').update(text).digest('hex').slice(0, 16)
 
 function sourceHash(dir) {
-  const files = readdirSync(dir).filter((f) => f.endsWith('.vert') || f.endsWith('.frag')).sort()
+  // A .glsl file is one the programs include, so it is part of what they are made from.
+  const files = readdirSync(dir).filter((f) => /\.(vert|frag|glsl)$/.test(f)).sort()
   return hash(files.map((f) => `${f}\n${lf(readFileSync(join(dir, f), 'utf8'))}`).join('\n'))
 }
 

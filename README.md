@@ -197,19 +197,35 @@ device's change, comes through `post`, onto the window's own queue.
 **The scenes move across one at a time.** `GPUScene` is a scene on the layer, and Pulse is the
 first: `PulseScene`, its shader the Metal one's GLSL line for line, held on WARP to what the Metal
 one's test holds it to. On the Mac, where both can be drawn, it is held to the Metal `Pulse` itself,
-pixel for pixel at five moments, within two in a channel. It is on screen on both:
+pixel for pixel at five moments, within two in a channel.
+
+The web's nine material studies came next, since each is one fragment shader and sometimes a
+layer of instanced cards: Orrery, Switchback, Daydream, Small Hours, Paper Cities, Weave, Frost,
+Hothouse and Night Bus. `GPUSurfaceScene` keeps their clocks, bands, touch and hits as the Metal
+`SurfaceScene` does, and their shaders are the Metal ones' MSL back in GLSL over a shared
+`surface.glsl`. Frost's crystals and Hothouse's leaves are cards, each placed by a matrix that steps
+per instance. On WARP each is held to drawing, not black, and moving with the music. On the Mac
+each is held to its Metal scene frame by frame through three seconds of playing. `GPUScenes`
+finds a song's scene by its `visual`, falling back to Pulse for the scenes not yet across. They
+are on screen:
 
 ```bash
-driftbox-play conformance/fixtures/documents/acid.song.json --window
+driftbox-play conformance/fixtures/documents/hothouse.song.json --window
 ```
 
-The song through WASAPI and Pulse through Direct3D on Windows, and through the engine's Audio Unit
-and Metal on the Mac, drawn once per refresh from the events the engine reports playing. On Windows
-the window is the shell's: File ▸ Open… (Ctrl+O) for another song, Space to play and stop,
-Ctrl+Enter back to the start, and the whole window a pad for the performance filter, as vibes mode
-is on the Mac, with Pulse drawing the finger. With `DRIFTBOX_SCENE_SHOTS` set to a directory, as for
-the scene tests, each second's frame is written there as it was presented: a BMP on Windows, a PNG
-on the Mac.
+The song plays through WASAPI on Windows, with its scene drawn through Direct3D. On the Mac it
+plays through the engine's Audio Unit, with Pulse drawn through Metal. Either way a frame is drawn
+once per refresh, from the events the engine reports playing and the mix it has made. On Windows
+the window is the shell's:
+
+- File ▸ Open… (Ctrl+O) opens another song, and its scene with it.
+- Space plays and stops; Ctrl+Enter goes back to the start.
+- View has the next and previous scene (Ctrl+Right, Ctrl+Left) and each scene by name.
+- The whole window is a pad for the performance filter, as vibes mode is on the Mac, and the
+  scene feels the finger.
+
+With `DRIFTBOX_SCENE_SHOTS` set to a directory, as for the scene tests, each second's frame is
+written there as it was presented: a BMP on Windows, a PNG on the Mac.
 
 ### Windows
 

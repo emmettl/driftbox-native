@@ -690,15 +690,10 @@
     /// Where the song is in quarter notes, read straight from the engine for the scene's frame
     /// rather than from the last tick, so it is smooth at the display's rate.
     func scoreBeat() -> Double? {
-      guard let host, !timeline.times.isEmpty else { return nil }
+      guard let host else { return nil }
       let frame = host.songFrame.load(ordering: .relaxed)
       guard frame >= 0 else { return nil }
-      let time = Double(frame) / sampleRate
-      guard let index = timeline.step(at: time) else { return 0 }
-      let start = timeline.times[index]
-      let end = index + 1 < timeline.times.count ? timeline.times[index + 1] : timeline.end
-      let fraction = end > start ? min(1, (time - start) / (end - start)) : 0
-      return (Double(index) + fraction) / 4
+      return timeline.scoreBeat(at: Double(frame) / sampleRate)
     }
 
     /// The mix's bass, mids and highs for the scene, from the last two thousand frames it heard.
