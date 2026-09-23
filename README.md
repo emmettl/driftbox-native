@@ -204,13 +204,32 @@ layer of instanced cards: Orrery, Switchback, Daydream, Small Hours, Paper Citie
 Hothouse and Night Bus. `GPUSurfaceScene` keeps their clocks, bands, touch and hits as the Metal
 `SurfaceScene` does, and their shaders are the Metal ones' MSL back in GLSL over a shared
 `surface.glsl`. Frost's crystals and Hothouse's leaves are cards, each placed by a matrix that steps
-per instance. On WARP each is held to drawing, not black, and moving with the music. On the Mac
-each is held to its Metal scene frame by frame through three seconds of playing. `GPUScenes`
-finds a song's scene by its `visual`, falling back to Pulse for the scenes not yet across. They
-are on screen:
+per instance.
+
+Then sixteen of the web's seventeen three.js scenes, on `GPUGeometryScene`: Wireframe, Sunset,
+Web, Saturn, Lifeforms, Cubik, Stillwater, Cycles, Clouds, Longhand, Defcon, Dancers, Convoy,
+Machine, Jumpman and Trench.
+- **Camera and geometry.** The camera, the model matrices and the shapes they build (`Space.swift`)
+  now use `Matrix4` and the standard library's vectors rather than Apple's `simd`. The Metal scenes
+  reach the same code through a small bridge, so there is one copy of the arithmetic.
+- **Sprites.** A point with a size, which Direct3D cannot draw, is an instanced quad. `sprite.glsl`
+  sizes it in pixels against the viewport the base binds, and gives the fragment Metal's
+  `point_coord`.
+- **Per-point data.** Buffers the Metal shaders read by vertex id became vertex attributes. Small
+  tables became uniform arrays.
+- **Graphic Lab is still Metal only.** It draws a canvas of type through Core Text every frame,
+  and needs a way to set type on the other platforms first.
+
+Every scene on the layer plays the same six seconds as the Metal scenes' own test: kicks, hats,
+and a finger circling through the middle two seconds. On WARP each is held to drawing something
+that is not black and to moving. On the Mac each is held to its Metal scene frame by frame. With
+`DRIFTBOX_SCENE_SHOTS` set, the test writes each scene's frames out to look at.
+
+`GPUScenes` finds a song's scene by its `visual`, falling back to Pulse for one not yet across.
+They are on screen:
 
 ```bash
-driftbox-play conformance/fixtures/documents/hothouse.song.json --window
+driftbox-play conformance/fixtures/documents/saturn.song.json --window
 ```
 
 The song plays through WASAPI on Windows, with its scene drawn through Direct3D. On the Mac it
