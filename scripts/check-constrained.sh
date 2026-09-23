@@ -27,7 +27,7 @@ out="$(mktemp -d)"
 trap 'rm -rf "$out"' EXIT
 
 # In dependency order, so each module can import the ones before it.
-for target in DriftboxDSP DriftboxSeq DriftboxEngine; do
+for target in DriftboxDSP DriftboxSeq DriftboxEngine DriftboxRack; do
   "$swiftc" -target wasm32-unknown-none-wasm \
     -enable-experimental-feature Embedded -enable-experimental-feature Extern \
     -wmo -O -parse-as-library -swift-version 6 \

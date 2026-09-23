@@ -1,0 +1,3925 @@
+[
+ {
+  "type": "groovebox",
+  "version": 2,
+  "name": "Groovebox",
+  "inlets": [],
+  "outlets": [
+   {
+    "id": "tr808-out",
+    "stereo": true
+   },
+   {
+    "id": "tr909-out",
+    "stereo": true
+   },
+   {
+    "id": "303-a-out",
+    "stereo": true
+   },
+   {
+    "id": "303-b-out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "tr808-level",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "tr808-pan",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "tr808-mute",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "tr909-level",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "tr909-pan",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "tr909-mute",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "303-a-level",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "303-a-pan",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "303-a-mute",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "303-b-level",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "303-b-pan",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "303-b-mute",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "audio-input",
+  "version": 1,
+  "name": "Audio Input",
+  "inlets": [],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "level",
+    "min": 0,
+    "max": 4,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "channel",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "audio-track",
+  "version": 1,
+  "name": "Audio Track",
+  "inlets": [],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "start",
+    "min": 0,
+    "max": 1023,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "level",
+    "min": 0,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "vco",
+  "version": 1,
+  "name": "VCO",
+  "inlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "fm",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "tune",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "shape",
+    "min": 0,
+    "max": 2,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "width",
+    "min": 0.05,
+    "max": 0.95,
+    "default": 0.5,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "wavetable",
+  "version": 1,
+  "name": "Wavetable",
+  "inlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "fm",
+    "stereo": false
+   },
+   {
+    "id": "pm",
+    "stereo": false
+   },
+   {
+    "id": "pos",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "tune",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "position",
+    "min": 0,
+    "max": 1,
+    "default": 0.5,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "index",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "voice",
+  "version": 1,
+  "name": "Voice",
+  "inlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "cutoff",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   },
+   {
+    "id": "env",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "tune",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "shapeA",
+    "min": 0,
+    "max": 2,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "shapeB",
+    "min": 0,
+    "max": 2,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "detune",
+    "min": -50,
+    "max": 50,
+    "default": 7,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "mix",
+    "min": 0,
+    "max": 1,
+    "default": 0.5,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "width",
+    "min": 0.05,
+    "max": 0.95,
+    "default": 0.5,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "cutoff",
+    "min": 20,
+    "max": 18000,
+    "default": 1200,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "resonance",
+    "min": 0,
+    "max": 1,
+    "default": 0.2,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "envAmount",
+    "min": 0,
+    "max": 6,
+    "default": 2,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "keyTrack",
+    "min": 0,
+    "max": 1,
+    "default": 0.35,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "attack",
+    "min": 0,
+    "max": 4,
+    "default": 0.005,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "decay",
+    "min": 0.001,
+    "max": 8,
+    "default": 0.4,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sustain",
+    "min": 0,
+    "max": 1,
+    "default": 0.7,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "release",
+    "min": 0.001,
+    "max": 8,
+    "default": 0.25,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "fDecay",
+    "min": 0.001,
+    "max": 8,
+    "default": 0.35,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "glide",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level",
+    "min": 0,
+    "max": 1,
+    "default": 0.7,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "noise",
+  "version": 1,
+  "name": "Noise",
+  "inlets": [],
+  "outlets": [
+   {
+    "id": "white",
+    "stereo": false
+   },
+   {
+    "id": "pink",
+    "stereo": false
+   }
+  ],
+  "params": [],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "sampler",
+  "version": 1,
+  "name": "Sampler",
+  "inlets": [
+   {
+    "id": "trig",
+    "stereo": false
+   },
+   {
+    "id": "slice",
+    "stereo": false
+   },
+   {
+    "id": "pitch",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   },
+   {
+    "id": "eoc",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "slices",
+    "min": 1,
+    "max": 32,
+    "default": 16,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "slice",
+    "min": 0,
+    "max": 31,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "start",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "loop",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "reverse",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "multisampler",
+  "version": 1,
+  "name": "Multisample Instrument",
+  "inlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "velocity",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   },
+   {
+    "id": "env",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "tune",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "attack",
+    "min": 0,
+    "max": 2,
+    "default": 0.002,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "release",
+    "min": 0.001,
+    "max": 8,
+    "default": 0.2,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "velocity",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level",
+    "min": 0,
+    "max": 1,
+    "default": 0.8,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "ladder",
+  "version": 1,
+  "name": "Ladder",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   },
+   {
+    "id": "cutoff",
+    "stereo": false
+   },
+   {
+    "id": "res",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "cutoff",
+    "min": 20,
+    "max": 12000,
+    "default": 800,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "resonance",
+    "min": 0,
+    "max": 1,
+    "default": 0.4,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "svf",
+  "version": 1,
+  "name": "SVF",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   },
+   {
+    "id": "cutoff",
+    "stereo": false
+   },
+   {
+    "id": "res",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "lp",
+    "stereo": false
+   },
+   {
+    "id": "hp",
+    "stereo": false
+   },
+   {
+    "id": "bp",
+    "stereo": false
+   },
+   {
+    "id": "notch",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "cutoff",
+    "min": 20,
+    "max": 18000,
+    "default": 1000,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "resonance",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "alligator",
+  "version": 1,
+  "name": "Alligator",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   },
+   {
+    "id": "gate1",
+    "stereo": false
+   },
+   {
+    "id": "gate2",
+    "stereo": false
+   },
+   {
+    "id": "gate3",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out1",
+    "stereo": false
+   },
+   {
+    "id": "out2",
+    "stereo": false
+   },
+   {
+    "id": "out3",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "attack",
+    "min": 0.0005,
+    "max": 0.2,
+    "default": 0.003,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "freq1",
+    "min": 20,
+    "max": 18000,
+    "default": 220,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "freq2",
+    "min": 20,
+    "max": 18000,
+    "default": 1200,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "freq3",
+    "min": 20,
+    "max": 18000,
+    "default": 4000,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "res1",
+    "min": 0,
+    "max": 1,
+    "default": 0.2,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "res2",
+    "min": 0,
+    "max": 1,
+    "default": 0.5,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "res3",
+    "min": 0,
+    "max": 1,
+    "default": 0.2,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "decay1",
+    "min": 0.001,
+    "max": 2,
+    "default": 0.25,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "decay2",
+    "min": 0.001,
+    "max": 2,
+    "default": 0.12,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "decay3",
+    "min": 0.001,
+    "max": 2,
+    "default": 0.06,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level1",
+    "min": 0,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level2",
+    "min": 0,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level3",
+    "min": 0,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "vocoder",
+  "version": 1,
+  "name": "Vocoder",
+  "inlets": [
+   {
+    "id": "carrier",
+    "stereo": false
+   },
+   {
+    "id": "mod",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "bands",
+    "min": 0,
+    "max": 2,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "attack",
+    "min": 0.0005,
+    "max": 0.2,
+    "default": 0.004,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "release",
+    "min": 0.001,
+    "max": 1,
+    "default": 0.05,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "shift",
+    "min": -12,
+    "max": 12,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "dry",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "vca",
+  "version": 1,
+  "name": "VCA",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   },
+   {
+    "id": "cv",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "gain",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "curve",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "drive",
+  "version": 1,
+  "name": "Drive",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   },
+   {
+    "id": "cv",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "drive",
+    "min": 0.1,
+    "max": 40,
+    "default": 2,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "bias",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "distortion",
+  "version": 1,
+  "name": "Distortion",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": true
+   },
+   {
+    "id": "amount",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "mode",
+    "min": 0,
+    "max": 3,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "amount",
+    "min": 0,
+    "max": 1,
+    "default": 0.25,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "tone",
+    "min": 200,
+    "max": 18000,
+    "default": 8000,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "bias",
+    "min": -0.5,
+    "max": 0.5,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level",
+    "min": 0,
+    "max": 1.5,
+    "default": 0.8,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "cabinet",
+  "version": 1,
+  "name": "Amp / Cab",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": true
+   },
+   {
+    "id": "drive",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "cabinet",
+    "min": 0,
+    "max": 2,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "drive",
+    "min": 0.5,
+    "max": 30,
+    "default": 2,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "bass",
+    "min": -12,
+    "max": 12,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "mid",
+    "min": -12,
+    "max": 12,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "treble",
+    "min": -12,
+    "max": 12,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level",
+    "min": 0,
+    "max": 1.5,
+    "default": 0.8,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "eq",
+  "version": 1,
+  "name": "EQ",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": true
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "low",
+    "min": -18,
+    "max": 18,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "lowFreq",
+    "min": 40,
+    "max": 500,
+    "default": 120,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "mid",
+    "min": -18,
+    "max": 18,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "midFreq",
+    "min": 100,
+    "max": 8000,
+    "default": 1000,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "q",
+    "min": 0.3,
+    "max": 8,
+    "default": 0.9,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "high",
+    "min": -18,
+    "max": 18,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "highFreq",
+    "min": 1500,
+    "max": 16000,
+    "default": 6000,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "imager",
+  "version": 1,
+  "name": "Stereo Imager",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": true
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "lowWidth",
+    "min": 0,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "highWidth",
+    "min": 0,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "crossover",
+    "min": 60,
+    "max": 2000,
+    "default": 250,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "compressor",
+  "version": 1,
+  "name": "Comp",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   },
+   {
+    "id": "key",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   },
+   {
+    "id": "gain",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "threshold",
+    "min": -60,
+    "max": 0,
+    "default": -18,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "ratio",
+    "min": 1,
+    "max": 20,
+    "default": 4,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "attack",
+    "min": 0.0001,
+    "max": 0.2,
+    "default": 0.005,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "release",
+    "min": 0.005,
+    "max": 1,
+    "default": 0.12,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "makeup",
+    "min": 0,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "knee",
+    "min": 0,
+    "max": 24,
+    "default": 6,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "limiter",
+  "version": 1,
+  "name": "Limiter",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": true
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   },
+   {
+    "id": "gain",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "inputGain",
+    "min": 0,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "ceiling",
+    "min": -12,
+    "max": 0,
+    "default": -0.5,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "release",
+    "min": 0.01,
+    "max": 1,
+    "default": 0.12,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "delay",
+  "version": 1,
+  "name": "Delay",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   },
+   {
+    "id": "time",
+    "stereo": false
+   },
+   {
+    "id": "fb",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "time",
+    "min": 0.0003,
+    "max": 2,
+    "default": 0.25,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "feedback",
+    "min": 0,
+    "max": 0.98,
+    "default": 0.3,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "ping-pong",
+  "version": 1,
+  "name": "Ping-Pong Delay",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   },
+   {
+    "id": "time",
+    "stereo": false
+   },
+   {
+    "id": "fb",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "time",
+    "min": 0.0003,
+    "max": 2,
+    "default": 0.25,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "feedback",
+    "min": 0,
+    "max": 0.98,
+    "default": 0.55,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "phaser",
+  "version": 1,
+  "name": "Phaser",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": true
+   },
+   {
+    "id": "sweep",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "rate",
+    "min": 0.02,
+    "max": 8,
+    "default": 0.35,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "center",
+    "min": 80,
+    "max": 4000,
+    "default": 800,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "depth",
+    "min": 0,
+    "max": 1,
+    "default": 0.65,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "feedback",
+    "min": -0.9,
+    "max": 0.9,
+    "default": 0.25,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "mix",
+    "min": 0,
+    "max": 1,
+    "default": 0.5,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "reverb",
+  "version": 1,
+  "name": "Reverb",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "size",
+    "min": 0.1,
+    "max": 1,
+    "default": 0.7,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "decay",
+    "min": 0,
+    "max": 0.98,
+    "default": 0.82,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "damp",
+    "min": 0,
+    "max": 0.99,
+    "default": 0.4,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "mix",
+    "min": 0,
+    "max": 1,
+    "default": 0.25,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "algorithm",
+    "min": 0,
+    "max": 3,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "lowCut",
+    "min": 20,
+    "max": 2000,
+    "default": 20,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "highCut",
+    "min": 1000,
+    "max": 18000,
+    "default": 18000,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "gate",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "gateThresh",
+    "min": 0,
+    "max": 1,
+    "default": 0.05,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "gateHold",
+    "min": 0,
+    "max": 2,
+    "default": 0.15,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "gateRelease",
+    "min": 0.001,
+    "max": 1,
+    "default": 0.02,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "looper",
+  "version": 1,
+  "name": "Loop Station",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": true
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "mode",
+    "min": 0,
+    "max": 3,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "feedback",
+    "min": 0,
+    "max": 1,
+    "default": 0.85,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "dry",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "loop",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "clear",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": true
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "adsr",
+  "version": 1,
+  "name": "ADSR",
+  "inlets": [
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "trig",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "attack",
+    "min": 0.0005,
+    "max": 10,
+    "default": 0.005,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "decay",
+    "min": 0.0005,
+    "max": 10,
+    "default": 0.2,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sustain",
+    "min": 0,
+    "max": 1,
+    "default": 0.6,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "release",
+    "min": 0.0005,
+    "max": 10,
+    "default": 0.3,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "lfo",
+  "version": 1,
+  "name": "LFO",
+  "inlets": [
+   {
+    "id": "rate",
+    "stereo": false
+   },
+   {
+    "id": "reset",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "bi",
+    "stereo": false
+   },
+   {
+    "id": "uni",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "rate",
+    "min": 0.01,
+    "max": 40,
+    "default": 2,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "shape",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "follower",
+  "version": 1,
+  "name": "Follower",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "env",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "attack",
+    "min": 0.0005,
+    "max": 1,
+    "default": 0.005,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "release",
+    "min": 0.0005,
+    "max": 2,
+    "default": 0.15,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "gain",
+    "min": 0,
+    "max": 8,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "threshold",
+    "min": 0,
+    "max": 2,
+    "default": 0.2,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "sample-hold",
+  "version": 1,
+  "name": "S&H",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   },
+   {
+    "id": "trig",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "offset",
+  "version": 1,
+  "name": "Offset",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "gain",
+    "min": -2,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "offset",
+    "min": -2,
+    "max": 2,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "quantizer",
+  "version": 1,
+  "name": "Quantizer",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   },
+   {
+    "id": "trig",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "scale",
+    "min": 0,
+    "max": 5,
+    "default": 2,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "root",
+    "min": 0,
+    "max": 11,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "combi",
+  "version": 1,
+  "name": "Combinator",
+  "inlets": [],
+  "outlets": [
+   {
+    "id": "rotary1",
+    "stereo": false
+   },
+   {
+    "id": "rotary2",
+    "stereo": false
+   },
+   {
+    "id": "rotary3",
+    "stereo": false
+   },
+   {
+    "id": "rotary4",
+    "stereo": false
+   },
+   {
+    "id": "button1",
+    "stereo": false
+   },
+   {
+    "id": "button2",
+    "stereo": false
+   },
+   {
+    "id": "button3",
+    "stereo": false
+   },
+   {
+    "id": "button4",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "rotary1",
+    "min": 0,
+    "max": 127,
+    "default": 64,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "rotary2",
+    "min": 0,
+    "max": 127,
+    "default": 64,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "rotary3",
+    "min": 0,
+    "max": 127,
+    "default": 64,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "rotary4",
+    "min": 0,
+    "max": 127,
+    "default": 64,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "button1",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "button2",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "button3",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "button4",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "transport",
+  "version": 1,
+  "name": "Transport",
+  "inlets": [],
+  "outlets": [
+   {
+    "id": "run",
+    "stereo": false
+   },
+   {
+    "id": "bar",
+    "stereo": false
+   },
+   {
+    "id": "beat",
+    "stereo": false
+   },
+   {
+    "id": "quarter",
+    "stereo": false
+   },
+   {
+    "id": "eighth",
+    "stereo": false
+   },
+   {
+    "id": "sixteenth",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "beatsPerBar",
+    "min": 1,
+    "max": 16,
+    "default": 4,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "clock",
+  "version": 1,
+  "name": "Clock",
+  "inlets": [
+   {
+    "id": "rate",
+    "stereo": false
+   },
+   {
+    "id": "reset",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "trig",
+    "stereo": false
+   },
+   {
+    "id": "phase",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "rate",
+    "min": 0.05,
+    "max": 100,
+    "default": 2,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "width",
+    "min": 0.02,
+    "max": 0.98,
+    "default": 0.5,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "seq",
+  "version": 1,
+  "name": "Seq",
+  "inlets": [
+   {
+    "id": "clock",
+    "stereo": false
+   },
+   {
+    "id": "reset",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "trig",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "length",
+    "min": 1,
+    "max": 8,
+    "default": 8,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "glide",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pitch1",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pitch2",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pitch3",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pitch4",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pitch5",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pitch6",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pitch7",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pitch8",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "gate1",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "gate2",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "gate3",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "gate4",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "gate5",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "gate6",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "gate7",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "gate8",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "tracker",
+  "version": 1,
+  "name": "Tracker",
+  "inlets": [
+   {
+    "id": "clock",
+    "stereo": false
+   },
+   {
+    "id": "reset",
+    "stereo": false
+   },
+   {
+    "id": "pattern",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "cv1",
+    "stereo": false
+   },
+   {
+    "id": "gate1",
+    "stereo": false
+   },
+   {
+    "id": "trig1",
+    "stereo": false
+   },
+   {
+    "id": "cv2",
+    "stereo": false
+   },
+   {
+    "id": "gate2",
+    "stereo": false
+   },
+   {
+    "id": "trig2",
+    "stereo": false
+   },
+   {
+    "id": "cv3",
+    "stereo": false
+   },
+   {
+    "id": "gate3",
+    "stereo": false
+   },
+   {
+    "id": "trig3",
+    "stereo": false
+   },
+   {
+    "id": "cv4",
+    "stereo": false
+   },
+   {
+    "id": "gate4",
+    "stereo": false
+   },
+   {
+    "id": "trig4",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "length",
+    "min": 1,
+    "max": 64,
+    "default": 16,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "mute1",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "mute2",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "mute3",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "mute4",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "unit1",
+    "min": 0,
+    "max": 2,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "unit2",
+    "min": 0,
+    "max": 2,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "unit3",
+    "min": 0,
+    "max": 2,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "unit4",
+    "min": 0,
+    "max": 2,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "pattern",
+    "min": 0,
+    "max": 7,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "arranger",
+  "version": 1,
+  "name": "Arranger",
+  "inlets": [
+   {
+    "id": "clock",
+    "stereo": false
+   },
+   {
+    "id": "reset",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "pattern",
+    "stereo": false
+   },
+   {
+    "id": "trig",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "length",
+    "min": 1,
+    "max": 16,
+    "default": 4,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "arp",
+  "version": 16,
+  "name": "Arp",
+  "inlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "velocity",
+    "stereo": false
+   },
+   {
+    "id": "clock",
+    "stereo": false
+   },
+   {
+    "id": "reset",
+    "stereo": false
+   },
+   {
+    "id": "start",
+    "stereo": false
+   },
+   {
+    "id": "gateCv",
+    "stereo": false
+   },
+   {
+    "id": "velocityCv",
+    "stereo": false
+   },
+   {
+    "id": "rateCv",
+    "stereo": false
+   },
+   {
+    "id": "shiftCv",
+    "stereo": false
+   },
+   {
+    "id": "mod",
+    "stereo": false
+   },
+   {
+    "id": "bend",
+    "stereo": false
+   },
+   {
+    "id": "aftertouch",
+    "stereo": false
+   },
+   {
+    "id": "expression",
+    "stereo": false
+   },
+   {
+    "id": "breath",
+    "stereo": false
+   },
+   {
+    "id": "sustain",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "velocity",
+    "stereo": false
+   },
+   {
+    "id": "trig",
+    "stereo": false
+   },
+   {
+    "id": "start",
+    "stereo": false
+   },
+   {
+    "id": "mod",
+    "stereo": false
+   },
+   {
+    "id": "bend",
+    "stereo": false
+   },
+   {
+    "id": "aftertouch",
+    "stereo": false
+   },
+   {
+    "id": "expression",
+    "stereo": false
+   },
+   {
+    "id": "breath",
+    "stereo": false
+   },
+   {
+    "id": "sustain",
+    "stereo": false
+   },
+   {
+    "id": "gateVelocity",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "source",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "chord",
+    "min": 0,
+    "max": 7,
+    "default": 3,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "octaves",
+    "min": 1,
+    "max": 4,
+    "default": 2,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "mode",
+    "min": 0,
+    "max": 5,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "gate",
+    "min": 0,
+    "max": 1,
+    "default": 0.5,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "hold",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "shift",
+    "min": -3,
+    "max": 3,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "velocityMode",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "velocity",
+    "min": 0.01,
+    "max": 1,
+    "default": 0.8,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "timing",
+    "min": 0,
+    "max": 2,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "division",
+    "min": 0,
+    "max": 15,
+    "default": 4,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "rate",
+    "min": 0.1,
+    "max": 250,
+    "default": 8,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "patternLength",
+    "min": 1,
+    "max": 16,
+    "default": 16,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "insert",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "singleRepeat",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "shuffle",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "enable",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": true
+ },
+ {
+  "type": "scale-player",
+  "version": 1,
+  "name": "Scale Player",
+  "inlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "velocity",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "velocity",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "key",
+    "min": 0,
+    "max": 11,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "scale",
+    "min": 0,
+    "max": 13,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "filter",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "chord-player",
+  "version": 1,
+  "name": "Chord Player",
+  "inlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "velocity",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "velocity",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "key",
+    "min": 0,
+    "max": 11,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "scale",
+    "min": 0,
+    "max": 13,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "notes",
+    "min": 1,
+    "max": 5,
+    "default": 3,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "inversion",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "open",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "octUp",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "octDown",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "color",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "alter",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": 8,
+  "voiceCollector": false
+ },
+ {
+  "type": "note-echo",
+  "version": 1,
+  "name": "Note Echo",
+  "inlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "velocity",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "velocity",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "sync",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "time",
+    "min": 1,
+    "max": 1000,
+    "default": 250,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "division",
+    "min": 0,
+    "max": 7,
+    "default": 3,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "repeats",
+    "min": 1,
+    "max": 16,
+    "default": 3,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "pitch",
+    "min": -12,
+    "max": 12,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "velocity",
+    "min": 0.1,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "gate",
+    "min": 0.05,
+    "max": 0.95,
+    "default": 0.5,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "dry",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "midi",
+  "version": 2,
+  "name": "MIDI",
+  "inlets": [],
+  "outlets": [
+   {
+    "id": "pitch",
+    "stereo": false
+   },
+   {
+    "id": "gate",
+    "stereo": false
+   },
+   {
+    "id": "vel",
+    "stereo": false
+   },
+   {
+    "id": "mod",
+    "stereo": false
+   },
+   {
+    "id": "bend",
+    "stereo": false
+   },
+   {
+    "id": "aftertouch",
+    "stereo": false
+   },
+   {
+    "id": "expression",
+    "stereo": false
+   },
+   {
+    "id": "breath",
+    "stereo": false
+   },
+   {
+    "id": "sustain",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "note",
+    "min": 0,
+    "max": 127,
+    "default": 36,
+    "stepped": false,
+    "hidden": true
+   },
+   {
+    "id": "gate",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": true
+   },
+   {
+    "id": "velocity",
+    "min": 0,
+    "max": 1,
+    "default": 0.8,
+    "stepped": false,
+    "hidden": true
+   },
+   {
+    "id": "mod",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": true
+   },
+   {
+    "id": "transpose",
+    "min": -24,
+    "max": 24,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "glide",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "channel",
+    "min": 0,
+    "max": 16,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "bend",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": true
+   },
+   {
+    "id": "aftertouch",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": true
+   },
+   {
+    "id": "expression",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": true
+   },
+   {
+    "id": "breath",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": true
+   },
+   {
+    "id": "sustain",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": true
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "meter",
+  "version": 1,
+  "name": "VU Meter",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "thru",
+    "stereo": false
+   },
+   {
+    "id": "env",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "gain",
+    "min": 0.25,
+    "max": 4,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "release",
+    "min": 0.05,
+    "max": 1.5,
+    "default": 0.3,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "mode",
+    "min": 0,
+    "max": 2,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "tuner",
+  "version": 1,
+  "name": "Chromatic Tuner",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "thru",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "reference",
+    "min": 400,
+    "max": 480,
+    "default": 440,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "mute",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "mixer",
+  "version": 1,
+  "name": "Mixer",
+  "inlets": [
+   {
+    "id": "in1",
+    "stereo": false
+   },
+   {
+    "id": "in2",
+    "stereo": false
+   },
+   {
+    "id": "in3",
+    "stereo": false
+   },
+   {
+    "id": "in4",
+    "stereo": false
+   },
+   {
+    "id": "cv1",
+    "stereo": false
+   },
+   {
+    "id": "cv2",
+    "stereo": false
+   },
+   {
+    "id": "cv3",
+    "stereo": false
+   },
+   {
+    "id": "cv4",
+    "stereo": false
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": false
+   }
+  ],
+  "params": [
+   {
+    "id": "level1",
+    "min": -2,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level2",
+    "min": -2,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level3",
+    "min": -2,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level4",
+    "min": -2,
+    "max": 2,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": true,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "line-mixer",
+  "version": 1,
+  "name": "Line Mixer",
+  "inlets": [
+   {
+    "id": "in1",
+    "stereo": true
+   },
+   {
+    "id": "in2",
+    "stereo": true
+   },
+   {
+    "id": "in3",
+    "stereo": true
+   },
+   {
+    "id": "in4",
+    "stereo": true
+   },
+   {
+    "id": "in5",
+    "stereo": true
+   },
+   {
+    "id": "in6",
+    "stereo": true
+   },
+   {
+    "id": "returnA",
+    "stereo": true
+   },
+   {
+    "id": "returnB",
+    "stereo": true
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   },
+   {
+    "id": "sendA",
+    "stereo": true
+   },
+   {
+    "id": "sendB",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "level1",
+    "min": 0,
+    "max": 1,
+    "default": 0.7,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level2",
+    "min": 0,
+    "max": 1,
+    "default": 0.7,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level3",
+    "min": 0,
+    "max": 1,
+    "default": 0.7,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level4",
+    "min": 0,
+    "max": 1,
+    "default": 0.7,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level5",
+    "min": 0,
+    "max": 1,
+    "default": 0.7,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "level6",
+    "min": 0,
+    "max": 1,
+    "default": 0.7,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pan1",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pan2",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pan3",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pan4",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pan5",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pan6",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "mute1",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "mute2",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "mute3",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "mute4",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "mute5",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "mute6",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "solo1",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "solo2",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "solo3",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "solo4",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "solo5",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "solo6",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "sendA1",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendA2",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendA3",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendA4",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendA5",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendA6",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendB1",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendB2",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendB3",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendB4",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendB5",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "sendB6",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "master",
+    "min": 0,
+    "max": 1.5,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "returnLevelA",
+    "min": 0,
+    "max": 1.5,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "returnLevelB",
+    "min": 0,
+    "max": 1.5,
+    "default": 1,
+    "stepped": false,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": false,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ },
+ {
+  "type": "out",
+  "version": 1,
+  "name": "Out",
+  "inlets": [
+   {
+    "id": "in",
+    "stereo": true
+   }
+  ],
+  "outlets": [
+   {
+    "id": "out",
+    "stereo": true
+   }
+  ],
+  "params": [
+   {
+    "id": "level",
+    "min": 0,
+    "max": 1,
+    "default": 0.7,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "pan",
+    "min": -1,
+    "max": 1,
+    "default": 0,
+    "stepped": false,
+    "hidden": false
+   },
+   {
+    "id": "mute",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   },
+   {
+    "id": "solo",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "stepped": true,
+    "hidden": false
+   }
+  ],
+  "poly": false,
+  "terminal": true,
+  "voiceExpansion": null,
+  "voiceCollector": false
+ }
+]

@@ -479,6 +479,259 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
 // for different hardware — so the reference is not bit-reproducible with itself at double
 // precision, and a byte comparison would fail on every machine but the one that last ran the
 // emitter. They are compared within the tolerance the Swift tests use.
+// The rack: patches rendered by the reference's headless `RackRenderer`, one block at a time, with
+// the knob moves each case makes at the blocks it makes them. Beside each render, the plan the
+// reference compiles the patch to, so the compiler is held to the reference as well as the sound.
+// Written as float32, which is what every rack buffer is.
+{
+  const rack = join(root, 'driftbox', 'packages', 'rack', 'src')
+  const { RackRenderer } = await import(join(rack, 'headless.ts'))
+  const { compile } = await import(join(rack, 'compile.ts'))
+  const { MODULES } = await import(join(rack, 'modules', 'index.ts'))
+  const m = (id, type, params, extra = {}) => ({ id, type, ...(params ? { params } : {}), ...extra })
+  const c = (from, to) => ({ from, to })
+  const cases = [
+    ['vco-saw', { modules: [m('osc', 'vco'), m('out', 'out')], cables: [c(['osc', 'out'], ['out', 'in'])] }, 16],
+    ['vco-pulse', { modules: [m('osc', 'vco', { shape: 1, width: 0.3, tune: -7 }), m('out', 'out')], cables: [c(['osc', 'out'], ['out', 'in'])] }, 16],
+    ['vco-tri', { modules: [m('osc', 'vco', { shape: 2, tune: 12 }), m('out', 'out')], cables: [c(['osc', 'out'], ['out', 'in'])] }, 16],
+    ['noise', {
+      modules: [m('hiss', 'noise'), m('mix', 'mixer', { level2: 0.5 }), m('out', 'out')],
+      cables: [c(['hiss', 'white'], ['mix', 'in1']), c(['hiss', 'pink'], ['mix', 'in2']), c(['mix', 'out'], ['out', 'in'])],
+    }, 16],
+    ['lfo-shapes', {
+      modules: [0, 1, 2, 3].map((shape) => m(`lfo${shape}`, 'lfo', { rate: 37, shape })).concat([m('mix', 'mixer', { level1: 0.25, level2: 0.25, level3: 0.25, level4: 0.25 }), m('out', 'out')]),
+      cables: [0, 1, 2, 3].map((shape) => c([`lfo${shape}`, shape % 2 ? 'uni' : 'bi'], ['mix', `in${shape + 1}`])).concat([c(['mix', 'out'], ['out', 'in'])]),
+    }, 24],
+    ['lfo-random', {
+      modules: [m('wander', 'lfo', { rate: 29, shape: 4 }), m('osc', 'vco'), m('out', 'out')],
+      cables: [c(['wander', 'bi'], ['osc', 'pitch']), c(['osc', 'out'], ['out', 'in'])],
+    }, 24],
+    ['adsr-vca', {
+      modules: [m('clock', 'lfo', { rate: 8, shape: 3 }), m('env', 'adsr', { attack: 0.005, decay: 0.05, sustain: 0.5, release: 0.02 }), m('osc', 'vco'), m('amp', 'vca', { gain: 0 }), m('out', 'out')],
+      cables: [c(['clock', 'uni'], ['env', 'gate']), c(['osc', 'out'], ['amp', 'in']), c(['env', 'out'], ['amp', 'cv']), c(['amp', 'out'], ['out', 'in'])],
+    }, 64],
+    ['ladder', {
+      modules: [m('osc', 'vco', { tune: -12 }), m('sweep', 'lfo', { rate: 3 }), m('filter', 'ladder', { cutoff: 1200, resonance: 0.85 }), m('out', 'out')],
+      cables: [c(['osc', 'out'], ['filter', 'in']), c(['sweep', 'bi'], ['filter', 'cutoff']), c(['filter', 'out'], ['out', 'in'])],
+    }, 32],
+    ['svf', {
+      modules: [m('hiss', 'noise'), m('wobble', 'lfo', { rate: 5 }), m('filter', 'svf', { cutoff: 2000, resonance: 0.7 }), m('mix', 'mixer', { level2: 0.3, level4: 0.2 }), m('out', 'out')],
+      cables: [
+        c(['hiss', 'white'], ['filter', 'in']), c(['wobble', 'uni'], ['filter', 'res']),
+        c(['filter', 'lp'], ['mix', 'in1']), c(['filter', 'hp'], ['mix', 'in2']), c(['filter', 'bp'], ['mix', 'in3']), c(['filter', 'notch'], ['mix', 'in4']),
+        c(['mix', 'out'], ['out', 'in']),
+      ],
+    }, 32],
+    ['sample-hold', {
+      modules: [m('hiss', 'noise'), m('clock', 'lfo', { rate: 20, shape: 3 }), m('hold', 'sample-hold'), m('osc', 'vco'), m('out', 'out')],
+      cables: [c(['hiss', 'white'], ['hold', 'in']), c(['clock', 'uni'], ['hold', 'trig']), c(['hold', 'out'], ['osc', 'pitch']), c(['osc', 'out'], ['out', 'in'])],
+    }, 32],
+    ['delay', {
+      modules: [
+        m('clock', 'lfo', { rate: 6, shape: 3 }), m('env', 'adsr', { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 }),
+        m('osc', 'vco', { shape: 1 }), m('amp', 'vca', { gain: 0 }), m('drift', 'lfo', { rate: 0.7 }),
+        m('echo', 'delay', { time: 0.013, feedback: 0.6 }), m('mix', 'mixer', { level1: 0.7 }), m('out', 'out'),
+      ],
+      cables: [
+        c(['clock', 'uni'], ['env', 'gate']), c(['osc', 'out'], ['amp', 'in']), c(['env', 'out'], ['amp', 'cv']),
+        c(['amp', 'out'], ['echo', 'in']), c(['drift', 'bi'], ['echo', 'time']), c(['echo', 'out'], ['mix', 'in1']), c(['amp', 'out'], ['mix', 'in2']),
+        c(['mix', 'out'], ['out', 'in']),
+      ],
+    }, 64],
+    ['offset', {
+      modules: [m('sweep', 'lfo', { rate: 11, shape: 1 }), m('shift', 'offset', { gain: -0.5, offset: 0.25 }), m('osc', 'vco'), m('out', 'out')],
+      cables: [c(['sweep', 'bi'], ['shift', 'in']), c(['shift', 'out'], ['osc', 'pitch']), c(['osc', 'out'], ['out', 'in'])],
+    }, 24],
+    ['feedback', {
+      modules: [m('osc', 'vco'), m('filter', 'svf', { cutoff: 700, resonance: 0.5 }), m('mix', 'mixer', { level1: 0.8 }), m('out', 'out')],
+      cables: [c(['osc', 'out'], ['filter', 'in']), c(['filter', 'bp'], ['mix', 'in1']), c(['mix', 'out'], ['osc', 'fm']), c(['mix', 'out'], ['out', 'in'])],
+    }, 32],
+    ['ramps', {
+      modules: [m('osc', 'vco', { tune: -5 }), m('filter', 'ladder', { cutoff: 500, resonance: 0.3 }), m('out', 'out')],
+      cables: [c(['osc', 'out'], ['filter', 'in']), c(['filter', 'out'], ['out', 'in'])],
+    }, 20, [
+      [4, 'param', 'filter', 'cutoff', 3000], [8, 'param', 'osc', 'shape', 1],
+      [10, 'schedule', 'filter', 'cutoff', 400, 10 * 128 + 37], [12, 'param', 'out', 'level', 0.3],
+      [12, 'schedule', 'osc', 'tune', 2, 13 * 128 + 5], [12, 'schedule', 'osc', 'tune', 7, 13 * 128 + 90],
+    ]],
+    ['master', {
+      modules: [
+        m('lead', 'vco', { tune: 3 }), m('near', 'out', { level: 1, pan: -0.6 }),
+        m('hiss', 'noise'), m('far', 'out', { pan: 0.8 }),
+        m('loud', 'vco', { shape: 1, tune: -9 }), m('stack', 'mixer', { level1: 2, level2: 2, level3: 2, level4: 2 }), m('wall', 'out', { level: 1 }),
+      ],
+      cables: [
+        c(['lead', 'out'], ['near', 'in']), c(['hiss', 'pink'], ['far', 'in']),
+        c(['loud', 'out'], ['stack', 'in1']), c(['loud', 'out'], ['stack', 'in2']), c(['loud', 'out'], ['stack', 'in3']), c(['loud', 'out'], ['stack', 'in4']),
+        c(['stack', 'out'], ['wall', 'in']),
+      ],
+    }, 32, [[8, 'param', 'near', 'mute', 1], [16, 'param', 'wall', 'solo', 1], [24, 'param', 'wall', 'solo', 0]]],
+    ['placeholder-bypass', {
+      modules: [m('osc', 'vco'), m('ghost', 'futurething', { depth: 3 }), m('filter', 'ladder', { cutoff: 300 }, { bypassed: true }), m('out', 'out')],
+      cables: [c(['osc', 'out'], ['ghost', 'in']), c(['ghost', 'out'], ['out', 'in']), c(['osc', 'out'], ['filter', 'in']), c(['filter', 'out'], ['out', 'in'])],
+    }, 16],
+    ['poly', {
+      voices: 3,
+      modules: [m('wobble', 'lfo', { rate: 4 }), m('osc', 'vco', { tune: -12 }), m('amp', 'vca', { gain: 0.3 }), m('out', 'out')],
+      cables: [c(['wobble', 'bi'], ['osc', 'fm']), c(['osc', 'out'], ['amp', 'in']), c(['amp', 'out'], ['out', 'in'])],
+    }, 24, [[0, 'voice', 'osc', 'tune', 0, 0], [0, 'voice', 'osc', 'tune', 4, 1], [0, 'voice', 'osc', 'tune', 7, 2]]],
+    ['stereo-thru', {
+      modules: [m('osc', 'vco'), m('first', 'out', { level: 0.5, pan: 0.5 }), m('second', 'out', { level: 0.8 })],
+      cables: [c(['osc', 'out'], ['first', 'in']), c(['first', 'out'], ['second', 'in'])],
+    }, 16],
+  ]
+  // Host input buses, when a case has them: bus b, channel c is a sine at 110(b+1) + 3c Hz at half
+  // scale, the same on both sides because it is float32 by the time anything reads it.
+  const hostBlock = (buses, block) => Array.from({ length: buses }, (_, bus) => [0, 1].map((channel) => {
+    const out = new Float32Array(128)
+    const frequency = 110 * (bus + 1) + 3 * channel
+    for (let i = 0; i < 128; i++) out[i] = 0.5 * Math.sin((2 * Math.PI * frequency * (block * 128 + i)) / 48000)
+    return out
+  }))
+  // Each family of modules keeps its cases in a file of its own, `rack-cases-<family>.mjs`, whose
+  // default export is a list of cases in the shape below, so the families can be ported apart.
+  for (const file of readdirSync(here).filter((name) => /^rack-cases-.+\.mjs$/.test(name)).sort()) {
+    const { default: more } = await import(join(here, file))
+    cases.push(...more)
+  }
+  const summary = []
+  // A case is [name, patch, blocks, events, host buses]. An event is [block, kind, ...]:
+  //   param    module param value            a knob, every voice
+  //   voice    module param value voice      a knob, one voice
+  //   schedule module param value frame      a knob at an exact frame
+  //   transport tempo running shuffle        the transport (running is 1 or 0)
+  //   data     module slot values            bulk data pushed to a module
+  for (const [name, patch, blocks, events = [], hostBuses = 0] of cases) {
+    const renderer = new RackRenderer(MODULES, { sampleRate: 48000, frames: 128 })
+    renderer.patch = patch
+    const left = new Float32Array(blocks * 128)
+    const right = new Float32Array(blocks * 128)
+    for (let block = 0; block < blocks; block++) {
+      for (const [at, kind, a, b, c, d] of events) {
+        if (at !== block) continue
+        if (kind === 'param') renderer.setParam(a, b, c)
+        else if (kind === 'voice') renderer.setParam(a, b, c, d)
+        else if (kind === 'schedule') renderer.scheduleParam(a, b, c, d)
+        else if (kind === 'transport') renderer.setTransport(a, b === 1, c ?? 0)
+        else if (kind === 'data') renderer.setData(a, b, Float32Array.from(c))
+        else throw new Error(`unknown rack event ${kind}`)
+      }
+      const l = new Float32Array(128)
+      const r = new Float32Array(128)
+      renderer.process([l, r], hostBuses > 0 ? hostBlock(hostBuses, block) : [])
+      left.set(l, block * 128)
+      right.set(r, block * 128)
+    }
+    const both = new Float32Array(blocks * 256)
+    both.set(left, 0)
+    both.set(right, blocks * 128)
+    write(join(fixtures, 'rack'), `${name}.f32`, Buffer.from(both.buffer))
+    const plan = compile(patch, MODULES)
+    summary.push({
+      name, patch, blocks, events, hostBuses,
+      plan: {
+        buffers: plan.buffers, voices: plan.voices, voiceWidths: plan.voiceWidths,
+        nodes: plan.nodes.map(({ id, type, inlets, inletConnected, inletTrims, outlets, outletConnected, params, poly, voices, voiceLanes }) =>
+          ({ id, type, inlets, inletConnected, inletTrims: inletTrims.map((slot) => slot ?? null), outlets, outletConnected, params, poly, voices, voiceLanes })),
+        outputs: plan.outputs,
+        params: plan.params,
+        notes: plan.notes.map(({ kind, module }) => ({ kind, module: module ?? null })),
+      },
+    })
+  }
+  write(join(fixtures, 'rack'), 'cases.json', json(summary))
+  // Every module's definition, which is the file format: ids, ports, param ranges and defaults.
+  const port = ({ id, stereo }) => ({ id, stereo: stereo === true })
+  write(join(fixtures, 'rack'), 'modules.json', json(Object.values(MODULES).map((def) => ({
+    type: def.type, version: def.version, name: def.name,
+    inlets: def.inlets.map(port), outlets: def.outlets.map(port),
+    params: def.params.map(({ id, min, max, stepped, hidden, ...rest }) =>
+      ({ id, min, max, default: rest.default, stepped: stepped === true, hidden: hidden === true })),
+    poly: def.poly !== false, terminal: def.terminal === true, voiceExpansion: def.voiceExpansion ?? null,
+    voiceCollector: def.voiceCollector === true,
+  }))))
+}
+
+// Rack patches as documents: every factory patch, song patch and device patch the reference
+// ships, and a set of damaged ones, each with what the reference makes of it — decoded and
+// encoded again, or refused (null). The Swift codec is held to these byte for byte.
+{
+  const rack = join(root, 'driftbox', 'packages', 'rack', 'src')
+  const { encodePatch, decodePatch } = await import(join(rack, 'patch-io.ts'))
+  const { PATCHES } = await import(join(rack, 'patches', 'index.ts'))
+  const { SONG_PATCHES } = await import(join(rack, 'patches', 'songs.ts'))
+  const inputs = []
+  for (const preset of PATCHES) inputs.push([`factory-${preset.id}`, encodePatch(preset.build())])
+  for (const preset of SONG_PATCHES) inputs.push([`song-${preset.id}`, encodePatch(preset.build())])
+  const base = PATCHES[0].build()
+  const damaged = (change) => {
+    const copy = JSON.parse(JSON.stringify(base))
+    change(copy)
+    return JSON.stringify({ v: 2, patch: copy })
+  }
+  inputs.push(
+    ['not json', '{nope'],
+    ['not an object', '[1,2,3]'],
+    ['no modules', '{"v":2,"patch":{"cables":[]}}'],
+    ['a newer format', JSON.stringify({ v: 3, patch: base })],
+    ['bare, without an envelope', JSON.stringify(base)],
+    ['duplicate ids keep the first', damaged((p) => p.modules.push({ ...p.modules[0], params: { tune: 5 } }))],
+    ['modules without ids or types', damaged((p) => p.modules.push({ type: 'vco' }, { id: 'x' }, { id: '', type: 'vco' }, 7, null))],
+    ['cables to nowhere and repeated', damaged((p) => p.cables.push({ from: ['nobody', 'out'], to: [p.modules[0].id, 'in'] }, p.cables[0], { from: ['a'], to: 3 }))],
+    ['knobs that are not numbers', damaged((p) => { p.modules[0].params = { a: 'x', b: null, c: 1e999, d: 0.5 } })],
+    ['a knob list with nothing usable', damaged((p) => { p.modules[0].params = { a: 'x' } })],
+    ['data with a hole in it', damaged((p) => { p.modules[0].data = { good: [1, 2, 3], bad: [1, 'two', 3], worse: 'no' } })],
+    ['positions, versions and bypass', damaged((p) => { p.modules[0].pos = [10, 20, 30]; p.modules[0].version = 2; p.modules[0].bypassed = true; p.modules[1].version = 1.5; p.modules[1].bypassed = 'yes'; p.modules[1].pos = ['a', 2] })],
+    ['voices and tempo in and out of range', damaged((p) => { p.voices = 4; p.tempo = 97.5 })],
+    ['voices of one, and a fraction', damaged((p) => { p.voices = 1; p.tempo = 900 })],
+    ['voices not a whole number', damaged((p) => { p.voices = 2.5; p.tempo = 19 })],
+    ['a visual, trimmed and cut', damaged((p) => { p.visual = '   ' + 'x'.repeat(200) + '  '; p.break = 'amen'; p.groovebox = 'acid' })],
+    ['an empty visual and break', damaged((p) => { p.visual = '   '; p.break = ''; p.groovebox = '' })],
+    ['modulation routes', damaged((p) => { p.modulation = [{ from: [p.modules[0].id, 'a'], to: [p.modules[1].id, 'b'], min: 0.2, max: 'x' }, { from: ['ghost', 'a'], to: [p.modules[1].id, 'b'] }, 'junk'] })],
+    ['automation, sorted and rounded', damaged((p) => { p.automation = [{ target: [p.modules[0].id, 'tune'], points: [{ at: 96.6, value: 1 }, { at: 12, value: 2 }, { at: -1, value: 3 }, { at: 12, value: 4 }, { at: 'x', value: 5 }], curve: 'hold' }, { target: [p.modules[0].id, 'width'], points: [{ at: 1, value: 'no' }] }, { target: ['ghost', 'tune'], points: [{ at: 1, value: 1 }] }] })],
+  )
+  // Each factory patch played whole for a second, the transport running at its tempo: every
+  // module it uses working together, through the codec, as somebody opening it would hear it.
+  const { RackRenderer } = await import(join(rack, 'headless.ts'))
+  const { MODULES } = await import(join(rack, 'modules', 'index.ts'))
+  const blocks = 375
+  const played = []
+  for (const preset of PATCHES) {
+    const patch = decodePatch(encodePatch(preset.build()))
+    const renderer = new RackRenderer(MODULES, { sampleRate: 48000, frames: 128 })
+    renderer.patch = patch
+    renderer.setTransport(patch.tempo ?? 120, true)
+    // A patch played from a keyboard gets a note, and a fifth where it has the voices for one,
+    // held for two thirds of the render: without them it would be a second of silence, which
+    // proves nothing.
+    const keys = patch.modules.find((module) => module.type === 'midi')?.id
+    const both = new Float32Array(blocks * 256)
+    for (let block = 0; block < blocks; block++) {
+      if (keys && block === 0) {
+        renderer.setParam(keys, 'note', 48, 0)
+        renderer.setParam(keys, 'gate', 1, 0)
+        if ((patch.voices ?? 1) > 1) {
+          renderer.setParam(keys, 'note', 55, 1)
+          renderer.setParam(keys, 'gate', 1, 1)
+        }
+      }
+      if (keys && block === 250) renderer.setParam(keys, 'gate', 0)
+      const l = new Float32Array(128)
+      const r = new Float32Array(128)
+      renderer.process([l, r])
+      both.set(l, block * 128)
+      both.set(r, blocks * 128 + block * 128)
+    }
+    write(join(fixtures, 'rack', 'factory'), `${preset.id}.f32`, Buffer.from(both.buffer))
+    played.push({ id: preset.id, blocks, tempo: patch.tempo ?? 120 })
+  }
+  write(join(fixtures, 'rack', 'factory'), 'played.json', json(played))
+  write(join(fixtures, 'rack'), 'patches.json', json(inputs.map(([name, input]) => {
+    const decoded = decodePatch(input)
+    return { name, input, output: decoded ? encodePatch(decoded) : null }
+  })))
+}
+
 const AUDIO_TOLERANCE = 1e-12
 
 function filesUnder(dir, base = dir) {
@@ -499,7 +752,16 @@ if (check) {
       stale.push(`${name}: only on one side`)
       continue
     }
-    if (name.endsWith('.f64')) {
+    if (name.endsWith('.f32')) {
+      // Float32 renders: the same arithmetic on another Node could differ in the last bit of a
+      // transcendental, so this is a tolerance rather than a byte comparison.
+      const floats = (buffer) => new Float32Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
+      const x = floats(a)
+      const y = floats(b)
+      let worst = x.length === y.length ? 0 : Infinity
+      for (let i = 0; i < x.length && worst !== Infinity; i++) worst = Math.max(worst, Math.abs(x[i] - y[i]))
+      if (!(worst <= 1e-6)) stale.push(`${name}: ${worst} exceeds 1e-6`)
+    } else if (name.endsWith('.f64')) {
       // Copied out, because a Buffer may sit at any offset in its pool and a Float64Array may not.
       const doubles = (buffer) => new Float64Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
       const x = doubles(a)

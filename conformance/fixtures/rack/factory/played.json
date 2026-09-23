@@ -1,0 +1,57 @@
+[
+ {
+  "id": "pocket-sequence",
+  "blocks": 375,
+  "tempo": 108
+ },
+ {
+  "id": "first-light",
+  "blocks": 375,
+  "tempo": 100
+ },
+ {
+  "id": "pressure-system",
+  "blocks": 375,
+  "tempo": 174
+ },
+ {
+  "id": "signal-relay",
+  "blocks": 375,
+  "tempo": 90
+ },
+ {
+  "id": "one-finger",
+  "blocks": 375,
+  "tempo": 112
+ },
+ {
+  "id": "acid",
+  "blocks": 375,
+  "tempo": 118
+ },
+ {
+  "id": "generative",
+  "blocks": 375,
+  "tempo": 96
+ },
+ {
+  "id": "cutup",
+  "blocks": 375,
+  "tempo": 174
+ },
+ {
+  "id": "ducked",
+  "blocks": 375,
+  "tempo": 174
+ },
+ {
+  "id": "wobbler",
+  "blocks": 375,
+  "tempo": 174
+ },
+ {
+  "id": "guitar-pedalboard",
+  "blocks": 375,
+  "tempo": 120
+ }
+]
