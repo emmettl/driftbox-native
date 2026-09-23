@@ -98,4 +98,19 @@ struct TypesetterTests {
       #expect(along.bytes != coverage.bytes, "half a pixel along is not the same bitmap")
     }
   }
+
+  /// The weight asked for reaches the glyph drawn and not only the line's measure: a heavier face,
+  /// or a variable font's weight axis as on Android, or a face emboldened when there is none.
+  @Test func aHeavierWeightIsMoreInk() throws {
+    for typesetter in try Typesetters.all() {
+      func ink(_ weight: Int) throws -> Int {
+        let line = typesetter.line("I", font: FontRequest(families: ["Arial"], weight: weight, size: 100))
+        let glyph = try #require(line.glyphs.first).glyph
+        return try #require(typesetter.coverage(glyph, offset: 0)).bytes.reduce(0) { $0 + Int($1) }
+      }
+      let regular = try ink(400)
+      let black = try ink(900)
+      #expect(Double(black) > Double(regular) * 1.4, "400 is \(regular) of ink and 900 \(black)")
+    }
+  }
 }

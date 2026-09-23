@@ -62,7 +62,7 @@ let package = Package(
       name: "DriftboxAndroid",
       dependencies: [
         "DriftboxHostAndroid", "DriftboxHost", "DriftboxSeq", "DriftboxEngine", "DriftboxDocument",
-        "DriftboxGPU", "DriftboxGPUGLES", "DriftboxScenes",
+        "DriftboxGPU", "DriftboxGPUGLES", "DriftboxScenes", "DriftboxText", "DriftboxTextAndroid",
         .target(name: "CAMidi", condition: .when(platforms: [.android])),
         .target(name: "CGLES", condition: .when(platforms: [.android])),
       ]),
@@ -89,6 +89,8 @@ let package = Package(
     .target(
       name: "DriftboxTextWindows",
       dependencies: ["DriftboxText", .target(name: "CDirectWrite", condition: .when(platforms: [.windows]))]),
+    // And Android's own text stack answering it on Android, through the app's Java; nothing off it.
+    .target(name: "DriftboxTextAndroid", dependencies: ["DriftboxText"]),
     // A 2D canvas on the GPU layer, the same on every platform but for the type it is given.
     .target(name: "DriftboxCanvas", dependencies: ["DriftboxGPU", "DriftboxText"]),
     // The GPU layer on OpenGL ES 3.0: Android's, and Linux's, where Mesa draws it in software for CI.

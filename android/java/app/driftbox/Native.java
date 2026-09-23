@@ -22,6 +22,9 @@ final class Native {
   /** The GPU contract's checks, on this phone's GPU, through OpenGL ES. Blocks while it draws. */
   static native String gpuCheck();
 
+  /** The typesetter, held to what every platform's is, on a thread of Swift's own. */
+  static native String textCheck();
+
   /** Every scene drawn, checked, and timed on a screen width by height at density. Blocks. */
   static native String sceneCheck(int width, int height, float density);
 

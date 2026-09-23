@@ -59,7 +59,7 @@ public final class Main extends Activity {
     super.onCreate(state);
     midi = new Midi(this);
     String run = getIntent().getStringExtra("run");
-    if ("midi-loopback".equals(run) || "gpu".equals(run) || "scenes".equals(run)) {
+    if ("midi-loopback".equals(run) || "gpu".equals(run) || "scenes".equals(run) || "text".equals(run)) {
       test(run);
     } else {
       String song = getIntent().getStringExtra("song");
@@ -216,6 +216,8 @@ public final class Main extends Activity {
       try {
         if ("gpu".equals(run)) {
           report = Native.gpuCheck();
+        } else if ("text".equals(run)) {
+          report = Native.textCheck();
         } else if ("scenes".equals(run)) {
           android.util.DisplayMetrics screen = new android.util.DisplayMetrics();
           getWindowManager().getDefaultDisplay().getRealMetrics(screen);
