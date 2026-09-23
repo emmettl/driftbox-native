@@ -64,6 +64,9 @@ public struct FixedVoiceSpec {
   /// events ring, which tells the interface what was played.
   public var voiceIndex = 0
   public var accent: Float = 1
+  /// Which machine it belongs to, as a `SectionOutputs` section — the 808 or the 909 — or -1
+  /// for a voice that belongs to none, which only ever reaches the mix.
+  public var section: Int8 = -1
 
   /// The same hit `frames` frames later. A song is prepared once against its own clock, from
   /// zero; every pass through it is placed on the engine's clock with this.
