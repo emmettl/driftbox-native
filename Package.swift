@@ -20,6 +20,7 @@ let package = Package(
     .library(name: "DriftboxHostAndroid", targets: ["DriftboxHostAndroid"]),
     .library(name: "DriftboxGPU", targets: ["DriftboxGPU"]),
     .library(name: "DriftboxGPUD3D11", targets: ["DriftboxGPUD3D11"]),
+    .library(name: "DriftboxWin32", targets: ["DriftboxWin32"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
   ],
   targets: [
@@ -54,6 +55,8 @@ let package = Package(
         .linkedLibrary("d3d11", .when(platforms: [.windows])),
         .linkedLibrary("d3dcompiler", .when(platforms: [.windows])),
       ]),
+    // The Windows shell: a window and its messages, so far.
+    .target(name: "DriftboxWin32"),
     // The visuals: Metal scenes driven by the engine's events. Empty on a platform without Metal.
     .target(name: "DriftboxScenes", dependencies: ["DriftboxDSP", "DriftboxEngine"]),
 
@@ -99,7 +102,8 @@ let package = Package(
     .testTarget(
       name: "DriftboxHostWindowsTests", dependencies: ["DriftboxHostWindows", "DriftboxHost", "DriftboxSeq"]),
     .testTarget(name: "DriftboxHostAndroidTests", dependencies: ["DriftboxHostAndroid"]),
-    .testTarget(name: "DriftboxGPUTests", dependencies: ["DriftboxGPU", "DriftboxGPUD3D11"]),
+    .testTarget(
+      name: "DriftboxGPUTests", dependencies: ["DriftboxGPU", "DriftboxGPUD3D11", "DriftboxWin32"]),
     .testTarget(name: "DriftboxScenesTests", dependencies: ["DriftboxScenes", "DriftboxEngine"]),
     .testTarget(
       name: "DriftboxHostTests",
