@@ -7,6 +7,8 @@ import Synchronization
   import Darwin
 #elseif os(Windows)
   import WinSDK
+#elseif canImport(Android)
+  import Android
 #else
   import Glibc
 #endif

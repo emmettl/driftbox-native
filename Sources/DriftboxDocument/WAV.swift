@@ -1,5 +1,12 @@
 import DriftboxEngine
-import Foundation
+
+// `Data` is all this takes, and the essentials have it without the rest of Foundation — which on
+// Android is a libdispatch and 30MB of ICU data.
+#if canImport(FoundationEssentials)
+  import FoundationEssentials
+#else
+  import Foundation
+#endif
 
 /// A stereo render as a WAV file: 32-bit float, interleaved, so nothing is lost on the way out.
 public enum WAV {

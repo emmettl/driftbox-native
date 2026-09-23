@@ -373,22 +373,28 @@ ships an Android platform. With it, the four constrained targets compile unchang
 x86_64 Android, optimised and so with the allocation checks, and without the NDK: the
 `@_extern(c)` branch in `Math.swift` that serves the bare Embedded build serves Android too. At
 link time they need libm, `malloc`, `free` and the `mem*` functions, all of them in Bionic.
-Nothing has been linked or run yet.
+Then the engine ran on a phone (step 1).
 
 So the port is the platform again. Most of it is Milestone 4 over again with a third answer to
 each question, and the rest is Android's alone:
 
-1. **The core on a phone.** The NDK, and a `canImport(Android)` branch beside `ucrt` wherever a
-   host imports its C library. Then the bench from `driftbox-play` built as a plain executable and
-   run over `adb`, since Android will run one without an app around it. The Mac's figures (3.3% of
-   real time flat out, 16% paced) say nothing about a phone's smaller, slower cores, and the rack
-   adds to them. This is measured before anything else is built.
-2. **Audio and MIDI behind the ports.** `DriftboxHostAndroid` answers `AudioRouting` with AAudio
-   in low-latency mode. It takes a callback the same shape as the one WASAPI's thread calls, and it
-   says when its device goes away. Android's native MIDI answers the MIDI ports. It sends against
-   a timestamp, so clock out needs no scheduler of its own the way WinMM's did. Listing devices
-   and opening a MIDI port can only be done from Java, and those two are all the JNI there is.
-   `HostTime` is `CLOCK_MONOTONIC`, which is what AAudio and the MIDI stamps both count in.
+1. ~~**The core on a phone.**~~ Done. A `canImport(Android)` branch beside `ucrt` wherever a host
+   imports its C library, the bench moved out of the Mac's branch of `driftbox-play` so that every
+   platform has it, and `scripts/android-bench.sh`, which builds the bench for arm64 and runs it
+   over `adb` on each kind of core. On a Fairphone 6, a mid-range phone, a big core renders the
+   catalogue at 13 to 16% of real time, four and a half times the Mac. A little core cannot keep
+   up at all. Paced like a device, the big core costs 67%, but only because the governor lets its
+   clock fall between calls; held up, the paced cost is 17.7%. Making the engine and loading a
+   song there takes about four seconds before the first render, which an app switching songs
+   would feel; where that goes is not yet looked at. The rack's load is not measured yet.
+2. **Audio and MIDI behind the ports.** ← *next.* `DriftboxHostAndroid` answers `AudioRouting`
+   with AAudio in low-latency mode. It takes a callback the same shape as the one WASAPI's thread
+   calls, and it says when its device goes away. Step 1 says what else it must do: keep the
+   render thread's clock up with a performance hint giving its target duration, and keep it off
+   the little cores. Android's native MIDI answers the MIDI ports. It sends against a timestamp,
+   so clock out needs no scheduler of its own the way WinMM's did. Listing devices and opening a
+   MIDI port can only be done from Java, and those two are all the JNI there is. `HostTime` is
+   `CLOCK_MONOTONIC`, which is what AAudio and the MIDI stamps both count in.
 3. **A third backend under the GPU layer.** OpenGL ES 3.0 covers everything the scenes ask of
    Metal, and every Android device has it. The shaders run to 2,400 lines across 29 scenes, and a
    third copy by hand is where writing them out stops being sensible (see below). `GraphicLab`
