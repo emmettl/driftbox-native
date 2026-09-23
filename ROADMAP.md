@@ -270,8 +270,22 @@ parity point.
    dynamics module resets; and the arranger's trigger was `Math.round` of a millisecond where every
    other module's is `Math.ceil`. The fixtures cannot feed a NaN, so `RecoveryTests` holds the port
    to those fixes.
-3. **A host and the panels.** ← *here.* The rack as an Audio Unit beside the groovebox's, then the
-   front and back panels — faceplates, jacks, and cables that swing.
+3. **A host and the panels.** ← *here.* The rack has a window of its own (⌘3), playing through
+   the same device as the song. Its front is every module's generic faceplate — a knob for a
+   range, buttons for a choice of three, a stepper past that — sized and stacked exactly as the
+   reference's `layout.ts` and faceplate table do it; its back is the bays, the jacks and the
+   cables, hanging and swinging as `cable.ts` has them, all held to the reference's own numbers
+   for every factory and song patch. Drag jack to jack to patch, from either end, and it snaps;
+   click a cable's belly or the × by its inlet and it goes up in smoke; drag a bay to move its
+   module, and its cables jiggle behind it. Tab turns the rack round, space runs its transport,
+   and the typing keys play it through the reference's own voice allocator. Modules come from a
+   picker of every shelf, with each module's picture and line of copy exported from the
+   reference's definitions; the factory patches are in the header; edits undo one turn of a knob
+   at a time; and the patch is kept between launches.
+   Left: the hand-built faceplates (the VCO's big tune knob, the tuner's needle, the looper's
+   buttons, the sequencers' grids and the rest), the inlet trims on the back, the breaks the
+   break-built patches expect, hardware MIDI into the rack, the rack as an Audio Unit, and the
+   groovebox as a module in it.
 
 ## Milestone 3 — what only native can do
 

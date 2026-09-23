@@ -39,9 +39,12 @@ let package = Package(
     // transport, the timeline, the clock out and the document rules all live here.
     .target(
       name: "DriftboxApp",
-      dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq", "DriftboxScenes"],
+      dependencies: [
+        "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq", "DriftboxScenes", "DriftboxRack",
+      ],
       resources: [
         .copy("Resources/Songs"), .copy("Resources/catalogue.json"), .copy("Resources/AppIcon.icns"),
+        .copy("Resources/Patches"), .copy("Resources/patches.json"), .copy("Resources/modules.json"),
       ]),
     // `@main` and nothing else, so that everything it starts can be reached from a test.
     .executableTarget(name: "Driftbox", dependencies: ["DriftboxApp"]),
@@ -73,7 +76,10 @@ let package = Package(
       dependencies: ["DriftboxDocument", "DriftboxSeq", "ConformanceSupport"]),
     .testTarget(
       name: "DriftboxAppTests",
-      dependencies: ["DriftboxApp", "DriftboxHost", "DriftboxSeq", "DriftboxDocument", "ConformanceSupport"]
+      dependencies: [
+        "DriftboxApp", "DriftboxHost", "DriftboxSeq", "DriftboxDocument", "DriftboxRack",
+        "ConformanceSupport",
+      ]
     ),
   ]
 )

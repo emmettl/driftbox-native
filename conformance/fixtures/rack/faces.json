@@ -1,0 +1,1084 @@
+[
+ {
+  "type": "groovebox",
+  "group": "Sources",
+  "blurb": "The retained song’s authored 808, 909 and two 303s as stereo rack sources. Silent when the patch has no retained song.",
+  "logo": {
+   "paths": [
+    "M7 9v22M21 9v22M35 9v22M49 9v22M57 9v22",
+    "M10 14h8M24 22h8M38 13h8M38 18h8M52 25h3",
+    "M10 27h8M24 13h8M24 28h8M38 27h8M52 15h3"
+   ]
+  },
+  "labels": {
+   "tr808-mute": [
+    "On",
+    "Mute"
+   ],
+   "tr909-mute": [
+    "On",
+    "Mute"
+   ],
+   "303-a-mute": [
+    "On",
+    "Mute"
+   ],
+   "303-b-mute": [
+    "On",
+    "Mute"
+   ]
+  }
+ },
+ {
+  "type": "audio-input",
+  "group": "Sources",
+  "blurb": "A microphone or audio-interface input supplied by the browser. Select the device in the rack header, then patch it like any other source.",
+  "logo": {
+   "paths": [
+    "M8 20h14M42 20h14",
+    "M22 10v20M42 10v20",
+    "M22 14c7 0 7-7 14-7v26c-7 0-7-7-14-7"
+   ]
+  },
+  "labels": {
+   "channel": [
+    "Left / mono",
+    "Right"
+   ]
+  }
+ },
+ {
+  "type": "audio-track",
+  "group": "Sources",
+  "blurb": "Places one stereo recording on the rack timeline. The audio stays in this session; its start position is saved.",
+  "logo": {
+   "paths": [
+    "M8 20h6l4-8 6 18 6-22 6 24 6-14 6 6h8",
+    "M8 37h48"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "vco",
+  "group": "Sources",
+  "blurb": "Band-limited saw, pulse and triangle, with a width knob on the pulse. The thing that makes a note, and where most patches start.",
+  "logo": {
+   "paths": [
+    "M4 27l12-16v16l12-16v16l12-16v16",
+    "M44 27v-16h12v16",
+    "M4 32h52"
+   ]
+  },
+  "labels": {
+   "shape": [
+    "Saw",
+    "Pulse",
+    "Tri"
+   ]
+  }
+ },
+ {
+  "type": "wavetable",
+  "group": "Sources",
+  "blurb": "Eight band-limited waveforms in one bank, morphed by a knob you can sweep at audio rate, plus phase modulation for FM tones. The rack’s second oscillator family.",
+  "logo": {
+   "paths": [
+    "M4 10c4-6 8-6 12 0s8 6 12 0 8-6 12 0 8 6 12 0",
+    "M4 24v-7h8v7h8v-7h8v7h8v-7h8v7h4",
+    "M4 34l8-8v8l8-8v8l8-8v8l8-8v8l8-8v8l8-8v8"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "voice",
+  "group": "Sources",
+  "blurb": "A whole synth in one module: two oscillators, a ladder filter and two envelopes. Patch a keyboard to it and play chords.",
+  "logo": {
+   "paths": [
+    "M4 27l10-14v14l10-14v14",
+    "M28 20h10",
+    "M42 27c6 0 6-14 12-14",
+    "M4 32h52"
+   ]
+  },
+  "labels": {
+   "shapeA": [
+    "Saw",
+    "Pulse",
+    "Tri"
+   ],
+   "shapeB": [
+    "Saw",
+    "Pulse",
+    "Tri"
+   ]
+  }
+ },
+ {
+  "type": "noise",
+  "group": "Sources",
+  "blurb": "White and pink at once. Hiss for hats and snares, and the raw material a sample-and-hold turns into a melody.",
+  "logo": {
+   "paths": [
+    "M4 21l4-9 4 17 4-13 4 8 4-15 4 20 4-11 4 5 4-14 4 19 4-10 4 3 4-8",
+    "M5 34h54"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "sampler",
+  "group": "Sources",
+  "blurb": "Plays a break, sliced. Retriggering by slice is what chopping is, and chopping is what jungle is made of.",
+  "logo": {
+   "paths": [
+    "M4 21c4 0 4-11 8-11s4 20 8 20 4-15 8-15 4 11 8 11 4-18 8-18 4 24 8 24 4-11 8-11",
+    "M16 7v26M32 7v26M48 7v26"
+   ]
+  },
+  "labels": {
+   "loop": [
+    "Off",
+    "On"
+   ],
+   "reverse": [
+    "Fwd",
+    "Rev"
+   ]
+  }
+ },
+ {
+  "type": "multisampler",
+  "group": "Sources",
+  "blurb": "Maps recordings across keys and velocity layers, with root tuning and sustain loops. Patch MIDI pitch, gate and velocity and play it polyphonically.",
+  "logo": {
+   "paths": [
+    "M6 31V10h52v21H6z",
+    "M13 10v21M21 10v21M29 10v21M37 10v21M45 10v21M53 10v21",
+    "M10 10v12h7V10M26 10v12h7V10M42 10v12h7V10",
+    "M7 35c7-6 12 4 19-2s12 4 19-2 8 3 12 0"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "ladder",
+  "group": "Filters",
+  "blurb": "The 303's filter: four poles, saturating, self-oscillating. Reach for it when the filter is meant to be the sound.",
+  "logo": {
+   "paths": [
+    "M5 9h13v6h11v6h10v6h10v6h10",
+    "M8 33c6-2 8-7 10-12 3-8 7-12 13-12",
+    "M34 9c7 0 11 4 11 10s4 10 12 10"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "svf",
+  "group": "Filters",
+  "blurb": "A clean two-pole filter with low, high, band and notch on separate outlets. For shaping a sound rather than becoming it.",
+  "logo": {
+   "paths": [
+    "M4 31c13 0 14-2 20-17 3-7 8-8 15-8",
+    "M25 31c5-1 8-7 11-14 4-9 9-11 23-11",
+    "M4 21c9 0 13-15 22-15s13 28 33 28",
+    "M4 7c10 0 14 5 20 14 5 8 10 11 17 11s9-5 18-25"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "alligator",
+  "group": "Filters",
+  "blurb": "Three filtered gates chopping one signal at different rhythms. A pad goes in and a rhythm part comes out.",
+  "logo": {
+   "paths": [
+    "M5 10h14l5 5-5 5H5l5-5-5-5",
+    "M23 16h17l5 5-5 5H23l5-5-5-5",
+    "M42 22h16l-5 5 5 5H42l5-5-5-5"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "vocoder",
+  "group": "Filters",
+  "blurb": "One sound wearing another's shape. Speak into a saw and the saw talks; run a break into a pad and the pad plays the drums.",
+  "logo": {
+   "paths": [
+    "M3 14c4-8 7 8 11 0s7 8 11 0",
+    "M28 9v22M34 6v28M40 11v18M46 8v24",
+    "M49 26c4-8 7 8 12 0"
+   ]
+  },
+  "labels": {
+   "bands": [
+    "8",
+    "16",
+    "32"
+   ]
+  }
+ },
+ {
+  "type": "vca",
+  "group": "Shaping",
+  "blurb": "Volume you can control with a cable. The module that turns an envelope into a note.",
+  "logo": {
+   "paths": [
+    "M6 20h10l24-13v26L16 20",
+    "M40 20h18",
+    "M28 35v-9M24 30l4-4 4 4"
+   ]
+  },
+  "labels": {
+   "curve": [
+    "Lin",
+    "Sq"
+   ]
+  }
+ },
+ {
+  "type": "drive",
+  "group": "Shaping",
+  "blurb": "Saturation, level-matched so the knob makes it dirtier rather than louder. Warmth on a bass, teeth on a break.",
+  "logo": {
+   "paths": [
+    "M4 21c5 0 6-13 11-13h6c4 0 4 25 8 25h6c4 0 5-25 9-25h6c5 0 6 13 10 13",
+    "M22 15h12v11H22z"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "distortion",
+  "group": "Shaping",
+  "blurb": "Tube, tape, fuzz and digital are different curves. Tone shapes the harmonics after the hit.",
+  "logo": {
+   "paths": [
+    "M5 20h9l4-11 7 23 7-23 7 23 7-23 4 11h9",
+    "M10 37h44",
+    "M17 34v6M47 34v6"
+   ]
+  },
+  "labels": {
+   "mode": [
+    "Tube",
+    "Tape",
+    "Fuzz",
+    "Digital"
+   ]
+  }
+ },
+ {
+  "type": "cabinet",
+  "group": "Shaping",
+  "blurb": "A driven preamp, tone stack and three speaker voicings. The missing step between a pedal and a recorded guitar.",
+  "logo": {
+   "paths": [
+    "M8 6h48v31H8z",
+    "M16 12h32",
+    "M20 25a12 9 0 1024 0 12 9 0 10-24 0",
+    "M27 25a5 4 0 1010 0 5 4 0 10-10 0"
+   ]
+  },
+  "labels": {
+   "cabinet": [
+    "Combo",
+    "Stack",
+    "Bright"
+   ]
+  }
+ },
+ {
+  "type": "eq",
+  "group": "Shaping",
+  "blurb": "Three bands: a low shelf, a sweepable mid with a Q, and a high shelf. Add or take away rather than cut off.",
+  "logo": {
+   "paths": [
+    "M6 32h52",
+    "M14 32c6 0 6-14 12-14s6 20 12 20 6-10 12-10",
+    "M14 44v-24",
+    "M50 44v-24"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "imager",
+  "group": "Shaping",
+  "blurb": "Keep the bottom centred while the top opens out. Independent low and high width meet at one crossover.",
+  "logo": {
+   "paths": [
+    "M32 7v30",
+    "M29 20L15 11v22l14-9",
+    "M35 20l14-9v22l-14-9",
+    "M8 38h48"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "compressor",
+  "group": "Shaping",
+  "blurb": "Ducks the loud parts so everything sits together. In drum and bass it is also where the pumping comes from.",
+  "logo": {
+   "paths": [
+    "M5 20c5-12 9 12 14 0s9 12 14 0 9 12 14 0 8 8 12 1",
+    "M14 5v9M10 10l4 4 4-4",
+    "M50 35v-9M46 30l4-4 4 4"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "limiter",
+  "group": "Shaping",
+  "blurb": "Five milliseconds of stereo-linked look-ahead hold peaks under a real ceiling. GR makes the limiting patchable.",
+  "logo": {
+   "paths": [
+    "M6 32h12c7 0 5-20 12-20s5 20 12 20h16",
+    "M8 8h48",
+    "M20 5v6M44 5v6"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "delay",
+  "group": "Space",
+  "blurb": "An echo with a time you can modulate. Wet only, so patch the dry through a Mixer and the balance stays visible.",
+  "logo": {
+   "paths": [
+    "M4 22c5-13 9 13 14 0s9 13 14 0",
+    "M28 22c4-9 7 9 11 0s7 9 11 0",
+    "M48 22c3-5 5 5 9 0",
+    "M20 32h35M48 29l7 3-7 3"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "ping-pong",
+  "group": "Space",
+  "blurb": "Wet echoes bounce left then right. Cross-feedback makes one mono line fill a stereo cable over time.",
+  "logo": {
+   "paths": [
+    "M8 12h15l-5-5M23 12l-5 5",
+    "M56 22H33l5-5M33 22l5 5",
+    "M8 32h15l-5-5M23 32l-5 5"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "phaser",
+  "group": "Space",
+  "blurb": "Six swept allpass stages make moving notches. Stereo motion is built in; Sweep CV moves both sides in octaves.",
+  "logo": {
+   "paths": [
+    "M5 12c7 0 7 20 14 20s7-20 14-20 7 20 14 20 7-20 12-20",
+    "M8 38h48",
+    "M18 35v6M32 35v6M46 35v6"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "reverb",
+  "group": "Space",
+  "blurb": "Four rooms built from feedback delay lines — room, hall, plate and a dispersive spring — with an EQ on the tail and a gate for the eighties snare.",
+  "logo": {
+   "paths": [
+    "M8 31V9h48v22",
+    "M15 25c6-10 12-10 18 0",
+    "M11 29c10-17 21-17 31 0",
+    "M7 34c15-24 31-24 48 0"
+   ]
+  },
+  "labels": {
+   "algorithm": [
+    "Room",
+    "Hall",
+    "Plate",
+    "Spring"
+   ],
+   "gate": [
+    "Off",
+    "On"
+   ]
+  }
+ },
+ {
+  "type": "looper",
+  "group": "Effects",
+  "blurb": "Captures up to thirty stereo seconds, then plays or overdubs them. The take lives for this session only.",
+  "logo": {
+   "paths": [
+    "M15 31a17 17 0 1 1 7 7",
+    "M15 31l-7-1 3 7",
+    "M25 22h14v12H25z"
+   ]
+  },
+  "labels": {
+   "mode": [
+    "Stop",
+    "Rec",
+    "Play",
+    "Dub"
+   ]
+  }
+ },
+ {
+  "type": "adsr",
+  "group": "Modulation",
+  "blurb": "Attack, decay, sustain and release from a gate. The shape a note has — into a VCA it is what makes the note at all.",
+  "logo": {
+   "paths": [
+    "M4 33L16 7l12 12h17l15 14",
+    "M4 36h56",
+    "M16 7v29M28 19v17M45 19v17"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "lfo",
+  "group": "Modulation",
+  "blurb": "A slow oscillator, bipolar and unipolar at the same time. Wobble on a filter, tremolo on a level, drift on anything.",
+  "logo": {
+   "paths": [
+    "M4 20c7-18 14-18 21 0s14 18 21 0 10-14 14-5",
+    "M4 31c7-10 14-10 21 0s14 10 21 0 10-8 14-3"
+   ]
+  },
+  "labels": {
+   "shape": [
+    "Sine",
+    "Tri",
+    "Saw",
+    "Square",
+    "Random"
+   ]
+  }
+ },
+ {
+  "type": "follower",
+  "group": "Modulation",
+  "blurb": "Turns audio into the shape it is already making. A filter that opens on every kick is one cable.",
+  "logo": {
+   "paths": [
+    "M4 27l5-15 5 20 5-23 5 17 5-8 5 9 5-12 5 11 5-5 5 7",
+    "M4 33c12 0 10-24 23-24 12 0 8 23 33 23"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "sample-hold",
+  "group": "Modulation",
+  "blurb": "Grabs a value on each trigger and holds it. Noise in, a Quantizer after, and you have a melody nobody wrote.",
+  "logo": {
+   "paths": [
+    "M4 31h10V13h11v10h12V8h11v16h12",
+    "M14 35V9M25 35V19M37 35V4M48 35V20"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "offset",
+  "group": "Modulation",
+  "blurb": "Scales, inverts and shifts a CV. The plainest module here and among the most used — an envelope upside down, an LFO in the right range.",
+  "logo": {
+   "paths": [
+    "M5 31h54M12 36V5",
+    "M16 28l15-15 13 8 14-14",
+    "M18 13l14 9 12-7 14 12"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "quantizer",
+  "group": "Modulation",
+  "blurb": "Snaps a pitch to a scale. Random voltage becomes a melody in A minor for almost no arithmetic.",
+  "logo": {
+   "paths": [
+    "M5 33h11V26h11V18h11V11h11V6h10",
+    "M11 27a3 3 0 1 0 6 0a3 3 0 1 0-6 0",
+    "M33 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0",
+    "M52 6l4 4M56 6l-4 4"
+   ]
+  },
+  "labels": {
+   "scale": [
+    "Chrom",
+    "Major",
+    "Minor",
+    "Pent",
+    "Dorian",
+    "Whole"
+   ],
+   "root": [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B"
+   ]
+  }
+ },
+ {
+  "type": "combi",
+  "group": "Modulation",
+  "blurb": "Four knobs and four buttons wired to any parameters in the rack. One gesture opening a filter, shortening a decay and pushing a send.",
+  "logo": {
+   "paths": [
+    "M8 15a5 5 0 1 0 10 0a5 5 0 1 0-10 0M21 15a5 5 0 1 0 10 0a5 5 0 1 0-10 0M34 15a5 5 0 1 0 10 0a5 5 0 1 0-10 0M47 15a5 5 0 1 0 10 0a5 5 0 1 0-10 0",
+    "M13 15l3-3M26 15v-4M39 15l-3-3M52 15l-3 3",
+    "M9 27h8v7H9zM22 27h8v7h-8zM35 27h8v7h-8zM48 27h8v7h-8z"
+   ]
+  },
+  "labels": {
+   "button1": [
+    "Off",
+    "On"
+   ],
+   "button2": [
+    "Off",
+    "On"
+   ],
+   "button3": [
+    "Off",
+    "On"
+   ],
+   "button4": [
+    "Off",
+    "On"
+   ]
+  }
+ },
+ {
+  "type": "transport",
+  "group": "Sequencing",
+  "blurb": "The only module that knows the tempo. Bars, beats and sixteenths for everything else to sync to.",
+  "logo": {
+   "paths": [
+    "M6 9l17 11L6 31z",
+    "M30 31V9M39 31V9",
+    "M47 12h10M47 20h10M47 28h10"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "clock",
+  "group": "Sequencing",
+  "blurb": "Divides a clock into a gate, a trigger and a ramp. One of these can drive four sequencers at four different rates.",
+  "logo": {
+   "paths": [
+    "M20 5a15 15 0 1 0 0 30a15 15 0 1 0 0-30",
+    "M20 20V10M20 20l8 5",
+    "M39 28V12h8v16h11"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "seq",
+  "group": "Sequencing",
+  "blurb": "Eight steps, a pitch knob and a switch on each. Immediate — what you reach for when you want a line right now.",
+  "logo": {
+   "paths": [
+    "M5 27h7V15h7v5h7V9h7v14h7V13h7v8h7V6h7",
+    "M8 33h3M15 33h3M22 33h3M29 33h3M36 33h3M43 33h3M50 33h3M57 33h3"
+   ]
+  },
+  "labels": {
+   "gate1": [
+    "Off",
+    "On"
+   ],
+   "gate2": [
+    "Off",
+    "On"
+   ],
+   "gate3": [
+    "Off",
+    "On"
+   ],
+   "gate4": [
+    "Off",
+    "On"
+   ],
+   "gate5": [
+    "Off",
+    "On"
+   ],
+   "gate6": [
+    "Off",
+    "On"
+   ],
+   "gate7": [
+    "Off",
+    "On"
+   ],
+   "gate8": [
+    "Off",
+    "On"
+   ]
+  }
+ },
+ {
+  "type": "tracker",
+  "group": "Sequencing",
+  "blurb": "Four lanes of up to sixty-four steps, and eight patterns of them. A bar of drum and bass with the break, the bass and two more parts in it.",
+  "logo": {
+   "paths": [
+    "M7 5v30M20 5v30M33 5v30M46 5v30M59 5v30",
+    "M7 12h52M7 20h52M7 28h52",
+    "M10 8h7M23 16h7M36 24h7M49 8h7M49 32h7"
+   ]
+  },
+  "labels": {
+   "mute1": [
+    "On",
+    "Off"
+   ],
+   "mute2": [
+    "On",
+    "Off"
+   ],
+   "mute3": [
+    "On",
+    "Off"
+   ],
+   "mute4": [
+    "On",
+    "Off"
+   ],
+   "unit1": [
+    "Semi",
+    "Unit",
+    "Curve"
+   ],
+   "unit2": [
+    "Semi",
+    "Unit",
+    "Curve"
+   ],
+   "unit3": [
+    "Semi",
+    "Unit",
+    "Curve"
+   ],
+   "unit4": [
+    "Semi",
+    "Unit",
+    "Curve"
+   ]
+  }
+ },
+ {
+  "type": "arranger",
+  "group": "Sequencing",
+  "blurb": "A list of sections, each a pattern and a count of bars. Intro, main, break, drop — a song, driving a Tracker.",
+  "logo": {
+   "paths": [
+    "M5 8h14v9H5zM25 8h24v9H25zM5 23h30v9H5zM41 23h18v9H41z",
+    "M19 12h6M49 12h8v15M35 27h6",
+    "M54 24l3 3-3 3"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "arp",
+  "group": "Sequencing",
+  "blurb": "Turns a played chord into one running line, or builds the original Driftbox chord from a single root. Run it from a cable, tempo or free clock, then add rests with its step pattern.",
+  "logo": {
+   "paths": [
+    "M6 30l8-8 8 8 8-8 8 8 8-8 8 8",
+    "M6 14h8",
+    "M22 14h8",
+    "M38 14h8"
+   ]
+  },
+  "labels": {
+   "source": [
+    "Root",
+    "Played"
+   ],
+   "chord": [
+    "Oct",
+    "5th",
+    "Maj",
+    "Min",
+    "Maj7",
+    "Min7",
+    "Sus4",
+    "Dim"
+   ],
+   "mode": [
+    "Up",
+    "Down",
+    "Up-Dn",
+    "Dn-Up",
+    "Rand",
+    "Manual"
+   ],
+   "hold": [
+    "Off",
+    "On"
+   ],
+   "velocityMode": [
+    "Played",
+    "Fixed"
+   ],
+   "timing": [
+    "External",
+    "Tempo",
+    "Free"
+   ],
+   "division": [
+    "1/2",
+    "1/4",
+    "1/8",
+    "1/8T",
+    "1/16",
+    "1/16T",
+    "1/32",
+    "1/32T",
+    "1/64",
+    "1/128",
+    "1/2D",
+    "1/2T",
+    "1/4D",
+    "1/4T",
+    "1/8D",
+    "1/16D"
+   ],
+   "insert": [
+    "Off",
+    "Low",
+    "Hi",
+    "3-1",
+    "4-2"
+   ],
+   "singleRepeat": [
+    "Off",
+    "On"
+   ],
+   "shuffle": [
+    "Off",
+    "On"
+   ],
+   "enable": [
+    "Off",
+    "On"
+   ]
+  }
+ },
+ {
+  "type": "scale-player",
+  "group": "Sequencing",
+  "blurb": "Keeps notes and whole chords in key. Correct wrong notes to the nearest scale tone or filter them out.",
+  "logo": {
+   "paths": [
+    "M7 32h7V17h7v15h7V12h7v20h7V20h7v12h7",
+    "M8 10h8M25 7h8M42 12h8"
+   ]
+  },
+  "labels": {
+   "key": [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B"
+   ],
+   "scale": [
+    "Major",
+    "Minor",
+    "Lydian",
+    "Mixolydian",
+    "Spanish",
+    "Dorian",
+    "Phrygian",
+    "Harm Min",
+    "Mel Min",
+    "Maj Pent",
+    "Min Pent",
+    "Hemi Pent",
+    "Chromatic",
+    "Custom"
+   ],
+   "filter": [
+    "Correct",
+    "Filter"
+   ]
+  }
+ },
+ {
+  "type": "chord-player",
+  "group": "Sequencing",
+  "blurb": "Turns every incoming note into a scale-built chord. Shape one to five tertian notes, then add octaves or colour.",
+  "logo": {
+   "paths": [
+    "M7 31h6V20h6v11h6V15h6v16h6V10h6v21h6V18h7v13",
+    "M11 11l10-5 10 5 10-5 12 5"
+   ]
+  },
+  "labels": {
+   "key": [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B"
+   ],
+   "scale": [
+    "Major",
+    "Minor",
+    "Lydian",
+    "Mixolydian",
+    "Spanish",
+    "Dorian",
+    "Phrygian",
+    "Harm Min",
+    "Mel Min",
+    "Maj Pent",
+    "Min Pent",
+    "Hemi Pent",
+    "Chromatic",
+    "Custom"
+   ],
+   "open": [
+    "Close",
+    "Open"
+   ],
+   "octUp": [
+    "Off",
+    "On"
+   ],
+   "octDown": [
+    "Off",
+    "On"
+   ],
+   "color": [
+    "Off",
+    "On"
+   ],
+   "alter": [
+    "Off",
+    "Held"
+   ]
+  }
+ },
+ {
+  "type": "note-echo",
+  "group": "Sequencing",
+  "blurb": "Repeats notes or whole chords in time, with a semitone shift and a linear velocity slope on every echo.",
+  "logo": {
+   "paths": [
+    "M7 13h10v10H7zM27 17h9v9h-9zM46 21h8v8h-8z",
+    "M17 18h10M36 22h10",
+    "M9 34h44"
+   ]
+  },
+  "labels": {
+   "sync": [
+    "Free",
+    "Tempo"
+   ],
+   "division": [
+    "1/128",
+    "1/64",
+    "1/32",
+    "1/16",
+    "1/8",
+    "1/4",
+    "3/8",
+    "1/2"
+   ],
+   "dry": [
+    "Mute",
+    "On"
+   ]
+  }
+ },
+ {
+  "type": "midi",
+  "group": "Sequencing",
+  "blurb": "Your keyboard, as pitch and a gate. The only module here whose input does not arrive down a cable.",
+  "logo": {
+   "paths": [
+    "M5 8h54v25H5z",
+    "M13 8v25M21 8v25M29 8v25M37 8v25M45 8v25M53 8v25",
+    "M10 8v14h7V8M26 8v14h7V8M42 8v14h7V8"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "meter",
+  "group": "Analysis",
+  "blurb": "Watches any signal as a needle, bank of LEDs or waveform. Thru is untouched; Env follows what you see.",
+  "logo": {
+   "paths": [
+    "M6 31a26 26 0 0 1 52 0",
+    "M13 29l4-4M19 19l3 4M32 12v6M45 19l-3 4M51 29l-4-4",
+    "M32 31l13-15",
+    "M27 31a5 5 0 1 0 10 0"
+   ]
+  },
+  "labels": {
+   "mode": [
+    "VU",
+    "LED",
+    "Wave"
+   ]
+  }
+ },
+ {
+  "type": "tuner",
+  "group": "Analysis",
+  "blurb": "Names the incoming note and its cents error. Thru is transparent unless Mute is on for silent tuning.",
+  "logo": {
+   "paths": [
+    "M8 29h48M12 29a20 20 0 0 1 40 0",
+    "M32 29l9-15M32 10v4M18 16l3 3M46 16l-3 3",
+    "M26 34h12"
+   ]
+  },
+  "labels": {
+   "mute": [
+    "Thru",
+    "Mute"
+   ]
+  }
+ },
+ {
+  "type": "mixer",
+  "group": "Mixing",
+  "blurb": "Four in, one out, with a level and a CV inlet on each. Every crossfade in the rack is one of these, in plain sight.",
+  "logo": {
+   "paths": [
+    "M10 6v28M23 6v28M36 6v28M49 6v28",
+    "M6 13h8v7H6zM19 24h8v7h-8zM32 9h8v7h-8zM45 19h8v7h-8z",
+    "M10 36l22 2 17-2"
+   ]
+  },
+  "labels": {}
+ },
+ {
+  "type": "line-mixer",
+  "group": "Mixing",
+  "blurb": "Six stereo channels with level, pan, mute and solo, two aux sends with their returns, and a stereo master. The desk the rack was patching by hand.",
+  "logo": {
+   "paths": [
+    "M6 5v20M16 5v20M26 5v20M36 5v20M46 5v20M56 5v20",
+    "M3 11h6M13 18h6M23 8h6M33 15h6M43 12h6M53 20h6",
+    "M6 29h50",
+    "M6 35h40M46 32l6 3-6 3"
+   ]
+  },
+  "labels": {
+   "mute1": [
+    "On",
+    "Mute"
+   ],
+   "mute2": [
+    "On",
+    "Mute"
+   ],
+   "mute3": [
+    "On",
+    "Mute"
+   ],
+   "mute4": [
+    "On",
+    "Mute"
+   ],
+   "mute5": [
+    "On",
+    "Mute"
+   ],
+   "mute6": [
+    "On",
+    "Mute"
+   ],
+   "solo1": [
+    "—",
+    "Solo"
+   ],
+   "solo2": [
+    "—",
+    "Solo"
+   ],
+   "solo3": [
+    "—",
+    "Solo"
+   ],
+   "solo4": [
+    "—",
+    "Solo"
+   ],
+   "solo5": [
+    "—",
+    "Solo"
+   ],
+   "solo6": [
+    "—",
+    "Solo"
+   ]
+  }
+ },
+ {
+  "type": "out",
+  "group": "Mixing",
+  "blurb": "The end of a chain, with level, pan, mute and solo. Two of them is a two-channel mix; none of them is silence.",
+  "logo": {
+   "paths": [
+    "M5 20h14l16-13v26L19 20",
+    "M41 14c5 3 5 9 0 12",
+    "M47 9c10 6 10 16 0 22",
+    "M18 16v8"
+   ]
+  },
+  "labels": {
+   "mute": [
+    "On",
+    "Mute"
+   ],
+   "solo": [
+    "—",
+    "Solo"
+   ]
+  }
+ }
+]

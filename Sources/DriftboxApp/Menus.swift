@@ -15,6 +15,9 @@
     @AppStorage(Defaults.sendsClock) private var sendsClock = false
     @AppStorage(Defaults.metronome) private var metronome = false
     @AppStorage(Defaults.countIn) private var countIn = false
+    /// The rack, while its window is in front: undo is its, then.
+    @FocusedValue(\.rack) private var rack
+    @Environment(\.openWindow) private var openWindow
 
     public init(player: Player, files: SongFiles, stage: Stage) {
       self.player = player
@@ -59,12 +62,21 @@
       // The manager is the one the window hands the content; what these show is read back off it,
       // so an edit that named itself says so here.
       CommandGroup(replacing: .undoRedo) {
-        Button(player.undoTitle) { player.undo() }
-          .keyboardShortcut("z")
-          .disabled(!player.canUndo)
-        Button(player.redoTitle) { player.redo() }
-          .keyboardShortcut("z", modifiers: [.command, .shift])
-          .disabled(!player.canRedo)
+        if let rack {
+          Button(rack.undoTitle) { rack.undo() }
+            .keyboardShortcut("z")
+            .disabled(!rack.canUndo)
+          Button(rack.redoTitle) { rack.redo() }
+            .keyboardShortcut("z", modifiers: [.command, .shift])
+            .disabled(!rack.canRedo)
+        } else {
+          Button(player.undoTitle) { player.undo() }
+            .keyboardShortcut("z")
+            .disabled(!player.canUndo)
+          Button(player.redoTitle) { player.redo() }
+            .keyboardShortcut("z", modifiers: [.command, .shift])
+            .disabled(!player.canRedo)
+        }
       }
 
       CommandGroup(after: .toolbar) {
@@ -91,6 +103,8 @@
       CommandGroup(before: .windowList) {
         Button("Visuals") { stage.output.show() }
           .keyboardShortcut("2")
+        Button("Rack") { openWindow(id: "rack") }
+          .keyboardShortcut("3")
         Divider()
       }
 
