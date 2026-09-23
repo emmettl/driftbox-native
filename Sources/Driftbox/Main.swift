@@ -49,7 +49,6 @@
       // the same device.
       Window("Rack", id: "rack") {
         RackWindow(model: rack) { player.attach(rack) }
-          .frame(minWidth: 620, idealWidth: 860, minHeight: 520, idealHeight: 820)
       }
       .defaultSize(width: 900, height: 860)
 

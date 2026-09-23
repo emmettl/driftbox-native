@@ -15,7 +15,9 @@ func modulatedParamValue(_ module: PatchModule, _ def: ModuleDef, _ paramId: Str
 
 /// Where a route's source sits, 0..1 across its own range. Normalised rather than assumed, so a
 /// route can be driven by a rotary, a button, or any other module's param.
-func sourcePosition(_ modules: [PatchModule], registry: [String: ModuleDef], from: PortReference) -> Double? {
+public func sourcePosition(
+  _ modules: [PatchModule], registry: [String: ModuleDef], from: PortReference
+) -> Double? {
   guard let module = modules.first(where: { $0.id == from.module }),
     let def = registry[module.type],
     let param = def.params.first(where: { $0.id == from.port }),
@@ -30,7 +32,7 @@ func sourcePosition(_ modules: [PatchModule], registry: [String: ModuleDef], fro
 /// What one route puts on its target: linear between the route's `min` and `max` (inverted when
 /// `min > max`), clamped to the target's range, and rounded as `Math.round` does when the target
 /// is stepped.
-func routeValue(_ route: ModRoute, position: Double, param: ParamDef) -> Double {
+public func routeValue(_ route: ModRoute, position: Double, param: ParamDef) -> Double {
   let low = route.min.flatMap { $0.isFinite ? $0 : nil } ?? param.min
   let high = route.max.flatMap { $0.isFinite ? $0 : nil } ?? param.max
   var value = low + (high - low) * position
@@ -40,7 +42,7 @@ func routeValue(_ route: ModRoute, position: Double, param: ParamDef) -> Double 
 
 /// The patch with its routings applied. A route naming a module or param this build does not
 /// have, or a hidden one, is skipped and kept, never deleted.
-func applyModulation(_ patch: Patch, registry: [String: ModuleDef]) -> Patch {
+public func applyModulation(_ patch: Patch, registry: [String: ModuleDef]) -> Patch {
   let routes = patch.modulation
   if routes.isEmpty { return patch }
 

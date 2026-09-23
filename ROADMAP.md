@@ -316,8 +316,12 @@ parity point.
    Then the Multisampler's Key Atlas — a set of recordings dropped on it maps itself by the names
    the reference reads (Piano_C3_pp, vel064, midi 72), held to its own reading of a spread of
    names — and the Audio Track, a recording placed at a bar and a step.
-   Left: the Combinator's routing editor and MIDI learn, the inlet trims on the back, the rack as
-   an Audio Unit, and the groovebox as a module in it.
+   Then the Combinator finished: its routings drive their knobs as a rotary turns, where before
+   they applied only when the graph was rebuilt, and a knob a routing drives is marked. The
+   routing is edited in an inspector beside the rack, showing what each routing puts on its
+   target as it moves, and each rotary learns a controller, the binding kept beside the patch.
+   Left: the inlet trims on the back, the rack as an Audio Unit, and the groovebox as a module
+   in it.
 
 ## Milestone 3 — what only native can do
 

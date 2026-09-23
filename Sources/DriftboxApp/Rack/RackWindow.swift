@@ -27,6 +27,15 @@
         RackStage(model: model)
       }
       .background(Theme.ground)
+      // The rack's own minimum, inside the inspector, so opening the routing beside it makes the
+      // window wider rather than squeezing the rack out of it.
+      .frame(minWidth: 620, idealWidth: 860, minHeight: 520, idealHeight: 820)
+      .inspector(isPresented: routing) {
+        if let combi = model.patch.modules.first(where: { $0.id == model.editingRoutes }) {
+          RoutingInspector(model: model, combi: combi)
+            .inspectorColumnWidth(min: 300, ideal: 340, max: 480)
+        }
+      }
       .focusable()
       .focused($focused)
       .focusEffectDisabled()
@@ -43,6 +52,11 @@
       .focusedSceneValue(\.rack, model)
       // MIDI from a controller plays the rack while this is the window in front.
       .onChange(of: active, initial: true) { model.inFront = active == .key }
+    }
+
+    /// Whether a Combinator's routing is open beside the rack.
+    private var routing: Binding<Bool> {
+      Binding(get: { model.editingRoutes != nil }, set: { if !$0 { model.editRoutes(nil) } })
     }
 
     private func keyPress(_ press: KeyPress) -> KeyPress.Result {
