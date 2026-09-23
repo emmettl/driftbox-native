@@ -30,8 +30,8 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxHost` | The engine and rack hosts, the rings to and from the render thread, the ports every platform's audio and MIDI sits behind, and the mixer every platform's output renders through. The Mac's adapters too, for now. |
 | `Sources/DriftboxHostWindows` | WASAPI and WinMM behind those ports: the host on Windows. |
 | `Sources/CWASAPI` | The Windows audio headers Swift's WinSDK module leaves out. Declarations only. |
-| `Sources/DriftboxHostAndroid` | AAudio behind the same ports: the host on Android, audio only so far. |
-| `Sources/CAAudio` | AAudio's header, which the Swift SDK's Android module leaves out. Declarations only. |
+| `Sources/DriftboxHostAndroid` | AAudio and native MIDI behind the same ports: the host on Android. |
+| `Sources/CAAudio`, `Sources/CAMidi` | AAudio's and native MIDI's headers, which the Swift SDK's Android module leaves out. Declarations only. |
 | `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |
 | `Sources/DriftboxGPU` | What the scenes ask of a GPU, as a protocol every backend answers the same way. |
 | `Sources/DriftboxGPUD3D11` | That protocol on Direct3D 11: the GPU on Windows. |
@@ -73,7 +73,7 @@ written down once, in `DriftboxHost`, and each platform answers it in a target o
 
 ```
 the app            views, and the one place that picks a platform's adapters
-adapters           DriftboxHostWindows: WASAPI, WinMM      DriftboxHostAndroid: AAudio
+adapters           DriftboxHostWindows: WASAPI, WinMM      DriftboxHostAndroid: AAudio, AMidi
                    the Mac's: AVAudioEngine, CoreMIDI
 ports              DriftboxHost: AudioRouting, MIDIInputPort, MIDIOutputPort, HostTime, RenderSource
 hosts              DriftboxHost: EngineHost, RackHost, the rings, the Mixer
@@ -214,7 +214,17 @@ The buffer starts at one burst and grows a burst at a time if the stream underru
 the render thread; Driftbox keeps it to the big cores, since left to the scheduler it underran a
 hundred times a second, and reports each callback's work to a performance hint session. A stream
 whose device goes away ends and asks to be replaced, as on Windows. There is one device, the
-system's, until the app can list them: that is Java's `AudioManager`. MIDI is not there yet.
+system's, until the app can list them: that is Java's `AudioManager`.
+
+MIDI is Android's native MIDI, which needs Android 10, so Driftbox builds for API 29. It can play
+through a device but not find or open one: that is Java's `MidiManager`. So the app will open
+devices and hand each to `AMidiDevices`, and `AMidiInput` and `AMidiOutput` open their ports from
+there. Input is read by a thread that asks every port in turn, since there is no callback, and a
+`MIDIByteStream` per port makes Android's packets back into messages: running status, clock in
+the middle of a note, system exclusive skipped. Output is stamped, and Android's USB driver holds
+each message until its time, so there is no scheduler as there is over WinMM; a device that is
+another app is given the stamp and may or may not keep to it. None of it has met a
+device yet: there is no Java side to open one until there is an app.
 
 ## Conformance
 

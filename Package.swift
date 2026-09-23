@@ -40,12 +40,17 @@ let package = Package(
     .target(
       name: "DriftboxHostWindows",
       dependencies: ["DriftboxHost", .target(name: "CWASAPI", condition: .when(platforms: [.windows]))]),
-    // The host on Android: AAudio behind the same ports, the same way. Its choice of cores builds
-    // everywhere, so that it is tested everywhere; the rest compiles to nothing off Android.
+    // The host on Android: AAudio and native MIDI behind the same ports, the same way. Its choice
+    // of cores and its port names build everywhere, so that they are tested everywhere; the rest
+    // compiles to nothing off Android.
     .systemLibrary(name: "CAAudio"),
+    .systemLibrary(name: "CAMidi"),
     .target(
       name: "DriftboxHostAndroid",
-      dependencies: ["DriftboxHost", .target(name: "CAAudio", condition: .when(platforms: [.android]))]),
+      dependencies: [
+        "DriftboxHost", .target(name: "CAAudio", condition: .when(platforms: [.android])),
+        .target(name: "CAMidi", condition: .when(platforms: [.android])),
+      ]),
     // What the scenes ask of a GPU, and the backends that answer it. The shaders are GLSL in
     // `shaders/`, made into every backend's language by `scripts/shaders.mjs` and checked in.
     .target(name: "DriftboxGPU"),
