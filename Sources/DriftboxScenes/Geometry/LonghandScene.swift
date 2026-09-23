@@ -145,10 +145,14 @@ public final class LonghandScene: GPUGeometryScene {
 
     let tube: [GPUVertexLayout] = [.single(.float3, location: 0), .single(.float3, location: 1)]
     let mark: [GPUVertexLayout] = [.single(.float3, location: 0)]
-    corePipeline = try pipeline(.longhandTube, blend: .none, vertexBuffers: tube)
-    haloPipeline = try pipeline(.longhandTube, blend: .additive, vertexBuffers: tube)
-    tipPipeline = try pipeline(.longhandMark, blend: .none, vertexBuffers: mark)
-    readerPipeline = try pipeline(.longhandMark, blend: .additive, vertexBuffers: mark)
+    // three shows one side of a surface, and here that is not cosmetic: the halo is additive,
+    // so drawing the far wall of the tube as well would double its glow. The front is three's
+    // own, so this keeps the near wall, as the web does; the Metal scene, culling against
+    // Metal's clockwise front, kept the far one, which covers the same pixels in a flat colour.
+    corePipeline = try pipeline(.longhandTube, blend: .none, cull: .back, vertexBuffers: tube)
+    haloPipeline = try pipeline(.longhandTube, blend: .additive, cull: .back, vertexBuffers: tube)
+    tipPipeline = try pipeline(.longhandMark, blend: .none, cull: .back, vertexBuffers: mark)
+    readerPipeline = try pipeline(.longhandMark, blend: .additive, cull: .back, vertexBuffers: mark)
     gridPipeline = try pipeline(
       .longhandGrid, primitive: .lines, blend: .none, vertexBuffers: [.single(.float3, location: 0)])
     // A sprite rather than a point: the layer has no points with a size.
@@ -301,10 +305,6 @@ public final class LonghandScene: GPUGeometryScene {
   }
 
   override public func encode(_ pass: any GPUPass) {
-    // three shows one side of a surface, and here that is not cosmetic: the halo is additive,
-    // so drawing the far wall of the tube as well would double its glow. The layer has no cull
-    // mode, so the ink's fragment shader throws the back faces away instead.
-
     // three's own order, opaque before transparent: the page, then the ink and its nibs, then
     // the dust and everything additive. Every material in the web scene has its depth writing
     // turned off but the grid's, and the grid is behind all of it — so nothing here is ever

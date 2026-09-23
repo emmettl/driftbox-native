@@ -12,6 +12,7 @@
     let inputLayout: UnsafeMutablePointer<ID3D11InputLayout>?
     let blendState: UnsafeMutablePointer<ID3D11BlendState>
     let depthState: UnsafeMutablePointer<ID3D11DepthStencilState>
+    let rasterizer: UnsafeMutablePointer<ID3D11RasterizerState>
     let topology: D3D_PRIMITIVE_TOPOLOGY
 
     init(device: D3D11Device, descriptor: GPUPipelineDescriptor) throws {
@@ -98,13 +99,30 @@
       self.blendState = blendState
 
       var depth = D3D11_DEPTH_STENCIL_DESC()
-      depth.DepthEnable = WindowsBool(descriptor.depth)
-      depth.DepthWriteMask = descriptor.depth ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO
+      depth.DepthEnable = WindowsBool(descriptor.depth != .none)
+      depth.DepthWriteMask =
+        descriptor.depth == .testAndWrite ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO
       depth.DepthFunc = D3D11_COMPARISON_LESS
       var depthState: UnsafeMutablePointer<ID3D11DepthStencilState>?
       made = d.pointee.lpVtbl.pointee.CreateDepthStencilState(d, &depth, &depthState)
       guard made >= 0, let depthState else { throw D3D11.error("\(program.name): no depth state", made) }
       self.depthState = depthState
+
+      // The layer's front is three's, counter-clockwise as it appears; Direct3D's is clockwise.
+      var raster = D3D11_RASTERIZER_DESC()
+      raster.FillMode = D3D11_FILL_SOLID
+      raster.FrontCounterClockwise = true
+      raster.CullMode =
+        switch descriptor.cull {
+        case .none: D3D11_CULL_NONE
+        case .back: D3D11_CULL_BACK
+        case .front: D3D11_CULL_FRONT
+        }
+      raster.DepthClipEnable = true
+      var rasterizer: UnsafeMutablePointer<ID3D11RasterizerState>?
+      made = d.pointee.lpVtbl.pointee.CreateRasterizerState(d, &raster, &rasterizer)
+      guard made >= 0, let rasterizer else { throw D3D11.error("\(program.name): no rasterizer state", made) }
+      self.rasterizer = rasterizer
 
       topology =
         switch descriptor.primitive {
@@ -116,6 +134,7 @@
     }
 
     deinit {
+      D3D11.release(rasterizer)
       D3D11.release(depthState)
       D3D11.release(blendState)
       D3D11.release(inputLayout)
@@ -179,6 +198,7 @@
       var factor: [Float] = [1, 1, 1, 1]
       context.pointee.lpVtbl.pointee.OMSetBlendState(context, pipeline.blendState, &factor, 0xFFFF_FFFF)
       context.pointee.lpVtbl.pointee.OMSetDepthStencilState(context, pipeline.depthState, 0)
+      context.pointee.lpVtbl.pointee.RSSetState(context, pipeline.rasterizer)
       strides = pipeline.descriptor.vertexBuffers.map { UINT($0.stride) }
       for (slot, buffer) in bound { bind(buffer, slot: slot) }
     }

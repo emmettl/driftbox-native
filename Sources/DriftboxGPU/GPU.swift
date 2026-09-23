@@ -116,20 +116,21 @@ public struct GPUPipelineDescriptor: Sendable {
   public var program: ShaderProgram
   public var primitive: GPUPrimitive
   public var blend: GPUBlend
-  /// Test against depth and write it, nearer winning; or neither.
-  public var depth: Bool
+  public var depth: GPUDepth
+  public var cull: GPUCull
   /// The vertex buffers, by slot, and which attribute each part of them feeds.
   public var vertexBuffers: [GPUVertexLayout]
 
   public init(
     program: ShaderProgram, primitive: GPUPrimitive = .triangles, blend: GPUBlend = .none,
-    depth: Bool = false,
+    depth: GPUDepth = .none, cull: GPUCull = .none,
     vertexBuffers: [GPUVertexLayout] = []
   ) {
     self.program = program
     self.primitive = primitive
     self.blend = blend
     self.depth = depth
+    self.cull = cull
     self.vertexBuffers = vertexBuffers
   }
 
@@ -156,6 +157,28 @@ public enum GPUPrimitive: Sendable {
   case triangleStrip
   case lines
   case lineStrip
+}
+
+/// What a pipeline does with the target's depth, nearer winning where it tests: three's
+/// `depthTest` and `depthWrite`, as the combinations of them the scenes use.
+public enum GPUDepth: Sendable {
+  /// Neither: drawn wherever it lands, and hides nothing drawn after it.
+  case none
+  /// Hidden behind what is nearer, but hiding nothing itself: for something transparent among
+  /// solid things, which is what three's `depthWrite={false}` is for.
+  case test
+  /// Hidden behind what is nearer, and hiding what is further: for solid things.
+  case testAndWrite
+}
+
+/// Which faces of a triangle are not drawn. A triangle's front is the side from which its corners
+/// run counter-clockwise as it appears on the target: three's front and OpenGL's, since every mesh
+/// the scenes draw was made for three. Direct3D and Metal default to the other way round, so their
+/// backends say so.
+public enum GPUCull: Sendable {
+  case none
+  case back
+  case front
 }
 
 /// three.js's blending modes, the ones the scenes use.

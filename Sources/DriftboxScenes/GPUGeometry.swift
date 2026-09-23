@@ -64,11 +64,12 @@ open class GPUGeometryScene: GPUScene {
   /// A pipeline for `program`, drawing `primitive`s under `blend`, fed by `vertexBuffers`.
   public func pipeline(
     _ program: ShaderProgram, primitive: GPUPrimitive = .triangles, blend: GPUBlend = .none,
-    depth: Bool = false, vertexBuffers: [GPUVertexLayout] = []
+    depth: GPUDepth = .none, cull: GPUCull = .none, vertexBuffers: [GPUVertexLayout] = []
   ) throws -> any GPUPipeline {
     try device.makePipeline(
       GPUPipelineDescriptor(
-        program: program, primitive: primitive, blend: blend, depth: depth, vertexBuffers: vertexBuffers))
+        program: program, primitive: primitive, blend: blend, depth: depth, cull: cull,
+        vertexBuffers: vertexBuffers))
   }
 
   /// A vertex buffer holding `values`, packed as they are in memory.

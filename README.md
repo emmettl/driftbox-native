@@ -119,14 +119,15 @@ The scenes' GPU is a port of the same kind: `DriftboxGPU` says what they may ask
 backend answers it on each platform — Direct3D 11 on Windows, Metal on the Mac, OpenGL ES 3.0 on
 Android.
 What it offers is what all three do the same way, and nothing more: buffers, textures, pipelines
-under three.js's three blends and depth, per-draw uniforms, and vertex attributes stepping per
-vertex or per instance. There are no sized points, since Direct3D cannot size one, so a sprite is
+under three.js's three blends, its depth tests with or without writes and its culling, per-draw
+uniforms, and vertex attributes stepping per vertex or per instance. There are no sized points, since Direct3D cannot size one, so a sprite is
 an instanced quad everywhere; and no storage buffers, since OpenGL ES 3.0 has none. The
-conventions every backend keeps: clip space y up with depth 0...1, a target's first row its top.
+conventions every backend keeps: clip space y up with depth 0...1, a target's first row its top,
+and a triangle's front counter-clockwise as it appears there, which is three's.
 
 `GPUContractTests` holds a backend to those conventions — which way up a target reads back,
-depth, the blends to the byte, instanced sprites, textures, buffers written again — and runs
-against every backend the platform has. Direct3D runs it on WARP, Windows' software rasteriser,
+depth written and only tested, which faces are culled, the blends to the byte, instanced sprites,
+textures, buffers written again — and runs against every backend the platform has. Direct3D runs it on WARP, Windows' software rasteriser,
 so the pixels are the same on every machine and CI needs no graphics card; Metal runs it on the
 Mac's own GPU; OpenGL ES runs it on Linux, on Mesa's software rasteriser, surfaceless, for WARP's
 reasons. A phone cannot run Swift Testing from here, so `scripts/android-app.sh gpu` runs the same
@@ -136,7 +137,8 @@ those tested stops a platform passing the contract by testing nothing.
 OpenGL's framebuffers start at the bottom, where the layer's targets start at the top. So the
 OpenGL ES backend draws every target upside down, turning each vertex shader's y over as it
 compiles it: a target's first row in memory is then its top, read back in order, sampled from the
-top left, with `gl_FragCoord` counting down from the top as it does in Metal and Direct3D. A window
+top left, with `gl_FragCoord` counting down from the top as it does in Metal and Direct3D. Drawing
+upside down turns every triangle over too, so the backend calls the layer's front clockwise. A window
 is the one thing that is not a target, and is turned over on the way to it. OpenGL ES 3.0 has no
 BGRA texture, so a BGRA texture is stored as given and read through a swizzle that swaps red and
 blue, and a target is swapped as it is read back; and its GLSL cannot bind a uniform block or a

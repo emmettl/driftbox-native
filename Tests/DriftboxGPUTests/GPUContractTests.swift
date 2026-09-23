@@ -118,7 +118,7 @@ struct GPUContractTests {
   @Test func attributesAndUniformsDrawAShape() throws {
     for device in try Backends.all() {
       let target = try device.makeTarget(width: 16, height: 16)
-      let pipeline = try device.makePipeline(Self.flat(depth: false, blend: .none))
+      let pipeline = try device.makePipeline(Self.flat(depth: .none, blend: .none))
       let square: [SIMD4<Float>] = Self.square(z: 0.5)
       var buffer: (any GPUBuffer)!
       try bytes(square) { buffer = try device.makeBuffer($0, kind: .vertex) }
@@ -140,10 +140,81 @@ struct GPUContractTests {
     }
   }
 
+  /// Depth tested but not written: hidden behind what is nearer, and hiding nothing drawn after.
+  /// Green far away and written; red near, tested only, and seen; blue between them, written, and
+  /// seen over the red that wrote nothing; yellow furthest of all, tested only, and not seen.
+  @Test func testedDepthHidesNothing() throws {
+    for device in try Backends.all() {
+      let written = try device.makePipeline(Self.flat(depth: .testAndWrite, blend: .none))
+      let tested = try device.makePipeline(Self.flat(depth: .test, blend: .none))
+      let target = try device.makeTarget(width: 8, height: 8)
+      var seen: [SIMD4<Int>] = []
+      let squares: [(z: Float, colour: SIMD4<Float>, pipeline: any GPUPipeline)] = [
+        (0.7, SIMD4(0, 1, 0, 1), written), (0.3, SIMD4(1, 0, 0, 1), tested),
+        (0.5, SIMD4(0, 0, 1, 1), written), (0.9, SIMD4(1, 1, 0, 1), tested),
+      ]
+      var buffers: [any GPUBuffer] = []
+      for square in squares {
+        try bytes(Self.square(z: square.z)) { buffers.append(try device.makeBuffer($0, kind: .vertex)) }
+      }
+      for drawn in 1...squares.count {
+        device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
+          for (square, buffer) in zip(squares.prefix(drawn), buffers) {
+            pass.setPipeline(square.pipeline)
+            var uniforms = FlatUniforms()
+            uniforms.colour = square.colour
+            pass.setUniforms(uniforms, binding: 0)
+            pass.setVertexBuffer(buffer, slot: 0)
+            pass.draw(vertexCount: 6)
+          }
+        }
+        seen.append(pixel(try device.readPixels(target), 4, 4, width: 8))
+      }
+      #expect(close(seen[0], SIMD4(0, 255, 0, 255)), "the far square")
+      #expect(close(seen[1], SIMD4(255, 0, 0, 255)), "the near one passes the test")
+      #expect(close(seen[2], SIMD4(0, 0, 255, 255)), "and wrote no depth to hide the one between")
+      #expect(close(seen[3], SIMD4(0, 0, 255, 255)), "which hides the furthest, tested only")
+    }
+  }
+
+  /// A triangle's front is counter-clockwise as it appears, as three's is. Left, one that runs
+  /// counter-clockwise; right, one that runs clockwise: culling the back keeps the left, culling
+  /// the front keeps the right, and culling neither keeps both.
+  @Test func frontsAreCounterClockwise() throws {
+    for device in try Backends.all() {
+      // In clip space, y up, which is how a triangle appears on the target.
+      let triangles: [SIMD4<Float>] = [
+        SIMD4(-1, -1, 0.5, 1), SIMD4(0, -1, 0.5, 1), SIMD4(-1, 1, 0.5, 1),
+        SIMD4(0, -1, 0.5, 1), SIMD4(1, 1, 0.5, 1), SIMD4(1, -1, 0.5, 1),
+      ]
+      var buffer: (any GPUBuffer)!
+      try bytes(triangles) { buffer = try device.makeBuffer($0, kind: .vertex) }
+      for (cull, left, right) in [(GPUCull.back, true, false), (.front, false, true), (.none, true, true)] {
+        var descriptor = Self.flat(depth: .none, blend: .none)
+        descriptor.cull = cull
+        let pipeline = try device.makePipeline(descriptor)
+        let target = try device.makeTarget(width: 16, height: 8)
+        device.render(into: target, clear: .colour(SIMD4(0, 0, 0, 1))) { pass in
+          pass.setPipeline(pipeline)
+          var uniforms = FlatUniforms()
+          uniforms.colour = SIMD4(1, 0, 0, 1)
+          pass.setUniforms(uniforms, binding: 0)
+          pass.setVertexBuffer(buffer, slot: 0)
+          pass.draw(vertexCount: 6)
+        }
+        let read = try device.readPixels(target)
+        let red = SIMD4(255, 0, 0, 255)
+        let black = SIMD4(0, 0, 0, 255)
+        #expect(close(pixel(read, 2, 6, width: 16), left ? red : black), "\(cull): the counter-clockwise one")
+        #expect(close(pixel(read, 13, 6, width: 16), right ? red : black), "\(cull): the clockwise one")
+      }
+    }
+  }
+
   /// With depth on, the nearer of two squares wins whichever is drawn first, drawn from indices.
   @Test func theNearerWinsWhateverTheOrder() throws {
     for device in try Backends.all() {
-      let pipeline = try device.makePipeline(Self.flat(depth: true, blend: .none))
+      let pipeline = try device.makePipeline(Self.flat(depth: .testAndWrite, blend: .none))
       var near: (any GPUBuffer)!
       var far: (any GPUBuffer)!
       var indices: (any GPUBuffer)!
@@ -180,7 +251,7 @@ struct GPUContractTests {
         (GPUBlend.none, SIMD4(255, 0, 0, 128)), (.normal, SIMD4(128, 0, 51, 255)),
         (.additive, SIMD4(128, 0, 102, 255)),
       ] {
-        let pipeline = try device.makePipeline(Self.flat(depth: false, blend: blend))
+        let pipeline = try device.makePipeline(Self.flat(depth: .none, blend: blend))
         let target = try device.makeTarget(width: 4, height: 4)
         var uniforms = FlatUniforms()
         uniforms.colour = SIMD4(1, 0, 0, 0.5)
@@ -281,7 +352,7 @@ struct GPUContractTests {
   /// A buffer written again draws what it now holds.
   @Test func aBufferWrittenAgainDrawsWhatItHolds() throws {
     for device in try Backends.all() {
-      let pipeline = try device.makePipeline(Self.flat(depth: false, blend: .none))
+      let pipeline = try device.makePipeline(Self.flat(depth: .none, blend: .none))
       var buffer: (any GPUBuffer)!
       // Off to the left of the screen, where nothing is drawn.
       let offscreen = Self.square(z: 0.5).map { SIMD4($0.x - 3, $0.y, $0.z, $0.w) }
@@ -306,7 +377,7 @@ struct GPUContractTests {
   // MARK: - Shapes
 
   /// The flat program, reading positions from float4s (the fourth ignored) sixteen bytes apart.
-  static func flat(depth: Bool, blend: GPUBlend) -> GPUPipelineDescriptor {
+  static func flat(depth: GPUDepth, blend: GPUBlend) -> GPUPipelineDescriptor {
     GPUPipelineDescriptor(
       program: .flat, blend: blend, depth: depth,
       vertexBuffers: [GPUVertexLayout(stride: 16, attributes: [.init(location: 0, format: .float3)])])
