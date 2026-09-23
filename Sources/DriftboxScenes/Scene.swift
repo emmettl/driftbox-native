@@ -19,8 +19,10 @@
 
   /// The scenes there are, by id, and the one a song gets when the one it names is not here yet.
   public enum Scenes {
-    public static let all: [Scene.Type] = [Pulse.self] + surfaces + geometry
-    public static let fallback: Scene.Type = Pulse.self
+    // Tables of types, made once and never changed: nothing about them can race, which the
+    // compiler cannot see because a scene's type is not itself `Sendable`.
+    nonisolated(unsafe) public static let all: [Scene.Type] = [Pulse.self] + surfaces + geometry
+    nonisolated(unsafe) public static let fallback: Scene.Type = Pulse.self
 
     /// The web's material studies, ported shader for shader.
     static let surfaces: [SurfaceScene.Type] = [

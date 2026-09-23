@@ -35,7 +35,7 @@ struct VoiceSpecTests {
     #expect(cases.count == 2)
     var found: [String] = []
     for fixture in cases.compactMap(\.object) {
-      let strong = try #require(fixture["strong"]?.bool)
+      let strong = try #require(fixture["strong"]?.bool as Bool?)
       let expected = try #require(fixture["spec"])
       collectDifferences(
         between: json(metronomeClick(strong: strong)), and: expected, at: strong ? "strong" : "weak",
