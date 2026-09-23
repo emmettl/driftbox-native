@@ -14,6 +14,7 @@
     @State private var octave = 0
     @State private var held: [Character: Int] = [:]
     @FocusState private var focused: Bool
+    @Environment(\.controlActiveState) private var active
 
     public init(model: RackModel, attach: @escaping () -> Void) {
       self.model = model
@@ -40,6 +41,8 @@
         model.allNotesOff()
       }
       .focusedSceneValue(\.rack, model)
+      // MIDI from a controller plays the rack while this is the window in front.
+      .onChange(of: active, initial: true) { model.inFront = active == .key }
     }
 
     private func keyPress(_ press: KeyPress) -> KeyPress.Result {
