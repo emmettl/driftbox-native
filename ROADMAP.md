@@ -324,7 +324,13 @@ parity point.
    within its travel it reaches the sound through a slot of its own, and only leaving unity or
    coming back to it rebuilds, as the reference's compiler spends a slot only on a pot doing
    something. Each pot is a slider to VoiceOver.
-   Left: the rack as an Audio Unit, and the groovebox as a module in it.
+   Then the rack as an Audio Unit, as the engine is one: the window plays it through
+   `RackAudioUnit` in the app's `AVAudioEngine`, rendering the same host bit for bit, carrying on
+   through the engine stopping and starting on a change of device, and saving and restoring its
+   state as the patch document — what an AUv3 extension will ask of it. It plays at its host's
+   rate and refuses any other, since the rack's audio is decoded at that rate; MIDI as render
+   events and a parameter tree for a host to automate are for the extension itself.
+   Left: the groovebox as a module in the rack.
 
 ## Help and tutorials
 

@@ -107,6 +107,11 @@
     var body: some View {
       HStack(spacing: 10) {
         PatchMenu(model: model)
+        if let failure = model.startFailure {
+          Label("No sound", systemImage: "exclamationmark.triangle.fill")
+            .font(Theme.mono(10)).foregroundStyle(Theme.eight)
+            .help("The rack could not start: \(failure)")
+        }
         Spacer(minLength: 8)
         Button {
           model.toggleRunning()

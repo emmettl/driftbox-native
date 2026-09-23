@@ -42,6 +42,8 @@
     private(set) var loading: Set<String> = []
     /// Why the last file could not be loaded, for the face that asked.
     private(set) var loadFailure: (module: String, reason: String)?
+    /// Why the rack cannot be heard, if its audio unit could not be made.
+    private(set) var startFailure: String?
     /// The Combinator whose routing is open beside the rack. Where the window is, not what the
     /// patch is, so it is never saved.
     private(set) var editingRoutes: String?
@@ -73,7 +75,10 @@
     /// A keyboard for each MIDI channel notes arrive on — the typing keys are channel 1 — so two
     /// controllers on two channels do not steal each other's voices.
     @ObservationIgnored private var keyboards: [Int: RackKeyboard] = [:]
-    @ObservationIgnored private var node: AVAudioSourceNode?
+    @ObservationIgnored private var node: AVAudioUnit?
+    /// The rack's Audio Unit, once it is made, and whether it is being.
+    @ObservationIgnored private(set) var unit: RackAudioUnit?
+    @ObservationIgnored private var attaching = false
     /// Whether anything renders the host. Until something does, nothing drains its command ring,
     /// so nothing is sent to it; whatever is there is loaded the moment something starts to.
     @ObservationIgnored private(set) var live = false
@@ -114,30 +119,44 @@
     /// A small, tempo-synced instrument that plays without a break to load.
     static let firstPatch = "pocket-sequence"
 
-    /// Play through `mixer`'s engine: a source node rendering the host, made once.
+    /// Play through `engine`: the rack's Audio Unit, made once, playing the host. Asynchronous,
+    /// as making an audio unit is; the rack is heard from when it arrives.
     public func attach(to engine: AVAudioEngine) {
-      guard node == nil else { return }
-      let (node, format) = Self.source(host)
-      engine.attach(node)
-      engine.connect(node, to: engine.mainMixerNode, format: format)
-      self.node = node
+      guard unit == nil, !attaching else { return }
+      attaching = true
+      _ = Self.registered
+      AVAudioUnit.instantiate(with: RackAudioUnit.componentDescription, options: []) {
+        [weak self] made, failure in
+        Task { @MainActor in self?.attached(made, failure, to: engine) }
+      }
+    }
+
+    /// The unit registered in this process, once, as the engine's is.
+    private static let registered: Void = AUAudioUnit.registerSubclass(
+      RackAudioUnit.self, as: RackAudioUnit.componentDescription, name: "Driftbox Rack", version: 1)
+
+    private func attached(_ made: AVAudioUnit?, _ failure: Error?, to engine: AVAudioEngine) {
+      attaching = false
+      guard let made, let unit = made.auAudioUnit as? RackAudioUnit else {
+        startFailure = failure?.localizedDescription ?? "its audio unit could not be made"
+        return
+      }
+      unit.host = host
+      unit.restore = { [weak self] document, name in
+        Task { @MainActor in self?.restore(document, name: name) }
+      }
+      engine.attach(made)
+      engine.connect(made, to: engine.mainMixerNode, format: made.outputFormat(forBus: 0))
+      node = made
+      self.unit = unit
+      save()
       listen()
     }
 
-    /// A source node rendering `host`. Made outside the main actor so its render block is not
-    /// taken to belong to it: the block runs on the audio thread, where a check that it was on
-    /// the main one would stop the app.
-    nonisolated private static func source(_ host: RackHost) -> (AVAudioSourceNode, AVAudioFormat) {
-      let format = AVAudioFormat(standardFormatWithSampleRate: host.sampleRate, channels: 2)!
-      let node = AVAudioSourceNode(format: format) { _, _, frames, buffers -> OSStatus in
-        let list = UnsafeMutableAudioBufferListPointer(buffers)
-        guard list.count >= 2, let left = list[0].mData?.assumingMemoryBound(to: Float.self),
-          let right = list[1].mData?.assumingMemoryBound(to: Float.self)
-        else { return noErr }
-        host.render(frames: Int(frames), left: left, right: right)
-        return noErr
-      }
-      return (node, format)
+    /// A state a plug-in host saved, opened as the rack's patch.
+    private func restore(_ document: String, name: String?) {
+      guard let patch = PatchCodec.decode(document) else { return }
+      open(patch, name: name ?? "Untitled")
     }
 
     /// Something renders the host from now on: hand it the patch, the transport and the notes.
@@ -244,6 +263,7 @@
     }
 
     private func save() {
+      unit?.saved.withLock { $0 = (PatchCodec.encode(patch), name) }
       guard let memory else { return }
       memory.set(PatchCodec.encode(patch), forKey: Self.savedKey)
       memory.set(name, forKey: Self.savedNameKey)
