@@ -357,7 +357,8 @@ program on the same machine goes through a loopback port made in Windows MIDI Se
 
 **The app** is `DriftboxWindows`: a window with the song's scene filling it, the controls over it
 — the transport bar, and the step grid to click steps on — the rest of it the performance filter's
-pad, and menus for the rest. Tab hides the controls, to perform.
+pad, and menus for the rest. Tab hides the controls, to perform. The keyboard is an instrument,
+as on the Mac: the number row strikes the drums, the home row plays 303 A, `z` and `x` its octave.
 - **File:** New, Open…, the catalogue, Save and Save As… as `.driftbox`.
 - **Edit:** Undo and Redo, named for the edit.
 - **Transport:** play and stop, sections, the loop, the metronome and the count-in.
