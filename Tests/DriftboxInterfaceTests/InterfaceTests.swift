@@ -224,7 +224,8 @@ struct InterfaceTests {
     let interface = try Self.interface(Self.bassSong(lines: ["303.a", "303.b"]))
     let before = interface.layout
     let grid = try #require(before.grid)
-    #expect(grid.y == before.bar.maxY + Layout.margin, "all the room under the transport")
+    let strip = try #require(before.strip)
+    #expect(grid.y == strip.maxY + Layout.margin, "all the room under the song's strip")
     #expect(before.maxScroll > 0)
 
     #expect(
@@ -300,7 +301,8 @@ struct InterfaceTests {
     let layout = interface.layout
     let panel = try #require(layout.inspector)
     #expect(panel.machine == "TR-909" && panel.title == "Bass Drum")
-    #expect(panel.frame.maxX == layout.bar.maxX && panel.frame.y == layout.bar.maxY + Layout.margin)
+    let strip = try #require(layout.strip)
+    #expect(panel.frame.maxX == layout.bar.maxX && panel.frame.y == strip.maxY + Layout.margin)
     #expect(panel.knobs.map(\.target).prefix(6) == ArraySlice((0..<6).map { KnobTarget.voice("909.bd", $0) }))
     #expect(
       panel.knobs.map(\.target).suffix(3) == [.send("909.bd", 0), .send("909.bd", 1), .swing("909.bd")])
@@ -355,6 +357,56 @@ struct InterfaceTests {
     let swing = try #require(interface.layout.inspector?.knobs.first { $0.target == .swing("909.bd") })
     let song = try #require(session.song)
     #expect(swing.target.format(0.5, in: song) == "· \(Int((song.swing * 100).rounded()))")
+  }
+
+  /// The song with a second pattern, and a chain of the first for two bars, the second for one,
+  /// and the first again.
+  static func chainedSong() -> Song {
+    var song = song()
+    var second = DriftboxSeq.Pattern(id: "q", name: "Break", length: 16)
+    second.tracks["909.bd"] = [StepValue](repeating: .off, count: 16)
+    song.patterns.append(second)
+    song.chain = [ChainStep(pattern: "p", repeat: 2), ChainStep(pattern: "q"), ChainStep(pattern: "p")]
+    return song
+  }
+
+  /// The song is a strip of its sections, each as wide as its bars and coloured by its pattern; a
+  /// press on one plays from its first bar.
+  @Test func theSongIsAStripOfSections() throws {
+    let interface = try Self.interface(Self.chainedSong())
+    let layout = interface.layout
+    #expect(layout.totalBars == 4)
+    let sections = layout.sections
+    #expect(sections.map(\.start) == [0, 2, 3])
+    #expect(sections.map(\.colour) == [0, 1, 0], "the same pattern, the same colour")
+    #expect(sections.map(\.name) == ["Pattern 1", "Break", "Pattern 1"])
+    #expect(abs(sections[0].frame.width - sections[1].frame.width * 2) < 0.01, "as wide as its bars")
+    #expect(layout.x(ofBar: 2) == sections[1].frame.x)
+    #expect(layout.x(ofBar: 2, end: true) == sections[0].frame.maxX, "the end of a section is its own edge")
+    #expect(layout.action(at: Self.centre(sections[1].frame)) == .seek(bar: 2))
+    #expect(layout.panels.contains(try #require(layout.strip)))
+  }
+
+  /// The pattern bar shows the pattern playing, or one chosen; and adds one, which is then shown.
+  @Test func thePatternBarChoosesWhatIsShown() throws {
+    let interface = try Self.interface(Self.chainedSong())
+    let session = interface.session
+    func chip(_ label: String) -> Layout.Chip? { interface.layout.patternChips.first { $0.label == label } }
+    #expect(chip("FOLLOW")?.isOn == true)
+    #expect(chip("Pattern 1")?.isOn == true, "the one playing, followed")
+
+    Self.click(interface, Self.centre(try #require(chip("Break")).frame))
+    #expect(session.editing == "q")
+    #expect(session.shownPattern?.id == "q")
+    #expect(chip("FOLLOW")?.isOn == false && chip("Break")?.isOn == true)
+
+    Self.click(interface, Self.centre(try #require(chip("FOLLOW")).frame))
+    #expect(session.editing == nil)
+
+    Self.click(interface, Self.centre(try #require(chip("+")).frame))
+    #expect(session.song?.patterns.count == 3)
+    #expect(session.editing == session.song?.patterns.last?.id, "shown, to be worked on")
+    #expect(session.undoTitle == "Undo Add Pattern")
   }
 
   /// Narrow, the columns keep to a size that can still be hit; wide, they stop growing.

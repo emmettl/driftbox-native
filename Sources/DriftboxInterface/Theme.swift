@@ -32,6 +32,12 @@ public enum Theme {
   public static let accentFill = (top: Colour(0xfff3a8), foot: three)
   public static let accentGlow = Colour(0xffbe46)
 
+  /// A pattern's colour on the song strip, by the order it first comes in the song.
+  public static func patternColour(_ index: Int) -> Colour {
+    let palette = [eight, nine, three, violet, Colour(0x6aa8ff), Colour(0xff8a6a)]
+    return palette[index % palette.count]
+  }
+
   /// White at `alpha`, which is most of what a panel's detail is drawn in.
   public static func white(_ alpha: Float) -> Colour { Colour(0xffffff, alpha: alpha) }
 
