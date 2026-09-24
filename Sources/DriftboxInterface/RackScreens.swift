@@ -27,6 +27,7 @@ extension RackInterface {
       case "sampler": drawSampleScreen(screen, face: face, on: canvas)
       case "audio-track": drawTrackScreen(screen, face: face, on: canvas)
       case "multisampler": drawAtlasScreen(screen, face: face, on: canvas)
+      case "groovebox": drawGroovebox(screen, face: face, on: canvas)
       default: break
       }
     }

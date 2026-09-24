@@ -57,6 +57,8 @@ public final class Desktop {
     self.session = session
     self.rack = rack
     rackInterface = rack.map(RackInterface.init)
+    // The rack lets go of a song it had linked here, as when another patch is opened in it.
+    rack?.onUnlinkSong = { [weak session] in session?.unlinkRack() }
     self.window = window
     self.device = device
     self.surface = surface
@@ -233,6 +235,10 @@ public final class Desktop {
     case DesktopMenus.redo: if showsRack, let rack { rack.redo() } else { session.redo() }
     case DesktopMenus.toggle: if showsRack, let rack { rack.toggleRunning() } else { session.toggle() }
     case DesktopMenus.showRack: setShowsRack(!showsRack)
+    case DesktopMenus.rackSongFromGroovebox:
+      guard let song = session.song else { return }
+      rack?.openSong(song, name: session.documentName)
+      setShowsRack(true)
     case DesktopMenus.rackBack: if showsRack { rack?.flip() }
     case DesktopMenus.start: session.seek(toStep: 0)
     case DesktopMenus.previousSection: session.skip(sections: -1)
@@ -256,6 +262,13 @@ public final class Desktop {
   /// The commands that carry what they are about in their id: a song, a scene, a device, a source,
   /// a destination.
   func performNamed(_ id: String) {
+    if let songID = DesktopMenus.value(id, after: DesktopMenus.rackSongPrefix) {
+      guard let entry = session.entries.first(where: { $0.id == songID }), let song = Catalogue.song(songID)
+      else { return }
+      rack?.openSong(song, name: entry.name)
+      setShowsRack(true)
+      return
+    }
     if let patchID = DesktopMenus.value(id, after: DesktopMenus.patchPrefix) {
       guard let entry = PatchEntry.all.first(where: { $0.id == patchID }) else { return }
       rack?.open(entry)

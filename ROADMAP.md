@@ -565,9 +565,11 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    Explorer, and a song dropped where no face takes it opens — and the window now drains the main
    dispatch queue each frame, so `@MainActor` work that awaits, as loading a file does, finishes.
    The Multisampler's Key Atlas has its map of zones by key and velocity and the chosen zone's
-   notes, velocities and loop, dragged, a set chosen several files at once or dropped. Next: the
-   groovebox and the Combinator's routing editor, which show as the generic face or not at all
-   until then.
+   notes, velocities and loop, dragged, a set chosen several files at once or dropped. The Groovebox
+   has its strips, meters and arrangement, each section played from or looped; a song comes into
+   the rack from Rack ▸ Groovebox Songs, and Edit in Groovebox opens it in the groovebox, linked,
+   so each edit there plays on in the rack. Every module the reference builds a face for has its
+   own now. Next: the Combinator's routing editor.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift

@@ -33,6 +33,8 @@ public final class RackInterface {
   private var menuRequest: (menu: Menu, at: SIMD2<Float>)?
   /// The module a press asked to choose a file for, which the window asks with a panel of its own.
   private var fileRequest: String?
+  /// A face asked for the rack's song to be opened in the groovebox, to edit it there.
+  private var songRequest = false
   var menuActions: [String: () -> Void] = [:]
   var menuDisabled: Set<String> = []
   /// On the back: what a press there is doing, and where the pointer is, in the rack's design space.
@@ -246,6 +248,18 @@ public final class RackInterface {
       fileRequest = module
     case .sampleBars(let bars):
       rack.setSampleBars(module, bars)
+    case .editSong:
+      songRequest = true
+    case .startSong(let bar):
+      rack.startSong(atBar: bar)
+    case .loopSong(let start, let bars):
+      if let loop = rack.songLoop, loop.start == start, loop.bars == bars {
+        rack.clearSongLoop()
+      } else {
+        rack.loopSong(start: start, bars: bars)
+      }
+    case .clearLoop:
+      rack.clearSongLoop()
     case .learn(let param):
       if pressModifiers.contains(.shift) {
         rack.clearCcBinding(module, param)
@@ -282,6 +296,12 @@ public final class RackInterface {
   public func takeFileRequest() -> String? {
     defer { fileRequest = nil }
     return fileRequest
+  }
+
+  /// Whether a face asked, since last asked, for the rack's song to be edited in the groovebox.
+  public func takeSongRequest() -> Bool {
+    defer { songRequest = false }
+    return songRequest
   }
 
   /// Whether the module takes several files at once, as a Multisampler takes a set.

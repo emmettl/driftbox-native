@@ -365,6 +365,35 @@ struct DesktopTests {
     }
   }
 
+  /// A groovebox song goes into the rack from the Rack menu, and is edited in the groovebox, linked,
+  /// with the groovebox shown again; another patch in the rack lets it go.
+  @Test func aRacksSongIsEditedInTheGroovebox() throws {
+    for device in try Self.devices() {
+      let window = StandInWindow()
+      let desktop = try Desktop(
+        session: Session(host: EngineHost(sampleRate: 48000)), window: window, device: device,
+        surface: StandInSurface(device: device, width: 320, height: 180), typesetter: NoTypesetter(),
+        rack: RackSession())
+      let rack = try #require(desktop.rack)
+      let entry = try #require(desktop.session.entries.first)
+      #expect(window.commandIDs.contains(DesktopMenus.rackSongPrefix + entry.id))
+      #expect(!window.commandIDs.contains(DesktopMenus.rackSongFromGroovebox), "no song in the groovebox")
+
+      window.choose(DesktopMenus.rackSongPrefix + entry.id)
+      #expect(rack.song != nil && rack.name == entry.name && desktop.showsRack)
+      desktop.editRackSong()
+      try desktop.drawFrame()
+      #expect(rack.songLinked && desktop.session.linkedToRack && !desktop.showsRack)
+      #expect(window.title == "\(entry.name) - Driftbox")
+      #expect(!window.commandIDs.contains(DesktopMenus.rackSongFromGroovebox), "it is the rack's already")
+
+      window.choose(DesktopMenus.patchPrefix + "acid")
+      #expect(!desktop.session.linkedToRack && !rack.songLinked, "another patch lets the song go")
+      try desktop.drawFrame()
+      #expect(window.commandIDs.contains(DesktopMenus.rackSongFromGroovebox))
+    }
+  }
+
   /// With a rack, the Rack menu shows it in the groovebox's place and opens its patches; while it
   /// shows, the window's title, its Edit menu, its Space and its pointer are the rack's; and the
   /// groovebox comes back as it was. Without one, there is no Rack menu.
