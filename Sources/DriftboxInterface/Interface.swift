@@ -5,6 +5,11 @@ import DriftboxSession
 import DriftboxShell
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Driftbox's controls, drawn on a canvas over the scene: the transport along the top, and the step
 /// grid for the pattern the transport is in, or the one chosen to edit. The same on every platform;
 /// it reads the session and edits it, and knows nothing of windows but the pointer.
@@ -294,7 +299,7 @@ public final class Interface {
       canvas.align = .right
       canvas.font = Theme.mono(14, weight: 600)
       canvas.fill = Theme.three
-      let text = String(format: "%.1f", followed)
+      let text = KnobSpec.tenths(followed)
       let width = canvas.measure(text)
       canvas.fillText(text, right - 12, baseline + 1)
       canvas.font = Theme.mono(8.5, weight: 500)

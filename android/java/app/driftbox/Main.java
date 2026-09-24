@@ -12,20 +12,24 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.Choreographer;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.TextView;
-import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * The app, so far: a song played, with the scene it names drawn from it over the whole screen, and
- * the screen a pad for the performance filter. Two fingers tapped step on to the next scene. Out of
+ * The app, so far: a song played, with the scene it names drawn from it over the whole screen, the
+ * controls over it, and the rest of the screen a pad for the performance filter. A second finger
+ * tapped while one is on the pad steps on to the next scene. Out of
  * view, or with the screen off, the song plays on, through {@link Playback}; it pauses for a call
  * or another app's playing, as media does. Which song and which scene are extras, a catalogue id
  * and a scene's:
@@ -71,15 +75,31 @@ public final class Main extends Activity {
   // the big cores for it.
   @Override
   protected void onStop() {
-    if (playing) Native.setDrawing(false);
+    if (playing) {
+      Choreographer.getInstance().removeFrameCallback(frames);
+      Native.setDrawing(false);
+    }
     super.onStop();
   }
 
   @Override
   protected void onStart() {
     super.onStart();
-    if (playing) Native.setDrawing(true);
+    if (playing) {
+      Native.setDrawing(true);
+      Choreographer.getInstance().postFrameCallback(frames);
+    }
   }
+
+  /** A frame for every refresh of the display, drawn on this thread, while the app is in view. */
+  private final Choreographer.FrameCallback frames =
+      new Choreographer.FrameCallback() {
+        @Override
+        public void doFrame(long nanos) {
+          Native.frame();
+          Choreographer.getInstance().postFrameCallback(this);
+        }
+      };
 
   @Override
   protected void onDestroy() {
@@ -93,19 +113,19 @@ public final class Main extends Activity {
     super.onDestroy();
   }
 
-  // MARK: - Pulse
+  // MARK: - Playing
 
   private void play(String song, String scene) {
-    String json;
+    File resources;
     try {
-      json = asset("songs/" + song + ".song.json");
+      resources = unpack();
     } catch (IOException e) {
-      Log.e(TAG, "no song called " + song + ": " + e);
+      Log.e(TAG, "could not unpack the catalogue: " + e);
       finish();
       return;
     }
-    if (!Native.start(json, scene, getResources().getDisplayMetrics().density)) {
-      Log.e(TAG, song + " is not a song");
+    if (!Native.start(song, scene, getResources().getDisplayMetrics().density, resources.getPath())) {
+      Log.e(TAG, "no song called " + song + " in the catalogue");
       finish();
       return;
     }
@@ -152,22 +172,33 @@ public final class Main extends Activity {
             Native.surfaceDestroyed();
           }
         });
+    // Every finger, in points, to Swift, which decides what each is: the controls', the pad's, or
+    // a gesture's.
+    float density = getResources().getDisplayMetrics().density;
     view.setOnTouchListener(
         (touched, event) -> {
           int action = event.getActionMasked();
-          // A second finger down, while the first is: the next scene. The first stays the pad's.
-          if (action == MotionEvent.ACTION_POINTER_DOWN && event.getPointerCount() == 2) {
-            Native.nextScene();
-            return true;
+          switch (action) {
+            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_POINTER_DOWN:
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_POINTER_UP: {
+              int index = event.getActionIndex();
+              int phase = action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN ? 0 : 2;
+              Native.touch(event.getPointerId(index), phase, event.getX(index) / density,
+                  event.getY(index) / density);
+              break;
+            }
+            case MotionEvent.ACTION_MOVE:
+            case MotionEvent.ACTION_CANCEL:
+              for (int index = 0; index < event.getPointerCount(); index++) {
+                Native.touch(event.getPointerId(index), action == MotionEvent.ACTION_MOVE ? 1 : 3,
+                    event.getX(index) / density, event.getY(index) / density);
+              }
+              break;
+            default:
+              break;
           }
-          if (action == MotionEvent.ACTION_POINTER_DOWN || action == MotionEvent.ACTION_POINTER_UP) {
-            return true;
-          }
-          boolean down = action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL;
-          // 0...1 from the bottom left, as the engine's pad and Pulse both take it.
-          float x = Math.max(0, Math.min(1, event.getX() / touched.getWidth()));
-          float y = Math.max(0, Math.min(1, 1 - event.getY() / touched.getHeight()));
-          Native.touch(x, y, down);
           return true;
         });
     setContentView(view);
@@ -195,12 +226,27 @@ public final class Main extends Activity {
     }
   }
 
-  private String asset(String path) throws IOException {
-    try (InputStream in = getAssets().open(path)) {
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
+  /**
+   * The session's resources — the catalogue and its songs — copied out of the package into a
+   * directory of the app's own, since Swift reads them as files, and where. Copied every time the
+   * app starts: they are small, and a package updated in place brings new ones.
+   */
+  private File unpack() throws IOException {
+    File resources = new File(getFilesDir(), "Resources");
+    copy("Resources", resources);
+    return resources;
+  }
+
+  private void copy(String asset, File to) throws IOException {
+    String[] inside = getAssets().list(asset);
+    if (inside != null && inside.length > 0) {
+      to.mkdirs();
+      for (String name : inside) copy(asset + "/" + name, new File(to, name));
+      return;
+    }
+    try (InputStream in = getAssets().open(asset); OutputStream out = new FileOutputStream(to)) {
       byte[] buffer = new byte[16384];
       for (int read; (read = in.read(buffer)) > 0; ) out.write(buffer, 0, read);
-      return new String(out.toByteArray(), StandardCharsets.UTF_8);
     }
   }
 

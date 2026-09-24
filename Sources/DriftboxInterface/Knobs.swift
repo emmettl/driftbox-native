@@ -40,6 +40,14 @@ public struct KnobSpec: Sendable {
     { $0 == 0 ? zero : percent($0) }
   }
 
+  /// `value` to one decimal place, as `%.1f` writes it. Worked out here rather than with
+  /// `String(format:)`, which reads a locale, and on Android brings the old Foundation and its
+  /// thirty megabytes of internationalisation with it.
+  public static func tenths(_ value: Double) -> String {
+    let tenths = Int((abs(value) * 10).rounded())
+    return "\(value < 0 && tenths != 0 ? "-" : "")\(tenths / 10).\(tenths % 10)"
+  }
+
   /// The master path, in `FxParams.names` order, each in its own units: a filter in hertz, a delay
   /// in sixteenths because that is what it snaps to, a reverb in seconds.
   public static let fx: [KnobSpec] = [
@@ -54,7 +62,7 @@ public struct KnobSpec: Sendable {
     KnobSpec(label: "Time", format: { "\(delayDivision($0))/16" }),
     KnobSpec(label: "F.back"),
     KnobSpec(label: "Tone"),
-    KnobSpec(label: "Size", format: { String(format: "%.1fs", 0.3 + $0 * 3.5) }),
+    KnobSpec(label: "Size", format: { "\(tenths(0.3 + $0 * 3.5))s" }),
     KnobSpec(label: "Damp"),
   ]
 

@@ -138,6 +138,14 @@ let package = Package(
         "DriftboxCanvas", "DriftboxDocument", "DriftboxGPU", "DriftboxHost", "DriftboxInterface",
         "DriftboxScenes", "DriftboxSession", "DriftboxShell", "DriftboxText",
       ]),
+    // Driftbox on a touch screen: the scene, the controls over it, the pad, fingers. The same on every
+    // platform with one; Android's app hands it its parts, and iOS's will.
+    .target(
+      name: "DriftboxTouch",
+      dependencies: [
+        "DriftboxCanvas", "DriftboxGPU", "DriftboxHost", "DriftboxInterface", "DriftboxScenes",
+        "DriftboxSession", "DriftboxShell", "DriftboxText",
+      ]),
     // Driftbox for Windows: Windows' parts, chosen, and handed to `Desktop`.
     .executableTarget(
       name: "DriftboxWindows",
@@ -232,6 +240,14 @@ let package = Package(
         "DriftboxSession", "DriftboxShell", "DriftboxText", "DriftboxGPUD3D11", "DriftboxGPUMetal",
         "DriftboxGPUGLES",
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
+      ]),
+    .testTarget(
+      name: "DriftboxTouchTests",
+      dependencies: [
+        "DriftboxGPU", "DriftboxHost", "DriftboxSession", "DriftboxShell", "DriftboxText", "DriftboxTouch",
+        .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxGPUMetal", condition: .when(platforms: [.macOS, .iOS])),
+        .target(name: "DriftboxGPUGLES", condition: .when(platforms: [.linux])),
       ]),
     .testTarget(
       name: "DriftboxTextTests",

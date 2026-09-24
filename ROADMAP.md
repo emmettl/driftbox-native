@@ -606,6 +606,15 @@ under the views: the layouts' arithmetic (as `RackLayout` already is, though it 
 `DriftboxApp` today), hit targets, each gesture as a small state machine, and undo. That lives
 below the views, in a target both platforms build, and is tested once.
 
+Begun on the drawn layer, since the desktop's interface arrived there first: `DriftboxInterface`
+is drawn on the canvas in points and takes pointers, and `DriftboxTouch`'s `Touchscreen` puts it,
+the session and the scene together for a touch screen, as `Desktop` does for a window. The Android
+app is that now, and the desktop's layout on a phone's 372 points says what the design has to
+answer: ten of a pattern's sixteen steps fit across and the rest cannot be reached, a step is 22
+points wide where a finger wants 44, the 303's notes are rows 7 points high, the grid scrolls only
+with a wheel, and a context menu is a right click. Drawing the controls over the scene costs a
+frame now and then at 120 a second.
+
 ### What Milestone 5 asks of Milestone 4
 
 - **The GPU layer takes a third backend** without its protocol changing. Nothing goes in it that

@@ -29,13 +29,14 @@ final class Native {
   static native String sceneCheck(int width, int height, float density);
 
   /**
-   * Play a song document, and draw a scene from it in whatever window it is given: the one called
-   * {@code scene}, or the one the song names when that is null.
+   * Play the catalogue's song {@code song}, and draw a scene from it, with the controls over it, in
+   * whatever window it is given: the scene called {@code scene}, or the one the song names when that
+   * is null. {@code resources} is the directory {@link Main} unpacked the catalogue and its songs into.
    */
-  static native boolean start(String json, String scene, float density);
+  static native boolean start(String song, String scene, float density, String resources);
 
-  /** Show the next scene there is. */
-  static native void nextScene();
+  /** A frame, drawn now: the {@code Choreographer}'s, once for each refresh of the display. */
+  static native void frame();
 
   /** Stop playing and drawing, and wait until both have. */
   static native void stop();
@@ -52,8 +53,11 @@ final class Native {
   /** Stop drawing in the window, having let go of it by the time this returns. */
   static native void surfaceDestroyed();
 
-  /** A finger at x, y, 0...1 from the bottom left, down or lifted. */
-  static native void touch(float x, float y, boolean down);
+  /**
+   * A finger, {@code id} as Android numbers it, at x, y in points from the top left: {@code phase}
+   * 0 down, 1 moved, 2 lifted, 3 taken away.
+   */
+  static native void touch(int id, int phase, float x, float y);
 
   /** Once a second, on the main thread: housekeeping, and a line for the log. */
   static native String tick();
