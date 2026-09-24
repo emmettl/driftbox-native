@@ -229,6 +229,7 @@ public final class Desktop {
     case DesktopMenus.redo: if showsRack, let rack { rack.redo() } else { session.redo() }
     case DesktopMenus.toggle: if showsRack, let rack { rack.toggleRunning() } else { session.toggle() }
     case DesktopMenus.showRack: setShowsRack(!showsRack)
+    case DesktopMenus.rackBack: if showsRack { rack?.flip() }
     case DesktopMenus.start: session.seek(toStep: 0)
     case DesktopMenus.previousSection: session.skip(sections: -1)
     case DesktopMenus.nextSection: session.skip(sections: 1)
@@ -302,6 +303,7 @@ public final class Desktop {
     case DesktopMenus.songsScene: return chosenScene == nil
     case DesktopMenus.controls: return interface.isShowing
     case DesktopMenus.showRack: return showsRack
+    case DesktopMenus.rackBack: return rack?.flipped == true
     case DesktopMenus.systemOutput: return session.outputDevice == nil
     case DesktopMenus.listen: return session.listensToMIDI
     case DesktopMenus.followClock: return session.followsClock

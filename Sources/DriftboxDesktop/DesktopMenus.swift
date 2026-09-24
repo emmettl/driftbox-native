@@ -30,6 +30,7 @@ public enum DesktopMenus {
   public static let songsScene = "view.songsScene"
   public static let controls = "view.controls"
   public static let showRack = "rack.show"
+  public static let rackBack = "rack.back"
   public static let systemOutput = "audio.system"
   public static let listen = "midi.listen"
   public static let followClock = "midi.followClock"
@@ -92,7 +93,11 @@ public enum DesktopMenus {
         Menu(
           "View",
           [
-            .command("Show Controls", id: controls, shortcut: Shortcut(.tab, [])),
+            // Tab turns the rack round while it shows, as it does on the Mac; the controls are the
+            // groovebox's.
+            showsRack
+              ? .command("Show Back", id: rackBack, shortcut: Shortcut(.tab, []))
+              : .command("Show Controls", id: controls, shortcut: Shortcut(.tab, [])),
             .separator,
             .command("Next Scene", id: nextScene, shortcut: Shortcut(.right)),
             .command("Previous Scene", id: previousScene, shortcut: Shortcut(.left)),

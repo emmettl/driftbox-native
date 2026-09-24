@@ -544,8 +544,13 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    groovebox, and Rack ▸ Show Rack (Ctrl+R) puts it in the groovebox's place, drawn on the canvas
    by `RackInterface` — a header with its transport, tempo, keys and Add, and every module's front
    where `RackLayout` puts it, with a knob, buttons or a stepper for each param, a menu each, and
-   the keys playing it as the Mac's do. Next: the back, its jacks and cables and patching; then the
-   faces the reference builds by hand, which show as the generic face until then.
+   the keys playing it as the Mac's do. BACK in its header, or Tab, turns it round: every module's
+   bay with its jacks, inlets teal and outlets amber, and the cables hanging between them and
+   swinging as it turns. A cable is drawn from a jack to another of the other side, from either
+   end, and snaps; the × by an inlet or a click on a cable's belly pulls it out; each inlet's trim
+   pot is dragged, finer with Shift, and pressed twice back to unity; and a bay is dragged to move
+   its module. Next: the faces the reference builds by hand, which show as the generic face until
+   then.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift

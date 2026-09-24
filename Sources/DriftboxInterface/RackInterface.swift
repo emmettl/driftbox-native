@@ -33,6 +33,11 @@ public final class RackInterface {
   private var menuRequest: (menu: Menu, at: SIMD2<Float>)?
   var menuActions: [String: () -> Void] = [:]
   var menuDisabled: Set<String> = []
+  /// On the back: what a press there is doing, and where the pointer is, in the rack's design space.
+  var back: BackGesture?
+  var backPointer: SIMD2<Float>?
+  /// A trim pot let go of without turning, and when: a second, soon after, puts it back to unity.
+  var lastPotTap: (jack: String, at: ContinuousClock.Instant)?
 
   public init(rack: RackSession) {
     self.rack = rack
@@ -52,6 +57,11 @@ public final class RackInterface {
     case .began:
       let stage = stage
       let target = stage.target(at: event.location)
+      // The back is its own: patching, trimming, carrying modules. The header is still the header.
+      if rack.flipped, stage.area.contains(event.location) {
+        beginBack(at: event.location, pointer: event.id, stage: stage)
+        return
+      }
       pressed = (event.id, target)
       switch target {
       case .knob(let module, let param):
@@ -67,6 +77,10 @@ public final class RackInterface {
         break
       }
     case .moved:
+      if back != nil {
+        moveBack(to: event.location, modifiers: event.modifiers)
+        return
+      }
       guard var turn = turning, turn.pointer == event.id else { return }
       let fine = event.modifiers.contains(.option)
       let rise = Double(turn.fromY - event.location.y)
@@ -86,6 +100,10 @@ public final class RackInterface {
       }
       turning = turn
     case .ended:
+      if back != nil {
+        endBack(at: event.location)
+        return
+      }
       guard let press = pressed, press.pointer == event.id else { return }
       pressed = nil
       if let turn = turning, turn.pointer == event.id {
@@ -96,6 +114,8 @@ public final class RackInterface {
       }
     case .cancelled:
       pressed = nil
+      back = nil
+      backPointer = nil
       if turning != nil { rack.endTurn() }
       turning = nil
     }
@@ -130,6 +150,7 @@ public final class RackInterface {
   private func perform(_ target: RackTarget, at point: SIMD2<Float>) {
     switch target {
     case .run: rack.toggleRunning()
+    case .flip: rack.flip()
     case .add: menuRequest = (addMenu(), point)
     case .option(let module, let param, let value): rack.set(module, param, to: Double(value))
     case .step(let module, let param, let by):
@@ -286,7 +307,11 @@ public final class RackInterface {
     canvas.translate(stage.origin.x, stage.origin.y)
     canvas.scale(stage.scale, stage.scale)
     let hovered = hover.flatMap { stage.area.contains($0) ? stage.design($0) : nil }
-    for face in stage.faces { drawFace(face, hovered: hovered, on: canvas) }
+    if rack.flipped {
+      drawBack(stage, on: canvas)
+    } else {
+      for face in stage.faces { drawFace(face, hovered: hovered, on: canvas) }
+    }
     canvas.restore()
     drawHeader(stage, on: canvas)
   }
