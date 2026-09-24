@@ -407,8 +407,10 @@ public final class Session {
 
   private func restoreSong() {
     guard let memory else { return }
-    if let url = rememberedFile(in: memory) {
-      if take(file: url) { return }
+    // Whether a document was remembered is asked apart from where it is now: one whose bookmark no
+    // longer resolves, because the file has gone, is still one to forget.
+    if memory.object(forKey: SessionDefaults.lastFile) != nil {
+      if let url = rememberedFile(in: memory), take(file: url) { return }
       memory.removeObject(forKey: SessionDefaults.lastFile)
     } else if let id = memory.string(forKey: SessionDefaults.lastSong),
       let entry = entries.first(where: { $0.id == id }), let loaded = Catalogue.song(id)
