@@ -822,9 +822,29 @@ public final class Interface {
     canvas.align = .left
     canvas.font = Theme.mono(9, weight: 500)
     canvas.fill = Theme.dim
-    canvas.fillText("SONG", strip.x + 14, strip.y + 17)
-    canvas.align = .right
-    canvas.fillText("\(layout.totalBars) bars", strip.maxX - 14, strip.y + 17)
+    if layout.compact {
+      // On a phone the head holds the tempo and the swing, the song's length beside its name.
+      let middle = strip.y + Layout.phoneStripHead / 2 + 3
+      canvas.fillText("SONG  \(layout.totalBars) bars", strip.x + 14, middle)
+      if let song = session.song {
+        for number in layout.numbers {
+          drawNumber(number, song: song, on: canvas)
+        }
+        if let followed = session.followedBPM, let swing = layout.numbers.first {
+          canvas.align = .right
+          canvas.font = Theme.mono(14, weight: 600)
+          canvas.fill = Theme.three
+          canvas.fillText(KnobSpec.tenths(followed), swing.cell.x - 12, middle + 1)
+          canvas.font = Theme.mono(8.5, weight: 500)
+          canvas.fill = Theme.dim
+          canvas.fillText("EXT", swing.cell.x - 64, middle)
+        }
+      }
+    } else {
+      canvas.fillText("SONG", strip.x + 14, strip.y + 17)
+      canvas.align = .right
+      canvas.fillText("\(layout.totalBars) bars", strip.maxX - 14, strip.y + 17)
+    }
 
     let bar = session.position?.bar ?? -1
     let step = session.position?.step ?? 0

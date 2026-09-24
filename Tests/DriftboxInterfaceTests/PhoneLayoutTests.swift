@@ -92,6 +92,28 @@ struct PhoneLayoutTests {
     #expect(!interface.performing, "and the chip in the corner brings the controls back")
   }
 
+  /// The tempo and the swing, which the transport has no room for, in the strip's head, at a
+  /// finger's height and clear of the sections; dragged up, the tempo goes up.
+  @Test func theTempoAndSwingAreInTheStrip() throws {
+    let interface = try Self.phone()
+    let layout = interface.layout
+    let strip = try #require(layout.strip)
+    let sections = try #require(layout.sectionsFrame)
+    #expect(layout.numbers.map(\.target) == [.tempo, .songSwing])
+    for number in layout.numbers {
+      let cell = number.cell
+      #expect(cell.x >= strip.x && cell.maxX <= strip.maxX && cell.y >= strip.y, "in the strip: \(cell)")
+      #expect(cell.maxY <= sections.y, "above its sections")
+      #expect(cell.height >= 30 && cell.width >= 80, "a finger's size: \(cell)")
+    }
+    let tempo = try #require(layout.numbers.first).cell
+    let from = SIMD2(tempo.x + tempo.width / 2, tempo.y + tempo.height / 2)
+    interface.pointer(Self.finger(.began, from))
+    interface.pointer(Self.finger(.moved, from - SIMD2(0, 20)))
+    interface.pointer(Self.finger(.ended, from - SIMD2(0, 20)))
+    #expect(interface.session.song?.bpm == 130, "twenty points up, ten beats a minute faster")
+  }
+
   @Test func aDesktopIsUnchanged() throws {
     let layout = try InterfaceTests.interface().layout
     #expect(!layout.compact && layout.pageChips.isEmpty)

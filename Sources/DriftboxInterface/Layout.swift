@@ -195,6 +195,9 @@ public struct Layout {
   public static let compactWidth: Float = 600
   /// A lane's name above its steps, on a phone.
   public static let nameHeight: Float = 16
+  /// The strip's head on a phone, above its sections: tall enough for the tempo and the swing to
+  /// be dragged with a finger.
+  public static let phoneStripHead: Float = 38
 
   public var size: SIMD2<Float>
   /// Whether this is a phone's layout.
@@ -204,7 +207,8 @@ public struct Layout {
   /// Where the song's name and the transport's readout go, between the chips.
   public var title: Rect
   public var readout: Rect
-  /// The numbers dragged in the readout: the tempo, unless an outside clock sets it, and the swing.
+  /// The numbers dragged in the readout, or on a phone in the strip's head: the tempo, unless an
+  /// outside clock sets it, and the swing.
   public var numbers: [Knob] = []
 
   /// The song's strip under the transport, and its sections, or nil with no song.
@@ -334,9 +338,20 @@ public struct Layout {
     // Inside the grid's panel: less on a phone, where every point across is a step's.
     let inset: Float = compact ? 6 : Self.inset
     guard let song = session.song else { return }
-    let strip = Rect(margin, bar.maxY + margin, bar.width, Self.stripHeight)
+    // On a phone the tempo and swing, which the transport has no room for, are in the strip's head,
+    // at a finger's height, and the strip is that much taller.
+    let stripHead: Float = compact ? Self.phoneStripHead : 26
+    let strip = Rect(margin, bar.maxY + margin, bar.width, Self.stripHeight + stripHead - 26)
     self.strip = strip
-    let sectionsFrame = Rect(strip.x + 14, strip.y + 26, max(0, strip.width - 28), 24)
+    if compact {
+      let swing = Rect(strip.maxX - 8 - 84, strip.y + 5, 84, stripHead - 8)
+      numbers.append(Knob(target: .songSwing, dial: swing, cell: swing))
+      if session.followedBPM == nil {
+        let tempo = Rect(swing.x - 4 - 84, swing.y, 84, swing.height)
+        numbers.insert(Knob(target: .tempo, dial: tempo, cell: tempo), at: 0)
+      }
+    }
+    let sectionsFrame = Rect(strip.x + 14, strip.y + stripHead, max(0, strip.width - 28), 24)
     self.sectionsFrame = sectionsFrame
     (sections, totalBars) = Self.sections(of: song, in: sectionsFrame)
     let below = strip.maxY + margin
