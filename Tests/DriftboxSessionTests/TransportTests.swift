@@ -140,4 +140,24 @@ struct TransportTests {
       #expect(session.followedBPM == nil)
     }
   }
+
+  /// A tempo kept elsewhere — an app the groovebox plays inside, a clock — is the engine's through
+  /// an edit, which reloads the song, and not only the timeline's.
+  @Test func aFollowedTempoOutlastsAnEdit() throws {
+    try withTemporaryDirectory { directory in
+      let (session, host) = try openedSession(steadySong(bpm: 120), in: directory)
+      session.follow(bpm: 240)
+      session.edit { $0.patterns[0].tracks["909.sd"] = [StepValue](repeating: .on, count: 16) }
+      #expect(session.tempo == 240)
+      // A quarter of a second, which is four sixteenths at 240 and two at the song's own 120: each
+      // a kick and a snare, as the engine struck them.
+      let start = host.engineFrame.load(ordering: .relaxed)
+      renderAudio(host, frames: 12000)
+      var hits = 0
+      while let event = host.nextEvent() {
+        if event.kind == .hit, event.frame - start < 12000 { hits += 1 }
+      }
+      #expect(hits == 8)
+    }
+  }
 }

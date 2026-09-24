@@ -3,38 +3,37 @@
   import AVFoundation
   import Synchronization
 
-  /// The rack as an Audio Unit: a stereo instrument with no inputs, as the engine's is — what an
-  /// app hosts in an `AVAudioEngine`, and what the AUv3 extension carries into other apps.
+  /// One of Driftbox's instruments as an Audio Unit — the rack, the groovebox — stereo with no
+  /// inputs, as an AUv3 extension carries it into other apps. What the two share is here; each is a
+  /// subclass that says which it is and what it plays.
   ///
-  /// It plays a `RackHost` it is given rather than one of its own, because the host is where the
-  /// rack's owner keeps what it has loaded: patches, and audio decoded and breaks rendered at the
-  /// host's rate. So the unit plays at that rate and no other, and says so to anyone who asks for
-  /// a different one, rather than playing every sample at the wrong pitch — unless its owner makes
-  /// the host at whatever rate it is asked for, which `prepare` is for.
+  /// It plays a `RenderSource` it is given rather than a host of its own, because the host is
+  /// where the instrument's owner keeps what it has loaded: songs and patches, and audio decoded and
+  /// breaks rendered at the host's rate. So the unit plays at that rate and no other, and says so to
+  /// anyone who asks for a different one, rather than playing every sample at the wrong pitch —
+  /// unless its owner makes the host at whatever rate it is asked for, which `prepare` is for.
   ///
   /// What an app loading it says reaches the owner off the render thread: the MIDI in its render
   /// events, through a ring; its tempo and whether its transport is moving, read as each block is
   /// rendered; and the preset it chose. The render block captures one pointer and nothing else.
-  public final class RackAudioUnit: AUAudioUnit {
-    public static let componentDescription = AudioComponentDescription(
-      componentType: kAudioUnitType_MusicDevice, componentSubType: 0x6472_636B,  // 'drck'
-      componentManufacturer: 0x4472_6662,  // 'Drfb': an OSType of all lower case is Apple's
-      componentFlags: 0, componentFlagsMask: 0)
-
-    /// What it plays. Setting it sets the output's rate to the host's.
-    public var host: RackHost? {
+  public class InstrumentAudioUnit: AUAudioUnit {
+    /// What it plays. Setting it sets the output's rate to the source's.
+    public var source: RenderSource? {
       didSet {
-        shared.pointee.host = host
-        if let host, host.sampleRate != outputBus.format.sampleRate,
-          let format = AVAudioFormat(standardFormatWithSampleRate: host.sampleRate, channels: 2)
+        shared.pointee.target = source.map { Shared.Target(context: $0.context, render: $0.render) }
+        if let source, source.sampleRate != outputBus.format.sampleRate,
+          let format = AVAudioFormat(standardFormatWithSampleRate: source.sampleRate, channels: 2)
         {
           try? outputBus.setFormat(format)
         }
       }
     }
 
-    /// The patch as a document, and its name, for a host saving the unit's state: kept by the
-    /// rack's owner, who knows how a patch is written, as it changes.
+    /// The key a saved state keeps the document under: what kind of document it is.
+    class var documentKey: String { "document" }
+
+    /// The document the instrument plays, and its name, for a host saving the unit's state: kept by
+    /// the owner, who knows how one is written, as it changes.
     public let saved = Mutex<(document: String, name: String)?>(nil)
     /// A host restoring a state it saved: the document to open, and its name if it had one.
     /// Called on whatever thread the host restores from.
@@ -51,10 +50,15 @@
     public var choosePreset: ((Int) -> Void)?
     private var chosen: AUAudioUnitPreset?
 
-    /// What the render block reads and writes, at an address that does not move: the host, the
-    /// MIDI heard, and the app's tempo and transport as last read.
+    /// What the render block reads and writes, at an address that does not move: what it renders,
+    /// the MIDI heard, and the app's tempo and transport as last read.
     struct Shared: ~Copyable {
-      var host: RackHost?
+      /// A source without its owner, which the render thread must not retain or release.
+      struct Target {
+        let context: UnsafeMutableRawPointer
+        let render: RenderSource.Render
+      }
+      var target: Target?
       let midi = UnsafeMutablePointer<UInt32>.allocate(capacity: Shared.ring)
       let written = Atomic<Int>(0)
       let read = Atomic<Int>(0)
@@ -70,7 +74,6 @@
     private var outputBus: AUAudioUnitBus
     private var outputBuses: AUAudioUnitBusArray!
 
-    static let patchKey = "patch"
     static let nameKey = "name"
 
     public override init(
@@ -87,15 +90,15 @@
 
     public override var outputBusses: AUAudioUnitBusArray { outputBuses }
 
-    /// Stereo at the host's rate, or nothing — unless the owner makes one at any rate.
+    /// Stereo at the source's rate, or nothing — unless the owner makes one at any rate.
     public override func shouldChange(to format: AVAudioFormat, for bus: AUAudioUnitBus) -> Bool {
       guard format.channelCount == 2 else { return false }
-      return prepare != nil || host.map { $0.sampleRate == format.sampleRate } ?? true
+      return prepare != nil || source.map { $0.sampleRate == format.sampleRate } ?? true
     }
 
     public override func allocateRenderResources() throws {
       prepare?(outputBus.format.sampleRate)
-      if let host, host.sampleRate != outputBus.format.sampleRate {
+      if let source, source.sampleRate != outputBus.format.sampleRate {
         throw NSError(domain: NSOSStatusErrorDomain, code: Int(kAudioUnitErr_FormatNotSupported))
       }
       // The app's clock, as it gives it to the unit: read on the render thread, as it must be.
@@ -114,14 +117,14 @@
       get {
         var state = super.fullState ?? [:]
         if let saved = saved.withLock({ $0 }) {
-          state[Self.patchKey] = saved.document
+          state[Self.documentKey] = saved.document
           state[Self.nameKey] = saved.name
         }
         return state
       }
       set {
         super.fullState = newValue
-        if let document = newValue?[Self.patchKey] as? String {
+        if let document = newValue?[Self.documentKey] as? String {
           restore?(document, newValue?[Self.nameKey] as? String)
         }
       }
@@ -220,12 +223,12 @@
         let frames = Int(frameCount)
         let l = left.assumingMemoryBound(to: Float.self)
         let r = right.assumingMemoryBound(to: Float.self)
-        guard let host = shared.pointee.host else {
+        guard let target = shared.pointee.target else {
           l.update(repeating: 0, count: frames)
           r.update(repeating: 0, count: frames)
           return noErr
         }
-        host.render(frames: frames, left: l, right: r)
+        target.render(target.context, frames, l, r)
         return noErr
       }
     }

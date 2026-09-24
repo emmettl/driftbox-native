@@ -25,7 +25,7 @@
     }
 
     /// `frames` rendered as the app would render them.
-    static func render(_ unit: RackAudioUnit, frames: Int) -> [Float] {
+    static func render(_ unit: InstrumentAudioUnit, frames: Int) -> [Float] {
       let list = AudioBufferList.allocate(maximumBuffers: 2)
       defer { free(list.unsafeMutablePointer) }
       let left = UnsafeMutablePointer<Float>.allocate(capacity: 512)
@@ -138,6 +138,26 @@
       plugin.tick()
       #expect(session.tempo == 97)
       #expect(session.running)
+
+      // A change the rack follows, not a state it is held to: stopped from the face while the app
+      // plays, it stays stopped.
+      session.toggleRunning()
+      for _ in 0..<4 {
+        _ = Self.render(unit, frames: 512)
+        plugin.tick()
+      }
+      #expect(!session.running)
+    }
+
+    /// The session is ticked as the face draws, so its meters move inside the app as in the Mac app.
+    @Test func theMetersAreRead() throws {
+      let (unit, plugin) = try Self.unit()
+      try unit.allocateRenderResources()
+      let session = try #require(plugin.session)
+      #expect(session.readings.isEmpty)
+      _ = Self.render(unit, frames: 4410)
+      for _ in 0..<Plugins.sessionEvery { plugin.tick() }
+      #expect(!session.readings.isEmpty)
     }
 
     /// How many colours `view` draws in, sampled across it: a measure of how much it draws.
