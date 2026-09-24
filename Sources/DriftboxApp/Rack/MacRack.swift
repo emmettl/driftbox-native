@@ -34,6 +34,13 @@
         sampleRate: sampleRate, plugins: AudioUnitHosting(), decoder: AudioFileDecoder(), memory: memory)
     }
 
+    /// A face for a rack that is already playing somewhere else: in another app, behind the rack's
+    /// Audio Unit, where the app renders it and nothing here attaches it to a device.
+    public init(session: RackSession) {
+      self.session = session
+      attached = true
+    }
+
     // MARK: Sound
 
     /// Play through `route` from now on, beside whatever else it plays. Once: the rack is not taken

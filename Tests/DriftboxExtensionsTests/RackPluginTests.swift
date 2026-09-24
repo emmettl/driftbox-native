@@ -4,7 +4,9 @@
   import DriftboxHostMac
   import DriftboxRack
   import DriftboxRackSession
+  import AppKit
   import Foundation
+  import SwiftUI
   import Testing
 
   @testable import DriftboxExtensions
@@ -136,6 +138,43 @@
       plugin.tick()
       #expect(session.tempo == 97)
       #expect(session.running)
+    }
+
+    /// How many colours `view` draws in, sampled across it: a measure of how much it draws.
+    static func colours(_ view: some View) throws -> Int {
+      let hosting = NSHostingView(rootView: view)
+      hosting.frame = NSRect(x: 0, y: 0, width: 900, height: 760)
+      hosting.layoutSubtreeIfNeeded()
+      let rep = try #require(hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds))
+      hosting.cacheDisplay(in: hosting.bounds, to: rep)
+      var colours = Set<Int>()
+      for y in stride(from: 0, to: rep.pixelsHigh, by: 8) {
+        for x in stride(from: 0, to: rep.pixelsWide, by: 8) {
+          guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+          colours.insert(
+            Int(c.redComponent * 255) << 16 | Int(c.greenComponent * 255) << 8 | Int(c.blueComponent * 255))
+        }
+      }
+      return colours.count
+    }
+
+    /// The face is the rack's own, on the session the unit plays, made again with it; and it draws.
+    @Test func theFaceIsTheRacksOwn() throws {
+      let (unit, plugin) = try Self.unit()
+      #expect(plugin.face == nil)
+      let waiting = try Self.colours(RackPluginView(plugin: plugin))
+      try unit.allocateRenderResources()
+      let face = try #require(plugin.face)
+      #expect(face.session === plugin.session)
+
+      #expect(try Self.colours(RackPluginView(plugin: plugin)) > 4 * waiting)
+
+      unit.deallocateRenderResources()
+      try unit.outputBusses[0].setFormat(
+        try #require(AVAudioFormat(standardFormatWithSampleRate: 96000, channels: 2)))
+      try unit.allocateRenderResources()
+      #expect(plugin.face !== face)
+      #expect(plugin.face?.session === plugin.session)
     }
   }
 #endif

@@ -198,7 +198,9 @@ let package = Package(
     // `NSExtensionMain`, not a `main` of its own; `scripts/bundle-app.sh` puts it in the app.
     .target(
       name: "DriftboxExtensions",
-      dependencies: ["DriftboxHostMac", "DriftboxHost", "DriftboxRackSession", "DriftboxDocument"]),
+      dependencies: [
+        "DriftboxApp", "DriftboxHostMac", "DriftboxHost", "DriftboxRackSession", "DriftboxDocument",
+      ]),
     .executableTarget(
       name: "DriftboxRackExtension", dependencies: ["DriftboxExtensions", "DriftboxHostMac"],
       linkerSettings: [
