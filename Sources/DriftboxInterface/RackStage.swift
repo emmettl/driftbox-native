@@ -116,13 +116,21 @@ public struct RackStage {
     case choose
     /// Take the sample to be this many bars long.
     case sampleBars(Int)
+    /// Open the rack's song in the groovebox, linked, to edit it there.
+    case editSong
+    /// Play the rack's song from a bar.
+    case startSong(bar: Int)
+    /// Loop bars of the rack's song, or stop looping them if they are what loops.
+    case loopSong(start: Int, bars: Int)
+    /// Stop looping the rack's song.
+    case clearLoop
 
     /// The param it sets, if it sets one.
     public var param: String? {
       switch self {
       case .set(let param, _): param
       case .data(_, _, _, let then, _): then
-      case .page, .learn, .choose, .sampleBars: nil
+      case .page, .learn, .choose, .sampleBars, .editSong, .startSong, .loopSong, .clearLoop: nil
       case .hold(let param): param
       }
     }
@@ -315,7 +323,11 @@ public struct RackStage {
       let height: Float = 13
       let first = cell.y + (46 - Float(count) * (height + 2)) / 2
       return .options(
-        (0..<count).map { Rect(cell.x + 5, first + Float($0) * (height + 2), cell.width - 10, height) })
+        (0..<count).map {
+          // As wide as a cell of the usual size gives them, and centred in a wider one.
+          let width = min(cell.width - 10, 48)
+          return Rect(cell.x + (cell.width - width) / 2, first + Float($0) * (height + 2), width, height)
+        })
     }
     return .stepper(
       value: Rect(cell.x + 2, cell.y + 6, cell.width - 4, 14),

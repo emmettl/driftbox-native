@@ -1,6 +1,7 @@
 import DriftboxInterface
 import DriftboxRack
 import DriftboxRackSession
+import DriftboxSession
 import DriftboxShell
 import Foundation
 import Testing
@@ -713,6 +714,41 @@ struct RackInterfaceTests {
     Self.press(rack, Self.window(rack.stage, Self.centre(loop.frame)))
     #expect(zone().loop)
     #expect(rack.stage.faces[0].buttons.contains { $0.label == "Sustain loop" && $0.isOn })
+  }
+
+  /// A groovebox with no song says where one comes from; with one, it says what the song is, asks
+  /// for it to be edited in the groovebox, and plays or loops it from any section of it.
+  @Test func theGrooveboxPlaysItsSongsSections() throws {
+    let (empty, bare) = try Self.alone("groovebox")
+    #expect(bare.words == "4 stereo sources" && bare.buttons.isEmpty)
+    #expect(bare.controls.filter { $0.param.id.hasSuffix("-mute") }.count == 4)
+    withExtendedLifetime(empty) {}
+
+    let entry = try #require(
+      Catalogue.entries().first { (Catalogue.song($0.id)?.chain.count ?? 0) >= 2 })
+    let song = try #require(Catalogue.song(entry.id))
+    let rack = Self.rack()
+    rack.rack.openSong(song, name: entry.name)
+    rack.rack.listen()
+    let stage = rack.stage
+    let face = try #require(stage.faces.first { $0.module.type == "groovebox" })
+    let edit = try #require(face.buttons.first { $0.press == .editSong })
+    Self.press(rack, Self.window(stage, Self.centre(edit.frame)))
+    #expect(rack.takeSongRequest() && !rack.takeSongRequest())
+
+    let second = (start: max(1, song.chain[0].repeat), bars: max(1, song.chain[1].repeat))
+    let loop = try #require(
+      face.buttons.first { $0.press == .loopSong(start: second.start, bars: second.bars) })
+    Self.press(rack, Self.window(stage, Self.centre(loop.frame)))
+    #expect(rack.rack.songLoop?.start == second.start && rack.rack.songLoop?.bars == second.bars)
+    let looped = try #require(rack.stage.faces.first { $0.module.type == "groovebox" })
+    #expect(looped.buttons.contains { $0.press == .clearLoop })
+    Self.press(rack, Self.window(rack.stage, Self.centre(loop.frame)))
+    #expect(rack.rack.songLoop == nil, "looped again, it stops looping")
+
+    let play = try #require(face.buttons.first { $0.press == .startSong(bar: second.start) })
+    Self.press(rack, Self.window(stage, Self.centre(play.frame)))
+    #expect(rack.rack.running)
   }
 
   struct Unexpected: Error {}

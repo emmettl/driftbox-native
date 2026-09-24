@@ -45,6 +45,9 @@ public enum DesktopMenus {
   public static let inputPrefix = "input."
   public static let clockPrefix = "clock."
   public static let patchPrefix = "patch."
+  /// A catalogue song into the rack, by its id; and the groovebox's own song into it.
+  public static let rackSongPrefix = "rackSong."
+  public static let rackSongFromGroovebox = "rack.songFromGroovebox"
 
   /// What a command is about, if it is one of `prefix`'s.
   public static func value(_ id: String, after prefix: String) -> String? {
@@ -116,6 +119,16 @@ public enum DesktopMenus {
                 .separator,
                 .submenu(
                   Menu("Open Patch", PatchEntry.all.map { .command($0.name, id: patchPrefix + $0.id) })),
+                // A groovebox song, whole, played beside the rack with its machines on a Groovebox source.
+                .submenu(
+                  Menu(
+                    "Groovebox Songs",
+                    (session.song != nil && !session.linkedToRack
+                      ? [
+                        .command("\(session.documentName), from the Groovebox", id: rackSongFromGroovebox),
+                        .separator,
+                      ] : [])
+                      + session.entries.map { .command($0.name, id: rackSongPrefix + $0.id) })),
               ])
           ])
         + [

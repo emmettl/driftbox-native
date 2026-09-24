@@ -35,6 +35,7 @@ extension Desktop {
       if let request = rackInterface.takeMenuRequest() {
         pop(request.menu, at: request.at, for: rackInterface)
       }
+      if rackInterface.takeSongRequest() { editRackSong() }
       if let module = rackInterface.takeFileRequest() {
         // A set for a Multisampler, several at once; one file for anything else.
         let urls =
@@ -55,6 +56,18 @@ extension Desktop {
     default:
       return false
     }
+  }
+
+  /// The rack's song opened in the groovebox, linked, and the groovebox shown in the rack's place:
+  /// each edit there plays on in the rack. Whatever is unsaved in the groovebox is asked about
+  /// first, as this replaces it.
+  func editRackSong() {
+    guard let rack, let song = rack.song, mayLoseChanges() else { return }
+    session.link(
+      song, name: rack.name, edited: { [weak rack] edited in rack?.songEdited(edited) },
+      ended: { [weak rack] in rack?.songLinked = false })
+    rack.songLinked = true
+    setShowsRack(false)
   }
 
   /// What a face loads: WAV, which the rack reads on every platform.

@@ -28,6 +28,7 @@ public enum RackFaces {
     "sampler": ["slices", "slice", "start", "loop", "reverse"],
     "audio-track": ["start", "level"],
     "multisampler": Set(atlasKnobs),
+    "groovebox": Set(machines.flatMap { ["\($0.1)-level", "\($0.1)-pan", "\($0.1)-mute"] }),
   ]
 
   static let shapes = ["Saw", "Pulse", "Tri"]
@@ -230,6 +231,8 @@ public enum RackFaces {
       return audioTrack(module, def, x: x, width: width, top: top, rack: rack)
     case "multisampler":
       return keyAtlas(module, def, x: x, width: width, top: top, rack: rack, page: page)
+    case "groovebox":
+      return groovebox(module, def, x: x, width: width, top: top, bottom: bottom, rack: rack)
     default:
       return nil
     }
