@@ -384,7 +384,8 @@ public final class RackInterface {
 
     canvas.save()
     canvas.clip(frame.x, frame.y, frame.width, frame.height)
-    // The title: the name, and what its jacks add up to at the right, over a hairline.
+    // The title: the name, and at the right what its jacks add up to or what the face is doing,
+    // over a hairline.
     let title = face.title
     let baseline = title.y + title.height / 2 + 4
     canvas.align = .left
@@ -392,9 +393,9 @@ public final class RackInterface {
     canvas.fill = Theme.ink.faded(dim)
     canvas.fillText(def.name.uppercased(), title.x, baseline)
     canvas.align = .right
-    canvas.font = Theme.mono(9)
-    canvas.fill = Theme.dim.faded(0.8 * dim)
-    canvas.fillText(RackLayout.portSummary(def), title.maxX, baseline)
+    canvas.font = face.wordsTint == nil ? Theme.mono(9) : Theme.mono(10, weight: 600)
+    canvas.fill = face.wordsTint?.faded(dim) ?? Theme.dim.faded(0.8 * dim)
+    canvas.fillText(face.words, title.maxX, baseline)
     canvas.fill = Theme.edge
     canvas.fillRect(title.x, title.maxY + 4, title.width, 1)
     let tint = Self.tint(ModuleFace.byType[def.type]?.group)
@@ -422,15 +423,17 @@ public final class RackInterface {
     let target = RackTarget.knob(module: module.id, param: def.id)
     let active = turning?.target == target
     let value = active ? turning!.value : rack.value(module, def)
+    let tint = control.tint ?? tint
+    let opacity = control.opacity
+    let labels = control.labels ?? ModuleFace.byType[module.type]?.labels[def.id]
     switch control.kind {
     case .knob(let dial):
       let span = def.max - def.min
       Draw.knob(
-        dial, value: span == 0 ? 0 : (value - def.min) / span, label: def.name,
+        dial, value: span == 0 ? 0 : (value - def.min) / span, label: control.name ?? def.name,
         text: RackDisplay.value(def, value), tint: tint, active: active,
-        hovered: hovered.map(control.cell.contains) ?? false, on: canvas)
+        hovered: hovered.map(control.cell.contains) ?? false, opacity: opacity, on: canvas)
     case .options(let buttons):
-      let labels = ModuleFace.byType[module.type]?.labels[def.id]
       for (index, button) in buttons.enumerated() {
         let on = Int(value.rounded()) == Int(def.min) + index
         canvas.fill = on ? tint : Theme.white(hovered.map(button.contains) == true ? 0.1 : 0.05)
@@ -441,9 +444,8 @@ public final class RackInterface {
         canvas.fillText(
           Self.label(index, def, labels), button.x + button.width / 2, button.y + button.height - 3.5)
       }
-      name(def, in: control.cell, on: canvas)
+      name(control.name ?? def.name, in: control.cell, on: canvas)
     case .stepper(let shown, let down, let up):
-      let labels = ModuleFace.byType[module.type]?.labels[def.id]
       let index = Int(value.rounded()) - Int(def.min)
       canvas.align = .center
       canvas.font = Theme.mono(9.5, weight: 600)
@@ -454,7 +456,7 @@ public final class RackInterface {
           button, label: label, isOn: false, hovered: hovered.map(button.contains) ?? false, down: false,
           tint: tint, size: 10, on: canvas)
       }
-      name(def, in: control.cell, on: canvas)
+      name(control.name ?? def.name, in: control.cell, on: canvas)
     }
     // A Combinator drives it: marked rather than disabled, as the reference marks it.
     if rack.isRouted(module.id, def.id) {
@@ -463,11 +465,11 @@ public final class RackInterface {
     }
   }
 
-  private func name(_ def: ParamDef, in cell: Rect, on canvas: Canvas) {
+  private func name(_ name: String, in cell: Rect, on canvas: Canvas) {
     canvas.align = .center
     canvas.font = Theme.mono(8.5, weight: 500)
     canvas.fill = Theme.dim
-    canvas.fillText(def.name.uppercased(), cell.x + cell.width / 2, cell.y + 57)
+    canvas.fillText(name.uppercased(), cell.x + cell.width / 2, cell.y + 57)
   }
 
   /// A choice's words for its `index`th value, or the number it is.

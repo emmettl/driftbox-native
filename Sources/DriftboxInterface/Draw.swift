@@ -34,16 +34,18 @@ enum Draw {
   /// (0...1) lit in `tint`, a pointer, and its name and value underneath.
   static func knob(
     _ dial: Rect, value: Double, label: String, text: String, tint: Colour, active: Bool, hovered: Bool,
-    on canvas: Canvas
+    opacity: Float = 1, on canvas: Canvas
   ) {
+    // Faint all through when asleep: every colour is taken down together.
+    func a(_ colour: Colour) -> Colour { colour.faded(opacity) }
     let d = dial.width
     let centre = SIMD2(dial.x + d / 2, dial.y + d / 2)
     // The cap.
     let cap = dial.outset(-d * 0.2)
-    canvas.fill = Theme.white(0.12)
+    canvas.fill = a(Theme.white(0.12))
     canvas.fillRoundedRect(
-      cap.x, cap.y, cap.width, cap.height, radius: cap.width / 2, foot: Theme.white(0.02))
-    canvas.stroke = Theme.white(0.1)
+      cap.x, cap.y, cap.width, cap.height, radius: cap.width / 2, foot: a(Theme.white(0.02)))
+    canvas.stroke = a(Theme.white(0.1))
     canvas.lineWidth = 1
     canvas.strokeRoundedRect(cap.x, cap.y, cap.width, cap.height, radius: cap.width / 2)
     // The travel, and the value along it, with a glow under.
@@ -52,26 +54,26 @@ enum Draw {
     let end = start + sweep * Float(max(0.0001, min(1, value)))
     let radius = d / 2 - 2
     canvas.lineWidth = 3
-    canvas.stroke = Theme.white(0.12)
+    canvas.stroke = a(Theme.white(0.12))
     canvas.strokeArc(centre.x, centre.y, radius: radius, from: start, to: start + sweep)
     canvas.lineWidth = 7
-    canvas.stroke = tint.faded(active ? 0.35 : hovered ? 0.22 : 0.12)
+    canvas.stroke = a(tint.faded(active ? 0.35 : hovered ? 0.22 : 0.12))
     canvas.strokeArc(centre.x, centre.y, radius: radius, from: start, to: end)
     canvas.lineWidth = 3
-    canvas.stroke = tint
+    canvas.stroke = a(tint)
     canvas.strokeArc(centre.x, centre.y, radius: radius, from: start, to: end)
     // The pointer.
     let direction = SIMD2(sin(end), -cos(end))
-    canvas.stroke = Theme.ink
+    canvas.stroke = a(Theme.ink)
     canvas.lineWidth = 2
     canvas.strokeLines([(centre + direction * (d * 0.08), centre + direction * (d * 0.3))])
     // Its name and where it is.
     canvas.align = .center
     canvas.font = Theme.mono(8.5, weight: 500)
-    canvas.fill = Theme.dim
+    canvas.fill = a(Theme.dim)
     canvas.fillText(label.uppercased(), centre.x, dial.maxY + 12)
     canvas.font = Theme.mono(9.5)
-    canvas.fill = active ? Theme.ink : Theme.ink.faded(0.55)
+    canvas.fill = a(active ? Theme.ink : Theme.ink.faded(0.55))
     canvas.fillText(text, centre.x, dial.maxY + 25)
   }
 }
