@@ -44,6 +44,23 @@ public final class Interface {
   public private(set) var scroll: Float = 0
   /// How far its steps are scrolled left, when they are wider than it.
   public private(set) var scrollX: Float = 0
+  /// On a phone, which eight steps the grid shows, and whether that follows the playhead: it does
+  /// until a page is chosen, and again once the pattern playing is followed.
+  public private(set) var page = 0
+  public private(set) var followsPage = true
+  /// On a phone, whether the controls are put away for performing: the whole screen the scene and
+  /// the pad but for one chip in the corner, which brings them back.
+  public var performing = false {
+    didSet {
+      if performing {
+        pressed = nil
+        turning = nil
+      }
+    }
+  }
+  /// A finger dragged on the grid rather than tapped: which, from where, where it was last, and
+  /// which way it went once it had gone far enough to say.
+  private var drag: (pointer: Int, from: SIMD2<Float>, last: SIMD2<Float>, across: Bool?)?
   /// Whether the song's effects are down the right, where the selected voice's knobs would be.
   public var showsEffects = false
   /// A pattern being renamed, and its name as it has been typed so far.
@@ -60,10 +77,18 @@ public final class Interface {
   }
 
   public var layout: Layout {
-    Layout(
-      session: session, size: size, scroll: scroll, scrollX: scrollX, effects: showsEffects,
-      renaming: renaming)
+    layout(scroll: scroll)
   }
+
+  /// The layout as it is but for the grid scrolled up by `scroll` and left by `scrollX`.
+  func layout(scroll: Float, scrollX: Float? = nil) -> Layout {
+    Layout(
+      session: session, size: size, scroll: scroll, scrollX: scrollX ?? self.scrollX, effects: showsEffects,
+      renaming: renaming, page: page)
+  }
+
+  /// Where the chip that brings the controls back is, while performing.
+  public var editChip: Rect { Rect(size.x - Layout.margin - 64, Layout.margin, 64, 32) }
 
   /// Scroll the grid, if `event` is over it. False for anywhere else.
   @discardableResult
@@ -72,8 +97,7 @@ public final class Interface {
     // Sideways as a wheel tilts, or as it turns with Shift held, as Windows' own programs take it.
     let sideways = event.modifiers.contains(.shift) ? event.delta.y + event.delta.x : event.delta.x
     let down = event.modifiers.contains(.shift) ? 0 : event.delta.y
-    let moved = Layout(
-      session: session, size: size, scroll: scroll + down, scrollX: scrollX + sideways, effects: showsEffects)
+    let moved = layout(scroll: scroll + down, scrollX: scrollX + sideways)
     scroll = moved.scroll
     scrollX = moved.scrollX
     return true
@@ -86,6 +110,7 @@ public final class Interface {
   public func pointer(_ event: PointerEvent) -> Bool {
     if event.kind == .mouse { hover = event.phase == .cancelled ? nil : event.location }
     guard isShowing else { return false }
+    if performing { return editChipPointer(event) }
     switch event.phase {
     case .began:
       // A press anywhere keeps the name being typed, as leaving a field does.
@@ -97,7 +122,26 @@ public final class Interface {
       if case .knob(let target) = action, let song = session.song {
         let value = target.value(in: song)
         turning = Turn(pointer: event.id, target: target, fromY: event.location.y, from: value, value: value)
+      } else if event.kind != .mouse, layout.gridContent?.contains(event.location) == true {
+        // A finger on the grid may be about to drag it rather than tap it: a wheel's work, and a
+        // swipe's, where there is no wheel.
+        drag = (event.id, event.location, event.location, nil)
       }
+      return true
+    case .moved where drag?.pointer == event.id:
+      guard var moving = drag else { return true }
+      let moved = event.location - moving.from
+      if moving.across == nil, (moved * moved).sum() > 100 {
+        // Far enough to be a drag, and no longer the tap it began as.
+        moving.across = abs(moved.x) > abs(moved.y)
+        pressed = (event.id, nil)
+      }
+      if moving.across == false {
+        let up = moving.last.y - event.location.y
+        scroll = layout(scroll: scroll + up).scroll
+      }
+      moving.last = event.location
+      drag = moving
       return true
     case .moved:
       if var turn = turning, turn.pointer == event.id {
@@ -114,6 +158,15 @@ public final class Interface {
     case .ended:
       guard let press = pressed, press.pointer == event.id else { return false }
       pressed = nil
+      if let swipe = drag, swipe.pointer == event.id {
+        drag = nil
+        // Swiped across: the next page to the left, the one before to the right, as a page turns.
+        let across = event.location.x - swipe.from.x
+        if swipe.across == true, abs(across) > 40, let pages = layout.metrics?.pages, pages > 1 {
+          page = min(pages - 1, max(0, page + (across < 0 ? 1 : -1)))
+          followsPage = false
+        }
+      }
       if let turn = turning, turn.pointer == event.id {
         turning = nil
         finish(turn)
@@ -125,6 +178,29 @@ public final class Interface {
       guard pressed?.pointer == event.id else { return false }
       pressed = nil
       turning = nil
+      drag = nil
+      return true
+    }
+  }
+
+  /// While performing, the one chip in the corner is all there is of the controls: a finger
+  /// anywhere else is the pad's.
+  private func editChipPointer(_ event: PointerEvent) -> Bool {
+    switch event.phase {
+    case .began:
+      guard editChip.contains(event.location) else { return false }
+      pressed = (event.id, .perform)
+      return true
+    case .moved:
+      return pressed?.pointer == event.id
+    case .ended:
+      guard pressed?.pointer == event.id else { return false }
+      pressed = nil
+      if editChip.contains(event.location) { performing = false }
+      return true
+    case .cancelled:
+      guard pressed?.pointer == event.id else { return false }
+      pressed = nil
       return true
     }
   }
@@ -205,6 +281,7 @@ public final class Interface {
       session.seek(toBar: bar)
     case .follow:
       session.editing = nil
+      followsPage = true
     case .showPattern(let id):
       session.editing = id
     case .addPattern:
@@ -224,6 +301,11 @@ public final class Interface {
       break
     case .bassSlide(let pattern, let voice, let index):
       editBass(pattern, voice, index, "Set Slide") { $0 = $0.settingSlide(!$0.slide) }
+    case .page(let index):
+      page = index
+      followsPage = false
+    case .perform:
+      performing = true
     }
   }
 
@@ -242,7 +324,20 @@ public final class Interface {
   /// Everything, onto `canvas`, whose transform takes points to its pixels.
   public func draw(on canvas: Canvas) {
     guard isShowing else { return }
-    let layout = layout
+    if performing {
+      chip(Layout.Chip(frame: editChip, label: "EDIT", action: .perform, isOn: false), on: canvas)
+      return
+    }
+    var layout = layout
+    // On a phone, the page the playhead is on, while it is followed; and whatever page, one there is.
+    if let metrics = layout.metrics, metrics.compact {
+      let wanted =
+        followsPage ? layout.playhead.map { $0 / GridMetrics.pageSteps } ?? metrics.page : metrics.page
+      if wanted != page {
+        page = wanted
+        layout = self.layout
+      }
+    }
     // Kept to what there is, should the window have grown or the pattern shrunk.
     scroll = layout.scroll
     scrollX = layout.scrollX
@@ -364,12 +459,15 @@ public final class Interface {
     canvas.save()
     canvas.clip(grid.x + 1, rows.y + 1, grid.width - 2, rows.height - 2)
 
+    for chip in layout.pageChips {
+      self.chip(chip, on: canvas)
+    }
     // The ruler: every fourth tick brighter, so a bar reads in beats, and the playhead's tall and lit.
     if let ruler = layout.ruler {
       clipToColumns(layout, on: canvas)
       defer { canvas.restore() }
-      for step in 0..<metrics.steps {
-        let x = ruler.x + Float(step) * metrics.stride
+      for step in metrics.first..<(metrics.first + metrics.shown) {
+        let x = ruler.x + Float(step - metrics.first) * metrics.stride
         let live = step == layout.playhead
         canvas.fill = live ? Theme.live : Theme.white(step % 4 == 0 ? 0.2 : 0.09)
         let height: Float = live ? 8 : 4
@@ -404,7 +502,7 @@ public final class Interface {
 
       let loop = pattern.trackLength(voice.id)
       clipToColumns(layout, on: canvas)
-      for index in 0..<pattern.length {
+      for index in 0..<pattern.length where metrics.shows(index) {
         face(
           layout.step(index, in: lane.frame), value: pattern.step(voice.id, at: index),
           fill: Theme.stepFill(voice.machine), playing: index == layout.playhead, onBeat: index % 4 == 0,
@@ -418,7 +516,8 @@ public final class Interface {
     if let lane = layout.filterLane {
       canvas.fill = Theme.nine.faded(0.18)
       canvas.fillRect(lane.x + 4, lane.y - 5, lane.width - 8, 1)
-      let middle = lane.y + lane.height / 2
+      // Beside its steps, or on a phone above them.
+      let middle = layout.compact ? lane.y + Layout.nameHeight / 2 : lane.y + lane.height / 2
       canvas.fill = Theme.nine.faded(0.35)
       canvas.fillEllipse(lane.x + 4, middle - 3, 6, 6)
       canvas.font = Theme.mono(11, weight: 500)
@@ -426,7 +525,7 @@ public final class Interface {
       canvas.align = .left
       canvas.fillText("PCF", lane.x + 17, middle + 4)
       clipToColumns(layout, on: canvas)
-      for index in 0..<pattern.length {
+      for index in 0..<pattern.length where metrics.shows(index) {
         face(
           layout.step(index, in: lane), value: pattern.pcf(at: index), fill: Theme.stepFill(.tr909),
           playing: index == layout.playhead, onBeat: index % 4 == 0, flam: false, tail: false,
@@ -435,7 +534,11 @@ public final class Interface {
       canvas.restore()
     }
     for line in layout.bassLines {
-      drawBassLine(line, layout, pattern: pattern, metrics: metrics, on: canvas)
+      if layout.compact {
+        drawStepBassLine(line, layout, pattern: pattern, metrics: metrics, on: canvas)
+      } else {
+        drawBassLine(line, layout, pattern: pattern, metrics: metrics, on: canvas)
+      }
     }
     canvas.restore()
 
@@ -463,6 +566,56 @@ public final class Interface {
     canvas.save()
     if let columns = layout.columns {
       canvas.clip(columns.x - 4, columns.y, columns.width + 8, columns.height)
+    }
+  }
+
+  /// A 303 line on a phone: a step to a cell, as the machine's own step buttons are, each saying its
+  /// note, lit while it sounds and outlined while it is paused, with its accent as an amber foot and
+  /// its slide as a violet mark to the right.
+  private func drawStepBassLine(
+    _ line: Layout.BassLine, _ layout: Layout, pattern: DriftboxSeq.Pattern, metrics: GridMetrics,
+    on canvas: Canvas
+  ) {
+    let selected = session.selectedVoice == line.voice
+    canvas.align = .left
+    canvas.font = Theme.mono(8.5, weight: 600)
+    canvas.fill = Theme.three
+    canvas.fillText("TB-303", line.header.x, line.header.y + 11)
+    canvas.font = Theme.mono(11, weight: 600)
+    canvas.fill = selected ? Theme.ink : Theme.ink.faded(0.8)
+    canvas.fillText(line.name, line.header.x + 52, line.header.y + 11)
+    let names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    for index in 0..<pattern.length where metrics.shows(index) {
+      let cell = Rect(
+        line.cells.x + Float(index - metrics.first) * metrics.stride, line.cells.y, metrics.cell,
+        line.cells.height)
+      let step = pattern.bassStep(line.voice, at: index)
+      let playing = index == layout.playhead
+      if let note = step.note.map({ Int($0) }), step.sounds {
+        canvas.fill = playing ? Colour(0xffe9b8) : Colour(0xffde96)
+        canvas.fillRoundedRect(cell.x, cell.y, cell.width, cell.height, radius: 6, foot: Theme.three)
+        canvas.fill = Colour(0x1a1206)
+        canvas.font = Theme.mono(11, weight: 600)
+        canvas.align = .center
+        canvas.fillText(
+          "\(names[note % 12])\(note / 12 + 1)", cell.x + cell.width / 2, cell.y + cell.height / 2 + 4)
+      } else {
+        canvas.fill = Theme.white(playing ? 0.14 : index % 4 == 0 ? 0.07 : 0.035)
+        canvas.fillRoundedRect(cell.x, cell.y, cell.width, cell.height, radius: 6)
+        if step.note != nil {
+          canvas.stroke = Theme.three.faded(0.55)
+          canvas.lineWidth = 1
+          canvas.strokeRoundedRect(cell.x, cell.y, cell.width, cell.height, radius: 6)
+        }
+      }
+      if step.accent {
+        canvas.fill = Theme.three
+        canvas.fillRoundedRect(cell.x + 6, cell.maxY - 5, cell.width - 12, 3, radius: 1.5)
+      }
+      if step.slide {
+        canvas.fill = Theme.violet
+        canvas.fillRoundedRect(cell.maxX - 6, cell.y + 6, 3, cell.height - 12, radius: 1.5)
+      }
     }
   }
 
