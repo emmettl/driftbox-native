@@ -1,4 +1,5 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
+  import DriftboxRackSession
   import SwiftUI
   import UniformTypeIdentifiers
 
@@ -139,7 +140,7 @@
 
     /// The selected zone's notes, velocities and loop.
     private func editor(
-      _ zone: MultisampleZone, zones: [MultisampleZone], at: Int, recording: RackModel.Recording?
+      _ zone: MultisampleZone, zones: [MultisampleZone], at: Int, recording: RackSession.Recording?
     ) -> some View {
       func edit(_ change: (inout MultisampleZone) -> Void) {
         var next = zones

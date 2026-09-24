@@ -1,6 +1,7 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import AppKit
   import DriftboxRack
+  import DriftboxRackSession
   import SwiftUI
 
   // The Chord Player's, the Arp's and the Combinator's faces: the first two show what they will
@@ -487,7 +488,7 @@
   /// while it waits for a controller, then the controller it learnt. Clicking an armed chip
   /// disarms it; shift-clicking, or its menu, forgets what it learnt, which re-learning cannot.
   struct LearnChip: View {
-    let model: RackModel
+    let model: RackSession
     let module: String
     let param: String
     @Environment(\.accessibilityReduceMotion) private var still

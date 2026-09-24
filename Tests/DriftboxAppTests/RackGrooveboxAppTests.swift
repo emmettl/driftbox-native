@@ -4,6 +4,7 @@
   import DriftboxEngine
   import DriftboxHost
   import DriftboxRack
+  import DriftboxRackSession
   import DriftboxSeq
   import Foundation
   import Testing
@@ -20,15 +21,16 @@
     }
 
     /// A rack and a groovebox window beside it, neither with a device.
-    static func pair() -> (RackModel, Player) {
-      let rack = RackModel()
+    static func pair() -> (MacRack, Player) {
+      let rack = MacRack()
       let player = Player(host: EngineHost(sampleRate: 48000))
       rack.groovebox = player
       return (rack, player)
     }
 
     @Test func aSongOpensWholeWithItsSource() throws {
-      let (rack, _) = Self.pair()
+      let (mac, _) = Self.pair()
+      let rack = mac.session
       let song = try Self.song()
       rack.openSong(song, name: "Garage")
       #expect(rack.name == "Garage")
@@ -46,10 +48,11 @@
     /// Edited in the groovebox window, the rack's song changes in place; undoing in the rack
     /// leaves the song alone, whose history is the window's.
     @Test func theGrooveboxWindowEditsTheRacksSong() throws {
-      let (rack, player) = Self.pair()
+      let (mac, player) = Self.pair()
+      let rack = mac.session
       let song = try Self.song()
       rack.openSong(song, name: "Garage")
-      rack.editInGroovebox()
+      mac.editInGroovebox()
       #expect(rack.songLinked)
       #expect(player.linkedToRack)
       #expect(player.song == song)
@@ -73,9 +76,10 @@
     }
 
     @Test func anotherPatchInTheRackEndsTheLink() throws {
-      let (rack, player) = Self.pair()
+      let (mac, player) = Self.pair()
+      let rack = mac.session
       rack.openSong(try Self.song(), name: "Garage")
-      rack.editInGroovebox()
+      mac.editInGroovebox()
       player.edit("Set Tempo") { $0.bpm = 97 }
       rack.open(Patch(modules: [], cables: []), name: "Empty")
       #expect(!rack.songLinked)
@@ -91,7 +95,8 @@
     /// A start at a bar sets the rack running and puts the song at that bar's first frame; a loop
     /// fits inside the song, as the reference's `clampBar` and `clampLoop` keep it.
     @Test func theSongStartsAtABarAndLoops() throws {
-      let (rack, _) = Self.pair()
+      let (mac, _) = Self.pair()
+      let rack = mac.session
       let song = try Self.song()
       rack.openSong(song, name: "Garage")
       // A loop asked for before the rack is listening is kept, and sent when it is.
@@ -119,10 +124,10 @@
       rack.clearSongLoop()
       #expect(rack.songLoop == nil)
 
-      #expect(RackModel.clampBar(-3, 8) == 0)
-      #expect(RackModel.clampBar(12, 8) == 7)
-      #expect(RackModel.clampLoop(6, 4, 8) == (6, 2))
-      #expect(RackModel.clampLoop(0, 0, 8) == (0, 1))
+      #expect(RackSession.clampBar(-3, 8) == 0)
+      #expect(RackSession.clampBar(12, 8) == 7)
+      #expect(RackSession.clampLoop(6, 4, 8) == (6, 2))
+      #expect(RackSession.clampLoop(0, 0, 8) == (0, 1))
     }
 
     @Test func theNoticeSaysWhatTheReferencesSays() {

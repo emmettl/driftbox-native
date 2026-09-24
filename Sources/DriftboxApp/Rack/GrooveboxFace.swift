@@ -1,5 +1,6 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxRack
+  import DriftboxRackSession
   import DriftboxSeq
   import SwiftUI
 
@@ -27,7 +28,7 @@
           .font(Theme.mono(9.5)).foregroundStyle(Theme.ink)
           Spacer(minLength: 4)
           Button(face.model.songLinked ? "Editing in Groovebox" : "Edit in Groovebox") {
-            face.model.editInGroovebox()
+            face.rack.editInGroovebox()
           }
           .buttonStyle(OptionStyle(on: face.model.songLinked, tint: Theme.nine))
           .disabled(face.model.songLinked)
@@ -77,7 +78,7 @@
     /// The song's sections in order: which pattern, for how many bars, lit while it plays. Click
     /// one to start the song there, or loop its bars.
     struct Arrangement: View {
-      let model: RackModel
+      let model: RackSession
       let song: Song
 
       /// Each section's first bar and how many bars it runs.
@@ -162,45 +163,6 @@
           RoundedRectangle(cornerRadius: 5, style: .continuous)
             .strokeBorder(playing ? Theme.nine.opacity(0.5) : Color.clear))
       }
-    }
-  }
-#endif
-
-#if canImport(SwiftUI) && canImport(AVFoundation)
-  import DriftboxRack
-
-  /// What the rack says about a document it did not author: the reference's `documentNotice`,
-  /// with "Sequencer →" become the groovebox window, since here the rack does not leave for the
-  /// song but opens it beside itself. Nothing for a patch built here.
-  struct DocumentNotice: Equatable {
-    var label: String
-    var retained: String
-    var guidance: String
-
-    /// `song` is the patterns and tempo of the song carried, or nil when this build cannot read it.
-    static func notice(_ compatibility: PatchCompatibility, song: (patterns: Int, bpm: Double)?)
-      -> DocumentNotice?
-    {
-      let label: String
-      switch compatibility {
-      case .rackNative: return nil
-      case .grooveboxCompatible: label = "groovebox compatible"
-      case .rackExtended: label = "rack extended"
-      }
-      guard let song else {
-        return DocumentNotice(
-          label: label,
-          retained: "A song from a newer groovebox build is retained exactly but cannot be edited here.",
-          guidance: "This build keeps it as it is, but cannot play or edit it.")
-      }
-      let bpm = song.bpm == song.bpm.rounded() ? "\(Int(song.bpm))" : "\(song.bpm)"
-      return DocumentNotice(
-        label: label, retained: "\(song.patterns) patterns at \(bpm) BPM retained exactly.",
-        guidance: compatibility == .rackExtended
-          ? "The song plays here; cabled machines run through the Groovebox source, and editing it in the "
-            + "groovebox window keeps the rack's additions here."
-          : "The song plays through its own mix; patch a Groovebox output to take that machine through the "
-            + "rack. Editing it in the groovebox window loses nothing.")
     }
   }
 #endif

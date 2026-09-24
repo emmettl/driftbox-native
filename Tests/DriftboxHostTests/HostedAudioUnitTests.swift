@@ -124,10 +124,12 @@
       host.load(patch)
       host.setExternal("fx", unit.external)
       let shut = Self.rms(Self.render(host, blocks: 80).left.suffix(4096))
+      await Self.settle(host) { abs(cutoff.value - cutoff.minValue) < 0.01 }
       #expect(abs(cutoff.value - cutoff.minValue) < 0.01, "at the bottom: \(cutoff.value)")
 
       host.setParam("fx", "macro1", 1)
       let open = Self.rms(Self.render(host, blocks: 80).left.suffix(4096))
+      await Self.settle(host) { abs(cutoff.value - cutoff.maxValue) < 1 }
       #expect(abs(cutoff.value - cutoff.maxValue) < 1, "at the top: \(cutoff.value)")
       #expect(shut < open * 0.1, "\(shut) against \(open)")
 
@@ -136,13 +138,22 @@
       patch.modules.append(PatchModule(id: "cv", type: "offset", params: ["offset": 0.5]))
       patch.cables.append(PatchCable(from: PortReference("cv", "out"), to: PortReference("fx", "cv1")))
       host.load(patch)
-      _ = Self.render(host, blocks: 10)
       let expected = HostedAudioUnit.scaled(0.5, low: cutoff.minValue, high: cutoff.maxValue, shape: 2)
+      await Self.settle(host) { abs(cutoff.value - expected) / expected < 0.01 }
       #expect(abs(cutoff.value - expected) / expected < 0.01, "\(cutoff.value), not \(expected)")
       #expect(HostedAudioUnit.logarithmic(cutoff), "a frequency is crossed as the unit shows it")
 
       unit.map(0, to: nil)
       #expect(unit.mapping(0) == nil)
+    }
+
+    /// Keep rendering until `done`, or two seconds: a version 2 unit publishes a change it was sent
+    /// back to its param in its own time, which under load is after the blocks that sent it.
+    static func settle(_ host: RackHost, until done: () -> Bool) async {
+      for _ in 0..<100 where !done() {
+        _ = render(host, blocks: 1)
+        try? await Task.sleep(for: .milliseconds(20))
+      }
     }
 
     /// What the patch keeps is enough to make the same unit again, set as it was.

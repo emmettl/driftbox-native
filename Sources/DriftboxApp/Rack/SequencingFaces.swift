@@ -1,5 +1,6 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxRack
+  import DriftboxRackSession
   import SwiftUI
 
   // The faces that edit what a module plays rather than how: the Tracker's lanes, the Arranger's

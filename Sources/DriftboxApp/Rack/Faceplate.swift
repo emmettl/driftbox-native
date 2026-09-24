@@ -1,5 +1,6 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxRack
+  import DriftboxRackSession
   import SwiftUI
 
   /// A module's front: the panel every module has — its ground, its edge, lit when selected and
@@ -7,7 +8,7 @@
   /// generic one: its name and what its jacks add up to, then a control for every param a hand
   /// could set, in cells of one size, three across on a half-width module and seven on a full one.
   struct Faceplate: View {
-    let model: RackModel
+    let rack: MacRack
     let module: PatchModule
     let def: ModuleDef
     let span: Int
@@ -16,7 +17,7 @@
     @State private var hovering = false
 
     var body: some View {
-      let face = FaceContext(model: model, module: module, def: def)
+      let face = FaceContext(rack: rack, module: module, def: def)
       VStack(alignment: .leading, spacing: 6) {
         switch def.type {
         case "vco": VcoFace(face: face)
@@ -79,9 +80,14 @@
   /// the reference's `FaceplateProps`, and nothing else, so a face cannot reach past its module.
   @MainActor
   struct FaceContext {
-    let model: RackModel
+    /// The rack on the Mac, for the few faces that reach the Mac's own things: a plug-in's window,
+    /// the groovebox window.
+    let rack: MacRack
     let module: PatchModule
     let def: ModuleDef
+
+    /// The rack's session, which every face reads and edits.
+    var model: RackSession { rack.session }
 
     var tint: Color { ModuleFace.accent(ModuleFace.byType[def.type]?.group) }
     var reading: MeterReading? { model.readings[module.id] }

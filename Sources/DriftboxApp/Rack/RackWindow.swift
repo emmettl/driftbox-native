@@ -1,6 +1,7 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import AppKit
   import DriftboxRack
+  import DriftboxRackSession
   import SwiftUI
 
   /// The rack's window: a header with the patch, the transport, the side showing and a way to
@@ -8,24 +9,25 @@
   /// play it — two octaves from `z` and `q`, with `,` and `.` for the octave — space starts and
   /// stops its transport, and tab turns it round.
   public struct RackWindow: View {
-    let model: RackModel
+    let rack: MacRack
     let attach: () -> Void
+    var model: RackSession { rack.session }
 
     @State private var octave = 0
     @State private var held: [Character: Int] = [:]
     @FocusState private var focused: Bool
     @Environment(\.controlActiveState) private var active
 
-    public init(model: RackModel, attach: @escaping () -> Void) {
-      self.model = model
+    public init(rack: MacRack, attach: @escaping () -> Void) {
+      self.rack = rack
       self.attach = attach
     }
 
     public var body: some View {
       VStack(spacing: 0) {
-        RackHeader(model: model, octave: octave)
+        RackHeader(rack: rack, octave: octave)
         if let notice = model.notice { NoticeBar(notice: notice) }
-        RackStage(model: model)
+        RackStage(rack: rack)
       }
       .background(Theme.ground)
       // The rack's own minimum, inside the inspector, so opening the routing beside it makes the
@@ -96,19 +98,20 @@
 
   extension FocusedValues {
     /// The rack, while its window is the one in front: what the Edit menu undoes in.
-    @Entry var rack: RackModel?
+    @Entry var rack: RackSession?
   }
 
   /// The rack's header.
   struct RackHeader: View {
-    let model: RackModel
+    let rack: MacRack
     let octave: Int
+    var model: RackSession { rack.session }
     @State private var adding = false
 
     var body: some View {
       HStack(spacing: 10) {
-        PatchMenu(model: model)
-        if let failure = model.startFailure {
+        PatchMenu(rack: rack)
+        if let failure = rack.startFailure {
           Label("No sound", systemImage: "exclamationmark.triangle.fill")
             .font(Theme.mono(10)).foregroundStyle(Theme.eight)
             .help("The rack could not start: \(failure)")
@@ -177,7 +180,8 @@
 
   /// The factory patches, by kind, and what is open now.
   struct PatchMenu: View {
-    let model: RackModel
+    let rack: MacRack
+    var model: RackSession { rack.session }
 
     var body: some View {
       Menu {
@@ -201,7 +205,7 @@
           }
         }
         // A groovebox song, whole, played beside the rack with its machines on a Groovebox source.
-        if let player = model.groovebox {
+        if let player = rack.groovebox {
           Section("Groovebox Songs") {
             if let song = player.song, !player.linkedToRack {
               Button("\(player.documentName), from the Groovebox Window") {
@@ -333,7 +337,8 @@
 
   /// The rack itself, scaled to the window's width, turning round from front to back.
   struct RackStage: View {
-    let model: RackModel
+    let rack: MacRack
+    var model: RackSession { rack.session }
 
     var body: some View {
       GeometryReader { geometry in
@@ -364,7 +369,7 @@
             let def = RackModules.registry[placement.type]
           {
             Faceplate(
-              model: model, module: module, def: def, span: placement.span,
+              rack: rack, module: module, def: def, span: placement.span,
               selected: model.selection.contains(placement.id)
             )
             .padding(3)
