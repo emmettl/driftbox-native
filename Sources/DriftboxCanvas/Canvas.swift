@@ -126,6 +126,15 @@ public final class Canvas {
   /// A buffer per run, kept from page to page: the layer draws a buffer's instances from the first,
   /// so each run drawn in one pass needs its own.
   private var buffers: [any GPUBuffer] = []
+  /// The lines set on this page and on the last, by their text and font. A line kept is one the
+  /// page before used: a line no page has asked for since goes, so a clock that changes every
+  /// frame keeps two lines here and not every one it has shown.
+  private var lines: (thisPage: [LineKey: TextLine], lastPage: [LineKey: TextLine]) = ([:], [:])
+
+  private struct LineKey: Hashable {
+    var text: String
+    var font: FontRequest
+  }
 
   public init(device: any GPUDevice, typesetter: any Typesetter) throws {
     self.device = device
@@ -157,6 +166,7 @@ public final class Canvas {
     saved.removeAll(keepingCapacity: true)
     marks.removeAll(keepingCapacity: true)
     runs.removeAll(keepingCapacity: true)
+    lines = (thisPage: [:], lastPage: lines.thisPage)
     current = 0
     begun = false
     snapshot = nil
@@ -297,13 +307,24 @@ public final class Canvas {
 
   /// `measureText(text).width` in the current font.
   public func measure(_ text: String) -> Float {
-    typesetter.line(text, font: state.font).width
+    line(text).width
+  }
+
+  /// `text` set in the current font: from the lines this page or the last has set, or set now. A
+  /// page is mostly the same text as the one before, and setting a line is a platform's shaper
+  /// every time — on a phone, tens of microseconds a line even when it has seen the text before.
+  private func line(_ text: String) -> TextLine {
+    let key = LineKey(text: text, font: state.font)
+    if let line = lines.thisPage[key] { return line }
+    let line = lines.lastPage[key] ?? typesetter.line(text, font: state.font)
+    lines.thisPage[key] = line
+    return line
   }
 
   /// `fillText`: `text` on the alphabetic baseline at `y`, starting, ending or centred at `x` as
   /// the alignment says, in the current font and fill.
   public func fillText(_ text: String, _ x: Float, _ y: Float) {
-    let line = typesetter.line(text, font: state.font)
+    let line = line(text)
     let start =
       switch state.align {
       case .left: x
