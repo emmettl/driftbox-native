@@ -328,18 +328,24 @@ struct RackInterfaceTests {
     for (type, shows) in RackFaces.shows {
       let (_, face) = try Self.alone(type)
       let controls = face.controls.map(\.param.id)
-      #expect(Set(controls + face.buttons.map(\.param)) == shows, "\(type)")
+      #expect(Set(controls + face.buttons.compactMap(\.press?.param)) == shows, "\(type)")
       #expect(controls.count == Set(controls).count, "\(type): each once")
-      var parts = face.controls.map(\.cell) + face.buttons.map(\.frame)
-      if let screen = face.screen { parts.append(screen) }
-      for (index, part) in parts.enumerated() {
+      // Buttons may sit on the screen, as a scale's keys do; nothing else may, nor on each other.
+      let parts = face.controls.map(\.cell) + face.buttons.map(\.frame) + face.cells.map(\.frame)
+      let screen = face.screen.map { [$0] } ?? []
+      func apart(_ a: Rect, _ b: Rect) -> Bool {
+        a.maxX <= b.x || b.maxX <= a.x || a.maxY <= b.y || b.maxY <= a.y
+      }
+      for (index, part) in (parts + screen).enumerated() {
         #expect(face.frame.contains(SIMD2(part.x, part.y)), "\(type)")
         #expect(face.frame.contains(SIMD2(part.maxX - 1, part.maxY - 1)), "\(type)")
+        guard index < parts.count else { continue }
         for other in parts[(index + 1)...] {
-          let apart =
-            part.maxX <= other.x || other.maxX <= part.x || part.maxY <= other.y || other.maxY <= part.y
-          #expect(apart, "\(type): \(part) and \(other) overlap")
+          #expect(apart(part, other), "\(type): \(part) and \(other) overlap")
         }
+      }
+      for part in face.controls.map(\.cell) + face.cells.map(\.frame) {
+        #expect(screen.allSatisfy { apart(part, $0) }, "\(type): \(part) is on the screen")
       }
     }
     let (_, generic) = try Self.alone("noise")
@@ -407,6 +413,90 @@ struct RackInterfaceTests {
       let screen = try #require(face.screen, "\(type)")
       #expect(screen.width > 100 && screen.height > 50, "\(type)")
     }
+  }
+
+  static func data(_ face: RackInterface, _ slot: String) -> [Double] {
+    face.rack.patch.modules[0].data[slot] ?? []
+  }
+
+  /// A tracker's step is clicked on and off and dragged for its value, one drag one undo; a lane's
+  /// tag moves its mode on; and a pattern longer than a bar is shown a bar at a time.
+  @Test func theTrackerIsWrittenStepByStep() throws {
+    let (rack, _) = try Self.alone("tracker")
+    rack.rack.set("m", "length", to: 16)
+    rack.rack.set("m", "pattern", to: 0)
+    var stage = rack.stage
+    var face = stage.faces[0]
+    #expect(face.cells.count == 64)
+    Self.press(rack, Self.window(stage, Self.centre(face.cells[0].frame)))
+    #expect(Self.data(rack, "lane1").first == 7)
+    #expect(rack.rack.undoTitle == "Undo Edit Step")
+    Self.press(rack, Self.window(stage, Self.centre(face.cells[0].frame)))
+    #expect(Self.data(rack, "lane1").first == 0, "and off again")
+
+    let step = Self.window(stage, Self.centre(face.cells[1].frame))
+    Self.press(rack, step, to: step - SIMD2(0, RackInterface.cellStep * 3 * stage.scale))
+    #expect(Self.data(rack, "lane1")[1] == 3)
+    rack.rack.undo()
+    #expect(Self.data(rack, "lane1")[1] == 0, "one drag, one undo")
+
+    let tag = try #require(face.buttons.first { $0.label == "S1" })
+    Self.press(rack, Self.window(stage, Self.centre(tag.frame)))
+    #expect(rack.stage.faces[0].buttons.contains { $0.label == "U1" })
+
+    rack.rack.set("m", "length", to: 32)
+    stage = rack.stage
+    face = stage.faces[0]
+    let second = try #require(face.buttons.first { $0.press == .page(1) })
+    Self.press(rack, Self.window(stage, Self.centre(second.frame)))
+    face = rack.stage.faces[0]
+    #expect(face.words.hasSuffix("bar 2/2"))
+    #expect(face.cells.first?.index == 16)
+  }
+
+  /// An arranger's pattern steps on when clicked, and its bars are dragged; a section written past
+  /// the end of the song so far lands where it was clicked.
+  @Test func theArrangerIsWrittenSectionBySection() throws {
+    let (rack, face) = try Self.alone("arranger")
+    let stage = rack.stage
+    #expect(face.cells.count == 32)
+    Self.press(rack, Self.window(stage, Self.centre(face.cells[6].frame)))
+    let patterns = Self.data(rack, "patterns")
+    #expect(patterns.count == 16 && patterns[3] == 1)
+    let bars = Self.window(stage, Self.centre(face.cells[1].frame))
+    Self.press(rack, bars, to: bars - SIMD2(0, RackInterface.cellStep * 2 * stage.scale))
+    let repeats = Self.data(rack, "repeats")
+    #expect(repeats.count == 16 && repeats[0] == 6 && repeats[1] == 4)
+    #expect(rack.rack.undoTitle == "Undo Edit Song")
+  }
+
+  /// A key of the scale's keyboard takes the map to Custom and turns its note over.
+  @Test func theScaleIsCustomisedFromItsKeys() throws {
+    let (rack, face) = try Self.alone("scale-player")
+    rack.rack.set("m", "key", to: 0)
+    rack.rack.set("m", "scale", to: 0)
+    let stage = rack.stage
+    let sharp = try #require(stage.faces[0].buttons.first { $0.label == "C#" })
+    #expect(!sharp.isOn && face.buttons.count == 12)
+    Self.press(rack, Self.window(stage, Self.centre(sharp.frame)))
+    #expect(Self.data(rack, "customScale") == [1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1])
+    let scale = try #require(RackModules.registry["scale-player"]?.params.first { $0.id == "scale" })
+    #expect(rack.rack.value(rack.rack.patch.modules[0], scale) == 13)
+  }
+
+  /// An echo's pulse is muted and unmuted by a click; one past the repeat count does nothing.
+  @Test func theEchoesAreMutedOneByOne() throws {
+    let (rack, _) = try Self.alone("note-echo")
+    rack.rack.set("m", "repeats", to: 4)
+    let stage = rack.stage
+    let face = stage.faces[0]
+    #expect(face.buttons.count == 17)
+    Self.press(rack, Self.window(stage, Self.centre(face.buttons[2].frame)))
+    let steps = Self.data(rack, "steps")
+    #expect(steps.count == 17 && steps[2] == 0 && steps[1] == 1)
+    #expect(face.buttons[9].press == nil)
+    Self.press(rack, Self.window(stage, Self.centre(face.buttons[9].frame)))
+    #expect(Self.data(rack, "steps") == steps)
   }
 
   struct Unexpected: Error {}

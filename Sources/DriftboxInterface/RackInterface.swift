@@ -38,12 +38,19 @@ public final class RackInterface {
   var backPointer: SIMD2<Float>?
   /// A trim pot let go of without turning, and when: a second, soon after, puts it back to unity.
   var lastPotTap: (jack: String, at: ContinuousClock.Instant)?
+  /// The bar a face with more than one shows, by module: the Mac keeps it in the face's view.
+  public private(set) var pages: [String: Int] = [:]
+  /// A number being dragged has moved far enough to be a drag, not a click.
+  private var cellMoved = false
 
   public init(rack: RackSession) {
     self.rack = rack
   }
 
-  public var stage: RackStage { RackStage(rack: rack, size: size, scroll: scroll) }
+  public var stage: RackStage { RackStage(rack: rack, size: size, scroll: scroll, pages: pages) }
+
+  /// Points of drag, in the rack's own units, for a number to move one: as the Mac's cells have it.
+  public static let cellStep: Float = 4
 
   /// Points of drag for a knob's whole travel, as the groovebox's knobs have it.
   public static let travel: Float = 170
@@ -69,6 +76,10 @@ public final class RackInterface {
         turning = (event.id, target!, event.location.y, value, value)
       case .tempo:
         turning = (event.id, .tempo, event.location.y, rack.tempo, rack.tempo)
+      case .cell(let module, let index):
+        guard let cell = cell(module, index, in: stage) else { break }
+        cellMoved = false
+        turning = (event.id, target!, event.location.y, Double(cell.value), Double(cell.value))
       case .module(let id):
         rack.select(id, adding: event.modifiers.contains(.control))
       case nil:
@@ -95,6 +106,21 @@ public final class RackInterface {
         turn.value = def.min + moved * span
         // Heard as it turns, as the Mac's knobs are: the first move is what undo goes back to.
         rack.turn(module, param, to: turn.value)
+      case .cell(let module, let index):
+        let stage = stage
+        guard let cell = cell(module, index, in: stage) else { return }
+        let travel = Float(rise) / stage.scale
+        if abs(travel) >= Self.cellStep { cellMoved = true }
+        guard cellMoved else { return }
+        let next = max(
+          cell.range.lowerBound,
+          min(
+            cell.range.upperBound, Int(turn.from) + Int(RackDisplay.jsRound(Double(travel / Self.cellStep)))))
+        if next != cell.value {
+          let data = rack.patch.modules.first { $0.id == module }?.data[cell.slot] ?? []
+          rack.setData(module, cell.slot, to: cell.written(next, in: data), name: cell.name)
+        }
+        turn.value = Double(next)
       default:
         return
       }
@@ -142,8 +168,34 @@ public final class RackInterface {
       } else {
         lastTap = (turn.target, now)
       }
+    case .cell(let module, let index):
+      rack.endTurn()
+      // Not dragged: a click, which does what the number does when clicked, if it does anything.
+      if !cellMoved, let press = cell(module, index, in: stage)?.click { self.press(press, on: module) }
+      cellMoved = false
     default:
       break
+    }
+  }
+
+  /// The number `index` on `module`'s face.
+  private func cell(_ module: String, _ index: Int, in stage: RackStage) -> RackStage.Cell? {
+    guard let face = stage.faces.first(where: { $0.module.id == module }), face.cells.indices.contains(index)
+    else { return nil }
+    return face.cells[index]
+  }
+
+  /// What one of a face's buttons or numbers does, on `module`.
+  private func press(_ press: RackStage.Press, on module: String) {
+    switch press {
+    case .set(let param, let value):
+      rack.set(module, param, to: value)
+    case .data(let slot, let values, let name, let then, let to):
+      rack.setData(module, slot, to: values, name: name)
+      rack.endTurn()
+      if let then { rack.set(module, then, to: to) }
+    case .page(let page):
+      pages[module] = page
     }
   }
 
@@ -157,6 +209,11 @@ public final class RackInterface {
       guard let def = def(module, param), let value = value(module, param) else { return }
       let next = max(def.min, min(def.max, value.rounded() + Double(by)))
       rack.set(module, param, to: next)
+    case .button(let module, let index):
+      guard let face = stage.faces.first(where: { $0.module.id == module }),
+        face.buttons.indices.contains(index), let press = face.buttons[index].press
+      else { return }
+      self.press(press, on: module)
     default:
       break
     }
@@ -391,9 +448,9 @@ public final class RackInterface {
     canvas.align = .left
     canvas.font = Theme.mono(11, weight: 600)
     canvas.fill = Theme.ink.faded(dim)
-    canvas.fillText(def.name.uppercased(), title.x, baseline)
+    canvas.fillText((face.name ?? def.name).uppercased(), title.x, baseline)
     if let mark = face.mark {
-      let name = canvas.measure(def.name.uppercased())
+      let name = canvas.measure((face.name ?? def.name).uppercased())
       canvas.font = Theme.mono(8)
       canvas.fill = (face.markTint ?? Theme.three).faded(dim)
       canvas.fillText(mark, title.x + name + 8, baseline)
