@@ -64,6 +64,11 @@ public enum Action: Equatable, Sendable {
   case addPattern
   /// Show the song's effects down the right, or put them away.
   case effects
+  /// On a phone, show the `n`th page of eight steps.
+  case page(Int)
+  /// On a phone, put the controls away and make the whole screen the scene and the pad, until the
+  /// one chip left in the corner brings them back.
+  case perform
 }
 
 /// A 303 line's rows, as the Mac draws them: two octaves of notes from the top, then a row each
@@ -95,16 +100,46 @@ public struct GridMetrics: Equatable, Sendable {
   public let steps: Int
   /// From one column's left edge to the next.
   public let stride: Float
+  /// The first step shown, and how many are: all of them beside their voices' names on a desktop,
+  /// and a page of eight at a finger's size on a phone, the names above them.
+  public let first: Int
+  public let shown: Int
+  /// How far into a lane its first step is: past the voice's name, or nothing where it is above.
+  public let label: Float
+  public let compact: Bool
 
   public init(steps: Int, width: Float) {
     self.steps = max(1, steps)
     let room = (width - Self.labelWidth - 8) / Float(self.steps)
     stride = min(Self.maximumStride, max(Self.minimumStride, room))
+    first = 0
+    shown = self.steps
+    label = Self.labelWidth
+    compact = false
   }
 
+  /// A phone's: the `page`th eight steps across `width`, as many hardware grooveboxes page theirs.
+  public init(steps: Int, width: Float, page: Int) {
+    self.steps = max(1, steps)
+    shown = min(Self.pageSteps, self.steps)
+    let pages = (self.steps + Self.pageSteps - 1) / Self.pageSteps
+    first = min(max(0, page), pages - 1) * Self.pageSteps
+    stride = max(Self.minimumStride, (width - 8) / Float(Self.pageSteps))
+    label = 0
+    compact = true
+  }
+
+  public static let pageSteps = 8
+
+  public var pages: Int { compact ? (steps + Self.pageSteps - 1) / Self.pageSteps : 1 }
+  public var page: Int { first / Self.pageSteps }
+  /// Whether the `index`th step is on the page shown.
+  public func shows(_ index: Int) -> Bool { index >= first && index < first + shown }
+
   public var cell: Float { stride - Self.gap }
-  /// A little taller than wide while the columns are narrow, and no taller than thirty points.
-  public var stepHeight: Float { min(30, max(22, cell * 1.2)) }
+  /// A little taller than wide while the columns are narrow, and no taller than thirty points; on a
+  /// phone, a finger's height.
+  public var stepHeight: Float { compact ? 40 : min(30, max(22, cell * 1.2)) }
 }
 
 /// Where everything on the interface is, for a window `size` points across, and what each part
@@ -141,7 +176,15 @@ public struct Layout {
     public var name: String { voice == "303.a" ? "303 A" : "303 B" }
   }
 
+  /// Narrower than this is a phone, in portrait: the controls laid out for fingers, a page of the
+  /// grid at a time.
+  public static let compactWidth: Float = 600
+  /// A lane's name above its steps, on a phone.
+  public static let nameHeight: Float = 16
+
   public var size: SIMD2<Float>
+  /// Whether this is a phone's layout.
+  public var compact: Bool
   public var bar: Rect
   public var chips: [Chip]
   /// Where the song's name and the transport's readout go, between the chips.
@@ -167,6 +210,8 @@ public struct Layout {
   public var gridContent: Rect?
   public var pattern: DriftboxSeq.Pattern?
   public var metrics: GridMetrics?
+  /// On a phone, the chips that choose which eight steps are shown.
+  public var pageChips: [Chip] = []
   public var ruler: Rect?
   public var lanes: [Lane] = []
   public var filterLane: Rect?
@@ -189,15 +234,57 @@ public struct Layout {
 
   /// The layout for a window `size` points across, the grid scrolled up by `scroll` and left by
   /// `scrollX`, the song's effects down the right if `effects` or the selected voice's knobs if not,
-  /// and a pattern's chip showing the name typed for it, if one is being renamed.
+  /// and a pattern's chip showing the name typed for it, if one is being renamed. On a phone the
+  /// grid does not scroll sideways but shows its `page`th eight steps.
   @MainActor
   public init(
     session: Session, size: SIMD2<Float>, scroll: Float = 0, scrollX: Float = 0, effects: Bool = false,
-    renaming: (pattern: String, text: String)? = nil
+    renaming: (pattern: String, text: String)? = nil, page: Int = 0
   ) {
     self.size = size
+    compact = size.x < Self.compactWidth
     let margin = Self.margin
     bar = Rect(margin, margin, max(0, size.x - margin * 2), Self.barHeight)
+    let chipY = bar.y + 8
+    let chipHeight = bar.height - 16
+    if compact {
+      // Across a phone, the transport's chips and nothing else: the song's name is in the strip's
+      // sections, and the tempo and swing wait for a panel of their own.
+      let widths: [(String, Float, Action, Bool)] = [
+        (session.isPlaying ? "STOP" : "PLAY", 52, .toggle, session.isPlaying), ("TOP", 42, .start, false),
+        ("FX", 36, .effects, effects && session.song != nil), ("CLICK", 52, .metronome, session.metronome),
+        ("LOOP", 48, .loop, session.loop != nil), ("PERFORM", 72, .perform, false),
+      ]
+      let spare = bar.width - 16 - widths.reduce(0) { $0 + $1.1 }
+      let gap = max(2, spare / Float(widths.count - 1))
+      var x = bar.x + 8
+      chips = widths.map { label, width, action, on in
+        defer { x += width + gap }
+        return Chip(frame: Rect(x, chipY, width, chipHeight), label: label, action: action, isOn: on)
+      }
+      title = Rect(bar.x, bar.y, 0, 0)
+      readout = Rect(bar.maxX, bar.y, 0, 0)
+    } else {
+      (chips, title, readout) = Self.desktopBar(session: session, bar: bar, effects: effects)
+    }
+    if !compact, session.song != nil {
+      let swing = Rect(readout.maxX - 82, chipY, 82, chipHeight)
+      numbers.append(Knob(target: .songSwing, dial: swing, cell: swing))
+      if session.followedBPM == nil {
+        let tempo = Rect(swing.x - 4 - 76, chipY, 76, chipHeight)
+        numbers.insert(Knob(target: .tempo, dial: tempo, cell: tempo), at: 0)
+      }
+    }
+    layOutGrid(
+      session: session, scroll: scroll, scrollX: scrollX, effects: effects, renaming: renaming, page: page)
+  }
+
+  /// The transport across a window: play and back to the top at the left, the effects, the click
+  /// and the loop at the right, and between them the song's name and the tempo and swing.
+  @MainActor
+  static func desktopBar(session: Session, bar: Rect, effects: Bool) -> (
+    chips: [Chip], title: Rect, readout: Rect
+  ) {
     let chipY = bar.y + 8
     let chipHeight = bar.height - 16
     var chips: [Chip] = [
@@ -212,20 +299,24 @@ public struct Layout {
     chips.append(Chip(frame: fxChip, label: "FX", action: .effects, isOn: effects && session.song != nil))
     chips.append(Chip(frame: clickChip, label: "CLICK", action: .metronome, isOn: session.metronome))
     chips.append(Chip(frame: loopChip, label: "LOOP", action: .loop, isOn: session.loop != nil))
-    self.chips = chips
     let left = bar.x + 136
     let middle = max(left, (left + fxChip.x - 12) / 2)
-    title = Rect(left, bar.y, max(0, middle - left), bar.height)
-    readout = Rect(middle, bar.y, max(0, fxChip.x - 12 - middle), bar.height)
-    if session.song != nil {
-      let swing = Rect(readout.maxX - 82, chipY, 82, chipHeight)
-      numbers.append(Knob(target: .songSwing, dial: swing, cell: swing))
-      if session.followedBPM == nil {
-        let tempo = Rect(swing.x - 4 - 76, chipY, 76, chipHeight)
-        numbers.insert(Knob(target: .tempo, dial: tempo, cell: tempo), at: 0)
-      }
-    }
+    return (
+      chips, Rect(left, bar.y, max(0, middle - left), bar.height),
+      Rect(middle, bar.y, max(0, fxChip.x - 12 - middle), bar.height)
+    )
+  }
 
+  /// The strip, the grid and the panel beside it, under the transport.
+  @MainActor
+  private mutating func layOutGrid(
+    session: Session, scroll: Float, scrollX: Float, effects: Bool,
+    renaming: (pattern: String, text: String)?,
+    page: Int
+  ) {
+    let margin = Self.margin
+    // Inside the grid's panel: less on a phone, where every point across is a step's.
+    let inset: Float = compact ? 6 : Self.inset
     guard let song = session.song else { return }
     let strip = Rect(margin, bar.maxY + margin, bar.width, Self.stripHeight)
     self.strip = strip
@@ -243,51 +334,71 @@ public struct Layout {
     // The playhead only means something on the pattern that is playing, and only while it is.
     if session.isPlaying, session.position?.pattern?.id == pattern.id { playhead = session.position?.step }
 
-    // Beside the panel, when there is one.
-    let width = max(0, (inspector.map { $0.frame.x - margin } ?? size.x - margin) - margin)
-    let metrics = GridMetrics(steps: pattern.length, width: width - Self.inset * 2)
+    // Beside the panel, when there is one; on a phone, under it, the whole width.
+    let width =
+      compact ? bar.width : max(0, (inspector.map { $0.frame.x - margin } ?? size.x - margin) - margin)
+    let metrics =
+      compact
+      ? GridMetrics(steps: pattern.length, width: width - inset * 2, page: page)
+      : GridMetrics(steps: pattern.length, width: width - inset * 2)
     self.metrics = metrics
     let voices = allVoices.enumerated().filter { pattern.tracks[$0.element.id] != nil }
     let lines = ["303.a", "303.b"].filter { pattern.bass[$0] != nil }
-    let laneHeight = metrics.stepHeight + 4
-    let filterHeight = metrics.stepHeight * 0.8
-    let lineHeight = BassMetrics.height + 12
+    // On a phone a lane's name is above its steps, which take its whole width.
+    let named = compact ? Self.nameHeight : 0
+    let laneHeight = named + metrics.stepHeight + 4
+    let filterHeight = named + metrics.stepHeight * 0.8
+    let lineHeight = compact ? named + metrics.stepHeight + 12 : BassMetrics.height + 12
+    let pages: Float = metrics.pages > 1 ? 32 : 0
     let content =
-      8 + 5 + Float(voices.count) * (laneHeight + 5) + 5 + filterHeight
+      pages + 8 + 5 + Float(voices.count) * (laneHeight + 5) + 5 + filterHeight
       + Float(lines.count) * (10 + lineHeight)
     // As tall as what is in it and its pattern bar, up to the room under the strip; past that, it
     // scrolls under the pattern bar.
     let head = Self.patternBarHeight + 16
     let room = max(0, size.y - margin - below)
-    let height = min(head + content + Self.inset + 8, room)
+    let height = min(head + content + inset + 8, room)
     let grid = Rect(margin, size.y - margin - height, width, height)
     self.grid = grid
-    maxScroll = max(0, head + content + Self.inset + 8 - height)
+    maxScroll = max(0, head + content + inset + 8 - height)
     self.scroll = min(max(0, scroll), maxScroll)
-    let patternBar = Rect(grid.x + Self.inset, grid.y + 8, width - Self.inset * 2, Self.patternBarHeight)
+    let patternBar = Rect(grid.x + inset, grid.y + 8, width - inset * 2, Self.patternBarHeight)
     self.patternBar = patternBar
     patternChips = Self.patternChips(
       session: session, song: song, shown: pattern, in: patternBar, renaming: renaming)
     let rows = Rect(grid.x, patternBar.maxY + 8, width, max(0, grid.maxY - patternBar.maxY - 8))
     gridContent = rows
 
-    let x = grid.x + Self.inset
-    let inner = width - Self.inset * 2
-    // The steps, wider than there is room for beside the lanes' names, scroll under them.
-    let first = x + 4 + GridMetrics.labelWidth
-    let seen = max(0, inner - 8 - GridMetrics.labelWidth)
-    maxScrollX = max(0, metrics.stride * Float(metrics.steps) - GridMetrics.gap - seen)
+    let x = grid.x + inset
+    let inner = width - inset * 2
+    // The steps, wider than there is room for beside the lanes' names, scroll under them; on a
+    // phone, a page of them fills the lane under its name, and nothing scrolls sideways.
+    let first = x + 4 + metrics.label
+    let seen = max(0, inner - 8 - metrics.label)
+    maxScrollX = compact ? 0 : max(0, metrics.stride * Float(metrics.steps) - GridMetrics.gap - seen)
     self.scrollX = min(max(0, scrollX), maxScrollX)
     columnsLeft = first - self.scrollX
     columns = Rect(first, rows.y, seen, rows.height)
     var y = rows.y + 8 - self.scroll
-    ruler = Rect(columnsLeft, y, metrics.stride * Float(metrics.steps), 8)
+    if metrics.pages > 1 {
+      // Which eight: a chip a page, "1–8", "9–16", in a row above the ruler.
+      pageChips = (0..<metrics.pages).map { index in
+        let first = index * GridMetrics.pageSteps + 1
+        let last = min(metrics.steps, first + GridMetrics.pageSteps - 1)
+        return Chip(
+          frame: Rect(x + 4 + Float(index) * 70, y, 64, 24), label: "\(first)–\(last)", action: .page(index),
+          isOn: index == metrics.page)
+      }
+      y += pages
+    }
+    ruler = Rect(columnsLeft, y, metrics.stride * Float(metrics.shown), 8)
     y += 8 + 5
     for (index, voice) in voices {
       lanes.append(
         Lane(
           voice: voice, index: index, frame: Rect(x, y, inner, laneHeight),
-          header: Rect(x + 4, y + 2, GridMetrics.labelWidth, metrics.stepHeight)))
+          header: compact
+            ? Rect(x + 4, y, inner - 8, named) : Rect(x + 4, y + 2, metrics.label, metrics.stepHeight)))
       y += laneHeight + 5
     }
     filterLane = Rect(x, y + 5, inner, filterHeight)
@@ -296,11 +407,17 @@ public struct Layout {
       y += 10
       let frame = Rect(x, y, inner, lineHeight)
       bassLines.append(
-        BassLine(
-          voice: voice, frame: frame, header: Rect(x + 4, y + 6, GridMetrics.labelWidth, 28),
-          cells: Rect(
-            columnsLeft, y + 6, metrics.stride * Float(metrics.steps) - GridMetrics.gap,
-            BassMetrics.height)))
+        compact
+          ? BassLine(
+            voice: voice, frame: frame, header: Rect(x + 4, y, inner - 8, named),
+            cells: Rect(
+              columnsLeft, y + named, metrics.stride * Float(metrics.shown) - GridMetrics.gap,
+              metrics.stepHeight))
+          : BassLine(
+            voice: voice, frame: frame, header: Rect(x + 4, y + 6, metrics.label, 28),
+            cells: Rect(
+              columnsLeft, y + 6, metrics.stride * Float(metrics.steps) - GridMetrics.gap,
+              BassMetrics.height)))
       y += lineHeight
     }
   }
@@ -309,8 +426,10 @@ public struct Layout {
   public func step(_ index: Int, in lane: Rect) -> Rect {
     guard let metrics else { return Rect(0, 0, 0, 0) }
     let height = lane == filterLane ? metrics.stepHeight * 0.8 : metrics.stepHeight
-    let top = lane == filterLane ? lane.y : lane.y + 2
-    return Rect(columnsLeft + Float(index) * metrics.stride, top, metrics.cell, height)
+    // On a phone, under the lane's name, and counted from the page's first step.
+    let named = compact ? Self.nameHeight : 0
+    let top = lane == filterLane ? lane.y + named : lane.y + 2 + named
+    return Rect(columnsLeft + Float(index - metrics.first) * metrics.stride, top, metrics.cell, height)
   }
 
   /// The panels, which is where a press is the interface's and not the pad's.
@@ -326,6 +445,7 @@ public struct Layout {
       return inspector.knobs.first { $0.cell.contains(point) }.map { .knob($0.target) }
     }
     if let chip = patternChips.first(where: { $0.frame.contains(point) }) { return chip.action }
+    if let chip = pageChips.first(where: { $0.frame.contains(point) }) { return chip.action }
     // The rows only where they are seen, under the pattern bar.
     guard let gridContent, gridContent.contains(point), let pattern, let metrics else { return nil }
     // A step only where steps are seen, and not under the names they scroll beneath.
@@ -347,7 +467,9 @@ public struct Layout {
     for line in bassLines {
       if line.header.contains(point) { return .select(voice: line.voice) }
       if onSteps, line.cells.contains(point) {
-        return bassAction(at: point, in: line, pattern: pattern, metrics: metrics)
+        // On a phone a step's note is chosen on a keyboard; until there is one, its line's knobs.
+        return compact
+          ? .select(voice: line.voice) : bassAction(at: point, in: line, pattern: pattern, metrics: metrics)
       }
     }
     return nil
@@ -399,6 +521,6 @@ public struct Layout {
     let along = x - columnsLeft
     guard along >= 0 else { return nil }
     let index = Int(along / metrics.stride)
-    return index < metrics.steps ? index : nil
+    return index < metrics.shown ? metrics.first + index : nil
   }
 }
