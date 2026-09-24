@@ -388,6 +388,13 @@ struct DesktopTests {
       window.choose(DesktopMenus.undo)
       #expect(rack.tempo != 99, "undone in the rack")
 
+      #expect(
+        window.commandIDs.contains(DesktopMenus.rackBack)
+          && !window.commandIDs.contains(DesktopMenus.controls))
+      window.choose(DesktopMenus.rackBack)
+      try desktop.drawFrame()
+      #expect(rack.flipped && window.isChecked?(DesktopMenus.rackBack) == true, "Tab turns the rack round")
+
       window.choose(DesktopMenus.showRack)
       try desktop.drawFrame()
       #expect(!desktop.showsRack && window.title == "Driftbox")

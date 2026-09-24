@@ -69,7 +69,7 @@ struct RackInterfaceTests {
     }
     #expect(stage.scale == 1.35, "as large as the Mac's rack goes, with room")
     #expect(stage.origin.y == stage.header.maxY + RackStage.margin)
-    #expect(stage.chips.map(\.label) == ["PLAY", "ADD"])
+    #expect(stage.chips.map(\.label) == ["PLAY", "BACK", "ADD"])
   }
 
   /// A knob turns as it is dragged and is heard as it turns, one turn one undo; two presses put it
@@ -199,5 +199,117 @@ struct RackInterfaceTests {
       !request.menu.commands.contains { $0.id == "add.plugin" }, "no plug-ins with nothing to make them")
     face.choose("add.noise")
     #expect(face.rack.patch.modules.contains { $0.type == "noise" })
+  }
+
+  /// The rack turned round, with its jacks where the layout puts them.
+  static func back() -> (RackInterface, RackStage, [RackLayout.Jack]) {
+    let face = rack()
+    let flip = face.stage.chips.first { $0.target == .flip }!
+    press(face, centre(flip.frame))
+    let stage = face.stage
+    return (face, stage, RackLayout.jacks(stage.placements))
+  }
+
+  static func window(_ stage: RackStage, _ jack: RackLayout.Jack) -> SIMD2<Float> {
+    window(stage, SIMD2(Float(jack.x), Float(jack.y)))
+  }
+
+  /// The header's BACK turns the rack round, and FRONT back again.
+  @Test func theRackTurnsRound() throws {
+    let (face, stage, _) = Self.back()
+    #expect(face.rack.flipped)
+    let flip = try #require(stage.chips.first { $0.target == .flip })
+    #expect(flip.label == "FRONT" && flip.isOn)
+    Self.press(face, Self.centre(flip.frame))
+    #expect(!face.rack.flipped)
+  }
+
+  /// A cable is drawn from a jack and dropped near another of the other side — either way round —
+  /// and lands in it, one undo; dropped on nothing, it is nothing.
+  @Test func aCableIsDrawnBetweenJacks() throws {
+    let (face, stage, jacks) = Self.back()
+    let taken = Set(face.rack.patch.cables.map(\.to))
+    let inlet = try #require(
+      jacks.first {
+        $0.kind == .inlet && $0.module == "out" && !taken.contains(PortReference($0.module, $0.port))
+      }
+        ?? jacks.first { $0.kind == .inlet && !taken.contains(PortReference($0.module, $0.port)) })
+    let outlet = try #require(jacks.first { $0.kind == .outlet && $0.module != inlet.module })
+    let cables = face.rack.patch.cables.count
+
+    Self.press(face, Self.window(stage, outlet), to: Self.window(stage, inlet) + SIMD2(8, 6))
+    #expect(face.rack.patch.cables.count == cables + 1, "it snaps")
+    #expect(
+      face.rack.patch.cables.last
+        == PatchCable(
+          from: PortReference(outlet.module, outlet.port), to: PortReference(inlet.module, inlet.port)))
+    #expect(face.rack.undoTitle == "Undo Connect")
+    face.rack.undo()
+
+    Self.press(face, Self.window(stage, inlet), to: Self.window(stage, outlet))
+    #expect(face.rack.patch.cables.count == cables + 1, "from the inlet end too")
+    face.rack.undo()
+
+    Self.press(face, Self.window(stage, outlet), to: Self.window(stage, outlet) + SIMD2(0, 400))
+    #expect(face.rack.patch.cables.count == cables)
+  }
+
+  /// The × by an inlet a cable is in pulls the cable out.
+  @Test func aCableIsPulledOut() throws {
+    let (face, stage, jacks) = Self.back()
+    let cable = face.rack.patch.cables[1]
+    let inlet = try #require(
+      RackLayout.jack(in: jacks, module: cable.to.module, port: cable.to.port, kind: .inlet))
+    let unplug = RackInterface.unplug(SIMD2(Float(inlet.x), Float(inlet.y)))
+    Self.press(face, Self.window(stage, unplug))
+    #expect(!face.rack.patch.cables.contains(cable))
+    #expect(face.rack.patch.cables.count == 1)
+  }
+
+  /// An inlet's trim pot turns as it is dragged down and up, one drag one undo, and two presses
+  /// put it back at unity.
+  @Test func aTrimPotTurns() throws {
+    let (face, stage, jacks) = Self.back()
+    let inlet = try #require(jacks.first { $0.kind == .inlet })
+    let pot = Self.window(stage, RackInterface.pot(inlet))
+    #expect(face.rack.trim(inlet.module, inlet.port) == 1)
+    face.pointer(PointerEvent(phase: .began, location: pot))
+    face.pointer(PointerEvent(phase: .moved, location: pot + SIMD2(0, 10)))
+    face.pointer(PointerEvent(phase: .moved, location: pot + SIMD2(0, 25)))
+    face.pointer(PointerEvent(phase: .ended, location: pot + SIMD2(0, 25)))
+    #expect(face.rack.trim(inlet.module, inlet.port) == 0.5)
+    #expect(face.rack.undoTitle == "Undo Set Input Trim")
+    face.rack.undo()
+    #expect(face.rack.trim(inlet.module, inlet.port) == 1, "one drag, one undo")
+    face.rack.redo()
+
+    face.pointer(PointerEvent(phase: .began, location: pot))
+    face.pointer(PointerEvent(phase: .moved, location: pot + SIMD2(0, 10), modifiers: .shift))
+    face.pointer(PointerEvent(phase: .ended, location: pot + SIMD2(0, 10)))
+    #expect(face.rack.trim(inlet.module, inlet.port) == 0.45, "finer with Shift")
+
+    Self.press(face, pot)
+    Self.press(face, pot)
+    #expect(face.rack.trim(inlet.module, inlet.port) == 1)
+  }
+
+  /// A bay is dragged to another place in the rack, and its module goes there; one only pressed is
+  /// selected, and stays where it is.
+  @Test func aModuleIsMovedOnTheBack() throws {
+    let (face, stage, _) = Self.back()
+    let out = try #require(stage.placements.first { $0.id == "out" })
+    let first = stage.placements[0]
+    let grab = SIMD2(Float(out.x) + 10, Float(out.y) + 10)
+    Self.press(face, Self.window(stage, grab))
+    #expect(face.rack.selection == ["out"])
+    #expect(face.rack.patch.modules.map(\.id) == ["keys", "osc", "out"])
+
+    let to = SIMD2(Float(first.x) + 10, Float(first.y) - 20)
+    Self.press(face, Self.window(stage, grab), to: Self.window(stage, to))
+    #expect(face.rack.patch.modules.first?.id == "out")
+    #expect(face.rack.undoTitle == "Undo Move Module")
+
+    Self.press(face, SIMD2(5, 690))
+    #expect(face.rack.selection.isEmpty)
   }
 }

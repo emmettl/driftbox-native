@@ -7,6 +7,8 @@ public enum RackTarget: Equatable, Sendable {
   case run
   /// Offer the modules to add.
   case add
+  /// Turn the rack round, to its back or its front.
+  case flip
   /// The tempo, dragged as a number.
   case tempo
   /// A module's panel, away from its controls: select it.
@@ -75,6 +77,8 @@ public struct RackStage {
   public var origin: SIMD2<Float>
   public var scale: Float
   public var faces: [Face]
+  /// Where each module is, as the rack's layout has it: the back draws its bays and jacks from these.
+  public var placements: [RackLayout.Placement]
   /// The rack's height in design space.
   public var height: Float
   public var scroll: Float
@@ -88,11 +92,13 @@ public struct RackStage {
     let chipY = header.y + 8
     let chipHeight = header.height - 16
     let add = Rect(header.maxX - 10 - 56, chipY, 56, chipHeight)
-    keys = Rect(add.x - 12 - 70, header.y, 70, header.height)
+    let flip = Rect(add.x - 6 - 64, chipY, 64, chipHeight)
+    keys = Rect(flip.x - 12 - 70, header.y, 70, header.height)
     tempo = Rect(keys.x - 8 - 76, chipY, 76, chipHeight)
     let run = Rect(tempo.x - 8 - 60, chipY, 60, chipHeight)
     chips = [
       Chip(frame: run, label: rack.running ? "STOP" : "PLAY", target: .run, isOn: rack.running),
+      Chip(frame: flip, label: rack.flipped ? "FRONT" : "BACK", target: .flip, isOn: rack.flipped),
       Chip(frame: add, label: "ADD", target: .add, isOn: false),
     ]
     title = Rect(header.x + 14, header.y, max(0, run.x - 12 - header.x - 14), header.height)
@@ -103,6 +109,7 @@ public struct RackStage {
     scale = max(0.5, min(1.35, (size.x - 48) / width))
     area = Rect(0, header.maxY + margin, size.x, max(0, size.y - header.maxY - margin))
     let layout = RackLayout.layout(rack.patch.modules)
+    placements = layout.placements
     height = Float(max(layout.height, RackLayout.row))
     maxScroll = max(0, (height + 24) * scale - area.height)
     self.scroll = min(max(0, scroll), maxScroll)
