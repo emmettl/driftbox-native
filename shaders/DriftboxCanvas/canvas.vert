@@ -8,7 +8,8 @@ layout(location = 0) in vec4 aAxes;    // where the unit square's x and y axes g
 layout(location = 1) in vec4 aOrigin;  // where its corner goes, and the kind of mark
 layout(location = 2) in vec4 aColour;  // straight alpha
 layout(location = 3) in vec4 aTexture; // for a glyph or an image: where in the texture, u0 v0 u1 v1;
-                                       // for a rounded fill, the colour at its foot; for a border, its width
+                                       // for a rounded fill, the colour at its foot; for a border, its width;
+                                       // for an arc, its width and the angles it runs between
 layout(location = 4) in vec4 aClip;    // the page's clip when it was made: x0 y0 x1 y1, in pixels
 
 layout(location = 0) out vec2 vLocal;

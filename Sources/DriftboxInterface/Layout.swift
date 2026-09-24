@@ -42,10 +42,18 @@ public enum Action: Equatable, Sendable {
   case filterStep(pattern: String, index: Int)
   /// Show a voice's knobs, or hide them if they are showing.
   case select(voice: String)
+  /// Show a voice's knobs, whatever is showing.
+  case show(voice: String)
   /// Set a 303 step's note, or pause it if that note is already set there.
   case note(pattern: String, voice: String, index: Int, note: Int)
   case bassAccent(pattern: String, voice: String, index: Int)
   case bassSlide(pattern: String, voice: String, index: Int)
+  /// Strike a voice, as the panel's "hit it" does.
+  case hit(voice: String)
+  /// Put the panel away.
+  case close
+  /// A knob, which a press turns by dragging rather than does anything to when it lifts.
+  case knob(KnobTarget)
 }
 
 /// A 303 line's rows, as the Mac draws them: two octaves of notes from the top, then a row each
@@ -138,6 +146,8 @@ public struct Layout {
   public var lanes: [Lane] = []
   public var filterLane: Rect?
   public var bassLines: [BassLine] = []
+  /// The selected voice's panel, down the right under the transport, or nil with none selected.
+  public var inspector: Inspector?
   /// The step the playhead is on, in the pattern shown, or nil when it is not playing there.
   public var playhead: Int?
   /// How far the grid's content is scrolled up inside its panel, kept to what there is.
@@ -169,12 +179,17 @@ public struct Layout {
     title = Rect(left, bar.y, max(0, middle - left), bar.height)
     readout = Rect(middle, bar.y, max(0, clickChip.x - 12 - middle), bar.height)
 
-    guard session.song != nil, let pattern = session.shownPattern else { return }
+    guard session.song != nil else { return }
+    inspector = session.selectedVoice.flatMap {
+      Self.inspector(for: $0, top: bar.maxY + margin, right: bar.maxX)
+    }
+    guard let pattern = session.shownPattern else { return }
     self.pattern = pattern
     // The playhead only means something on the pattern that is playing, and only while it is.
     if session.isPlaying, session.position?.pattern?.id == pattern.id { playhead = session.position?.step }
 
-    let width = max(0, size.x - margin * 2)
+    // Beside the panel, when there is one.
+    let width = max(0, (inspector.map { $0.frame.x - margin } ?? size.x - margin) - margin)
     let metrics = GridMetrics(steps: pattern.length, width: width - Self.inset * 2)
     self.metrics = metrics
     let voices = allVoices.enumerated().filter { pattern.tracks[$0.element.id] != nil }
@@ -230,11 +245,15 @@ public struct Layout {
   }
 
   /// The panels, which is where a press is the interface's and not the pad's.
-  public var panels: [Rect] { [bar] + (grid.map { [$0] } ?? []) }
+  public var panels: [Rect] { [bar] + [grid, inspector?.frame].compactMap { $0 } }
 
   /// What pressing at `point` would do, if anything.
   public func action(at point: SIMD2<Float>) -> Action? {
     if let chip = chips.first(where: { $0.frame.contains(point) }) { return chip.action }
+    if let inspector, inspector.frame.contains(point) {
+      if let chip = inspector.chips.first(where: { $0.frame.contains(point) }) { return chip.action }
+      return inspector.knobs.first { $0.cell.contains(point) }.map { .knob($0.target) }
+    }
     guard let grid, grid.contains(point), let pattern, let metrics else { return nil }
     for lane in lanes {
       if lane.header.contains(point) { return .select(voice: lane.voice.id) }

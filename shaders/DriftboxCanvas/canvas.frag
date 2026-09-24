@@ -38,6 +38,18 @@ float roundedDistance(vec2 local, vec2 size, float radius) {
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 
+// How far this pixel's centre is outside an arc `width` pixels wide round the circle the mark's
+// square holds, running clockwise from the top between `from` and `to`, with round ends.
+float arcDistance(vec2 local, vec2 size, float width, float from, float to) {
+  vec2 p = (local - 0.5) * size;
+  float r = 0.5 * min(size.x, size.y) - 0.5 * width;
+  float angle = atan(p.x, -p.y);
+  if (angle >= from && angle <= to) return abs(length(p) - r) - 0.5 * width;
+  vec2 start = r * vec2(sin(from), -cos(from));
+  vec2 end = r * vec2(sin(to), -cos(to));
+  return min(length(p - start), length(p - end)) - 0.5 * width;
+}
+
 void main() {
   // The clip, antialiased at its edge as the marks are.
   vec2 fromEdge = min(vPage - vClip.xy, vClip.zw - vPage);
@@ -55,6 +67,8 @@ void main() {
   } else if (vKind == KIND_BORDER) {
     float d = roundedDistance(vLocal, vShape.xy, vShape.z);
     coverage = clamp(0.5 - d, 0.0, 1.0) - clamp(0.5 - (d + vExtra.x), 0.0, 1.0);
+  } else if (vKind == KIND_ARC) {
+    coverage = clamp(0.5 - arcDistance(vLocal, vShape.xy, vExtra.x, vExtra.y, vExtra.z), 0.0, 1.0);
   } else if (vKind == KIND_GLYPH) {
     coverage = texture(atlas, vUv).a;
   } else {
