@@ -30,13 +30,16 @@ public final class RackInterface {
   /// A knob let go of without turning, and when: a second, soon after, puts it back.
   private var lastTap: (target: RackTarget, at: ContinuousClock.Instant)?
   /// The menu the last press asked for, which the window shows as its own.
-  private var menuRequest: (menu: Menu, at: SIMD2<Float>)?
+  var menuRequest: (menu: Menu, at: SIMD2<Float>)?
   /// The module a press asked to choose a file for, which the window asks with a panel of its own.
   private var fileRequest: String?
   /// A face asked for the rack's song to be opened in the groovebox, to edit it there.
   private var songRequest = false
   var menuActions: [String: () -> Void] = [:]
   var menuDisabled: Set<String> = []
+  var menuChecked: Set<String> = []
+  /// One end of a routing being typed: which routing, which end, and what is typed so far.
+  var typing: (index: Int, isMax: Bool, text: String)?
   /// On the back: what a press there is doing, and where the pointer is, in the rack's design space.
   var back: BackGesture?
   var backPointer: SIMD2<Float>?
@@ -73,6 +76,8 @@ public final class RackInterface {
     if event.kind == .mouse { hover = event.phase == .cancelled ? nil : event.location }
     switch event.phase {
     case .began:
+      // A press anywhere sets an end being typed, as leaving a field does.
+      if typing != nil { finishTyping() }
       let stage = stage
       let target = stage.target(at: event.location)
       // The back is its own: patching, trimming, carrying modules. The header is still the header.
@@ -260,6 +265,8 @@ public final class RackInterface {
       }
     case .clearLoop:
       rack.clearSongLoop()
+    case .routes:
+      rack.editRoutes(rack.editingRoutes == module ? nil : module)
     case .learn(let param):
       if pressModifiers.contains(.shift) {
         rack.clearCcBinding(module, param)
@@ -286,6 +293,8 @@ public final class RackInterface {
         face.buttons.indices.contains(index), let press = face.buttons[index].press
       else { return }
       self.press(press, on: module)
+    case .routing(let part):
+      perform(part, at: point)
     default:
       break
     }
@@ -354,6 +363,8 @@ public final class RackInterface {
   /// The keys, as the Mac's rack window plays them: two octaves from `z` and `q`, with `,` and `.`
   /// for the octave. False for any other key, and for anything held with more than Shift.
   public func key(_ event: KeyEvent) -> Bool {
+    // An end of a routing being typed has every key.
+    if typing != nil { return type(event) }
     guard event.modifiers.subtracting(.shift).isEmpty, case .character(let typed) = event.key else {
       return false
     }
@@ -390,6 +401,7 @@ public final class RackInterface {
   public func menu(at point: SIMD2<Float>) -> Menu? {
     menuActions = [:]
     menuDisabled = []
+    menuChecked = []
     guard let face = stage.face(at: point) else { return nil }
     let id = face.module.id
     let index = rack.patch.modules.firstIndex { $0.id == id } ?? 0
@@ -415,6 +427,7 @@ public final class RackInterface {
   func addMenu() -> Menu {
     menuActions = [:]
     menuDisabled = []
+    menuChecked = []
     var groups: [String] = []
     var types: [String: [String]] = [:]
     for card in ModuleFace.all where RackModules.registry[card.type] != nil {
@@ -436,6 +449,7 @@ public final class RackInterface {
   }
 
   public func menuIsEnabled(_ id: String) -> Bool { !menuDisabled.contains(id) }
+  public func menuIsChecked(_ id: String) -> Bool { menuChecked.contains(id) }
 
   public func choose(_ id: String) {
     guard menuIsEnabled(id), let action = menuActions[id] else { return }
@@ -443,11 +457,12 @@ public final class RackInterface {
     action()
   }
 
-  private func item(_ title: String, _ id: String, enabled: Bool = true, _ action: @escaping () -> Void)
-    -> MenuItem
-  {
+  func item(
+    _ title: String, _ id: String, enabled: Bool = true, checked: Bool = false, _ action: @escaping () -> Void
+  ) -> MenuItem {
     menuActions[id] = action
     if !enabled { menuDisabled.insert(id) }
+    if checked { menuChecked.insert(id) }
     return .command(title, id: id)
   }
 
@@ -488,6 +503,7 @@ public final class RackInterface {
     }
     canvas.restore()
     drawHeader(stage, on: canvas)
+    if let routing = stage.routing { drawRouting(routing, hovered: hover, on: canvas) }
   }
 
   private func drawHeader(_ stage: RackStage, on canvas: Canvas) {

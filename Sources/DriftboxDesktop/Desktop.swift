@@ -144,7 +144,9 @@ public final class Desktop {
   /// The window's title and menus as the session now is. Each is handed over only when it differs
   /// from what the window has, which the window checks itself for the menus.
   func refresh() {
-    if window.takesText != interface.takesText { window.takesText = interface.takesText }
+    // Typing is the rack's while it shows, as a routing's end is typed, and the controls' otherwise.
+    let takesText = showsRack ? rackInterface?.takesText ?? false : interface.takesText
+    if window.takesText != takesText { window.takesText = takesText }
     let title = showsRack ? rack.map(Self.title(for:)) ?? "Driftbox" : Self.title(for: session)
     if window.title != title { window.title = title }
     window.menuBar = DesktopMenus.bar(for: session, rack: rack, showsRack: showsRack)

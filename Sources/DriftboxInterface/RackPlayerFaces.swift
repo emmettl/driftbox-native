@@ -191,8 +191,14 @@ extension RackFaces {
           style: .pad(live: combiLive(module.id, id, rack: rack))))
     }
     let list = padY + 28 + 6
+    // Under the routing written out, what edits it: open beside the rack, as on the Mac.
+    let open = rack.editingRoutes == module.id
+    buttons.append(
+      RackStage.Button(
+        frame: Rect(left, bottom - 16, 110, 16), label: open ? "Close Routing" : "Routing…", press: .routes,
+        isOn: open, tint: Theme.nine, style: .option))
     return Built(
       words: routes.isEmpty ? "no routing" : "\(routes.count) routing\(routes.count == 1 ? "" : "s")",
-      cells: cells, screen: Rect(left, list, across, max(0, bottom - list)), buttons: buttons)
+      cells: cells, screen: Rect(left, list, across, max(0, bottom - 22 - list)), buttons: buttons)
   }
 }
