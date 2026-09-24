@@ -17,3 +17,6 @@ const float KIND_IMAGE = 3.0;
 // pixels, the corners' radius in the mark's origin's w.
 const float KIND_ROUNDED = 4.0;
 const float KIND_BORDER = 5.0;
+// A stroke along part of the circle its square holds, with round ends: a knob's travel. Its width
+// and the angles it runs between, clockwise from the top, in the mark's texture's x, y and z.
+const float KIND_ARC = 6.0;

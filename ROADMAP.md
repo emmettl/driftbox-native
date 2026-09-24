@@ -469,7 +469,9 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    scene as smoked glass, with the View menu's Show Controls (Tab) taking them away to perform.
    The canvas gained rounded panels with a fill that runs top to bottom, borders, and type set at
    the size it lands under an even scale, so that the interface is as sharp at 150% as at 100%.
-   The keyboard plays as the Mac's does. Left: knobs, the song strip, settings, the rack and its cables, and a grid
+   The keyboard plays as the Mac's does, and a voice selected has its panel of knobs down the
+   right, turned by dragging, on arcs the canvas draws. Left: the effects' knobs, the song strip,
+   settings, the rack and its cables, and a grid
    wider than the window.
 5. **Shipping.** The Swift runtime beside the executable; signing; winget; the `.driftbox` file
    association. Songs are already `.driftbox` — the web app's documents byte for byte, under a name

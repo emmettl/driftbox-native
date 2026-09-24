@@ -266,6 +266,24 @@ struct CanvasTests {
     }
   }
 
+  /// An arc runs clockwise from the top between its angles, its width across, and no further.
+  @Test func anArcRunsBetweenItsAngles() throws {
+    for device in try Devices.all() {
+      let read = try Self.page(device, 32) { canvas in
+        canvas.stroke = Colour(0xff0000)
+        canvas.lineWidth = 4
+        // The upper half: from the left, over the top, to the right.
+        canvas.strokeArc(16, 16, radius: 12, from: -.pi / 2, to: .pi / 2)
+      }
+      #expect(near(pixel(read, 16, 4, width: 32), red), "over the top")
+      #expect(near(pixel(read, 16, 5, width: 32), red), "its width across")
+      #expect(near(pixel(read, 27, 12, width: 32), red), "round to the right")
+      #expect(near(pixel(read, 16, 27, width: 32), clear), "and not underneath")
+      #expect(near(pixel(read, 16, 16, width: 32), clear), "nor in the middle")
+      #expect(near(pixel(read, 16, 9, width: 32), clear), "nor inside its width")
+    }
+  }
+
   /// Type under an even scale is set at the size it lands on the page, not set small and
   /// magnified: the same pixels as the larger type drawn where the scale puts it.
   @Test func scaledTypeIsSharp() throws {

@@ -105,7 +105,9 @@ struct InterfaceTests {
 
     Self.click(interface, Self.centre(kick.header))
     #expect(session.selectedVoice == "909.bd")
-    Self.click(interface, Self.centre(kick.header))
+    // Its panel has come, and the grid has made room for it.
+    let beside = try #require(interface.layout.lanes.first { $0.voice.id == "909.bd" })
+    Self.click(interface, Self.centre(beside.header))
     #expect(session.selectedVoice == nil, "and hides them again")
 
     Self.click(interface, Self.centre(layout.step(2, in: try #require(layout.filterLane))))
@@ -284,6 +286,75 @@ struct InterfaceTests {
     #expect(keys.octave == -1)
     for _ in 0..<3 { _ = press(KeyEvent(key: .character("x"))) }
     #expect(keys.octave == 1)
+  }
+
+  /// A voice selected has its panel down the right, under the transport, with its six knobs and
+  /// its sends and swing; the grid makes room beside it. Put away, the grid has the width back.
+  @Test func aSelectedVoiceHasItsPanel() throws {
+    let interface = try Self.interface(Self.bassSong())
+    let session = interface.session
+    let wide = try #require(interface.layout.grid)
+    #expect(interface.layout.inspector == nil)
+
+    session.selectedVoice = "909.bd"
+    let layout = interface.layout
+    let panel = try #require(layout.inspector)
+    #expect(panel.machine == "TR-909" && panel.title == "Bass Drum")
+    #expect(panel.frame.maxX == layout.bar.maxX && panel.frame.y == layout.bar.maxY + Layout.margin)
+    #expect(panel.knobs.map(\.target).prefix(6) == ArraySlice((0..<6).map { KnobTarget.voice("909.bd", $0) }))
+    #expect(
+      panel.knobs.map(\.target).suffix(3) == [.send("909.bd", 0), .send("909.bd", 1), .swing("909.bd")])
+    let grid = try #require(layout.grid)
+    #expect(grid.maxX < panel.frame.x && grid.width < wide.width, "beside it")
+    #expect(layout.panels.contains(panel.frame))
+
+    let close = try #require(panel.chips.first { $0.action == .close })
+    Self.click(interface, Self.centre(close.frame))
+    #expect(session.selectedVoice == nil)
+    #expect(interface.layout.grid == wide)
+
+    session.selectedVoice = "303.a"
+    let bass = try #require(interface.layout.inspector)
+    #expect(bass.machine == "TB-303" && bass.knobs.count == 8 + 3)
+    let b = try #require(bass.chips.first { $0.label == "B" })
+    Self.click(interface, Self.centre(b.frame))
+    #expect(session.selectedVoice == "303.b", "the other line's")
+    let a = try #require(interface.layout.inspector?.chips.first { $0.label == "A" })
+    Self.click(interface, Self.centre(a.frame))
+    Self.click(interface, Self.centre(a.frame))
+    #expect(session.selectedVoice == "303.a", "the lit one stays lit")
+  }
+
+  /// A knob turns as it is dragged, up for more, and the song hears it once, when it is let go: one
+  /// turn, one undo. Two quick presses put it back where it started life.
+  @Test func aKnobIsTurnedByDragging() throws {
+    let interface = try Self.interface()
+    let session = interface.session
+    session.selectedVoice = "909.bd"
+    let knob = try #require(interface.layout.inspector?.knobs.first { $0.target == .voice("909.bd", 1) })
+    let from = knob.target.value(in: try #require(session.song))
+    let at = Self.centre(knob.dial)
+
+    #expect(interface.pointer(PointerEvent(phase: .began, location: at)))
+    #expect(interface.pointer(PointerEvent(phase: .moved, location: at - SIMD2(0, 17))))
+    let turned = min(1, from + 0.1)
+    #expect(abs((interface.turning?.value ?? -1) - turned) < 1e-6, "a tenth of the way, for seventeen points")
+    #expect(!session.canUndo, "not yet")
+    #expect(interface.pointer(PointerEvent(phase: .ended, location: at - SIMD2(0, 17))))
+    #expect(interface.turning == nil)
+    #expect(abs((session.song?.kit.params["909.bd"]?.tune ?? -1) - turned) < 1e-6)
+    #expect(session.undoTitle == "Undo Set Tune")
+    session.undo()
+    #expect(!session.canUndo, "one turn, one undo")
+    session.redo()
+
+    Self.click(interface, at)
+    Self.click(interface, at)
+    #expect(session.song?.kit.params["909.bd"]?.tune == VoiceParams.defaults.tune, "back where it started")
+
+    let swing = try #require(interface.layout.inspector?.knobs.first { $0.target == .swing("909.bd") })
+    let song = try #require(session.song)
+    #expect(swing.target.format(0.5, in: song) == "· \(Int((song.swing * 100).rounded()))")
   }
 
   /// Narrow, the columns keep to a size that can still be hit; wide, they stop growing.

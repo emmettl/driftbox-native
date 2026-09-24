@@ -108,6 +108,7 @@ public final class Canvas {
     case image = 3
     case rounded = 4
     case border = 5
+    case arc = 6
   }
 
   public let device: any GPUDevice
@@ -285,6 +286,16 @@ public final class Canvas {
     place(
       .border, x, y, width, height, colour: state.stroke,
       texture: SIMD4(state.lineWidth * scaleOfTransform, 0, 0, 0), extra: radius)
+  }
+
+  /// Part of the circle `radius` round `(x, y)`, stroked `lineWidth` across in the stroke, with round
+  /// ends: from the angle `from` to `to`, in radians clockwise from the top, which may be anywhere
+  /// from -π to π. A knob's travel. Like the rounded rectangle, it is meant upright.
+  public func strokeArc(_ x: Float, _ y: Float, radius: Float, from: Float, to: Float) {
+    let reach = radius + state.lineWidth / 2
+    place(
+      .arc, x - reach, y - reach, reach * 2, reach * 2, colour: state.stroke,
+      texture: SIMD4(state.lineWidth * scaleOfTransform, min(from, to), max(from, to), 0))
   }
 
   /// How much the transform scales a length: the mean of what it does to its two axes.

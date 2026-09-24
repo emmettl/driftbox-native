@@ -21,7 +21,12 @@ public final class Interface {
   /// Whether the controls are showing. Hidden, the whole window is the scene and the pad, for
   /// performing.
   public var isShowing = true {
-    didSet { if !isShowing { pressed = nil } }
+    didSet {
+      if !isShowing {
+        pressed = nil
+        turning = nil
+      }
+    }
   }
   /// The window's size in points, which the last frame was laid out for.
   public var size: SIMD2<Float> = .zero
@@ -58,21 +63,69 @@ public final class Interface {
     case .began:
       let layout = layout
       guard layout.panels.contains(where: { $0.contains(event.location) }) else { return false }
-      pressed = (event.id, layout.action(at: event.location))
+      let action = layout.action(at: event.location)
+      pressed = (event.id, action)
+      if case .knob(let target) = action, let song = session.song {
+        let value = target.value(in: song)
+        turning = Turn(pointer: event.id, target: target, fromY: event.location.y, from: value, value: value)
+      }
       return true
     case .moved:
+      if var turn = turning, turn.pointer == event.id {
+        // Up turns it up. Option held turns it a quarter as fast, for fine work.
+        let travel = Self.travel * (event.modifiers.contains(.option) ? 4 : 1)
+        turn.value = max(0, min(1, turn.from + Double((turn.fromY - event.location.y) / travel)))
+        turning = turn
+      }
       return pressed?.pointer == event.id
     case .ended:
       guard let press = pressed, press.pointer == event.id else { return false }
       pressed = nil
-      if let action = press.action, layout.action(at: event.location) == action {
+      if let turn = turning, turn.pointer == event.id {
+        turning = nil
+        finish(turn)
+      } else if let action = press.action, layout.action(at: event.location) == action {
         perform(action, modifiers: event.modifiers)
       }
       return true
     case .cancelled:
       guard pressed?.pointer == event.id else { return false }
       pressed = nil
+      turning = nil
       return true
+    }
+  }
+
+  /// A knob being turned: by which pointer, from where, and what it was and is.
+  public struct Turn: Equatable {
+    public var pointer: Int
+    public var target: KnobTarget
+    public var fromY: Float
+    public var from: Double
+    public var value: Double
+  }
+
+  /// The knob being turned, which the song only hears about when it is let go: one turn, one undo.
+  public private(set) var turning: Turn?
+  /// A knob pressed and let go without turning, and when: a second, soon after, puts it back.
+  private var lastTap: (target: KnobTarget, at: ContinuousClock.Instant)?
+  /// Points of drag for a knob's whole travel.
+  public static let travel: Float = 170
+
+  private func finish(_ turn: Turn) {
+    if turn.value != turn.from {
+      session.edit(turn.target.editName) { turn.target.set(turn.value, in: &$0) }
+      lastTap = nil
+      return
+    }
+    let now = ContinuousClock.now
+    if let last = lastTap, last.target == turn.target, now - last.at < .milliseconds(400) {
+      lastTap = nil
+      if turn.from != turn.target.rest {
+        session.edit(turn.target.editName) { turn.target.set(turn.target.rest, in: &$0) }
+      }
+    } else {
+      lastTap = (turn.target, now)
     }
   }
 
@@ -87,6 +140,8 @@ public final class Interface {
     case .metronome: session.metronome.toggle()
     case .select(let voice):
       session.selectedVoice = session.selectedVoice == voice ? nil : voice
+    case .show(let voice):
+      session.selectedVoice = voice
     case .filterStep(let pattern, let index):
       session.editPattern(pattern, "Set Filter Step") { $0.cyclingPCF(at: index) }
     case .step(let pattern, let voice, let index):
@@ -107,6 +162,15 @@ public final class Interface {
       }
     case .bassAccent(let pattern, let voice, let index):
       editBass(pattern, voice, index, "Set Accent") { $0.accent.toggle() }
+    case .hit(let voice):
+      if let index = session.usedVoices.firstIndex(where: { $0.id == voice }) {
+        session.strike(index: index, accent: false)
+      }
+    case .close:
+      session.selectedVoice = nil
+    case .knob:
+      // Turned by dragging, which the pointer does; a knob does nothing when merely let go.
+      break
     case .bassSlide(let pattern, let voice, let index):
       editBass(pattern, voice, index, "Set Slide") { $0 = $0.settingSlide(!$0.slide) }
     }
@@ -135,6 +199,9 @@ public final class Interface {
     }
     drawBar(layout, on: canvas)
     drawGrid(layout, on: canvas)
+    if let inspector = layout.inspector, let song = session.song {
+      drawInspector(inspector, song: song, on: canvas)
+    }
   }
 
   private func isHovered(_ rect: Rect) -> Bool { hover.map(rect.contains) ?? false }
@@ -186,11 +253,10 @@ public final class Interface {
 
   /// A button as the web draws one: a dark rounded chip with a hairline edge that brightens under
   /// the pointer, lit in teal when it is on.
-  private func chip(_ chip: Layout.Chip, on canvas: Canvas) {
+  private func chip(_ chip: Layout.Chip, tint: Colour = Theme.nine, on canvas: Canvas) {
     let frame = chip.frame
     let hovered = isHovered(frame)
     let down = isPressed(chip.action)
-    let tint = Theme.nine
     canvas.fill = chip.isOn ? tint.faded(0.12) : Theme.white(down ? 0.1 : 0.045)
     canvas.fillRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: 7)
     canvas.stroke = chip.isOn ? tint.faded(0.9) : Theme.white(hovered ? 0.3 : 0.1)
@@ -373,6 +439,87 @@ public final class Interface {
         canvas.strokeRoundedRect(cell.x, cell.y, cell.width, cell.height, radius: 2)
       }
     }
+  }
+
+  /// The selected voice's panel: its machine and name, what can be done with it, its knobs, and
+  /// its sends and swing under a line.
+  private func drawInspector(_ inspector: Layout.Inspector, song: Song, on canvas: Canvas) {
+    let frame = inspector.frame
+    panel(frame, on: canvas)
+    let tint =
+      switch inspector.machine {
+      case "TR-808": Theme.eight
+      case "TR-909": Theme.nine
+      default: Theme.three
+      }
+    let x = frame.x + Layout.padding
+    canvas.align = .left
+    canvas.font = Theme.mono(9.5, weight: 600)
+    canvas.fill = tint
+    canvas.fillText(inspector.machine, x, frame.y + Layout.padding + 9)
+    canvas.font = Theme.mono(15, weight: 600)
+    canvas.fill = Theme.ink
+    canvas.fillText(inspector.title, x, frame.y + Layout.padding + 27)
+    for chip in inspector.chips { self.chip(chip, tint: tint, on: canvas) }
+    canvas.fill = Theme.edge
+    canvas.fillRect(x, inspector.sendsTop, frame.width - Layout.padding * 2, 1)
+    canvas.font = Theme.mono(8.5, weight: 500)
+    canvas.fill = Theme.dim
+    canvas.fillText("OUT", x, inspector.sendsTop + 29)
+    for knob in inspector.knobs {
+      let value = turning?.target == knob.target ? turning!.value : knob.target.value(in: song)
+      let isSend = knob.dial.width < 40
+      drawKnob(
+        knob, value: value, label: knob.target.spec.label, text: knob.target.format(value, in: song),
+        tint: isSend ? tint.faded(0.8) : tint, active: turning?.target == knob.target, on: canvas)
+    }
+  }
+
+  /// A knob, as the Mac draws one: a dark cap lit from above, its travel round it with the value
+  /// lit in the voice's colour, a pointer, and its name and value underneath.
+  private func drawKnob(
+    _ knob: Layout.Knob, value: Double, label: String, text: String, tint: Colour, active: Bool,
+    on canvas: Canvas
+  ) {
+    let dial = knob.dial
+    let d = dial.width
+    let centre = SIMD2(dial.x + d / 2, dial.y + d / 2)
+    let hovered = isHovered(knob.cell)
+    // The cap.
+    let cap = dial.outset(-d * 0.2)
+    canvas.fill = Theme.white(0.12)
+    canvas.fillRoundedRect(
+      cap.x, cap.y, cap.width, cap.height, radius: cap.width / 2, foot: Theme.white(0.02))
+    canvas.stroke = Theme.white(0.1)
+    canvas.lineWidth = 1
+    canvas.strokeRoundedRect(cap.x, cap.y, cap.width, cap.height, radius: cap.width / 2)
+    // The travel, and the value along it, with a glow under.
+    let sweep = Float.pi * 1.5
+    let start = -sweep / 2
+    let end = start + sweep * Float(max(0.0001, value))
+    let radius = d / 2 - 2
+    canvas.lineWidth = 3
+    canvas.stroke = Theme.white(0.12)
+    canvas.strokeArc(centre.x, centre.y, radius: radius, from: start, to: start + sweep)
+    canvas.lineWidth = 7
+    canvas.stroke = tint.faded(active ? 0.35 : hovered ? 0.22 : 0.12)
+    canvas.strokeArc(centre.x, centre.y, radius: radius, from: start, to: end)
+    canvas.lineWidth = 3
+    canvas.stroke = tint
+    canvas.strokeArc(centre.x, centre.y, radius: radius, from: start, to: end)
+    // The pointer.
+    let direction = SIMD2(sin(end), -cos(end))
+    canvas.stroke = Theme.ink
+    canvas.lineWidth = 2
+    canvas.strokeLines([(centre + direction * (d * 0.08), centre + direction * (d * 0.3))])
+    // Its name and where it is.
+    canvas.align = .center
+    canvas.font = Theme.mono(8.5, weight: 500)
+    canvas.fill = Theme.dim
+    canvas.fillText(label.uppercased(), centre.x, dial.maxY + 12)
+    canvas.font = Theme.mono(9.5)
+    canvas.fill = active ? Theme.ink : Theme.ink.faded(0.55)
+    canvas.fillText(text, centre.x, dial.maxY + 25)
   }
 
   /// One step: off, on, or accented, lit top to bottom; the playhead's column outlined in teal all
