@@ -365,7 +365,9 @@ every milestone. Then, everything the web app teaches with, and what a Mac does 
 Plug-in hosting (Audio Units first, which work on iOS too; VST3 on the Mac), AUv3 export,
 external displays, performance capture to video.
 
-1. **Plug-in hosting.** ← *here.* Begun: the rack's `plugin` module, which the reference has
+1. **Plug-in hosting.** Audio Units done; VST3 left, which needs a VST3 plug-in to test against
+   and none is installed here — the interfaces written out in Swift, as WASAPI's COM ones are, and
+   a small plug-in of the project's own to hold them to. Begun: the rack's `plugin` module, which the reference has
    no counterpart to and keeps as a placeholder. In the constrained graph it is a slot holding a C
    function and a context, which the host fills, so nothing of any plug-in format reaches the
    audio targets; empty, or with the plug-in missing, it is silent. `RackHost` keeps each module's
@@ -397,6 +399,21 @@ external displays, performance capture to video.
    macro that moves, knob and CV together, to its param once a block, across the param's range as
    the unit shows it, logarithmic for a frequency; a version 2 unit drops a ramped change, so none
    is ramped. A knob names what it turns and says its value in that param's words.
+2. ~~**External displays.**~~ Done, as part of the visuals: the visuals window goes to any display,
+   full screen, and comes back there at the next launch, with the main window's backdrop showing
+   its frame.
+3. **Performance capture to video.** ← *here.* Begun: File › Export Movie writes the song as it
+   is, with the scene being shown, to a QuickTime movie — H.264 at 1080p and 60 frames a second,
+   AAC at 48 kHz — faster than it plays. One engine makes both: an `EngineHost` renders the song
+   and its tail, a `Session` over it turns what it played into each frame's scene input exactly as
+   the app's visuals are fed, and a renderer of its own draws each frame offscreen. The sound is
+   rendered first and the frames' inputs kept, then the writer is fed whichever track it will take,
+   since it holds one back until the other catches up and the sound's encoder keeps some in hand.
+   Next: a live performance captured as played — the pad, the keys, the edits — rather than the
+   song as written.
+4. **AUv3 export.** The engine and the rack are Audio Units already, in `DriftboxHostMac`; what is
+   left is the extension that carries them into another app, which needs a bundle SwiftPM does not
+   build.
 
 ### What the later milestones ask of the first
 

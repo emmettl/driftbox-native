@@ -394,6 +394,14 @@ public final class Session {
     startEngine()
   }
 
+  /// A song from nowhere the session remembers — a copy of another's, to render — called `name`,
+  /// opened stopped. Not remembered as the song to open next time.
+  public func open(_ song: Song, named name: String) {
+    take(
+      song, as: CatalogueEntry(id: "", name: name, blurb: "", visual: song.visual ?? ""), from: nil,
+      remembered: false)
+  }
+
   /// A song document from disk, in the web app's format.
   public func open(file url: URL) {
     guard take(file: url) else {

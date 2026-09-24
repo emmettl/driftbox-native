@@ -21,6 +21,15 @@
   public final class Stage {
     @ObservationIgnored let player: Session
     @ObservationIgnored let renderer: SceneRenderer?
+    /// A movie being written, and how far it has got from 0 to 1; nil while none is.
+    public private(set) var exporting: Double?
+    /// Why the last movie was not written, until another is begun or this is put away.
+    public var exportFailure: String?
+    @ObservationIgnored private var exportStopped = false
+    /// What is done with a movie once it is written: shown in the Finder, or, in a test, noted.
+    @ObservationIgnored var reveal: (URL) -> Void = { NSWorkspace.shared.activateFileViewerSelecting([$0]) }
+    /// The format movies are written in; smaller in a test.
+    @ObservationIgnored var movieFormat = MovieExport.Format()
     /// The window the visuals go out to.
     @ObservationIgnored public private(set) lazy var output = VisualsWindow(stage: self)
     /// A scene chosen over the one the song names, or nil for the song's own. Put back to the
@@ -79,6 +88,36 @@
       descriptor.storageMode = .private
       return device.makeTexture(descriptor: descriptor)
     }
+
+    // MARK: - Movies
+
+    /// Write the song as it is now, with the scene being shown, to a movie at `url`, and show it in
+    /// the Finder once it is written. One at a time; it carries on while the song is edited or
+    /// played, since it renders a copy of its own.
+    func exportMovie(to url: URL) {
+      guard exporting == nil, let song = player.song else { return }
+      exporting = 0
+      exportFailure = nil
+      exportStopped = false
+      let scene = sceneId
+      Task {
+        do {
+          try await MovieExport.write(song, scene: scene, to: url, format: movieFormat) { [weak self] done in
+            guard let self else { return false }
+            exporting = done
+            return !exportStopped
+          }
+          reveal(url)
+        } catch is CancellationError {
+        } catch {
+          exportFailure = "The movie could not be written: \(error)"
+        }
+        exporting = nil
+      }
+    }
+
+    /// Stop the movie being written, and take away what there is of it.
+    func stopExport() { exportStopped = true }
 
     // MARK: - Remembered between launches
 

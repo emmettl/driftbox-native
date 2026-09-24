@@ -59,6 +59,9 @@
         Button("Export Stems…") { files.exportStems() }
           .keyboardShortcut("e", modifiers: [.command, .shift])
           .disabled(player.song == nil)
+        Button("Export Movie…") { files.exportMovie(through: stage) }
+          .keyboardShortcut("e", modifiers: [.command, .option])
+          .disabled(player.song == nil || stage.exporting != nil)
       }
 
       // The manager is the one the window hands the content; what these show is read back off it,
