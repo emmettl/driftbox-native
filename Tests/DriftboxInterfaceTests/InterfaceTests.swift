@@ -475,6 +475,76 @@ struct InterfaceTests {
     #expect(session.undoTitle == "Undo Set Swing")
   }
 
+  /// A lane's menu turns it, clears it, copies it into another, and loops it shorter, ticking the
+  /// length it loops at; paste is greyed until there is something to paste.
+  @Test func aLanesMenu() throws {
+    let interface = try Self.interface()
+    let session = interface.session
+    let layout = interface.layout
+    let kick = try #require(layout.lanes.first { $0.voice.id == "909.bd" })
+    let clap = try #require(layout.lanes.first { $0.voice.id == "808.cp" })
+    let menu = try #require(interface.menu(at: Self.centre(layout.step(5, in: kick.frame))))
+    #expect(menu.title == "Bass Drum")
+    #expect(!interface.menuIsEnabled("lane.paste"), "nothing to paste")
+    #expect(interface.menuIsChecked("lane.length.16") && !interface.menuIsChecked("lane.length.8"))
+
+    interface.choose("lane.rotateRight")
+    #expect(session.shownPattern?.step("909.bd", at: 1) == .on, "the beat moved on a step")
+    #expect(session.undoTitle == "Undo Rotate Right")
+    _ = interface.menu(at: Self.centre(kick.header))
+    interface.choose("lane.copy")
+    _ = interface.menu(at: Self.centre(clap.header))
+    #expect(interface.menuIsEnabled("lane.paste"))
+    interface.choose("lane.paste")
+    #expect(session.shownPattern?.tracks["808.cp"] == session.shownPattern?.tracks["909.bd"])
+    _ = interface.menu(at: Self.centre(kick.header))
+    interface.choose("lane.length.8")
+    #expect(session.shownPattern?.trackLength("909.bd") == 8)
+    _ = interface.menu(at: Self.centre(kick.header))
+    #expect(interface.menuIsChecked("lane.length.8"))
+    interface.choose("lane.clear")
+    #expect(session.shownPattern?.tracks["909.bd"] == nil, "cleared, the lane goes")
+
+    #expect(interface.menu(at: SIMD2(400, 200)) == nil, "the scene has no menu")
+    interface.choose("lane.clear")
+    #expect(session.undoTitle == "Undo Clear Lane", "and a command of a menu gone does nothing")
+  }
+
+  /// A section's menu repeats it, moves it and takes it out; a pattern's adds it to the song,
+  /// duplicates it and removes it.
+  @Test func aSectionsMenuAndAPatterns() throws {
+    let interface = try Self.interface(Self.chainedSong())
+    let session = interface.session
+    let sections = interface.layout.sections
+    let menu = try #require(interface.menu(at: Self.centre(sections[1].frame)))
+    #expect(menu.title == "Break")
+    #expect(interface.menuIsChecked("section.repeat.1") && interface.menuIsChecked("section.pattern.q"))
+    interface.choose("section.repeat.4")
+    #expect(session.song?.chain[1].repeat == 4)
+    _ = interface.menu(at: Self.centre(interface.layout.sections[0].frame))
+    #expect(!interface.menuIsEnabled("section.earlier"), "the first can go no earlier")
+    interface.choose("section.later")
+    #expect(session.song?.chain.map(\.pattern) == ["q", "p", "p"])
+    _ = interface.menu(at: Self.centre(interface.layout.sections[2].frame))
+    interface.choose("section.remove")
+    #expect(session.song?.chain.count == 2)
+
+    let breakChip = try #require(interface.layout.patternChips.first { $0.label == "Break" })
+    _ = try #require(interface.menu(at: Self.centre(breakChip.frame)))
+    interface.choose("pattern.addToSong")
+    #expect(session.song?.chain.last?.pattern == "q")
+    _ = interface.menu(at: Self.centre(breakChip.frame))
+    interface.choose("pattern.duplicate")
+    #expect(session.song?.patterns.count == 3)
+    #expect(session.editing == session.song?.patterns.last?.id, "the copy, shown")
+    let copy = try #require(session.editing)
+    let copyChip = try #require(interface.layout.patternChips.first { $0.action == .showPattern(copy) })
+    _ = interface.menu(at: Self.centre(copyChip.frame))
+    interface.choose("pattern.remove")
+    #expect(session.song?.patterns.count == 2)
+    #expect(session.editing == nil, "following again, with the one shown gone")
+  }
+
   /// Narrow, the columns keep to a size that can still be hit; wide, they stop growing.
   @Test func theColumnsStretchBetweenLimits() {
     #expect(GridMetrics(steps: 16, width: 200).stride == GridMetrics.minimumStride)

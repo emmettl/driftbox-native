@@ -47,6 +47,19 @@ final class StandInWindow: ShellWindow {
     asked.append(name)
     return saveAnswer
   }
+  /// The context menus shown, and what the next one has chosen from it, if that can be chosen.
+  var popped: [Menu] = []
+  var popUpChoice: String?
+  func popUp(
+    _ menu: Menu, at point: SIMD2<Float>, isEnabled: (String) -> Bool, isChecked: (String) -> Bool
+  ) -> String? {
+    popped.append(menu)
+    guard let choice = popUpChoice, menu.commands.contains(where: { $0.id == choice }), isEnabled(choice)
+    else {
+      return nil
+    }
+    return choice
+  }
 
   /// A command as the window sends one: only while enabled.
   func choose(_ id: String) {
@@ -302,6 +315,34 @@ struct DesktopTests {
       window.onEvent?(.pointer(PointerEvent(phase: .ended, location: onTheBar)))
       try desktop.drawFrame()
       #expect(surface.presented == 2)
+    }
+  }
+
+  /// The secondary button on a lane shows the lane's menu as the window shows one, and what is
+  /// chosen from it is done; it is nothing to the pad.
+  @Test func aLanesMenuIsTheWindows() throws {
+    for device in try Self.devices() {
+      try withTemporaryDirectory { directory in
+        let (desktop, window, _) = try Self.desktop(on: device)
+        let url = directory.appendingPathComponent("Groove.driftbox")
+        try Data(SongCodec.encode(Self.song()).utf8).write(to: url)
+        window.chosenFile = url
+        window.choose(DesktopMenus.open)
+        window.width = 1280
+        window.height = 720
+        try desktop.drawFrame()
+        let lane = try #require(desktop.interface.layout.lanes.first)
+        let at = SIMD2(lane.frame.x + 200, lane.frame.y + lane.frame.height / 2)
+
+        window.popUpChoice = "lane.clear"
+        window.onEvent?(.pointer(PointerEvent(phase: .began, location: at, button: 1)))
+        window.onEvent?(.pointer(PointerEvent(phase: .ended, location: at, button: 1)))
+        #expect(window.popped.first?.title == "Bass Drum")
+        #expect(window.popped.first?.commands.map(\.id).contains("lane.paste") == true)
+        #expect(desktop.session.shownPattern?.tracks["909.bd"] == nil, "cleared, the lane goes")
+        #expect(desktop.session.undoTitle == "Undo Clear Lane")
+        #expect(desktop.session.padTouch == nil)
+      }
     }
   }
 
