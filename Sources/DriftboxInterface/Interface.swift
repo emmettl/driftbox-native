@@ -166,6 +166,22 @@ public final class Interface {
       if let index = session.usedVoices.firstIndex(where: { $0.id == voice }) {
         session.strike(index: index, accent: false)
       }
+    case .seek(let bar):
+      session.seek(toBar: bar)
+    case .follow:
+      session.editing = nil
+    case .showPattern(let id):
+      session.editing = id
+    case .addPattern:
+      let length = session.shownPattern?.length ?? 16
+      var added: String?
+      session.edit("Add Pattern") { song in
+        let result = song.addingPattern(length: length)
+        song = result.song
+        added = result.id
+      }
+      // Made in order to be worked on: it is the one shown.
+      if let added { session.editing = added }
     case .close:
       session.selectedVoice = nil
     case .knob:
@@ -198,6 +214,7 @@ public final class Interface {
       hover.flatMap { layout.action(at: $0) == press.action ? press.action : nil }
     }
     drawBar(layout, on: canvas)
+    drawStrip(layout, on: canvas)
     drawGrid(layout, on: canvas)
     if let inspector = layout.inspector, let song = session.song {
       drawInspector(inspector, song: song, on: canvas)
@@ -271,8 +288,12 @@ public final class Interface {
   private func drawGrid(_ layout: Layout, on canvas: Canvas) {
     guard let grid = layout.grid, let pattern = layout.pattern, let metrics = layout.metrics else { return }
     panel(grid, on: canvas)
+    drawPatternBar(layout, on: canvas)
+    guard let rows = layout.gridContent else { return }
+    canvas.fill = Theme.edge
+    canvas.fillRect(grid.x + 1, rows.y, grid.width - 2, 1)
     canvas.save()
-    canvas.clip(grid.x + 1, grid.y + 1, grid.width - 2, grid.height - 2)
+    canvas.clip(grid.x + 1, rows.y + 1, grid.width - 2, rows.height - 2)
 
     // The ruler: every fourth tick brighter, so a bar reads in beats, and the playhead's tall and lit.
     if let ruler = layout.ruler {
@@ -345,9 +366,9 @@ public final class Interface {
 
     // Where the grid is scrolled to, when it is taller than its panel.
     if layout.maxScroll > 0 {
-      let track = grid.height - 24
-      let thumb = max(24, track * grid.height / (grid.height + layout.maxScroll))
-      let top = grid.y + 12 + (track - thumb) * layout.scroll / layout.maxScroll
+      let track = rows.height - 16
+      let thumb = max(24, track * rows.height / (rows.height + layout.maxScroll))
+      let top = rows.y + 8 + (track - thumb) * layout.scroll / layout.maxScroll
       canvas.fill = Theme.white(0.18)
       canvas.fillRoundedRect(grid.maxX - 7, top, 3, thumb, radius: 1.5)
     }
@@ -437,6 +458,85 @@ public final class Interface {
         canvas.stroke = Theme.three.faded(0.55)
         canvas.lineWidth = 1
         canvas.strokeRoundedRect(cell.x, cell.y, cell.width, cell.height, radius: 2)
+      }
+    }
+  }
+
+  /// The song, drawn to scale: a section per entry of the chain, coloured by pattern so the song's
+  /// shape shows — the verse that comes back, the break in the middle. The section the transport is
+  /// in lights and fills as it goes, and the loop is a bracket over the bars it covers.
+  private func drawStrip(_ layout: Layout, on canvas: Canvas) {
+    guard let strip = layout.strip else { return }
+    panel(strip, on: canvas)
+    canvas.align = .left
+    canvas.font = Theme.mono(9, weight: 500)
+    canvas.fill = Theme.dim
+    canvas.fillText("SONG", strip.x + 14, strip.y + 17)
+    canvas.align = .right
+    canvas.fillText("\(layout.totalBars) bars", strip.maxX - 14, strip.y + 17)
+
+    let bar = session.position?.bar ?? -1
+    let step = session.position?.step ?? 0
+    let length = session.position?.pattern?.length ?? 16
+    for section in layout.sections {
+      let frame = section.frame
+      let tint = Theme.patternColour(section.colour)
+      let current = bar >= section.start && bar < section.start + section.bars
+      let playing = current && session.isPlaying
+      let hovered = isHovered(frame)
+      let radius = min(6, frame.width / 2)
+      canvas.fill = tint.faded(playing ? 0.28 : hovered ? 0.2 : 0.12)
+      canvas.fillRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: radius)
+      if playing {
+        let progress =
+          (Float(bar - section.start) + Float(step) / Float(max(1, length))) / Float(section.bars)
+        let width = frame.width * min(1, max(0, progress))
+        canvas.fill = tint.faded(0.35)
+        canvas.fillRoundedRect(frame.x, frame.y, width, frame.height, radius: min(radius, width / 2))
+      }
+      if frame.width > 34 {
+        canvas.save()
+        canvas.clip(frame.x, frame.y, frame.width - 4, frame.height)
+        canvas.align = .left
+        canvas.font = Theme.mono(10, weight: playing ? 600 : 400)
+        canvas.fill = playing ? Theme.ink : Theme.ink.faded(0.75)
+        canvas.fillText(section.name, frame.x + 7, frame.y + frame.height / 2 + 4)
+        if section.bars > 1, frame.width > 70 {
+          canvas.align = .right
+          canvas.font = Theme.mono(9)
+          canvas.fill = Theme.dim
+          canvas.fillText("×\(section.bars)", frame.maxX - 7, frame.y + frame.height / 2 + 4)
+        }
+        canvas.restore()
+      }
+      canvas.stroke = tint.faded(playing ? 0.95 : current || hovered ? 0.6 : 0.3)
+      canvas.lineWidth = 1
+      canvas.strokeRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: radius)
+    }
+    if let loop = session.loop, let sections = layout.sectionsFrame, layout.totalBars > 0 {
+      let from = layout.x(ofBar: loop.start)
+      let to = layout.x(ofBar: loop.end, end: true)
+      canvas.stroke = Theme.live
+      canvas.lineWidth = 2
+      canvas.strokeRoundedRect(
+        from - 3, sections.y - 3, max(8, to - from + 6), sections.height + 6, radius: 8)
+    }
+  }
+
+  /// The patterns, at the grid's head: follow the transport, or show one to edit; and add one.
+  private func drawPatternBar(_ layout: Layout, on canvas: Canvas) {
+    guard let bar = layout.patternBar else { return }
+    canvas.align = .left
+    canvas.font = Theme.mono(9, weight: 500)
+    canvas.fill = Theme.dim
+    canvas.fillText("PATTERN", bar.x + 4, bar.y + bar.height / 2 + 3)
+    let playing = session.isPlaying ? session.position?.pattern?.id : nil
+    for chip in layout.patternChips {
+      self.chip(chip, on: canvas)
+      // The pattern playing, whichever is shown, has a light.
+      if case .showPattern(let id) = chip.action, id == playing {
+        canvas.fill = Theme.live
+        canvas.fillEllipse(chip.frame.maxX - 8, chip.frame.y + 4, 4, 4)
       }
     }
   }

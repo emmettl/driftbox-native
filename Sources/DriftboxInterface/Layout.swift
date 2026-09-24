@@ -54,6 +54,14 @@ public enum Action: Equatable, Sendable {
   case close
   /// A knob, which a press turns by dragging rather than does anything to when it lifts.
   case knob(KnobTarget)
+  /// Play from a bar of the song, as a section of the strip does.
+  case seek(bar: Int)
+  /// Show whichever pattern is playing.
+  case follow
+  /// Show a pattern to edit, whatever is playing.
+  case showPattern(String)
+  /// Add a pattern the length of the one shown, and show it.
+  case addPattern
 }
 
 /// A 303 line's rows, as the Mac draws them: two octaves of notes from the top, then a row each
@@ -138,8 +146,21 @@ public struct Layout {
   public var title: Rect
   public var readout: Rect
 
+  /// The song's strip under the transport, and its sections, or nil with no song.
+  public var strip: Rect?
+  public var sections: [Section] = []
+  /// Where the sections are drawn, inside the strip.
+  public var sectionsFrame: Rect?
+  /// The song's length in bars.
+  public var totalBars = 0
+
   /// The grid's panel, and what is in it, or nil with no song.
   public var grid: Rect?
+  /// The row of patterns at the grid's head, which stays put as the grid scrolls under it.
+  public var patternBar: Rect?
+  public var patternChips: [Chip] = []
+  /// Where the grid's rows are, and are seen: the panel under its pattern bar.
+  public var gridContent: Rect?
   public var pattern: DriftboxSeq.Pattern?
   public var metrics: GridMetrics?
   public var ruler: Rect?
@@ -179,9 +200,16 @@ public struct Layout {
     title = Rect(left, bar.y, max(0, middle - left), bar.height)
     readout = Rect(middle, bar.y, max(0, clickChip.x - 12 - middle), bar.height)
 
-    guard session.song != nil else { return }
+    guard let song = session.song else { return }
+    let strip = Rect(margin, bar.maxY + margin, bar.width, Self.stripHeight)
+    self.strip = strip
+    let sectionsFrame = Rect(strip.x + 14, strip.y + 26, max(0, strip.width - 28), 24)
+    self.sectionsFrame = sectionsFrame
+    (sections, totalBars) = Self.sections(of: song, in: sectionsFrame)
+    let below = strip.maxY + margin
+
     inspector = session.selectedVoice.flatMap {
-      Self.inspector(for: $0, top: bar.maxY + margin, right: bar.maxX)
+      Self.inspector(for: $0, top: below, right: bar.maxX)
     }
     guard let pattern = session.shownPattern else { return }
     self.pattern = pattern
@@ -200,17 +228,24 @@ public struct Layout {
     let content =
       8 + 5 + Float(voices.count) * (laneHeight + 5) + 5 + filterHeight
       + Float(lines.count) * (10 + lineHeight)
-    // As tall as what is in it, up to the room under the transport; past that, it scrolls.
-    let room = max(0, size.y - margin - (bar.maxY + margin))
-    let height = min(content + Self.inset * 2, room)
+    // As tall as what is in it and its pattern bar, up to the room under the strip; past that, it
+    // scrolls under the pattern bar.
+    let head = Self.patternBarHeight + 16
+    let room = max(0, size.y - margin - below)
+    let height = min(head + content + Self.inset + 8, room)
     let grid = Rect(margin, size.y - margin - height, width, height)
     self.grid = grid
-    maxScroll = max(0, content + Self.inset * 2 - height)
+    maxScroll = max(0, head + content + Self.inset + 8 - height)
     self.scroll = min(max(0, scroll), maxScroll)
+    let patternBar = Rect(grid.x + Self.inset, grid.y + 8, width - Self.inset * 2, Self.patternBarHeight)
+    self.patternBar = patternBar
+    patternChips = Self.patternChips(session: session, song: song, shown: pattern, in: patternBar)
+    let rows = Rect(grid.x, patternBar.maxY + 8, width, max(0, grid.maxY - patternBar.maxY - 8))
+    gridContent = rows
 
     let x = grid.x + Self.inset
     let inner = width - Self.inset * 2
-    var y = grid.y + Self.inset - self.scroll
+    var y = rows.y + 8 - self.scroll
     ruler = Rect(x + GridMetrics.labelWidth + 4, y, metrics.stride * Float(metrics.steps), 8)
     y += 8 + 5
     for (index, voice) in voices {
@@ -245,16 +280,19 @@ public struct Layout {
   }
 
   /// The panels, which is where a press is the interface's and not the pad's.
-  public var panels: [Rect] { [bar] + [grid, inspector?.frame].compactMap { $0 } }
+  public var panels: [Rect] { [bar] + [strip, grid, inspector?.frame].compactMap { $0 } }
 
   /// What pressing at `point` would do, if anything.
   public func action(at point: SIMD2<Float>) -> Action? {
     if let chip = chips.first(where: { $0.frame.contains(point) }) { return chip.action }
+    if let section = sections.first(where: { $0.frame.contains(point) }) { return .seek(bar: section.start) }
     if let inspector, inspector.frame.contains(point) {
       if let chip = inspector.chips.first(where: { $0.frame.contains(point) }) { return chip.action }
       return inspector.knobs.first { $0.cell.contains(point) }.map { .knob($0.target) }
     }
-    guard let grid, grid.contains(point), let pattern, let metrics else { return nil }
+    if let chip = patternChips.first(where: { $0.frame.contains(point) }) { return chip.action }
+    // The rows only where they are seen, under the pattern bar.
+    guard let gridContent, gridContent.contains(point), let pattern, let metrics else { return nil }
     for lane in lanes {
       if lane.header.contains(point) { return .select(voice: lane.voice.id) }
       guard lane.frame.contains(point) else { continue }
