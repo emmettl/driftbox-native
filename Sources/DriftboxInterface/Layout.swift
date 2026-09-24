@@ -179,11 +179,22 @@ public struct Layout {
   public var scroll: Float = 0
   /// How far it can be.
   public var maxScroll: Float = 0
+  /// How far the steps are scrolled left, under the lanes' names, when they are wider than the grid.
+  public var scrollX: Float = 0
+  public var maxScrollX: Float = 0
+  /// Where the steps are seen: right of the lanes' names, under the pattern bar.
+  public var columns: Rect?
+  /// Where the first step's column starts, scrolled.
+  public var columnsLeft: Float = 0
 
-  /// The layout for a window `size` points across, the grid scrolled up by `scroll`, and the song's
-  /// effects down the right if `effects`, or the selected voice's knobs if not.
+  /// The layout for a window `size` points across, the grid scrolled up by `scroll` and left by
+  /// `scrollX`, the song's effects down the right if `effects` or the selected voice's knobs if not,
+  /// and a pattern's chip showing the name typed for it, if one is being renamed.
   @MainActor
-  public init(session: Session, size: SIMD2<Float>, scroll: Float = 0, effects: Bool = false) {
+  public init(
+    session: Session, size: SIMD2<Float>, scroll: Float = 0, scrollX: Float = 0, effects: Bool = false,
+    renaming: (pattern: String, text: String)? = nil
+  ) {
     self.size = size
     let margin = Self.margin
     bar = Rect(margin, margin, max(0, size.x - margin * 2), Self.barHeight)
@@ -255,14 +266,22 @@ public struct Layout {
     self.scroll = min(max(0, scroll), maxScroll)
     let patternBar = Rect(grid.x + Self.inset, grid.y + 8, width - Self.inset * 2, Self.patternBarHeight)
     self.patternBar = patternBar
-    patternChips = Self.patternChips(session: session, song: song, shown: pattern, in: patternBar)
+    patternChips = Self.patternChips(
+      session: session, song: song, shown: pattern, in: patternBar, renaming: renaming)
     let rows = Rect(grid.x, patternBar.maxY + 8, width, max(0, grid.maxY - patternBar.maxY - 8))
     gridContent = rows
 
     let x = grid.x + Self.inset
     let inner = width - Self.inset * 2
+    // The steps, wider than there is room for beside the lanes' names, scroll under them.
+    let first = x + 4 + GridMetrics.labelWidth
+    let seen = max(0, inner - 8 - GridMetrics.labelWidth)
+    maxScrollX = max(0, metrics.stride * Float(metrics.steps) - GridMetrics.gap - seen)
+    self.scrollX = min(max(0, scrollX), maxScrollX)
+    columnsLeft = first - self.scrollX
+    columns = Rect(first, rows.y, seen, rows.height)
     var y = rows.y + 8 - self.scroll
-    ruler = Rect(x + GridMetrics.labelWidth + 4, y, metrics.stride * Float(metrics.steps), 8)
+    ruler = Rect(columnsLeft, y, metrics.stride * Float(metrics.steps), 8)
     y += 8 + 5
     for (index, voice) in voices {
       lanes.append(
@@ -280,7 +299,7 @@ public struct Layout {
         BassLine(
           voice: voice, frame: frame, header: Rect(x + 4, y + 6, GridMetrics.labelWidth, 28),
           cells: Rect(
-            x + 4 + GridMetrics.labelWidth, y + 6, metrics.stride * Float(metrics.steps) - GridMetrics.gap,
+            columnsLeft, y + 6, metrics.stride * Float(metrics.steps) - GridMetrics.gap,
             BassMetrics.height)))
       y += lineHeight
     }
@@ -291,8 +310,7 @@ public struct Layout {
     guard let metrics else { return Rect(0, 0, 0, 0) }
     let height = lane == filterLane ? metrics.stepHeight * 0.8 : metrics.stepHeight
     let top = lane == filterLane ? lane.y : lane.y + 2
-    return Rect(
-      lane.x + 4 + GridMetrics.labelWidth + Float(index) * metrics.stride, top, metrics.cell, height)
+    return Rect(columnsLeft + Float(index) * metrics.stride, top, metrics.cell, height)
   }
 
   /// The panels, which is where a press is the interface's and not the pad's.
@@ -310,23 +328,25 @@ public struct Layout {
     if let chip = patternChips.first(where: { $0.frame.contains(point) }) { return chip.action }
     // The rows only where they are seen, under the pattern bar.
     guard let gridContent, gridContent.contains(point), let pattern, let metrics else { return nil }
+    // A step only where steps are seen, and not under the names they scroll beneath.
+    let onSteps = columns?.contains(point) ?? false
     for lane in lanes {
       if lane.header.contains(point) { return .select(voice: lane.voice.id) }
-      guard lane.frame.contains(point) else { continue }
+      guard onSteps, lane.frame.contains(point) else { continue }
       if let index = column(at: point.x, lane: lane.frame, metrics: metrics),
         step(index, in: lane.frame).contains(point), index < pattern.trackLength(lane.voice.id)
       {
         return .step(pattern: pattern.id, voice: lane.voice.id, index: index)
       }
     }
-    if let filterLane, let index = column(at: point.x, lane: filterLane, metrics: metrics),
+    if onSteps, let filterLane, let index = column(at: point.x, lane: filterLane, metrics: metrics),
       step(index, in: filterLane).contains(point)
     {
       return .filterStep(pattern: pattern.id, index: index)
     }
     for line in bassLines {
       if line.header.contains(point) { return .select(voice: line.voice) }
-      if line.cells.contains(point) {
+      if onSteps, line.cells.contains(point) {
         return bassAction(at: point, in: line, pattern: pattern, metrics: metrics)
       }
     }
@@ -376,7 +396,7 @@ public struct Layout {
   }
 
   private func column(at x: Float, lane: Rect, metrics: GridMetrics) -> Int? {
-    let along = x - (lane.x + 4 + GridMetrics.labelWidth)
+    let along = x - columnsLeft
     guard along >= 0 else { return nil }
     let index = Int(along / metrics.stride)
     return index < metrics.steps ? index : nil

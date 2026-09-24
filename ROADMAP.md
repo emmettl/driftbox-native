@@ -485,8 +485,9 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    The tempo and the swing are numbers dragged in the transport, as a data wheel sets them. The
    secondary button gives a lane, a 303 line, a section or a pattern its menu, as Windows shows
    one: turning, transposing, clearing, copying, loop lengths, repeats, moving and removing.
-   Left: renaming, the sections' machines, settings, the rack and its cables, and a grid wider
-   than the window.
+   A section's menu gives each machine a pattern of its own there, dotted on the strip; a pattern
+   is renamed in its chip; and steps wider than the grid scroll sideways under the lanes' names.
+   Left: settings, and the rack and its cables.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift

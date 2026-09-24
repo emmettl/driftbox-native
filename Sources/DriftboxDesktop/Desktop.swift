@@ -119,6 +119,7 @@ public final class Desktop {
   /// The window's title and menus as the session now is. Each is handed over only when it differs
   /// from what the window has, which the window checks itself for the menus.
   func refresh() {
+    if window.takesText != interface.takesText { window.takesText = interface.takesText }
     let title = Self.title(for: session)
     if window.title != title { window.title = title }
     window.menuBar = DesktopMenus.bar(for: session)
@@ -148,7 +149,9 @@ public final class Desktop {
     case .scroll(let scroll):
       _ = interface.scroll(scroll)
     case .key(let key):
-      _ = keys.play(key, on: session)
+      // A name being typed has every key; otherwise the keyboard is an instrument.
+      if !interface.key(key) { _ = keys.play(key, on: session) }
+      window.takesText = interface.takesText
     default:
       break
     }

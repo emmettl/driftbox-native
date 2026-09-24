@@ -1,5 +1,6 @@
 import DriftboxCanvas
 import DriftboxEngine
+import DriftboxSeq
 import DriftboxText
 
 /// Driftbox's look, which is the web app's and the Mac's: panels of smoked glass over the visuals,
@@ -36,6 +37,15 @@ public enum Theme {
   public static func patternColour(_ index: Int) -> Colour {
     let palette = [eight, nine, three, violet, Colour(0x6aa8ff), Colour(0xff8a6a)]
     return palette[index % palette.count]
+  }
+
+  /// A machine's colour, as its lanes and lines have it.
+  public static func colour(_ slot: ClipSlot) -> Colour {
+    switch slot {
+    case .tr808: eight
+    case .tr909: nine
+    case .bassA, .bassB: three
+    }
   }
 
   /// White at `alpha`, which is most of what a panel's detail is drawn in.

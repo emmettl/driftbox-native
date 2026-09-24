@@ -545,6 +545,89 @@ struct InterfaceTests {
     #expect(session.editing == nil, "following again, with the one shown gone")
   }
 
+  /// Steps wider than the grid scroll sideways, as the wheel tilts or turns with Shift held, under
+  /// the lanes' names, which stay; a step scrolled under them is not there to press.
+  @Test func aWideGridScrollsSideways() throws {
+    var song = Self.song()
+    song.patterns[0].length = 64
+    song.patterns[0].tracks["909.bd"] = (0..<64).map { $0 % 4 == 0 ? .on : .off }
+    song.patterns[0].tracks["808.cp"] = [StepValue](repeating: .off, count: 64)
+    let interface = try Self.interface(song)
+    let before = interface.layout
+    let columns = try #require(before.columns)
+    #expect(before.metrics?.stride == GridMetrics.minimumStride)
+    #expect(before.maxScrollX == 64 * GridMetrics.minimumStride - GridMetrics.gap - columns.width)
+    let filter = try #require(before.filterLane)
+    #expect(before.step(0, in: filter).x == columns.x)
+
+    let grid = try #require(before.grid)
+    #expect(
+      interface.scroll(ScrollEvent(location: Self.centre(grid), delta: SIMD2(0, 100), modifiers: .shift)))
+    let after = interface.layout
+    #expect(after.scrollX == 100 && after.scroll == 0, "sideways, and not down")
+    #expect(after.step(0, in: filter).x == columns.x - 100)
+    #expect(after.action(at: Self.centre(after.step(2, in: filter))) == nil, "under the names")
+    #expect(after.action(at: Self.centre(after.step(6, in: filter))) == .filterStep(pattern: "p", index: 6))
+    let kick = try #require(after.lanes.first { $0.voice.id == "909.bd" })
+    #expect(after.action(at: Self.centre(kick.header)) == .select(voice: "909.bd"), "the names stay")
+
+    interface.scroll(ScrollEvent(location: Self.centre(grid), delta: SIMD2(10_000, 0)))
+    #expect(interface.layout.scrollX == interface.layout.maxScrollX, "a tilt, as far as there is")
+  }
+
+  /// A section's machines: one playing a pattern of its own for the section, marked on the strip,
+  /// and given back to the section's by choosing the section's again.
+  @Test func aSectionsMachines() throws {
+    let interface = try Self.interface(Self.chainedSong())
+    let session = interface.session
+    _ = try #require(interface.menu(at: Self.centre(interface.layout.sections[0].frame)))
+    #expect(interface.menuIsChecked("section.clip.\(ClipSlot.bassA.rawValue).p"), "the section's own")
+    interface.choose("section.clip.\(ClipSlot.bassA.rawValue).q")
+    #expect(session.song?.chain[0].clips[.bassA] == "q")
+    #expect(session.undoTitle == "Undo Set 303 A Pattern")
+    #expect(interface.layout.sections[0].clips == [.bassA])
+    _ = interface.menu(at: Self.centre(interface.layout.sections[0].frame))
+    interface.choose("section.clip.\(ClipSlot.bassA.rawValue).p")
+    #expect(session.song?.chain[0].clips.isEmpty == true)
+  }
+
+  /// A pattern is renamed in its chip: typed into, with Backspace, kept with Return or a press
+  /// elsewhere, left as it was with Escape; and while it is, every key is the name's.
+  @Test func aPatternIsRenamedInItsChip() throws {
+    let interface = try Self.interface(Self.chainedSong())
+    let session = interface.session
+    func type(_ text: String) {
+      for character in text {
+        _ = interface.key(KeyEvent(key: character == " " ? .space : .character(character)))
+      }
+    }
+    #expect(!interface.key(KeyEvent(key: .character("a"))), "nothing being named: not the name's")
+    let breakChip = try #require(interface.layout.patternChips.first { $0.label == "Break" })
+    _ = interface.menu(at: Self.centre(breakChip.frame))
+    interface.choose("pattern.rename")
+    #expect(interface.takesText && interface.renaming?.text == "Break")
+    for _ in 0..<5 { _ = interface.key(KeyEvent(key: .backspace)) }
+    _ = interface.key(KeyEvent(key: .character("D"), modifiers: .shift))
+    type("rop 2")
+    #expect(
+      interface.key(KeyEvent(key: .character("s"), modifiers: .control)), "a shortcut too is the name's")
+    #expect(interface.layout.patternChips.contains { $0.label == "Drop 2" }, "the chip shows what is typed")
+    _ = interface.key(KeyEvent(key: .return))
+    #expect(!interface.takesText)
+    #expect(session.song?.pattern(id: "q")?.name == "Drop 2")
+    #expect(session.undoTitle == "Undo Rename Pattern")
+
+    interface.rename(pattern: "q")
+    type("x")
+    _ = interface.key(KeyEvent(key: .escape))
+    #expect(session.song?.pattern(id: "q")?.name == "Drop 2", "Escape leaves it")
+
+    interface.rename(pattern: "q")
+    type("!")
+    _ = interface.pointer(PointerEvent(phase: .began, location: SIMD2(400, 200)))
+    #expect(session.song?.pattern(id: "q")?.name == "Drop 2!", "a press elsewhere keeps it")
+  }
+
   /// Narrow, the columns keep to a size that can still be hit; wide, they stop growing.
   @Test func theColumnsStretchBetweenLimits() {
     #expect(GridMetrics(steps: 16, width: 200).stride == GridMetrics.minimumStride)

@@ -154,6 +154,27 @@ extension Interface {
               }
             }
           })),
+      // One machine playing something else for a section — the 303 carrying on while the drums
+      // change underneath it.
+      .submenu(
+        Menu(
+          "Machines",
+          ClipSlot.allCases.map { slot in
+            let chosen = entry.clips[slot] ?? entry.pattern
+            return .submenu(
+              Menu(
+                Self.title(of: slot),
+                song.patterns.map { pattern in
+                  item(
+                    pattern.id == entry.pattern ? "\(pattern.name) (the section's)" : pattern.name,
+                    "section.clip.\(slot.rawValue).\(pattern.id)", checked: chosen == pattern.id
+                  ) {
+                    self.session.edit("Set \(Self.title(of: slot)) Pattern") {
+                      $0 = $0.settingChainClip(at: index, slot: slot, to: pattern.id)
+                    }
+                  }
+                }))
+          })),
       .submenu(
         Menu(
           "Repeat",
@@ -185,6 +206,7 @@ extension Interface {
     return Menu(
       name,
       [
+        item("Rename…", "pattern.rename") { self.rename(pattern: id) },
         item("Add to Song", "pattern.addToSong") {
           self.session.edit("Add to Song") { $0 = $0.appendingToChain(id) }
         },
@@ -223,7 +245,66 @@ extension Interface {
     session.editPattern(id, name, change)
   }
 
+  /// A machine, as its menu names it.
+  static func title(of slot: ClipSlot) -> String {
+    switch slot {
+    case .tr808: "TR-808"
+    case .tr909: "TR-909"
+    case .bassA: "303 A"
+    case .bassB: "303 B"
+    }
+  }
+
   /// Chance, for randomising and altering: the system's, since what comes out is not meant to be
   /// the same twice.
   static func chance() -> Double { Double.random(in: 0..<1) }
+}
+
+// MARK: - Renaming
+
+extension Interface {
+  /// Start renaming a pattern: its chip becomes a field holding its name, typed into from here.
+  public func rename(pattern id: String) {
+    guard let pattern = session.song?.pattern(id: id) else { return }
+    renaming = (id, pattern.name)
+  }
+
+  /// A key, while a name is being typed: a character to add, Backspace to take one away, Return to
+  /// keep the name and Escape to leave it as it was. Every key is the name's while it is; false
+  /// when nothing is being named.
+  public func key(_ event: KeyEvent) -> Bool {
+    guard var renaming else { return false }
+    guard event.isDown else { return true }
+    switch event.key {
+    case .return:
+      finishRenaming()
+      return true
+    case .escape:
+      self.renaming = nil
+      return true
+    case .backspace:
+      if !renaming.text.isEmpty { renaming.text.removeLast() }
+    case .space:
+      renaming.text.append(" ")
+    case .character(let character) where event.modifiers.isSubset(of: [.shift]):
+      renaming.text.append(character)
+    default:
+      return true
+    }
+    renaming.text = String(renaming.text.prefix(Self.longestName))
+    self.renaming = renaming
+    return true
+  }
+
+  /// The longest a pattern's name may be typed.
+  public static let longestName = 24
+
+  /// Keep the name typed: an empty one, or one only of spaces, is not kept, as the song's own
+  /// renaming has it.
+  func finishRenaming() {
+    guard let renaming else { return }
+    self.renaming = nil
+    guard session.song?.pattern(id: renaming.pattern)?.name != renaming.text else { return }
+    session.edit("Rename Pattern") { $0 = $0.renamingPattern(renaming.pattern, to: renaming.text) }
+  }
 }
