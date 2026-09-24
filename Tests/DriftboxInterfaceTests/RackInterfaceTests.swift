@@ -666,5 +666,54 @@ struct RackInterfaceTests {
     #expect(!face.drop([URL(fileURLWithPath: "C:/nowhere.wav")], at: SIMD2(5, 5)))
   }
 
+  /// An empty Key Atlas asks for several files; a set dropped on it maps itself by name, a zone is
+  /// chosen on the map or stepped to, and its notes, velocities and loop are edited, one drag one
+  /// undo, the low note never past the high.
+  @Test func theKeyAtlasMapsAndEditsZones() async throws {
+    let (rack, face) = try Self.alone("multisampler")
+    let stage = rack.stage
+    #expect(face.name == "Key Atlas" && face.words == "empty")
+    let prompt = try #require(face.buttons.first { if case .prompt = $0.style { true } else { false } })
+    Self.press(rack, Self.window(stage, Self.centre(prompt.frame)))
+    #expect(rack.takeFileRequest() == "m" && rack.takesSeveral("m"))
+
+    let low = try Self.wav(name: "Piano_C3.wav")
+    let high = try Self.wav(name: "Piano_C5.wav")
+    #expect(rack.drop([low, high], at: Self.window(stage, Self.centre(face.frame))))
+    try await Self.until { (rack.rack.recordings["m"]?.count ?? 0) == 2 }
+    var mapped = rack.stage.faces[0]
+    #expect(mapped.words == "2 zones" && mapped.light == true)
+    let zones = mapped.buttons.filter { if case .zone = $0.style { true } else { false } }
+    #expect(zones.count == 2 && zones[0].isOn)
+
+    Self.press(rack, Self.window(rack.stage, Self.centre(zones[1].frame)))
+    #expect(rack.pages["m"] == 1)
+    let back = try #require(rack.stage.faces[0].buttons.first { $0.label == "‹" })
+    Self.press(rack, Self.window(rack.stage, Self.centre(back.frame)))
+    #expect(rack.pages["m"] == 0)
+
+    func zone() -> MultisampleZone { MultisampleZone.unpack(Self.data(rack, "zones"))[0] }
+    let before = zone()
+    mapped = rack.stage.faces[0]
+    let root = try #require(mapped.cells.first { $0.caption == "ROOT" })
+    #expect(root.text?(root.value) == Multisample.noteName(before.root))
+    let at = Self.window(rack.stage, Self.centre(root.frame))
+    Self.press(rack, at, to: at - SIMD2(0, root.step * 3 * rack.stage.scale))
+    #expect(zone().root == before.root + 3)
+    #expect(rack.rack.undoTitle == "Undo Edit Zone")
+    rack.rack.undo()
+    #expect(zone().root == before.root, "one drag, one undo")
+
+    let lowField = try #require(rack.stage.faces[0].cells.first { $0.caption == "LOW" })
+    let from = Self.window(rack.stage, Self.centre(lowField.frame))
+    Self.press(rack, from, to: from - SIMD2(0, lowField.step * 127 * rack.stage.scale))
+    #expect(zone().low == zone().high, "never past the high note")
+
+    let loop = try #require(rack.stage.faces[0].buttons.first { $0.label == "No loop" })
+    Self.press(rack, Self.window(rack.stage, Self.centre(loop.frame)))
+    #expect(zone().loop)
+    #expect(rack.stage.faces[0].buttons.contains { $0.label == "Sustain loop" && $0.isOn })
+  }
+
   struct Unexpected: Error {}
 }

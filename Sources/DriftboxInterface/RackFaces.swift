@@ -27,6 +27,7 @@ public enum RackFaces {
     "combi": Set((1...4).flatMap { ["rotary\($0)", "button\($0)"] }),
     "sampler": ["slices", "slice", "start", "loop", "reverse"],
     "audio-track": ["start", "level"],
+    "multisampler": Set(atlasKnobs),
   ]
 
   static let shapes = ["Saw", "Pulse", "Tri"]
@@ -227,6 +228,8 @@ public enum RackFaces {
       return sampler(module, def, x: x, width: width, top: top, rack: rack)
     case "audio-track":
       return audioTrack(module, def, x: x, width: width, top: top, rack: rack)
+    case "multisampler":
+      return keyAtlas(module, def, x: x, width: width, top: top, rack: rack, page: page)
     default:
       return nil
     }

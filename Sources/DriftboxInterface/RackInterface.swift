@@ -40,7 +40,8 @@ public final class RackInterface {
   var backPointer: SIMD2<Float>?
   /// A trim pot let go of without turning, and when: a second, soon after, puts it back to unity.
   var lastPotTap: (jack: String, at: ContinuousClock.Instant)?
-  /// The bar a face with more than one shows, by module: the Mac keeps it in the face's view.
+  /// The bar a face with more than one shows, or the zone a Key Atlas edits, by module: the Mac
+  /// keeps these in the face's view.
   public private(set) var pages: [String: Int] = [:]
   /// A number being dragged has moved far enough to be a drag, not a click.
   private var cellMoved = false
@@ -137,7 +138,15 @@ public final class RackInterface {
           min(
             cell.range.upperBound, Int(turn.from) + Int(RackDisplay.jsRound(Double(travel / cell.step)))))
         if next != cell.value {
-          if let (id, offset, scale) = cell.param {
+          if let writes = cell.writes {
+            // As it turns: written, and the whole drag one step of undo.
+            switch writes(next) {
+            case .data(let slot, let values, let name, _, _):
+              rack.setData(module, slot, to: values, name: name)
+            case .set(let param, let value): rack.turn(module, param, to: value)
+            default: break
+            }
+          } else if let (id, offset, scale) = cell.param {
             rack.turn(module, id, to: offset + scale * Double(next))
           } else {
             let data = rack.patch.modules.first { $0.id == module }?.data[cell.slot] ?? []
@@ -291,7 +300,10 @@ public final class RackInterface {
     switch type {
     case "sampler": Task { await rack.load(url, into: module) }
     case "audio-track": Task { await rack.loadTrack(url, into: module) }
-    case "multisampler": Task { await rack.loadInstrument(urls, into: module) }
+    case "multisampler":
+      // A new set, edited from its first zone.
+      pages[module] = 0
+      Task { await rack.loadInstrument(urls, into: module) }
     default: return false
     }
     return true

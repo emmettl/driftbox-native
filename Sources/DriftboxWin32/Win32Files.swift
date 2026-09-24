@@ -8,12 +8,18 @@
   enum Win32Files {
     /// A file to open, of one of `types`; nil when cancelled.
     static func open(owner: HWND?, types: [FileType]) -> URL? {
-      run(owner: owner, types: types, name: nil, defaultExtension: nil, saving: false)
+      run(owner: owner, types: types, name: nil, defaultExtension: nil, saving: false).first
+    }
+
+    /// Files to open, of one of `types`, as many as are chosen; empty when cancelled.
+    static func openMany(owner: HWND?, types: [FileType]) -> [URL] {
+      run(owner: owner, types: types, name: nil, defaultExtension: nil, saving: false, several: true)
     }
 
     /// Where to save a file of `type`, starting from `name`; nil when cancelled.
     static func save(owner: HWND?, type: FileType, name: String) -> URL? {
       run(owner: owner, types: [type], name: name, defaultExtension: type.extensions.first, saving: true)
+        .first
     }
 
     /// The filter a dialog offers: each type's name and its patterns, every string ended with a
@@ -28,8 +34,9 @@
     }
 
     private static func run(
-      owner: HWND?, types: [FileType], name: String?, defaultExtension: String?, saving: Bool
-    ) -> URL? {
+      owner: HWND?, types: [FileType], name: String?, defaultExtension: String?, saving: Bool,
+      several: Bool = false
+    ) -> [URL] {
       var filter = filter(for: types)
       var path = [WCHAR](repeating: 0, count: 32768)
       if let name {
@@ -50,13 +57,20 @@
             dialog.Flags =
               DWORD(OFN_EXPLORER) | DWORD(OFN_NOCHANGEDIR) | DWORD(OFN_PATHMUSTEXIST)
               | (saving ? DWORD(OFN_OVERWRITEPROMPT) : DWORD(OFN_FILEMUSTEXIST))
+              | (several ? DWORD(OFN_ALLOWMULTISELECT) : 0)
             return saving ? GetSaveFileNameW(&dialog) : GetOpenFileNameW(&dialog)
           }
         }
       }
-      guard chosen else { return nil }
-      let end = path.firstIndex(of: 0) ?? path.count
-      return URL(fileURLWithPath: String(decoding: path[..<end], as: UTF16.self))
+      guard chosen else { return [] }
+      // One file is its whole path. Several are the folder, then each name, every one ended with a
+      // nul and the list with another.
+      let parts = path.split(separator: 0, omittingEmptySubsequences: false).prefix { !$0.isEmpty }
+        .map { String(decoding: $0, as: UTF16.self) }
+      guard let first = parts.first else { return [] }
+      guard parts.count > 1 else { return [URL(fileURLWithPath: first)] }
+      let folder = URL(fileURLWithPath: first, isDirectory: true)
+      return parts.dropFirst().map { folder.appendingPathComponent($0) }
     }
   }
 #endif
