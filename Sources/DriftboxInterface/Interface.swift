@@ -359,13 +359,7 @@ public final class Interface {
 
   private func isPressed(_ action: Action) -> Bool { held == action }
 
-  private func panel(_ rect: Rect, on canvas: Canvas) {
-    canvas.fill = Theme.panel
-    canvas.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, radius: 12)
-    canvas.stroke = Theme.edge
-    canvas.lineWidth = 1
-    canvas.strokeRoundedRect(rect.x, rect.y, rect.width, rect.height, radius: 12)
-  }
+  private func panel(_ rect: Rect, on canvas: Canvas) { Draw.panel(rect, on: canvas) }
 
   private func drawBar(_ layout: Layout, on canvas: Canvas) {
     panel(layout.bar, on: canvas)
@@ -435,18 +429,10 @@ public final class Interface {
   /// A button as the web draws one: a dark rounded chip with a hairline edge that brightens under
   /// the pointer, lit in teal when it is on.
   private func chip(_ chip: Layout.Chip, tint: Colour = Theme.nine, on canvas: Canvas) {
-    let frame = chip.frame
-    let hovered = isHovered(frame)
-    let down = isPressed(chip.action)
-    canvas.fill = chip.isOn ? tint.faded(0.12) : Theme.white(down ? 0.1 : 0.045)
-    canvas.fillRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: 7)
-    canvas.stroke = chip.isOn ? tint.faded(0.9) : Theme.white(hovered ? 0.3 : 0.1)
-    canvas.lineWidth = 1
-    canvas.strokeRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: 7)
-    canvas.font = Theme.mono(11)
-    canvas.fill = chip.isOn ? tint : Theme.ink.faded(0.92)
-    canvas.align = .center
-    canvas.fillText(chip.label, frame.x + frame.width / 2, frame.y + frame.height / 2 + 4)
+    Draw.chip(
+      chip.frame, label: chip.label, isOn: chip.isOn, hovered: isHovered(chip.frame),
+      down: isPressed(chip.action),
+      tint: tint, on: canvas)
   }
 
   private func drawGrid(_ layout: Layout, on canvas: Canvas) {
@@ -861,45 +847,9 @@ public final class Interface {
     _ knob: Layout.Knob, value: Double, label: String, text: String, tint: Colour, active: Bool,
     on canvas: Canvas
   ) {
-    let dial = knob.dial
-    let d = dial.width
-    let centre = SIMD2(dial.x + d / 2, dial.y + d / 2)
-    let hovered = isHovered(knob.cell)
-    // The cap.
-    let cap = dial.outset(-d * 0.2)
-    canvas.fill = Theme.white(0.12)
-    canvas.fillRoundedRect(
-      cap.x, cap.y, cap.width, cap.height, radius: cap.width / 2, foot: Theme.white(0.02))
-    canvas.stroke = Theme.white(0.1)
-    canvas.lineWidth = 1
-    canvas.strokeRoundedRect(cap.x, cap.y, cap.width, cap.height, radius: cap.width / 2)
-    // The travel, and the value along it, with a glow under.
-    let sweep = Float.pi * 1.5
-    let start = -sweep / 2
-    let end = start + sweep * Float(max(0.0001, value))
-    let radius = d / 2 - 2
-    canvas.lineWidth = 3
-    canvas.stroke = Theme.white(0.12)
-    canvas.strokeArc(centre.x, centre.y, radius: radius, from: start, to: start + sweep)
-    canvas.lineWidth = 7
-    canvas.stroke = tint.faded(active ? 0.35 : hovered ? 0.22 : 0.12)
-    canvas.strokeArc(centre.x, centre.y, radius: radius, from: start, to: end)
-    canvas.lineWidth = 3
-    canvas.stroke = tint
-    canvas.strokeArc(centre.x, centre.y, radius: radius, from: start, to: end)
-    // The pointer.
-    let direction = SIMD2(sin(end), -cos(end))
-    canvas.stroke = Theme.ink
-    canvas.lineWidth = 2
-    canvas.strokeLines([(centre + direction * (d * 0.08), centre + direction * (d * 0.3))])
-    // Its name and where it is.
-    canvas.align = .center
-    canvas.font = Theme.mono(8.5, weight: 500)
-    canvas.fill = Theme.dim
-    canvas.fillText(label.uppercased(), centre.x, dial.maxY + 12)
-    canvas.font = Theme.mono(9.5)
-    canvas.fill = active ? Theme.ink : Theme.ink.faded(0.55)
-    canvas.fillText(text, centre.x, dial.maxY + 25)
+    Draw.knob(
+      knob.dial, value: value, label: label, text: text, tint: tint, active: active,
+      hovered: isHovered(knob.cell), on: canvas)
   }
 
   /// One step: off, on, or accented, lit top to bottom; the playhead's column outlined in teal all

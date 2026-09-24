@@ -3,6 +3,7 @@
   import DriftboxGPUD3D11
   import DriftboxHost
   import DriftboxHostWindows
+  import DriftboxRackSession
   import DriftboxSession
   import DriftboxTextWindows
   import DriftboxWin32
@@ -62,7 +63,9 @@
       let surface = try device.makeSurface(window: window.handle, width: window.width, height: window.height)
       let desktop = try Desktop(
         session: session, window: window, device: device, surface: surface,
-        typesetter: try DirectWriteTypesetter())
+        typesetter: try DirectWriteTypesetter(),
+        // The rack, through the same output: heard beside the groovebox, and shown in its place.
+        rack: RackSession(sampleRate: route.sampleRate, audio: route, memory: UserDefaults.standard))
       try desktop.run()
     }
 

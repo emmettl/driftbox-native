@@ -365,6 +365,8 @@ program on the same machine goes through a loopback port made in Windows MIDI Se
 patterns, and the selected voice's knobs or the song's effects — the rest of it the performance filter's
 pad, and menus for the rest. Tab hides the controls, to perform. The keyboard is an instrument,
 as on the Mac: the number row strikes the drums, the home row plays 303 A, `z` and `x` its octave.
+The rack is there too, from Rack ▸ Show Rack (Ctrl+R): the patch's modules with their knobs and
+choices, its catalogue of patches, and the keys playing it, heard beside the groovebox.
 - **File:** New, Open…, the catalogue, Save and Save As… as `.driftbox`.
 - **Edit:** Undo and Redo, named for the edit.
 - **Transport:** play and stop, sections, the loop, the metronome and the count-in.

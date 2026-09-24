@@ -145,7 +145,8 @@ let package = Package(
     .target(
       name: "DriftboxInterface",
       dependencies: [
-        "DriftboxCanvas", "DriftboxEngine", "DriftboxSeq", "DriftboxSession", "DriftboxShell", "DriftboxText",
+        "DriftboxCanvas", "DriftboxEngine", "DriftboxRack", "DriftboxRackSession",
+        "DriftboxSeq", "DriftboxSession", "DriftboxShell", "DriftboxText",
       ]),
 
     // Driftbox on a desktop: a window with menus, the song's scene, the pad. The same on every
@@ -154,7 +155,7 @@ let package = Package(
       name: "DriftboxDesktop",
       dependencies: [
         "DriftboxCanvas", "DriftboxDocument", "DriftboxGPU", "DriftboxHost", "DriftboxInterface",
-        "DriftboxScenes", "DriftboxSession", "DriftboxShell", "DriftboxText",
+        "DriftboxRackSession", "DriftboxScenes", "DriftboxSession", "DriftboxShell", "DriftboxText",
       ]),
     // Driftbox on a touch screen: the scene, the controls over it, the pad, fingers. The same on every
     // platform with one; Android's app hands it its parts, and iOS's will.
@@ -168,7 +169,7 @@ let package = Package(
     .executableTarget(
       name: "DriftboxWindows",
       dependencies: [
-        "DriftboxDesktop", "DriftboxHost", "DriftboxSession",
+        "DriftboxDesktop", "DriftboxHost", "DriftboxRackSession", "DriftboxSession",
         .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
@@ -246,7 +247,8 @@ let package = Package(
     .testTarget(
       name: "DriftboxDesktopTests",
       dependencies: [
-        "DriftboxDesktop", "DriftboxInterface", "DriftboxSession", "DriftboxShell", "DriftboxGPU",
+        "DriftboxDesktop", "DriftboxInterface", "DriftboxRackSession", "DriftboxSession", "DriftboxShell",
+        "DriftboxGPU",
         "DriftboxHost", "DriftboxSeq",
         "DriftboxText", "DriftboxDocument", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxGPUGLES",
       ]),
@@ -259,7 +261,8 @@ let package = Package(
     .testTarget(
       name: "DriftboxInterfaceTests",
       dependencies: [
-        "DriftboxInterface", "DriftboxCanvas", "DriftboxEngine", "DriftboxGPU", "DriftboxHost", "DriftboxSeq",
+        "DriftboxInterface", "DriftboxRack", "DriftboxRackSession", "DriftboxCanvas", "DriftboxEngine",
+        "DriftboxGPU", "DriftboxHost", "DriftboxSeq",
         "DriftboxSession", "DriftboxShell", "DriftboxText", "DriftboxGPUD3D11", "DriftboxGPUMetal",
         "DriftboxGPUGLES",
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),

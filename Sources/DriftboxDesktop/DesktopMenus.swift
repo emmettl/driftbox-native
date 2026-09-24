@@ -1,3 +1,4 @@
+import DriftboxRackSession
 import DriftboxScenes
 import DriftboxSession
 import DriftboxShell
@@ -28,6 +29,7 @@ public enum DesktopMenus {
   public static let previousScene = "view.previousScene"
   public static let songsScene = "view.songsScene"
   public static let controls = "view.controls"
+  public static let showRack = "rack.show"
   public static let systemOutput = "audio.system"
   public static let listen = "midi.listen"
   public static let followClock = "midi.followClock"
@@ -41,81 +43,101 @@ public enum DesktopMenus {
   public static let outputPrefix = "output."
   public static let inputPrefix = "input."
   public static let clockPrefix = "clock."
+  public static let patchPrefix = "patch."
 
   /// What a command is about, if it is one of `prefix`'s.
   public static func value(_ id: String, after prefix: String) -> String? {
     id.hasPrefix(prefix) ? String(id.dropFirst(prefix.count)) : nil
   }
 
+  /// The menus for `session`, and for `rack` when there is one: the Edit menu undoes in whichever
+  /// shows.
   @MainActor
-  public static func bar(for session: Session) -> MenuBar {
-    MenuBar([
-      Menu(
-        "File",
-        [
-          .command("New", id: new, shortcut: Shortcut("n")),
-          .command("Open…", id: open, shortcut: Shortcut("o")),
-          .submenu(
-            Menu("Open Catalogue Song", session.entries.map { .command($0.name, id: songPrefix + $0.id) })),
-          .separator,
-          .command("Save", id: save, shortcut: Shortcut("s")),
-          .command("Save As…", id: saveAs, shortcut: Shortcut("s", [.primary, .shift])),
-          .separator,
-          .command("Exit", id: exit, shortcut: Shortcut("q")),
-        ]),
-      Menu(
-        "Edit",
-        [
-          .command(session.undoTitle, id: undo, shortcut: Shortcut("z")),
-          .command(session.redoTitle, id: redo, shortcut: Shortcut("y")),
-        ]),
-      Menu(
-        "Transport",
-        [
-          .command("Play or Stop", id: toggle, shortcut: Shortcut(.space, [])),
-          .command("Return to Start", id: start, shortcut: Shortcut(.home, [])),
-          .command("Previous Section", id: previousSection, shortcut: Shortcut(.pageUp, [])),
-          .command("Next Section", id: nextSection, shortcut: Shortcut(.pageDown, [])),
-          .separator,
-          .command("Loop This Section", id: loop, shortcut: Shortcut("l")),
-          .command("Metronome", id: metronome, shortcut: Shortcut("m")),
-          .command("Count In", id: countIn),
-        ]),
-      Menu(
-        "View",
-        [
-          .command("Show Controls", id: controls, shortcut: Shortcut(.tab, [])),
-          .separator,
-          .command("Next Scene", id: nextScene, shortcut: Shortcut(.right)),
-          .command("Previous Scene", id: previousScene, shortcut: Shortcut(.left)),
-          .separator,
-          .command("The Song's Scene", id: songsScene),
-          .submenu(Menu("Scene", GPUScenes.all.map { .command($0.name, id: scenePrefix + $0.id) })),
-        ]),
-      Menu(
-        "Audio",
-        [.command("System Output", id: systemOutput), .separator]
-          + session.outputs.map { .command($0.name, id: outputPrefix + $0.id) }),
-      Menu(
-        "MIDI",
-        [
-          .command("Listen to MIDI", id: listen),
-          .submenu(
+  public static func bar(for session: Session, rack: RackSession? = nil, showsRack: Bool = false) -> MenuBar {
+    let undoTitle = showsRack ? rack?.undoTitle ?? "Undo" : session.undoTitle
+    let redoTitle = showsRack ? rack?.redoTitle ?? "Redo" : session.redoTitle
+    return MenuBar(
+      [
+        Menu(
+          "File",
+          [
+            .command("New", id: new, shortcut: Shortcut("n")),
+            .command("Open…", id: open, shortcut: Shortcut("o")),
+            .submenu(
+              Menu("Open Catalogue Song", session.entries.map { .command($0.name, id: songPrefix + $0.id) })),
+            .separator,
+            .command("Save", id: save, shortcut: Shortcut("s")),
+            .command("Save As…", id: saveAs, shortcut: Shortcut("s", [.primary, .shift])),
+            .separator,
+            .command("Exit", id: exit, shortcut: Shortcut("q")),
+          ]),
+        Menu(
+          "Edit",
+          [
+            .command(undoTitle, id: undo, shortcut: Shortcut("z")),
+            .command(redoTitle, id: redo, shortcut: Shortcut("y")),
+          ]),
+        Menu(
+          "Transport",
+          [
+            .command("Play or Stop", id: toggle, shortcut: Shortcut(.space, [])),
+            .command("Return to Start", id: start, shortcut: Shortcut(.home, [])),
+            .command("Previous Section", id: previousSection, shortcut: Shortcut(.pageUp, [])),
+            .command("Next Section", id: nextSection, shortcut: Shortcut(.pageDown, [])),
+            .separator,
+            .command("Loop This Section", id: loop, shortcut: Shortcut("l")),
+            .command("Metronome", id: metronome, shortcut: Shortcut("m")),
+            .command("Count In", id: countIn),
+          ]),
+        Menu(
+          "View",
+          [
+            .command("Show Controls", id: controls, shortcut: Shortcut(.tab, [])),
+            .separator,
+            .command("Next Scene", id: nextScene, shortcut: Shortcut(.right)),
+            .command("Previous Scene", id: previousScene, shortcut: Shortcut(.left)),
+            .separator,
+            .command("The Song's Scene", id: songsScene),
+            .submenu(Menu("Scene", GPUScenes.all.map { .command($0.name, id: scenePrefix + $0.id) })),
+          ]),
+      ]
+        + (rack == nil
+          ? []
+          : [
             Menu(
-              "Inputs",
-              session.midiSources.isEmpty
-                ? [.command("No MIDI Inputs", id: noInputs)]
-                : session.midiSources.map { .command($0, id: inputPrefix + $0) })),
-          .separator,
-          .command("Follow MIDI Clock", id: followClock),
-          .command("Send MIDI Clock", id: sendClock),
-          .submenu(
-            Menu(
-              "Send Clock To",
-              session.clockDestinations.isEmpty
-                ? [.command("No MIDI Outputs", id: noOutputs)]
-                : session.clockDestinations.map { .command($0, id: clockPrefix + $0) })),
-        ]),
-    ])
+              "Rack",
+              [
+                .command("Show Rack", id: showRack, shortcut: Shortcut("r")),
+                .separator,
+                .submenu(
+                  Menu("Open Patch", PatchEntry.all.map { .command($0.name, id: patchPrefix + $0.id) })),
+              ])
+          ])
+        + [
+          Menu(
+            "Audio",
+            [.command("System Output", id: systemOutput), .separator]
+              + session.outputs.map { .command($0.name, id: outputPrefix + $0.id) }),
+          Menu(
+            "MIDI",
+            [
+              .command("Listen to MIDI", id: listen),
+              .submenu(
+                Menu(
+                  "Inputs",
+                  session.midiSources.isEmpty
+                    ? [.command("No MIDI Inputs", id: noInputs)]
+                    : session.midiSources.map { .command($0, id: inputPrefix + $0) })),
+              .separator,
+              .command("Follow MIDI Clock", id: followClock),
+              .command("Send MIDI Clock", id: sendClock),
+              .submenu(
+                Menu(
+                  "Send Clock To",
+                  session.clockDestinations.isEmpty
+                    ? [.command("No MIDI Outputs", id: noOutputs)]
+                    : session.clockDestinations.map { .command($0, id: clockPrefix + $0) })),
+            ]),
+        ])
   }
 }
