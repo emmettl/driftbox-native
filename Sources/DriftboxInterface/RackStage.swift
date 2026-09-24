@@ -26,6 +26,22 @@ public enum RackTarget: Equatable, Sendable {
   /// One of a face's numbers, dragged for its value and clicked to act: a tracker's step, an
   /// arranger's section.
   case cell(module: String, index: Int)
+  /// Part of the Combinator's routing, open beside the rack.
+  case routing(RoutingPart)
+}
+
+/// What a press on a Combinator's routing is on: its close and add buttons, and each routing's
+/// source, target module and knob, its two ends, and its remove button, by its place among the
+/// patch's routings.
+public enum RoutingPart: Equatable, Sendable {
+  case close
+  case add
+  case source(Int)
+  case module(Int)
+  case knob(Int)
+  case min(Int)
+  case max(Int)
+  case remove(Int)
 }
 
 /// Where everything on the rack is, for a window `size` points across: the header in points, and
@@ -69,6 +85,9 @@ public struct RackStage {
     /// Turned in whole numbers.
     public var whole = false
   }
+
+  /// Where a Combinator's routing is, beside the rack, when it is open.
+  public var routing: Routing?
 
   /// A module's front, in design space.
   public struct Face {
@@ -124,13 +143,15 @@ public struct RackStage {
     case loopSong(start: Int, bars: Int)
     /// Stop looping the rack's song.
     case clearLoop
+    /// Open the Combinator's routing beside the rack, or close it.
+    case routes
 
     /// The param it sets, if it sets one.
     public var param: String? {
       switch self {
       case .set(let param, _): param
       case .data(_, _, _, let then, _): then
-      case .page, .learn, .choose, .sampleBars, .editSong, .startSong, .loopSong, .clearLoop: nil
+      case .page, .learn, .choose, .sampleBars, .editSong, .startSong, .loopSong, .clearLoop, .routes: nil
       case .hold(let param): param
       }
     }
@@ -263,15 +284,20 @@ public struct RackStage {
 
     // About the reference's size, a little larger when there is room: past this the panels stop
     // reading as a rack of modules and start reading as a poster of one.
+    // A Combinator's routing open beside the rack takes the right of the window, and the rack the rest.
+    let combi = rack.editingRoutes.flatMap { id in rack.patch.modules.first { $0.id == id } }
+    let room = combi == nil ? size.x : max(0, size.x - Routing.width)
     let width = Float(RackLayout.width)
-    scale = max(0.5, min(1.35, (size.x - 48) / width))
-    area = Rect(0, header.maxY + margin, size.x, max(0, size.y - header.maxY - margin))
+    scale = max(0.5, min(1.35, (room - 48) / width))
+    area = Rect(0, header.maxY + margin, room, max(0, size.y - header.maxY - margin))
+    let beside = Rect(room, area.y, max(0, size.x - room - margin), max(0, size.y - area.y - margin))
+    routing = combi.map { Routing(combi: $0, rack: rack, frame: beside) }
     let layout = RackLayout.layout(rack.patch.modules)
     placements = layout.placements
     height = Float(max(layout.height, RackLayout.row))
     maxScroll = max(0, (height + 24) * scale - area.height)
     self.scroll = min(max(0, scroll), maxScroll)
-    origin = SIMD2((size.x - width * scale) / 2, area.y - self.scroll)
+    origin = SIMD2((room - width * scale) / 2, area.y - self.scroll)
 
     let modules = Dictionary(rack.patch.modules.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     faces = layout.placements.compactMap { placement in
@@ -340,6 +366,7 @@ public struct RackStage {
 
   /// What pressing at `point`, on the window, would do.
   public func target(at point: SIMD2<Float>) -> RackTarget? {
+    if let part = routing?.part(at: point) { return .routing(part) }
     if let chip = chips.first(where: { $0.frame.contains(point) }) { return chip.target }
     if tempo.contains(point) { return .tempo }
     guard area.contains(point) else { return nil }

@@ -751,5 +751,61 @@ struct RackInterfaceTests {
     #expect(rack.rack.running)
   }
 
+  /// A Combinator's routing opens beside the rack from its face; a routing is added, aimed through
+  /// its menus, its ends typed — blank the target's own limit, Escape as it was — and removed; and
+  /// the routing closes, the rack taking the window back.
+  @Test func aCombinatorsRoutingIsEditedBesideTheRack() throws {
+    let rack = RackSession()
+    rack.open(
+      Patch(modules: [PatchModule(id: "c", type: "combi"), PatchModule(id: "osc", type: "vco")], cables: []),
+      name: "Routing")
+    let face = RackInterface(rack: rack)
+    face.size = SIMD2(1000, 700)
+    let combi = try #require(face.stage.faces.first { $0.module.id == "c" })
+    let open = try #require(combi.buttons.first { $0.press == .routes })
+    Self.press(face, Self.window(face.stage, Self.centre(open.frame)))
+    #expect(rack.editingRoutes == "c")
+    var routing = try #require(face.stage.routing)
+    #expect(face.stage.area.width == 1000 - RackStage.Routing.width)
+    #expect(routing.rows.isEmpty)
+
+    Self.press(face, Self.centre(routing.add))
+    routing = try #require(face.stage.routing)
+    let row = try #require(routing.rows.first)
+    #expect(rack.patch.modulation.count == 1 && rack.patch.modulation[0].to.module == "osc")
+
+    Self.press(face, Self.centre(row.knob))
+    let knobs = try #require(face.takeMenuRequest()).menu
+    #expect(knobs.commands.map(\.id).contains("route.knob.width"))
+    #expect(face.menuIsChecked("route.knob.\(rack.patch.modulation[0].to.port)"))
+    face.choose("route.knob.width")
+    #expect(rack.patch.modulation[0].to.port == "width")
+    Self.press(face, Self.centre(row.source))
+    _ = face.takeMenuRequest()
+    face.choose("route.source.rotary2")
+    #expect(rack.patch.modulation[0].from.port == "rotary2")
+
+    Self.press(face, Self.centre(row.min))
+    #expect(face.takesText)
+    for key in ["0", ".", "2"] { _ = face.key(KeyEvent(key: .character(Character(key)))) }
+    #expect(face.key(KeyEvent(key: .character("q"))), "every key is the field's while it is typed into")
+    _ = face.key(KeyEvent(key: .return))
+    #expect(!face.takesText && rack.patch.modulation[0].min == 0.2)
+    Self.press(face, Self.centre(row.max))
+    _ = face.key(KeyEvent(key: .character("9")))
+    _ = face.key(KeyEvent(key: .escape))
+    #expect(rack.patch.modulation[0].max == nil, "Escape leaves it as it was")
+    Self.press(face, Self.centre(row.min))
+    for _ in 0..<4 { _ = face.key(KeyEvent(key: .backspace)) }
+    _ = face.key(KeyEvent(key: .return))
+    #expect(rack.patch.modulation[0].min == nil, "blank is the knob's own limit")
+
+    Self.press(face, Self.centre(row.remove))
+    #expect(rack.patch.modulation.isEmpty)
+    Self.press(face, Self.centre(try #require(face.stage.routing).close))
+    #expect(rack.editingRoutes == nil && face.stage.routing == nil)
+    #expect(face.stage.area.width == 1000)
+  }
+
   struct Unexpected: Error {}
 }

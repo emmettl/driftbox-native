@@ -569,7 +569,10 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    has its strips, meters and arrangement, each section played from or looped; a song comes into
    the rack from Rack ▸ Groovebox Songs, and Edit in Groovebox opens it in the groovebox, linked,
    so each edit there plays on in the rack. Every module the reference builds a face for has its
-   own now. Next: the Combinator's routing editor.
+   own now, and the Combinator's Routing… opens its routing beside the rack, as the Mac's
+   inspector: each routing's source, target module and knob chosen from menus, its ends typed —
+   blank is the knob's own limit — and what it is putting on its target now. Left for the rack
+   here: plug-ins, which have no host on Windows yet, so a plug-in module is kept and silent.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift

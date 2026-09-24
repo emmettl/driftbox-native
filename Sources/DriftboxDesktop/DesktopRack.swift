@@ -84,7 +84,7 @@ extension Desktop {
 
   private func pop(_ menu: Menu, at point: SIMD2<Float>, for rack: RackInterface) {
     let chosen = window.popUp(
-      menu, at: point, isEnabled: { rack.menuIsEnabled($0) }, isChecked: { _ in false })
+      menu, at: point, isEnabled: { rack.menuIsEnabled($0) }, isChecked: { rack.menuIsChecked($0) })
     if let chosen { rack.choose(chosen) }
   }
 
