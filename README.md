@@ -373,6 +373,21 @@ hands them to `DriftboxDesktop`, the app every platform with a `ShellWindow` run
 `DesktopTests` hold that app to its menus, commands, title, care over unsaved work and frames, with
 a stand-in window, on WARP.
 
+**Shipping it.** The program carries Driftbox's icon, `windows/Driftbox.res`, which
+`scripts/windows-icon.mjs` draws from the web app's own icon in a Chromium and compiles with the
+SDK's `rc`: the four-pad picture at 16 to 32 pixels, the full one from 48 up. It opens a song it is
+handed, as Explorer hands one over, and `DriftboxWindows.exe --register` makes `.driftbox` files
+open in it and show its icon, for the current user, as an installer would; `--unregister` gives
+them back. After a release build,
+
+```bash
+node scripts/windows-package.mjs
+```
+
+makes `dist/Driftbox`, which runs on a machine with no Swift on it, and a zip of it: the program,
+the catalogue's resource bundle, and the Swift and Visual C++ runtime DLLs it loads, found by
+reading their import tables — 18 of them, about 70MB, 26MB zipped.
+
 ### Android
 
 The engine plays through a phone, and times itself there. It is built with the swift.org toolchain

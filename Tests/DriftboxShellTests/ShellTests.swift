@@ -287,5 +287,22 @@ struct ShellTests {
       defer { window.close() }
       #expect(throws: Broken.self) { try window.run { throw Broken() } }
     }
+
+    /// Registering a type writes what an installer would: the ending to the program's name for it,
+    /// the program's own icon, and the program to open it with, the file's path quoted after it.
+    /// What would be written, only: a test has no business in the machine's registry.
+    @Test func aFileTypeIsTheProgramsAsAnInstallerWritesIt() {
+      let songs = Win32FileType(fileExtension: ".driftbox", progID: "Driftbox.Song", name: "Driftbox Song")
+      let values = songs.values(executable: #"C:\Program Files\Driftbox\Driftbox.exe"#)
+      #expect(
+        values.map(\.key) == [
+          ".driftbox", "Driftbox.Song", #"Driftbox.Song\DefaultIcon"#, #"Driftbox.Song\shell\open\command"#,
+        ])
+      #expect(values.allSatisfy { $0.name == nil }, "every one the key's default")
+      #expect(values[0].data == "Driftbox.Song")
+      #expect(values[1].data == "Driftbox Song")
+      #expect(values[2].data == #""C:\Program Files\Driftbox\Driftbox.exe",0"#)
+      #expect(values[3].data == #""C:\Program Files\Driftbox\Driftbox.exe" "%1""#)
+    }
   }
 #endif
