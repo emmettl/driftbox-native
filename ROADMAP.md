@@ -495,6 +495,13 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    A section's menu gives each machine a pattern of its own there, dotted on the strip; a pattern
    is renamed in its chip; and steps wider than the grid scroll sideways under the lanes' names.
    Left: settings, and the rack and its cables.
+   The rack comes by way of `DriftboxRackSession`, which holds what the Mac's `RackModel` does —
+   the patch, its edits and undo, the keys, controllers, samples, song and transport — on every
+   platform, with the Mac's audio, plug-ins and file reading behind ports: `AudioRouting`,
+   `RackPluginHosting` (none on Windows yet, so plug-ins there are kept and silent) and
+   `SampleDecoding` (a WAV reader of its own by default). The Mac's model, its helpers and the
+   patch catalogue are still its own copies until it moves onto the session, on a Mac, when they go.
+   Next: the rack drawn on the canvas, its fronts, its back and its cables.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift
