@@ -21,9 +21,23 @@
     static let all: [ModuleFace] = {
       guard let url = Bundle.module.url(forResource: "modules", withExtension: "json"),
         let data = try? Data(contentsOf: url)
-      else { return [] }
-      return (try? JSONDecoder().decode([ModuleFace].self, from: data)) ?? []
+      else { return native }
+      return ((try? JSONDecoder().decode([ModuleFace].self, from: data)) ?? []) + native
     }()
+
+    /// The modules the reference has none of, so its export has no card for.
+    static let native = [
+      ModuleFace(
+        type: "plugin", group: "Effects",
+        blurb:
+          "An Audio Unit effect from this Mac, in stereo, with its own controls a click away. The patch keeps "
+          + "which one and how it is set, even where it is missing.",
+        logo: Logo(paths: [
+          "M14 9v8M24 9v8", "M9 17h20v6a10 10 0 0 1-20 0z", "M19 33v5",
+          "M36 23c3-8 6-8 9 0s6 8 9 0",
+        ]),
+        labels: [:])
+    ]
 
     static let byType: [String: ModuleFace] = Dictionary(
       all.map { ($0.type, $0) }, uniquingKeysWith: { a, _ in a })
