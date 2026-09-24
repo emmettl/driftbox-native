@@ -49,7 +49,8 @@ Metal. Next after this is the rack.
 | `Sources/CDirectWrite` | The part of DirectWrite that is called, declared in C, since its own headers are C++. Declarations only. |
 | `Sources/DriftboxCanvas` | A 2D canvas on the GPU layer: Canvas2D's shapes, state, type and blends, the same on every platform. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
-| `Sources/DriftboxDesktop` | Driftbox on a desktop with a `ShellWindow`: menus, the scene, the pad, on `Session`. |
+| `Sources/DriftboxInterface` | The controls, drawn on the canvas in points over the scene: the transport bar and the step grid, laid out and hit from one layout, on `Session`. |
+| `Sources/DriftboxDesktop` | Driftbox on a desktop with a `ShellWindow`: menus, the scene, the controls over it, the pad, on `Session`. |
 | `Sources/DriftboxWindows` | The Windows app: Windows' parts, chosen and handed to `DriftboxDesktop`. |
 | `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
 | `Sources/Driftbox` | The executable, which is nothing but `@main`. |
@@ -354,12 +355,13 @@ a scheduler of its own that holds each message to its stamp on a high-resolution
 a millisecond, and devices are read again every two seconds and known by name. A clock for another
 program on the same machine goes through a loopback port made in Windows MIDI Services.
 
-**The app** is `DriftboxWindows`: a window with the song's scene filling it, the whole of it the
-performance filter's pad, and menus for the rest.
+**The app** is `DriftboxWindows`: a window with the song's scene filling it, the controls over it
+— the transport bar, and the step grid to click steps on — the rest of it the performance filter's
+pad, and menus for the rest. Tab hides the controls, to perform.
 - **File:** New, Open…, the catalogue, Save and Save As… as `.driftbox`.
 - **Edit:** Undo and Redo, named for the edit.
 - **Transport:** play and stop, sections, the loop, the metronome and the count-in.
-- **View:** the song's scene, or any other.
+- **View:** the controls shown or hidden, and the song's scene or any other.
 - **Audio and MIDI:** the output device, the MIDI inputs heard, and the MIDI clock followed or sent,
   and where. Settings are menu items the menu ticks as it opens.
 

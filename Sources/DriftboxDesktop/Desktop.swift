@@ -1,14 +1,17 @@
+import DriftboxCanvas
 import DriftboxDocument
 import DriftboxGPU
 import DriftboxHost
+import DriftboxInterface
 import DriftboxScenes
 import DriftboxSession
 import DriftboxShell
 import DriftboxText
 import Foundation
 
-/// Driftbox on a desktop: a window with a menu bar, the song's scene filling it, and the whole of it
-/// the performance filter's pad. Everything here is the same on every platform with a `ShellWindow`;
+/// Driftbox on a desktop: a window with a menu bar, the song's scene filling it, the controls over
+/// the scene, and the rest of it the performance filter's pad. Everything here is the same on every
+/// platform with a `ShellWindow`;
 /// what a platform gives is the window, a GPU device and the surface it draws to in that window,
 /// the typesetter, and — inside the session — its audio and MIDI. The platform's own app is the one
 /// place that chooses them, and then calls `run`.
@@ -24,6 +27,9 @@ public final class Desktop {
   let surface: any GPUSurface
   let typesetter: any Typesetter
   let presenter: Presenter
+  /// The controls, over the scene, and the page they are drawn on.
+  public let interface: Interface
+  let canvas: Canvas
   var frame: any GPUTarget
   var resized: (width: Int, height: Int)?
 
@@ -46,6 +52,8 @@ public final class Desktop {
     self.surface = surface
     self.typesetter = typesetter
     presenter = try Presenter(device: device)
+    interface = Interface(session: session)
+    canvas = try Canvas(device: device, typesetter: typesetter)
     frame = try device.makeTarget(width: max(1, surface.width), height: max(1, surface.height))
     let type = GPUScenes.type(for: session.song?.visual)
     scene = try type.init(device: device, typesetter: typesetter)
@@ -81,7 +89,19 @@ public final class Desktop {
     scene.draw(session.sceneInput(time: time, pixelRatio: window.scale), into: frame, on: device)
     let target = try surface.target()
     presenter.present(frame, into: target, on: device)
+    try drawInterface(into: target)
     try surface.present()
+  }
+
+  /// The controls, drawn on a page the size of the window in its pixels, in points, and laid over
+  /// the scene.
+  func drawInterface(into target: any GPUTarget) throws {
+    interface.size = SIMD2(Float(window.width), Float(window.height)) / window.scale
+    guard interface.isShowing else { return }
+    try canvas.begin(width: target.width, height: target.height)
+    canvas.scale(window.scale, window.scale)
+    interface.draw(on: canvas)
+    presenter.overlay(canvas.finish(), into: target, on: device)
   }
 
   /// The scene there should be: the one chosen, or the song's own, or Pulse while there is no
@@ -118,7 +138,8 @@ public final class Desktop {
     case .resized(let width, let height, _):
       resized = (width, height)
     case .pointer(let pointer):
-      pad(pointer)
+      // A press on the controls is theirs; anywhere else, the window is the pad.
+      if !interface.pointer(pointer) { pad(pointer) }
     default:
       break
     }
@@ -169,10 +190,11 @@ public final class Desktop {
     case DesktopMenus.nextSection: session.skip(sections: 1)
     case DesktopMenus.metronome: session.metronome.toggle()
     case DesktopMenus.countIn: session.countsIn.toggle()
-    case DesktopMenus.loop: loopSection()
+    case DesktopMenus.loop: session.loopSection()
     case DesktopMenus.nextScene: stepScene(by: 1)
     case DesktopMenus.previousScene: stepScene(by: -1)
     case DesktopMenus.songsScene: chosenScene = nil
+    case DesktopMenus.controls: interface.isShowing.toggle()
     case DesktopMenus.systemOutput: session.outputDevice = nil
     case DesktopMenus.listen: session.listensToMIDI.toggle()
     case DesktopMenus.followClock: session.followsClock.toggle()
@@ -203,15 +225,6 @@ public final class Desktop {
     }
   }
 
-  /// Loop the section the transport is in, or stop looping it.
-  func loopSection() {
-    let starts = session.sectionBars
-    let bar = session.position?.bar ?? 0
-    guard let at = starts.lastIndex(where: { $0 <= bar }), let song = session.song else { return }
-    let end = at + 1 < starts.count ? starts[at + 1] : song.bars
-    session.toggleLoop(start: starts[at], bars: max(1, end - starts[at]))
-  }
-
   /// The next or previous scene on the layer from the one showing, chosen from then on.
   func stepScene(by offset: Int) {
     let all = GPUScenes.all
@@ -237,6 +250,7 @@ public final class Desktop {
     case DesktopMenus.countIn: return session.countsIn
     case DesktopMenus.loop: return session.loop != nil
     case DesktopMenus.songsScene: return chosenScene == nil
+    case DesktopMenus.controls: return interface.isShowing
     case DesktopMenus.systemOutput: return session.outputDevice == nil
     case DesktopMenus.listen: return session.listensToMIDI
     case DesktopMenus.followClock: return session.followsClock
