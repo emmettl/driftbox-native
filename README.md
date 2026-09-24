@@ -461,7 +461,8 @@ pixel, and decides what each finger is: the controls' if it lands on them, the p
 first anywhere else, and a second finger tapped steps on to the next scene. Everything but the
 audio is on Java's main thread, as a desktop's is on its window's: Java's `Choreographer` asks for
 each frame and hands over each finger between them, and a window is let go of before Java's
-`surfaceDestroyed` returns, as Android wants.
+`surfaceDestroyed` returns, as Android wants. It lays the controls out for fingers: a phone's
+narrower than 600 points, kept upright, and a tablet's, a roomier phone's, wider, turned either way.
 
 The session finds its songs as files, where the app unpacks them from its package, rather than
 through `Bundle`: on Android that, `String(format:)` and `UserDefaults` are the old Foundation, and

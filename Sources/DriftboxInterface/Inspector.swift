@@ -54,6 +54,8 @@ extension Layout {
 
   static let padding: Float = 14
   static let knobCell: Float = 70
+  /// As wide as a knob's column is let grow before another knob goes in the row.
+  static let widestKnob: Float = 88
 
   /// The panel for `id`, a drum voice or a 303, at the top right under the transport, `width`
   /// across; nil for anything else.
@@ -96,13 +98,15 @@ extension Layout {
     y += 34 + 12
 
     var knobs: [Knob] = []
-    let column = innerWidth / 3
+    // Three to a row, or on a tablet's sheet as many as there is room for.
+    let across = min(targets.count, max(3, Int(innerWidth / widestKnob)))
+    let column = innerWidth / Float(across)
     for (index, target) in targets.enumerated() {
       let cell = Rect(
-        inner + Float(index % 3) * column, y + Float(index / 3) * (knobCell + 10), column, knobCell)
+        inner + Float(index % across) * column, y + Float(index / across) * (knobCell + 10), column, knobCell)
       knobs.append(Knob(target: target, dial: Rect(cell.x + (column - 40) / 2, cell.y, 40, 40), cell: cell))
     }
-    let rows = (targets.count + 2) / 3
+    let rows = (targets.count + across - 1) / across
     y += Float(rows) * knobCell + Float(rows - 1) * 10 + 12
 
     // The sends and the swing: where the voice goes and when, rather than how it sounds.
@@ -137,21 +141,29 @@ extension Layout {
 
     var knobs: [Knob] = []
     var labels: [Label] = []
-    for group in KnobSpec.fxGroups {
-      labels.append(Label(text: group.name.uppercased(), x: inner, y: y + 9))
-      y += 16
+    // A group under another; or on a tablet's sheet, two groups side by side.
+    let across = innerWidth >= 560 ? 2 : 1
+    let groupWidth = (innerWidth - Float(across - 1) * 16) / Float(across)
+    var rowHeight: Float = 0
+    for (place, group) in KnobSpec.fxGroups.enumerated() {
+      let left = inner + Float(place % across) * (groupWidth + 16)
+      labels.append(Label(text: group.name.uppercased(), x: left, y: y + 9))
       // The filter's five in a row of their own, smaller; the rest three to a row, as on a voice.
       let columns: Float = group.knobs.count > 3 ? 5 : 3
       let diameter: Float = group.knobs.count > 3 ? 32 : 36
-      let column = innerWidth / columns
+      let column = groupWidth / columns
       for (index, knob) in group.knobs.enumerated() {
-        let cell = Rect(inner + Float(index) * column, y, column, diameter + 28)
+        let cell = Rect(left + Float(index) * column, y + 16, column, diameter + 28)
         knobs.append(
           Knob(
-            target: .fx(knob), dial: Rect(cell.x + (column - diameter) / 2, y, diameter, diameter), cell: cell
-          ))
+            target: .fx(knob), dial: Rect(cell.x + (column - diameter) / 2, cell.y, diameter, diameter),
+            cell: cell))
       }
-      y += diameter + 28 + 8
+      rowHeight = max(rowHeight, 16 + diameter + 28 + 8)
+      if place % across == across - 1 || place == KnobSpec.fxGroups.count - 1 {
+        y += rowHeight
+        rowHeight = 0
+      }
     }
     y += padding - 8
     return Inspector(

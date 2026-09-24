@@ -72,12 +72,12 @@ public enum Action: Equatable, Sendable {
   case addPattern
   /// Show the song's effects down the right, or put them away.
   case effects
-  /// On a phone, show the `n`th page of eight steps.
+  /// Where the steps are paged, show the `n`th eight.
   case page(Int)
-  /// On a phone, put the controls away and make the whole screen the scene and the pad, until the
-  /// one chip left in the corner brings them back.
+  /// On a touchscreen, put the controls away and make the whole screen the scene and the pad, until
+  /// the one chip left in the corner brings them back.
   case perform
-  /// On a phone, choose a 303 step to set on the keyboard, or with nil put the keyboard away.
+  /// On a touchscreen, choose a 303 step to set on the keyboard, or with nil put the keyboard away.
   case bassStep(voice: String, index: Int?)
   /// Pause a 303 step, keeping its note, or sound it again.
   case bassGate(pattern: String, voice: String, index: Int)
@@ -115,12 +115,14 @@ public struct GridMetrics: Equatable, Sendable {
   /// From one column's left edge to the next.
   public let stride: Float
   /// The first step shown, and how many are: all of them beside their voices' names on a desktop,
-  /// and a page of eight at a finger's size on a phone, the names above them.
+  /// and a page of eight at a finger's size on a phone, the names above them. A tablet shows them
+  /// all beside their names if they fit at a finger's size, and a page of eight if not.
   public let first: Int
   public let shown: Int
   /// How far into a lane its first step is: past the voice's name, or nothing where it is above.
   public let label: Float
-  public let compact: Bool
+  /// Whether it is laid out for fingers, on a phone or a tablet.
+  public let touch: Bool
 
   public init(steps: Int, width: Float) {
     self.steps = max(1, steps)
@@ -129,31 +131,38 @@ public struct GridMetrics: Equatable, Sendable {
     first = 0
     shown = self.steps
     label = Self.labelWidth
-    compact = false
+    touch = false
   }
 
   /// A phone's: the `page`th eight steps across `width`, as many hardware grooveboxes page theirs.
-  public init(steps: Int, width: Float, page: Int) {
+  /// With a `label`, a tablet's: the names beside the steps, and every step if they all fit.
+  public init(steps: Int, width: Float, page: Int, label: Float = 0) {
     self.steps = max(1, steps)
-    shown = min(Self.pageSteps, self.steps)
-    let pages = (self.steps + Self.pageSteps - 1) / Self.pageSteps
+    let room = width - label - 8
+    let all = label > 0 && room / Float(self.steps) >= Self.fingerStride
+    shown = all ? self.steps : min(Self.pageSteps, self.steps)
+    let pages = (self.steps + shown - 1) / shown
     first = min(max(0, page), pages - 1) * Self.pageSteps
-    stride = max(Self.minimumStride, (width - 8) / Float(Self.pageSteps))
-    label = 0
-    compact = true
+    let fitted = max(Self.minimumStride, room / Float(all ? self.steps : Self.pageSteps))
+    // A phone's page fills it; a tablet's columns stop where a desktop's do.
+    stride = label > 0 ? min(Self.maximumStride, fitted) : fitted
+    self.label = label
+    touch = true
   }
 
   public static let pageSteps = 8
+  /// The narrowest a column can be and still be hit with a finger.
+  public static let fingerStride: Float = 44
 
-  public var pages: Int { compact ? (steps + Self.pageSteps - 1) / Self.pageSteps : 1 }
+  public var pages: Int { (steps + shown - 1) / shown }
   public var page: Int { first / Self.pageSteps }
   /// Whether the `index`th step is on the page shown.
   public func shows(_ index: Int) -> Bool { index >= first && index < first + shown }
 
   public var cell: Float { stride - Self.gap }
   /// A little taller than wide while the columns are narrow, and no taller than thirty points; on a
-  /// phone, a finger's height.
-  public var stepHeight: Float { compact ? 40 : min(30, max(22, cell * 1.2)) }
+  /// phone or a tablet, a finger's height.
+  public var stepHeight: Float { touch ? 40 : min(30, max(22, cell * 1.2)) }
 }
 
 /// Where everything on the interface is, for a window `size` points across, and what each part
@@ -202,6 +211,13 @@ public struct Layout {
   public var size: SIMD2<Float>
   /// Whether this is a phone's layout.
   public var compact: Bool
+  /// Whether it is laid out for fingers: a phone's, or a tablet's, which is a roomier phone's — the
+  /// steps at a finger's size beside their names, the 303's notes set on a keyboard, and the knobs a
+  /// sheet at the foot while it is upright.
+  public var touch: Bool
+  /// Whether the knobs are a sheet across the foot of the screen, the grid above it, rather than a
+  /// column down the right.
+  public var sheet: Bool
   public var bar: Rect
   public var chips: [Chip]
   /// Where the song's name and the transport's readout go, between the chips.
@@ -251,24 +267,27 @@ public struct Layout {
   public var columnsLeft: Float = 0
 
   /// The layout for a window `size` points across, the grid scrolled up by `scroll` and left by
-  /// `scrollX`, the song's effects down the right if `effects` or the selected voice's knobs if not,
-  /// grid does not scroll sideways but shows its `page`th eight steps, and with `keyboard` it leaves
-  /// room above itself for the 303 keyboard.
-  /// grid does not scroll sideways but shows its `page`th eight steps.
+  /// `scrollX`, the song's effects down the right if `effects` or the selected voice's knobs if not;
+  /// where the steps are paged, it shows the `page`th eight, and with `keyboard` it leaves room
+  /// above itself for the 303 keyboard. With `touch` it is for a touchscreen, which narrower
+  /// than `compactWidth` is a phone's, and wider a tablet's.
   @MainActor
   public init(
     session: Session, size: SIMD2<Float>, scroll: Float = 0, scrollX: Float = 0, effects: Bool = false,
-    renaming: (pattern: String, text: String)? = nil, page: Int = 0, keyboard: Bool = false
+    renaming: (pattern: String, text: String)? = nil, page: Int = 0, keyboard: Bool = false,
+    touch: Bool = false
   ) {
     self.size = size
     compact = size.x < Self.compactWidth
+    self.touch = touch || compact
+    sheet = compact || (touch && size.y > size.x)
     let margin = Self.margin
     bar = Rect(margin, margin, max(0, size.x - margin * 2), Self.barHeight)
     let chipY = bar.y + 8
     let chipHeight = bar.height - 16
     if compact {
       // Across a phone, the transport's chips and nothing else: the song's name is in the strip's
-      // sections, and the tempo and swing wait for a panel of their own.
+      // sections, and the tempo and swing are in its head.
       let widths: [(String, Float, Action, Bool)] = [
         (session.isPlaying ? "STOP" : "PLAY", 52, .toggle, session.isPlaying), ("TOP", 42, .start, false),
         ("FX", 36, .effects, effects && session.song != nil), ("CLICK", 52, .metronome, session.metronome),
@@ -284,9 +303,10 @@ public struct Layout {
       title = Rect(bar.x, bar.y, 0, 0)
       readout = Rect(bar.maxX, bar.y, 0, 0)
     } else {
-      (chips, title, readout) = Self.desktopBar(session: session, bar: bar, effects: effects)
+      (chips, title, readout) = Self.desktopBar(
+        session: session, bar: bar, effects: effects, perform: self.touch)
     }
-    if !compact, session.song != nil {
+    if !self.touch, session.song != nil {
       let swing = Rect(readout.maxX - 82, chipY, 82, chipHeight)
       numbers.append(Knob(target: .songSwing, dial: swing, cell: swing))
       if session.followedBPM == nil {
@@ -300,9 +320,11 @@ public struct Layout {
   }
 
   /// The transport across a window: play and back to the top at the left, the effects, the click
-  /// and the loop at the right, and between them the song's name and the tempo and swing.
+  /// and the loop at the right, and between them the song's name and the tempo and swing. On a
+  /// tablet, with `perform`, the chip that puts the controls away comes after the top's, and the
+  /// tempo and swing are in the strip.
   @MainActor
-  static func desktopBar(session: Session, bar: Rect, effects: Bool) -> (
+  static func desktopBar(session: Session, bar: Rect, effects: Bool, perform: Bool = false) -> (
     chips: [Chip], title: Rect, readout: Rect
   ) {
     let chipY = bar.y + 8
@@ -313,14 +335,18 @@ public struct Layout {
         action: .toggle, isOn: session.isPlaying),
       Chip(frame: Rect(bar.x + 76, chipY, 48, chipHeight), label: "TOP", action: .start, isOn: false),
     ]
+    if perform {
+      chips.append(Chip(frame: Rect(bar.x + 130, chipY, 76, chipHeight), label: "PERFORM", action: .perform, isOn: false))
+    }
     let loopChip = Rect(bar.maxX - 10 - 56, chipY, 56, chipHeight)
     let clickChip = Rect(loopChip.x - 6 - 64, chipY, 64, chipHeight)
     let fxChip = Rect(clickChip.x - 6 - 44, chipY, 44, chipHeight)
     chips.append(Chip(frame: fxChip, label: "FX", action: .effects, isOn: effects && session.song != nil))
     chips.append(Chip(frame: clickChip, label: "CLICK", action: .metronome, isOn: session.metronome))
     chips.append(Chip(frame: loopChip, label: "LOOP", action: .loop, isOn: session.loop != nil))
-    let left = bar.x + 136
-    let middle = max(left, (left + fxChip.x - 12) / 2)
+    let left = bar.x + (perform ? 218 : 136)
+    // Half each; on a tablet, where the readout is only where the transport is, the name the rest.
+    let middle = max(left, perform ? fxChip.x - 12 - 100 : (left + fxChip.x - 12) / 2)
     return (
       chips, Rect(left, bar.y, max(0, middle - left), bar.height),
       Rect(middle, bar.y, max(0, fxChip.x - 12 - middle), bar.height)
@@ -338,12 +364,12 @@ public struct Layout {
     // Inside the grid's panel: less on a phone, where every point across is a step's.
     let inset: Float = compact ? 6 : Self.inset
     guard let song = session.song else { return }
-    // On a phone the tempo and swing, which the transport has no room for, are in the strip's head,
-    // at a finger's height, and the strip is that much taller.
-    let stripHead: Float = compact ? Self.phoneStripHead : 26
+    // On a phone or a tablet the tempo and swing are in the strip's head, where a phone's transport,
+    // which has no room for them, has them; at a finger's height, and the strip is that much taller.
+    let stripHead: Float = touch ? Self.phoneStripHead : 26
     let strip = Rect(margin, bar.maxY + margin, bar.width, Self.stripHeight + stripHead - 26)
     self.strip = strip
-    if compact {
+    if touch {
       let swing = Rect(strip.maxX - 8 - 84, strip.y + 5, 84, stripHead - 8)
       numbers.append(Knob(target: .songSwing, dial: swing, cell: swing))
       if session.followedBPM == nil {
@@ -356,29 +382,32 @@ public struct Layout {
     (sections, totalBars) = Self.sections(of: song, in: sectionsFrame)
     let below = strip.maxY + margin
 
-    // A column down the right; on a phone, a sheet across the foot of the screen, the grid above it.
-    let panelWidth = compact ? bar.width : Self.inspectorWidth
+    // A column down the right; on a phone, or an upright tablet, a sheet across the foot of the
+    // screen, the grid above it.
+    let panelWidth = self.sheet ? bar.width : Self.inspectorWidth
     inspector =
       effects
       ? Self.effects(top: below, right: bar.maxX, width: panelWidth)
       : session.selectedVoice.flatMap {
         Self.inspector(for: $0, top: below, right: bar.maxX, width: panelWidth)
       }
-    if compact, let sheet = inspector { inspector = sheet.moved(to: size.y - margin - sheet.frame.height) }
-    // Where the grid's foot is: the screen's, or on a phone the sheet's top.
-    let foot = compact ? (inspector?.frame.y ?? size.y) : size.y
+    if self.sheet, let sheet = inspector { inspector = sheet.moved(to: size.y - margin - sheet.frame.height) }
+    // Where the grid's foot is: the screen's, or the sheet's top.
+    let foot = self.sheet ? (inspector?.frame.y ?? size.y) : size.y
     guard let pattern = session.shownPattern else { return }
     self.pattern = pattern
     // The playhead only means something on the pattern that is playing, and only while it is.
     if session.isPlaying, session.position?.pattern?.id == pattern.id { playhead = session.position?.step }
 
-    // Beside the panel, when there is one; on a phone, under it, the whole width.
+    // Beside the panel, when there is one; above the sheet, the whole width.
     let width =
-      compact ? bar.width : max(0, (inspector.map { $0.frame.x - margin } ?? size.x - margin) - margin)
+      self.sheet ? bar.width : max(0, (inspector.map { $0.frame.x - margin } ?? size.x - margin) - margin)
     let metrics =
       compact
       ? GridMetrics(steps: pattern.length, width: width - inset * 2, page: page)
-      : GridMetrics(steps: pattern.length, width: width - inset * 2)
+      : touch
+        ? GridMetrics(steps: pattern.length, width: width - inset * 2, page: page, label: GridMetrics.labelWidth)
+        : GridMetrics(steps: pattern.length, width: width - inset * 2)
     self.metrics = metrics
     let voices = allVoices.enumerated().filter { pattern.tracks[$0.element.id] != nil }
     let lines = ["303.a", "303.b"].filter { pattern.bass[$0] != nil }
@@ -386,7 +415,7 @@ public struct Layout {
     let named = compact ? Self.nameHeight : 0
     let laneHeight = named + metrics.stepHeight + 4
     let filterHeight = named + metrics.stepHeight * 0.8
-    let lineHeight = compact ? named + metrics.stepHeight + 12 : BassMetrics.height + 12
+    let lineHeight = touch ? named + metrics.stepHeight + 12 : BassMetrics.height + 12
     let pages: Float = metrics.pages > 1 ? 32 : 0
     let content =
       pages + 8 + 5 + Float(voices.count) * (laneHeight + 5) + 5 + filterHeight
@@ -394,8 +423,8 @@ public struct Layout {
     // As tall as what is in it and its pattern bar, up to the room under the strip; past that, it
     // scrolls under the pattern bar.
     let head = Self.patternBarHeight + 16
-    // On a phone, less while the 303 keyboard is open above it: the grid scrolls, and nothing covers it.
-    let reserved = compact && keyboard ? BassKeyboard.height + margin : 0
+    // For fingers, less while the 303 keyboard is open above it: the grid scrolls, and nothing covers it.
+    let reserved = touch && keyboard ? BassKeyboard.height + margin : 0
     let room = max(0, foot - margin - below - reserved)
     let height = min(head + content + inset + 8, room)
     let grid = Rect(margin, foot - margin - height, width, height)
@@ -412,10 +441,10 @@ public struct Layout {
     let x = grid.x + inset
     let inner = width - inset * 2
     // The steps, wider than there is room for beside the lanes' names, scroll under them; on a
-    // phone, a page of them fills the lane under its name, and nothing scrolls sideways.
+    // phone, a page of them fills the lane under its name, and nothing paged scrolls sideways.
     let first = x + 4 + metrics.label
     let seen = max(0, inner - 8 - metrics.label)
-    maxScrollX = compact ? 0 : max(0, metrics.stride * Float(metrics.steps) - GridMetrics.gap - seen)
+    maxScrollX = metrics.pages > 1 ? 0 : max(0, metrics.stride * Float(metrics.steps) - GridMetrics.gap - seen)
     self.scrollX = min(max(0, scrollX), maxScrollX)
     columnsLeft = first - self.scrollX
     columns = Rect(first, rows.y, seen, rows.height)
@@ -446,13 +475,17 @@ public struct Layout {
     for voice in lines {
       y += 10
       let frame = Rect(x, y, inner, lineHeight)
+      // For fingers, a row of steps whose notes the keyboard sets, under the line's name on a phone
+      // and beside it on a tablet; on a desktop, the piano roll.
+      let header =
+        compact ? Rect(x + 4, y, inner - 8, named) : Rect(x + 4, y + 6, metrics.label, metrics.stepHeight)
       bassLines.append(
-        compact
+        touch
           ? BassLine(
-            voice: voice, frame: frame, header: Rect(x + 4, y, inner - 8, named),
+            voice: voice, frame: frame, header: header,
             cells: Rect(
-              columnsLeft, y + named, metrics.stride * Float(metrics.shown) - GridMetrics.gap,
-              metrics.stepHeight))
+              columnsLeft, compact ? y + named : y + 6,
+              metrics.stride * Float(metrics.shown) - GridMetrics.gap, metrics.stepHeight))
           : BassLine(
             voice: voice, frame: frame, header: Rect(x + 4, y + 6, metrics.label, 28),
             cells: Rect(
@@ -507,8 +540,8 @@ public struct Layout {
     for line in bassLines {
       if line.header.contains(point) { return .select(voice: line.voice) }
       if onSteps, line.cells.contains(point) {
-        // On a phone a step is chosen, and its note then set on the keyboard.
-        guard compact else { return bassAction(at: point, in: line, pattern: pattern, metrics: metrics) }
+        // For fingers a step is chosen, and its note then set on the keyboard.
+        guard touch else { return bassAction(at: point, in: line, pattern: pattern, metrics: metrics) }
         return column(at: point.x, lane: line.cells, metrics: metrics).map {
           .bassStep(voice: line.voice, index: $0)
         }
