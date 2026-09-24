@@ -106,6 +106,8 @@ public final class Canvas {
     case ellipse = 1
     case glyph = 2
     case image = 3
+    case rounded = 4
+    case border = 5
   }
 
   public let device: any GPUDevice
@@ -267,6 +269,30 @@ public final class Canvas {
     place(.ellipse, x, y, width, height, colour: state.fill)
   }
 
+  /// A rectangle with corners rounded to `radius`, filled from the fill at its top to `foot` at its
+  /// bottom, or the fill all the way down: an interface's panels and buttons. It is meant upright;
+  /// under a transform that turns it, it is drawn where its axes go, but its corners are measured
+  /// as if it were not turned.
+  public func fillRoundedRect(
+    _ x: Float, _ y: Float, _ width: Float, _ height: Float, radius: Float, foot: Colour? = nil
+  ) {
+    place(
+      .rounded, x, y, width, height, colour: state.fill, texture: (foot ?? state.fill).vector, extra: radius)
+  }
+
+  /// The border of the same rectangle, `lineWidth` wide inside its edge, in the stroke.
+  public func strokeRoundedRect(_ x: Float, _ y: Float, _ width: Float, _ height: Float, radius: Float) {
+    place(
+      .border, x, y, width, height, colour: state.stroke,
+      texture: SIMD4(state.lineWidth * scaleOfTransform, 0, 0, 0), extra: radius)
+  }
+
+  /// How much the transform scales a length: the mean of what it does to its two axes.
+  private var scaleOfTransform: Float {
+    let t = state.transform
+    return ((t.a * t.a + t.b * t.b).squareRoot() + (t.c * t.c + t.d * t.d).squareRoot()) / 2
+  }
+
   /// Straight lines, each stroked `lineWidth` across and cut off flat where it ends, as Canvas2D's
   /// default `butt` caps are. Each line is its own mark, so where two lines of a translucent stroke
   /// cross, the crossing is drawn twice; Canvas2D strokes a path as one shape, and draws it once.
@@ -285,12 +311,15 @@ public final class Canvas {
     }
   }
 
-  private func place(_ kind: Kind, _ x: Float, _ y: Float, _ width: Float, _ height: Float, colour: Colour) {
+  private func place(
+    _ kind: Kind, _ x: Float, _ y: Float, _ width: Float, _ height: Float, colour: Colour,
+    texture: SIMD4<Float> = .zero, extra: Float = 0
+  ) {
     add(
       Mark(
         axes: Self.axes(state.transform.turn(SIMD2(width, 0)), state.transform.turn(SIMD2(0, height))),
-        origin: Self.origin(state.transform.apply(SIMD2(x, y)), kind.rawValue, 0),
-        colour: colour.vector, texture: .zero, clip: state.clip))
+        origin: Self.origin(state.transform.apply(SIMD2(x, y)), kind.rawValue, extra * scaleOfTransform),
+        colour: colour.vector, texture: texture, clip: state.clip))
   }
 
   /// A mark's two axes, as `aAxes` takes them.
@@ -298,9 +327,9 @@ public final class Canvas {
     SIMD4(lowHalf: x, highHalf: y)
   }
 
-  /// A mark's corner and its kind, as `aOrigin` takes them.
-  private static func origin(_ corner: SIMD2<Float>, _ kind: Float, _ unused: Float) -> SIMD4<Float> {
-    SIMD4(corner.x, corner.y, kind, unused)
+  /// A mark's corner, its kind and what else it carries, as `aOrigin` takes them.
+  private static func origin(_ corner: SIMD2<Float>, _ kind: Float, _ extra: Float) -> SIMD4<Float> {
+    SIMD4(corner.x, corner.y, kind, extra)
   }
 
   private func add(_ mark: Mark) {
@@ -329,6 +358,18 @@ public final class Canvas {
   /// `fillText`: `text` on the alphabetic baseline at `y`, starting, ending or centred at `x` as
   /// the alignment says, in the current font and fill.
   public func fillText(_ text: String, _ x: Float, _ y: Float) {
+    let t = state.transform
+    if t.b == 0 && t.c == 0 && t.a == t.d && t.a > 0 && !t.movesOnly {
+      // Scaled evenly, as an interface is on a screen with more than one pixel to its point: set
+      // at the size it will be on the page and laid on the grid there, not set small and magnified.
+      save()
+      state.font.size *= t.a
+      state.transform = Affine()
+      let at = t.apply(SIMD2(x, y))
+      fillText(text, at.x, at.y)
+      restore()
+      return
+    }
     let line = line(text)
     let start =
       switch state.align {

@@ -3,9 +3,23 @@
 /// projector's output shows the projector's picture with bars, and a backdrop covers its window.
 public final class Presenter {
   private let pipeline: any GPUPipeline
+  private let overlayPipeline: any GPUPipeline
 
   public init(device: any GPUDevice) throws {
     pipeline = try device.makePipeline(GPUPipelineDescriptor(program: .present, primitive: .triangleStrip))
+    overlayPipeline = try device.makePipeline(
+      GPUPipelineDescriptor(program: .overlay, primitive: .triangleStrip, blend: .normal))
+  }
+
+  /// `page` over what `target` already shows, pixel for pixel: an interface drawn on a canvas the
+  /// size of the target, over the frame it was presented. The page is what a canvas leaves, its
+  /// colour multiplied by its alpha, and goes over as the canvas drew it.
+  public func overlay(_ page: any GPUTarget, into target: any GPUTarget, on device: any GPUDevice) {
+    device.render(into: target, clear: .none) { pass in
+      pass.setPipeline(overlayPipeline)
+      pass.setTexture(page.colour, binding: 1)
+      pass.draw(vertexCount: 4)
+    }
   }
 
   /// `frame` into `target`, fitted, or `filling` it.

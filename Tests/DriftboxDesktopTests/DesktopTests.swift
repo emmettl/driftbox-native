@@ -270,15 +270,38 @@ struct DesktopTests {
     }
   }
 
-  /// The window is the pad: pressed, the filter moves and the scene sees the finger; let go, both
-  /// let go.
+  /// The window is the pad, away from the controls: pressed, the filter moves and the scene sees
+  /// the finger; let go, both let go.
   @Test func theWindowIsThePad() throws {
     for device in try Self.devices() {
       let (desktop, window, _) = try Self.desktop(on: device)
-      window.onEvent?(.pointer(PointerEvent(phase: .began, id: 0, kind: .mouse, location: SIMD2(80, 45))))
-      #expect(desktop.session.padTouch == SIMD2(0.25, 0.75))
-      window.onEvent?(.pointer(PointerEvent(phase: .ended, id: 0, kind: .mouse, location: SIMD2(80, 45))))
+      window.onEvent?(.pointer(PointerEvent(phase: .began, id: 0, kind: .mouse, location: SIMD2(80, 135))))
+      #expect(desktop.session.padTouch == SIMD2(0.25, 0.25))
+      window.onEvent?(.pointer(PointerEvent(phase: .ended, id: 0, kind: .mouse, location: SIMD2(80, 135))))
       #expect(desktop.session.padTouch == nil)
+    }
+  }
+
+  /// A press on the controls is theirs and not the pad's; with the controls hidden, from the View
+  /// menu, the whole window is the pad again. A frame draws them over the scene, or does not.
+  @Test func theControlsAreOverThePad() throws {
+    for device in try Self.devices() {
+      let (desktop, window, surface) = try Self.desktop(on: device)
+      try desktop.drawFrame()
+      let onTheBar = SIMD2<Float>(250, 30)
+      window.onEvent?(.pointer(PointerEvent(phase: .began, location: onTheBar)))
+      #expect(desktop.session.padTouch == nil)
+      window.onEvent?(.pointer(PointerEvent(phase: .ended, location: onTheBar)))
+
+      #expect(window.isChecked?(DesktopMenus.controls) == true)
+      window.choose(DesktopMenus.controls)
+      #expect(!desktop.interface.isShowing)
+      #expect(window.isChecked?(DesktopMenus.controls) == false)
+      window.onEvent?(.pointer(PointerEvent(phase: .began, location: onTheBar)))
+      #expect(desktop.session.padTouch != nil)
+      window.onEvent?(.pointer(PointerEvent(phase: .ended, location: onTheBar)))
+      try desktop.drawFrame()
+      #expect(surface.presented == 2)
     }
   }
 

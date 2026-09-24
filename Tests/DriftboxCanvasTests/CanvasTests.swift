@@ -210,6 +210,83 @@ struct CanvasTests {
     }
   }
 
+  /// A rounded rectangle covers its edges but not its corners, and its corners scale with the
+  /// transform: the same shape drawn at half the size under a scale of two is the same pixels.
+  @Test func roundedCornersAreRound() throws {
+    for device in try Devices.all() {
+      let read = try Self.page(device, 32) { canvas in
+        canvas.fill = Colour(0xff0000)
+        canvas.fillRoundedRect(0, 0, 32, 32, radius: 8)
+      }
+      #expect(near(pixel(read, 16, 16, width: 32), red))
+      #expect(near(pixel(read, 16, 0, width: 32), red), "its top edge, straight")
+      #expect(near(pixel(read, 0, 16, width: 32), red), "its left edge")
+      #expect(near(pixel(read, 1, 1, width: 32), clear), "but not the corner")
+      #expect(near(pixel(read, 30, 30, width: 32), clear), "any corner")
+      let scaled = try Self.page(device, 32) { canvas in
+        canvas.fill = Colour(0xff0000)
+        canvas.scale(2, 2)
+        canvas.fillRoundedRect(0, 0, 16, 16, radius: 4)
+      }
+      #expect(zip(read, scaled).allSatisfy { abs(Int($0) - Int($1)) <= 1 }, "the same under a scale")
+    }
+  }
+
+  /// A rounded fill runs from its colour at the top to its foot's at the bottom.
+  @Test func aFillRunsToItsFoot() throws {
+    for device in try Devices.all() {
+      let read = try Self.page(device) { canvas in
+        canvas.fill = Colour(0xff0000)
+        canvas.fillRoundedRect(0, 0, 16, 16, radius: 0, foot: Colour(0x0000ff))
+      }
+      let top = pixel(read, 8, 0, width: 16)
+      let middle = pixel(read, 8, 8, width: 16)
+      let bottom = pixel(read, 8, 15, width: 16)
+      #expect(top.x > 240 && top.z < 15, "red at the top: \(top)")
+      #expect(bottom.z > 240 && bottom.x < 15, "blue at the foot: \(bottom)")
+      #expect(abs(middle.x - middle.z) < 20 && middle.w == 255, "and half and half between: \(middle)")
+    }
+  }
+
+  /// A border is its line width inside the rectangle's edge, and nothing within.
+  @Test func aBorderIsInsideItsEdge() throws {
+    for device in try Devices.all() {
+      let read = try Self.page(device) { canvas in
+        canvas.stroke = Colour(0xff0000)
+        canvas.lineWidth = 2
+        canvas.strokeRoundedRect(2, 2, 12, 12, radius: 0)
+      }
+      #expect(near(pixel(read, 2, 8, width: 16), red))
+      #expect(near(pixel(read, 3, 8, width: 16), red))
+      #expect(near(pixel(read, 13, 8, width: 16), red), "on every side")
+      #expect(near(pixel(read, 8, 2, width: 16), red))
+      #expect(near(pixel(read, 1, 8, width: 16), clear), "nothing outside")
+      #expect(near(pixel(read, 4, 8, width: 16), clear), "nor inside the line")
+      #expect(near(pixel(read, 8, 8, width: 16), clear))
+    }
+  }
+
+  /// Type under an even scale is set at the size it lands on the page, not set small and
+  /// magnified: the same pixels as the larger type drawn where the scale puts it.
+  @Test func scaledTypeIsSharp() throws {
+    guard let typesetter = try Devices.typesetter() else { return }
+    for device in try Devices.all() {
+      let read = try Self.page(device, 64, typesetter: typesetter) { canvas in
+        canvas.font = FontRequest(families: ["Arial"], size: 32)
+        canvas.fill = Colour(0xff0000)
+        canvas.fillText("Ag", 10, 44)
+      }
+      let scaled = try Self.page(device, 64, typesetter: typesetter) { canvas in
+        canvas.font = FontRequest(families: ["Arial"], size: 16)
+        canvas.fill = Colour(0xff0000)
+        canvas.scale(2, 2)
+        canvas.fillText("Ag", 5, 22)
+      }
+      #expect(read.contains { $0 > 128 }, "something drawn")
+      #expect(read == scaled)
+    }
+  }
+
   /// A stroked line is its width across, centred on the line.
   @Test func aLineIsItsWidthAcross() throws {
     for device in try Devices.all() {

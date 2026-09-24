@@ -605,6 +605,15 @@ public final class Session {
     loop = loop == range ? nil : range
   }
 
+  /// Loop the section the transport is in, or stop looping it.
+  public func loopSection() {
+    let starts = sectionBars
+    let bar = position?.bar ?? 0
+    guard let at = starts.lastIndex(where: { $0 <= bar }), let song else { return }
+    let end = at + 1 < starts.count ? starts[at + 1] : song.bars
+    toggleLoop(start: starts[at], bars: max(1, end - starts[at]))
+  }
+
   /// Stretch the loop to take in the section from `start` for `bars`, whichever side it is on.
   public func extendLoop(toStart start: Int, bars: Int) {
     guard let current = loop else { return toggleLoop(start: start, bars: bars) }
