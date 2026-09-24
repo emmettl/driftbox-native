@@ -2,6 +2,7 @@
   import DriftboxDocument
   import DriftboxHost
   import DriftboxSeq
+  import DriftboxSession
   import Foundation
 
   @testable import DriftboxApp
@@ -65,12 +66,12 @@
   /// because that is how one arrives in the application, and the engine is rendered by the caller.
   @MainActor
   func openedPlayer(_ song: Song, named name: String = "Test", in directory: URL) throws -> (
-    player: Player, host: EngineHost
+    player: Session, host: EngineHost
   ) {
     let url = directory.appendingPathComponent("\(name).song.json")
     try Data(SongCodec.encode(song).utf8).write(to: url)
     let host = EngineHost(sampleRate: 48000)
-    let player = Player(host: host)
+    let player = Session(host: host)
     player.open(file: url)
     return (player, host)
   }

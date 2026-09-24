@@ -150,12 +150,24 @@
     }
 
     /// The one node every attached source plays through: the mixer's sum, two channels at the
-    /// route's rate. Its block captures the mixer and scratch it owns, nothing of the route's.
+    /// route's rate.
     private func makeNode() {
       guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2) else { return }
-      let scratch = Scratch()
-      let mixer = mixer
-      let node = AVAudioSourceNode(format: format) { _, _, count, list in
+      let node = AVAudioSourceNode(
+        format: format, renderBlock: Self.renderBlock(mixer: mixer, scratch: Scratch()))
+      engine.attach(node)
+      engine.connect(node, to: engine.mainMixerNode, format: format)
+      self.node = node
+      apply()
+    }
+
+    /// What the node calls from the device's thread. Made here, off the main actor: a block written
+    /// inside the route would be the main actor's, and Swift traps when the audio thread calls one.
+    /// It captures the mixer and scratch it owns, nothing of the route's.
+    nonisolated private static func renderBlock(mixer: Mixer, scratch: Scratch)
+      -> AVAudioSourceNodeRenderBlock
+    {
+      { _, _, count, list in
         let buffers = UnsafeMutableAudioBufferListPointer(list)
         guard buffers.count >= 2, let left = buffers[0].mData?.assumingMemoryBound(to: Float.self),
           let right = buffers[1].mData?.assumingMemoryBound(to: Float.self)
@@ -173,10 +185,6 @@
         mixer.buffers.add(1, ordering: .releasing)
         return noErr
       }
-      engine.attach(node)
-      engine.connect(node, to: engine.mainMixerNode, format: format)
-      self.node = node
-      apply()
     }
 
     /// Two channels of scratch for the mixer to render each source into, kept for the node's life.

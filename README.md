@@ -122,11 +122,10 @@ beside any Audio Units attached to the engine directly.
 **Where it stands.** `DriftboxHostWindows` is built on the ports and tested against them, and so
 is `DriftboxHostAndroid`'s audio, played through a phone. `DriftboxHostMac` is too: `AudioRoute`
 is the Mac's `AudioRouting`, `MIDIInput` and `MIDIOutput` its MIDI ports, and the clock is
-`HostTime`'s. `Player` and `MacRack` still play their engine and rack as Audio Units in the route's
-engine rather than as sources on it; moving the groovebox onto `Session` is what changes that, and
-after it `driftbox-play` can be one program on every platform rather than branches.
+`HostTime`'s. The Mac app plays the groovebox's engine and the rack as sources on one route, as
+every platform does; `driftbox-play` can now be one program on every platform rather than branches.
 
-**What an app holds** is `DriftboxSession`'s `Session`: the Mac app's `Player` without the Mac in it.
+**What an app holds** is `DriftboxSession`'s `Session`: the groovebox without any platform in it.
 It holds the song and the transport, the loop, the metronome and the count-in, editing and undo, a
 MIDI clock followed and one sent, and what is remembered between launches. It also ships the
 catalogue of songs.
@@ -137,10 +136,12 @@ catalogue of songs.
   window's.
 - **Undo is its own.** Foundation's `UndoManager` is not there on Windows, and every edit is a song
   before and a song after, so `UndoHistory` is a stack of those with their names.
-- **Settings persist under the Mac app's own keys,** so that its preferences come with it.
+- **Settings persist under the Mac app's own keys,** so that its preferences came with it.
+- **Something else can take the MIDI** that arrives, through `MIDIListener`: on the Mac, the rack
+  while its window is in front.
 
-The Windows app is to be built on it. The Mac app still has its `Player`, which reads the catalogue
-and the clock cursor from the session, until it moves onto `Session` too, on a Mac.
+The Mac app is built on it: a `Studio` makes the Mac's adapters, hands them to a `Session` and to the
+rack's `RackSession`, and ticks both. The Windows app is to be built the same way.
 
 ### The GPU
 
@@ -483,8 +484,12 @@ node conformance/emit/emit.mjs          # rewrite the checked-in fixtures
 node conformance/emit/emit.mjs --full   # also whole-song plans, into conformance/generated
 node conformance/emit/emit-audio.mjs    # everything rendered in Chromium, into conformance/generated
 scripts/check-fixtures.sh               # fail if the fixtures are stale against the submodule (emit --check)
-swift test
+SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 swift test
 ```
+
+The variable makes a test run check actor isolation as strictly as the app does. Without it the
+test runner is lenient, and a closure made on the main actor but called from an audio or MIDI thread
+traps in the app while every test passes.
 
 Needs Node 24 or later and, for the audio, a Chromium — and nothing else. Node strips the types
 itself, and `conformance/emit/ts-resolve.mjs` points the reference's `./x.js` imports at the

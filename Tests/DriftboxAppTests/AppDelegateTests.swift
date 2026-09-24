@@ -3,6 +3,7 @@
   import DriftboxDocument
   import DriftboxHost
   import DriftboxSeq
+  import DriftboxSession
   import Foundation
   import Testing
 
@@ -42,7 +43,7 @@
         let delegate = AppDelegate()
         delegate.attach(SongFiles(player: player))
         // Attaching again would hand the same window to a second set of files.
-        delegate.attach(SongFiles(player: Player(host: EngineHost(sampleRate: 48000))))
+        delegate.attach(SongFiles(player: Session(host: EngineHost(sampleRate: 48000))))
 
         delegate.application(NSApplication.shared, open: [second, third])
         #expect(player.documentName == "Third")
@@ -55,7 +56,7 @@
       #expect(delegate.applicationShouldTerminate(NSApplication.shared) == .terminateNow)
       #expect(delegate.applicationShouldTerminateAfterLastWindowClosed(NSApplication.shared))
 
-      let player = Player(host: EngineHost(sampleRate: 48000))
+      let player = Session(host: EngineHost(sampleRate: 48000))
       delegate.attach(SongFiles(player: player))
       player.new()
       #expect(delegate.applicationShouldTerminate(NSApplication.shared) == .terminateNow)

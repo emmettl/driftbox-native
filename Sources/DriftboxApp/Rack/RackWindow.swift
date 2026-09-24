@@ -2,6 +2,7 @@
   import AppKit
   import DriftboxRack
   import DriftboxRackSession
+  import DriftboxSession
   import SwiftUI
 
   /// The rack's window: a header with the patch, the transport, the side showing and a way to

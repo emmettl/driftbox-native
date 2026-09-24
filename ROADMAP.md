@@ -436,8 +436,12 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    `MIDIInput` and `MIDIOutput` are its MIDI ports, on `HostTime`'s clock and the shared
    `MIDIDestination`; the Audio Units — the engine's, the rack's, and those the rack hosts — go
    with them, leaving `DriftboxHost` with nothing of any one platform. The rack's model moved onto
-   `RackSession` already. Left, and needing a Mac: the groovebox moved onto `Session`, its `Player`
-   gone.
+   `RackSession` already. Then the groovebox moved onto `Session`, `Player` gone: a `Studio` makes the
+   Mac's adapters and hands them to the two sessions, which play as sources on one route — the
+   engine's and the rack's Audio Units are for plug-in hosts now, not the app — and one timer ticks
+   both. `Session` took on what only `Player` had: the rack's song linked for editing, and MIDI
+   handed to the rack while its window is in front. Undo is the session's own history, one step an
+   edit, as on every platform.
 3. **A GPU layer under the scenes.** ← *here.* The scenes use a small part of Metal: buffers,
    render pipelines, per-draw constants, indexed draws, depth, blending. `DriftboxGPU` says that
    much and no more, in what Metal, Direct3D 11 and OpenGL ES 3.0 all do alike — sprites as

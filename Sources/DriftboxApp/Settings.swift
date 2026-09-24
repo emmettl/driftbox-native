@@ -1,6 +1,7 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxHost
   import DriftboxHostMac
+  import DriftboxSession
   import SwiftUI
 
   /// What the app remembers between launches. Small on purpose: a setting the app cannot honour
@@ -46,7 +47,7 @@
   /// mirror, in one direction only, so that a setting and the thing it controls cannot drift
   /// apart: everything that changes one of these writes the preference and arrives back here.
   struct Preferences: ViewModifier {
-    let player: Player
+    let player: Session
     @AppStorage(Defaults.visuals) private var visuals = true
     @AppStorage(Defaults.listensToMIDI) private var listens = true
     @AppStorage(Defaults.ignoredMIDI) private var ignored = ""
@@ -77,7 +78,7 @@
   /// The settings window: where the sound goes, the MIDI the app listens to, the clock it sends,
   /// and whether the visuals run. Everything here is something the engine actually reads.
   public struct SettingsView: View {
-    let player: Player
+    let player: Session
     @AppStorage(Defaults.visuals) private var visuals = true
     @AppStorage(Defaults.listensToMIDI) private var listens = true
     @AppStorage(Defaults.ignoredMIDI) private var ignored = ""
@@ -86,7 +87,7 @@
     @AppStorage(Defaults.audioOutput) private var output = ""
     @AppStorage(Defaults.audioOutputName) private var outputName = ""
 
-    public init(player: Player) {
+    public init(player: Session) {
       self.player = player
     }
 

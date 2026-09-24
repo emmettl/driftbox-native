@@ -2,6 +2,7 @@
   import AppKit
   import DriftboxDocument
   import DriftboxEngine
+  import DriftboxSession
   import SwiftUI
   import UniformTypeIdentifiers
 
@@ -18,21 +19,21 @@
   /// already has a file. The menu and the toolbar both call these rather than each holding their
   /// own copy, so the two cannot come to mean different things.
   ///
-  /// AppKit, and deliberately not on `Player`: a panel is a Mac, and `Player` is meant to survive
+  /// AppKit, and deliberately not on `Session`: a panel is a Mac, and `Session` is meant to survive
   /// the move to a platform that has none.
   @MainActor
   public struct SongFiles {
-    let player: Player
+    let player: Session
     /// What Save As asks, and the one part of saving that needs somebody at the machine. Held as a
     /// function rather than written into `saveAs`, so that the rule about when Save has to ask at
     /// all can be exercised where there is nobody there to answer.
     let askWhereToSave: @MainActor (String) -> URL?
 
-    public init(player: Player) {
+    public init(player: Session) {
       self.init(player: player, askWhereToSave: Self.savePanel)
     }
 
-    init(player: Player, askWhereToSave: @escaping @MainActor (String) -> URL?) {
+    init(player: Session, askWhereToSave: @escaping @MainActor (String) -> URL?) {
       self.player = player
       self.askWhereToSave = askWhereToSave
     }
@@ -175,7 +176,7 @@
   /// question before that work is closed over. Sits in the background of the content, where it can
   /// reach the window without anything being drawn for it.
   struct WindowIdentity: NSViewRepresentable {
-    let player: Player
+    let player: Session
     let files: SongFiles
 
     func makeNSView(context: Context) -> NSView {

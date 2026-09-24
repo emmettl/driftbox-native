@@ -4,17 +4,17 @@
   import DriftboxEngine
   import DriftboxHost
   import DriftboxSeq
+  import DriftboxSession
   import SwiftUI
   import UniformTypeIdentifiers
 
   public struct ContentView: View {
-    @Bindable var player: Player
+    @Bindable var player: Session
     let stage: Stage
-    @Environment(\.undoManager) private var undoManager
     @AppStorage(Defaults.visuals) private var showsVisuals = true
     @State private var columns = NavigationSplitViewVisibility.all
 
-    public init(player: Player, stage: Stage) {
+    public init(player: Session, stage: Stage) {
       self.player = player
       self.stage = stage
     }
@@ -74,7 +74,6 @@
       // The window's own ground is the indigo, so the sidebar's glass is tinted by it rather
       // than by the system's grey.
       .containerBackground(Theme.ground, for: .window)
-      .onChange(of: undoManager, initial: true) { _, manager in player.undoManager = manager }
       .modifier(Keys(player: player))
       .modifier(Preferences(player: player))
       .focusable()
@@ -137,7 +136,7 @@
 
   /// With no song open: the window says what to do, in its own voice.
   struct EmptyWindow: View {
-    let player: Player
+    let player: Session
     let files: SongFiles
 
     var body: some View {
@@ -167,7 +166,7 @@
   /// The songs, as a list of rows drawn here rather than by the system, so the chosen one lights
   /// in the instrument's colours instead of the system's blue. The arrow keys still walk it.
   struct SongList: View {
-    let player: Player
+    let player: Session
     let files: SongFiles
     @FocusState private var focused: Bool
 
@@ -286,7 +285,7 @@
   /// The toolbar is the transport: play, the position and tempo in a display of their own, the
   /// clock switches, and the visuals and export on the right.
   struct TransportToolbar: ToolbarContent {
-    let player: Player
+    let player: Session
     let files: SongFiles
     @Binding var showsVisuals: Bool
 
@@ -325,7 +324,7 @@
 
   /// Play, lit and glowing while it runs.
   struct PlayButton: View {
-    let player: Player
+    let player: Session
 
     var body: some View {
       Button {
@@ -346,7 +345,7 @@
   /// tempo and swing, which are dragged like the knobs are. And the two clock switches, which
   /// are performance decisions and so belong beside the tempo rather than in Settings.
   struct TransportDisplay: View {
-    let player: Player
+    let player: Session
     // The clock is remembered between launches, so this writes the preference and the window
     // mirrors it onto the player; the menu's own switch writes the same one.
     @AppStorage(Defaults.sendsClock) private var sendsClock = false
@@ -405,7 +404,7 @@
   /// What helps play along: the loop, when there is one, the metronome and the count-in. Over
   /// the song strip, where the loop is drawn.
   struct TransportAids: View {
-    let player: Player
+    let player: Session
     @AppStorage(Defaults.metronome) private var metronome = false
     @AppStorage(Defaults.countIn) private var countIn = false
 
@@ -517,7 +516,7 @@
   /// the song's shape shows — the verse that comes back, the break in the middle. The playing
   /// block lights and fills as it goes; a click jumps to its first bar.
   struct SongStrip: View {
-    let player: Player
+    let player: Session
     let song: Song
 
     var body: some View {
@@ -720,7 +719,7 @@
 
   /// What can be done to one section of the song, as its context menu.
   struct ChainMenu: View {
-    let player: Player
+    let player: Session
     let song: Song
     let index: Int
     let start: Int
@@ -729,7 +728,7 @@
       let entry = song.chain[index]
       Button("Play from Here") { player.seek(toBar: start) }
       let bars = max(1, entry.repeat)
-      let looped = player.loop == Player.LoopRange(start: start, bars: bars)
+      let looped = player.loop == Session.LoopRange(start: start, bars: bars)
       Button(looped ? "Stop Looping This Section" : "Loop This Section") {
         player.toggleLoop(start: start, bars: bars)
       }

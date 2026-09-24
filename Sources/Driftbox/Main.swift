@@ -1,13 +1,14 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import AppKit
   import DriftboxApp
+  import DriftboxSession
   import SwiftUI
 
   @main
   struct Driftbox: App {
-    @State private var player: Player
+    @State private var studio: Studio
     @State private var stage: Stage
-    @State private var rack: MacRack
+    private var player: Session { studio.session }
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
@@ -19,10 +20,9 @@
         NSApplication.shared.applicationIconImage = icon
       }
       NSApplication.shared.activate(ignoringOtherApps: true)
-      let player = Player()
-      _player = State(initialValue: player)
-      _stage = State(initialValue: Stage(player: player))
-      _rack = State(initialValue: MacRack(memory: .standard))
+      let studio = Studio()
+      _studio = State(initialValue: studio)
+      _stage = State(initialValue: Stage(player: studio.session))
     }
 
     var body: some Scene {
@@ -48,7 +48,7 @@
       // The rack is an instrument beside the groovebox, in a window of its own, playing through
       // the same device.
       Window("Rack", id: "rack") {
-        RackWindow(rack: rack) { player.attach(rack) }
+        RackWindow(rack: studio.rack) { studio.openRack() }
       }
       .defaultSize(width: 900, height: 860)
 

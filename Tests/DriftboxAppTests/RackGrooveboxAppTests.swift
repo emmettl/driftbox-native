@@ -6,6 +6,7 @@
   import DriftboxRack
   import DriftboxRackSession
   import DriftboxSeq
+  import DriftboxSession
   import Foundation
   import Testing
 
@@ -21,9 +22,9 @@
     }
 
     /// A rack and a groovebox window beside it, neither with a device.
-    static func pair() -> (MacRack, Player) {
+    static func pair() -> (MacRack, Session) {
       let rack = MacRack()
-      let player = Player(host: EngineHost(sampleRate: 48000))
+      let player = Session(host: EngineHost(sampleRate: 48000))
       rack.groovebox = player
       return (rack, player)
     }

@@ -1,5 +1,6 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxRackSession
+  import DriftboxSession
   import SwiftUI
 
   /// The menu bar. Everything the toolbar does is here too, and the menu is the contract: it is
@@ -7,7 +8,7 @@
   /// that it can be undone at all. The toolbar's buttons call the same methods and carry no key
   /// equivalents of their own, so nothing is bound twice.
   public struct AppMenus: Commands {
-    let player: Player
+    let player: Session
     let files: SongFiles
     let stage: Stage
     // Both are remembered between launches, so the menu writes the preference and the window
@@ -20,7 +21,7 @@
     @FocusedValue(\.rack) private var rack
     @Environment(\.openWindow) private var openWindow
 
-    public init(player: Player, files: SongFiles, stage: Stage) {
+    public init(player: Session, files: SongFiles, stage: Stage) {
       self.player = player
       self.files = files
       self.stage = stage

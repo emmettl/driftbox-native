@@ -1,10 +1,11 @@
 #if canImport(SwiftUI) && canImport(AVFoundation) && canImport(Metal)
   import DriftboxScenes
+  import DriftboxSession
   import SwiftUI
 
   /// Which scene the visuals show: the song's own, or any of them.
   struct SceneMenu: View {
-    let player: Player
+    let player: Session
     let stage: Stage
 
     var body: some View {
@@ -44,7 +45,7 @@
   /// scope, and a way to play, change the scene and get back to the editor. As the web's vibes
   /// mode, and for the same use — standing in front of it rather than editing at it.
   struct VibesStage: View {
-    let player: Player
+    let player: Session
     let stage: Stage
     @State private var touching = false
 
@@ -122,7 +123,7 @@
   /// The mix as a line, redrawn with the player's own tick — thirty times a second while the song
   /// moves, which is as often as there is new audio to show.
   struct ScopeView: View {
-    let player: Player
+    let player: Session
 
     var body: some View {
       // Read so the view is redrawn whenever the transport moves on.

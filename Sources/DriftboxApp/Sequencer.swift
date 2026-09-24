@@ -2,6 +2,7 @@
   import AppKit
   import DriftboxEngine
   import DriftboxSeq
+  import DriftboxSession
   import SwiftUI
 
   /// Where the grid's columns fall, shared by the drum lanes, the ruler over them and the 303
@@ -33,7 +34,7 @@
   /// the playhead on it, a lane per drum voice, then the two 303 lines. Columns stretch with the
   /// window, down to a size that can still be hit, and scroll sideways past that.
   struct Sequencer: View {
-    let player: Player
+    let player: Session
     let song: Song
 
     var body: some View {
@@ -98,7 +99,7 @@
   /// One voice's row of the grid. Its inputs are all plain values, so a step elsewhere, or a
   /// flash on another lane, leaves this one's body alone.
   struct Lane: View {
-    let player: Player
+    let player: Session
     let pattern: DriftboxSeq.Pattern
     let voice: Voice
     let metrics: GridMetrics
@@ -131,7 +132,7 @@
   /// A lane's name, with a light that flashes in the machine's colour as the voice strikes, and
   /// its menu, which shows itself under the pointer.
   struct LaneHeader: View {
-    let player: Player
+    let player: Session
     let pattern: DriftboxSeq.Pattern
     let voice: Voice
     let struck: Bool
@@ -184,7 +185,7 @@
   /// The pattern-controlled filter's lane: strikes of the song-wide filter, on the drums'
   /// columns, in teal, as the web draws it.
   struct PCFLane: View {
-    let player: Player
+    let player: Session
     let pattern: DriftboxSeq.Pattern
     let metrics: GridMetrics
     let playhead: Int
@@ -226,7 +227,7 @@
 
   /// A lane for a voice the pattern does not use yet, or a 303 line it has not got.
   struct AddLaneMenu: View {
-    let player: Player
+    let player: Session
     let pattern: DriftboxSeq.Pattern
 
     var body: some View {
@@ -280,7 +281,7 @@
   /// outlined and glowing all the way down. A press gives under the pointer, and a change of
   /// state fades rather than snaps.
   struct StepButton: View {
-    let player: Player
+    let player: Session
     let patternId: String
     let voiceId: String
     let index: Int

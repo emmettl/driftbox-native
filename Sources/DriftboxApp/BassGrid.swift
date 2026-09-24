@@ -1,5 +1,6 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxSeq
+  import DriftboxSession
   import SwiftUI
 
   /// A 303 line: for each step, whether it sounds, its pitch across two octaves, accent and slide.
@@ -10,7 +11,7 @@
   /// Drawn as one canvas rather than four hundred views: the playhead moves eight times a second,
   /// and re-diffing that many cells each time was a quarter of a core.
   struct BassGrid: View {
-    let player: Player
+    let player: Session
     let pattern: DriftboxSeq.Pattern
     let voiceId: String
     var metrics = GridMetrics(steps: 16, width: 0)
