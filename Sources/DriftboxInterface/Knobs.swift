@@ -1,3 +1,4 @@
+import DriftboxEngine
 import DriftboxSeq
 import Foundation
 
@@ -34,6 +35,33 @@ public struct KnobSpec: Sendable {
     KnobSpec(label: "Cutoff"), KnobSpec(label: "Reso"), KnobSpec(label: "Env Mod"),
     KnobSpec(label: "Decay"), KnobSpec(label: "Accent"), KnobSpec(label: "Level"),
   ]
+
+  public static func percentOr(_ zero: String) -> @Sendable (Double) -> String {
+    { $0 == 0 ? zero : percent($0) }
+  }
+
+  /// The master path, in `FxParams.names` order, each in its own units: a filter in hertz, a delay
+  /// in sixteenths because that is what it snaps to, a reverb in seconds.
+  public static let fx: [KnobSpec] = [
+    KnobSpec(label: "Drive", format: percentOr("clean")),
+    KnobSpec(label: "PCF", format: percentOr("off")),
+    KnobSpec(label: "Cutoff", format: { "\(Int(MasterInserts.filterFrequency($0).rounded()))Hz" }),
+    KnobSpec(label: "Reso"),
+    KnobSpec(label: "Env"),
+    KnobSpec(
+      label: "Decay", format: { "\(Int((MasterInserts.filterDecaySeconds($0) * 1000).rounded()))ms" }),
+    KnobSpec(label: "Comp", format: percentOr("off")),
+    KnobSpec(label: "Time", format: { "\(delayDivision($0))/16" }),
+    KnobSpec(label: "F.back"),
+    KnobSpec(label: "Tone"),
+    KnobSpec(label: "Size", format: { String(format: "%.1fs", 0.3 + $0 * 3.5) }),
+    KnobSpec(label: "Damp"),
+  ]
+
+  /// The master path's knobs by what they belong to, as indices into `fx`.
+  public static let fxGroups: [(name: String, knobs: [Int])] = [
+    ("Insert", [0, 6]), ("Filter", [1, 2, 3, 4, 5]), ("Delay", [7, 8, 9]), ("Reverb", [10, 11]),
+  ]
 }
 
 /// What a knob turns, in the song.
@@ -46,6 +74,8 @@ public enum KnobTarget: Hashable, Sendable {
   case send(String, Int)
   /// A voice's swing, as an offset from the song's.
   case swing(String)
+  /// One of the song's effects.
+  case fx(Int)
 
   public var spec: KnobSpec {
     switch self {
@@ -53,6 +83,7 @@ public enum KnobTarget: Hashable, Sendable {
     case .bass(_, let knob): KnobSpec.bass[knob]
     case .send(_, let knob): KnobSpec.sends[knob]
     case .swing: KnobSpec(label: "Swing")
+    case .fx(let knob): KnobSpec.fx[knob]
     }
   }
 
@@ -63,6 +94,7 @@ public enum KnobTarget: Hashable, Sendable {
     case .bass(let id, let knob): (song.kit.bass[id] ?? BassParams())[knob]
     case .send(let id, let knob): (song.kit.sends[id] ?? SendLevels())[knob]
     case .swing(let id): song.kit.swing[id] ?? 0.5
+    case .fx(let knob): song.fx[knob]
     }
   }
 
@@ -73,6 +105,7 @@ public enum KnobTarget: Hashable, Sendable {
     case .bass(_, let knob): BassParams.defaults[knob]
     case .send(_, let knob): SendLevels.defaults[knob]
     case .swing: 0.5
+    case .fx(let knob): FxParams.defaults[knob]
     }
   }
 
@@ -110,6 +143,8 @@ public enum KnobTarget: Hashable, Sendable {
       song.kit.sends[id] = edited
     case .swing(let id):
       song.kit.swing[id] = value
+    case .fx(let knob):
+      song.fx[knob] = value
     }
   }
 }

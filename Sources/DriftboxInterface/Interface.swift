@@ -37,18 +37,21 @@ public final class Interface {
 
   /// How far the grid is scrolled up inside its panel.
   public private(set) var scroll: Float = 0
+  /// Whether the song's effects are down the right, where the selected voice's knobs would be.
+  public var showsEffects = false
 
   public init(session: Session) {
     self.session = session
   }
 
-  public var layout: Layout { Layout(session: session, size: size, scroll: scroll) }
+  public var layout: Layout { Layout(session: session, size: size, scroll: scroll, effects: showsEffects) }
 
   /// Scroll the grid, if `event` is over it. False for anywhere else.
   @discardableResult
   public func scroll(_ event: ScrollEvent) -> Bool {
     guard isShowing, let grid = layout.grid, grid.contains(event.location) else { return false }
-    scroll = Layout(session: session, size: size, scroll: scroll + event.delta.y).scroll
+    scroll =
+      Layout(session: session, size: size, scroll: scroll + event.delta.y, effects: showsEffects).scroll
     return true
   }
 
@@ -139,9 +142,14 @@ public final class Interface {
     case .loop: session.loopSection()
     case .metronome: session.metronome.toggle()
     case .select(let voice):
-      session.selectedVoice = session.selectedVoice == voice ? nil : voice
+      // Its knobs, in the effects' place if they are there.
+      session.selectedVoice = session.selectedVoice == voice && !showsEffects ? nil : voice
+      showsEffects = false
     case .show(let voice):
       session.selectedVoice = voice
+      showsEffects = false
+    case .effects:
+      showsEffects.toggle()
     case .filterStep(let pattern, let index):
       session.editPattern(pattern, "Set Filter Step") { $0.cyclingPCF(at: index) }
     case .step(let pattern, let voice, let index):
@@ -550,25 +558,29 @@ public final class Interface {
       switch inspector.machine {
       case "TR-808": Theme.eight
       case "TR-909": Theme.nine
-      default: Theme.three
+      case "TB-303": Theme.three
+      default: Theme.violet
       }
     let x = frame.x + Layout.padding
     canvas.align = .left
     canvas.font = Theme.mono(9.5, weight: 600)
-    canvas.fill = tint
+    canvas.fill = inspector.voice == nil ? Theme.dim : tint
     canvas.fillText(inspector.machine, x, frame.y + Layout.padding + 9)
     canvas.font = Theme.mono(15, weight: 600)
     canvas.fill = Theme.ink
     canvas.fillText(inspector.title, x, frame.y + Layout.padding + 27)
     for chip in inspector.chips { self.chip(chip, tint: tint, on: canvas) }
-    canvas.fill = Theme.edge
-    canvas.fillRect(x, inspector.sendsTop, frame.width - Layout.padding * 2, 1)
+    if let divider = inspector.divider {
+      canvas.fill = Theme.edge
+      canvas.fillRect(x, divider, frame.width - Layout.padding * 2, 1)
+    }
+    canvas.align = .left
     canvas.font = Theme.mono(8.5, weight: 500)
     canvas.fill = Theme.dim
-    canvas.fillText("OUT", x, inspector.sendsTop + 29)
+    for label in inspector.labels { canvas.fillText(label.text, label.x, label.y) }
     for knob in inspector.knobs {
       let value = turning?.target == knob.target ? turning!.value : knob.target.value(in: song)
-      let isSend = knob.dial.width < 40
+      let isSend = inspector.voice != nil && knob.dial.width < 40
       drawKnob(
         knob, value: value, label: knob.target.spec.label, text: knob.target.format(value, in: song),
         tint: isSend ? tint.faded(0.8) : tint, active: turning?.target == knob.target, on: canvas)

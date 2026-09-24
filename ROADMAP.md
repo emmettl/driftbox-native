@@ -472,8 +472,8 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    The keyboard plays as the Mac's does, and a voice selected has its panel of knobs down the
    right, turned by dragging, on arcs the canvas draws. The song is a strip of its sections to
    play from, with the loop bracketed over it, and the grid is headed by its patterns, to follow
-   or choose or add to. Left: the effects' knobs, editing the chain, settings, the rack and its
-   cables, and a grid wider than the window.
+   or choose or add to. FX puts the song's effects in the voice panel's place, in their groups.
+   Left: editing the chain, settings, the rack and its cables, and a grid wider than the window.
 5. **Shipping.** The Swift runtime beside the executable; signing; winget; the `.driftbox` file
    association. Songs are already `.driftbox` — the web app's documents byte for byte, under a name
    Windows can associate without claiming every `.json`. `SongFile` in `DriftboxDocument` holds
