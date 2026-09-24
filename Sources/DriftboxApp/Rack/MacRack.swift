@@ -4,79 +4,45 @@
   import DriftboxHost
   import DriftboxHostMac
   import DriftboxRackSession
+  import DriftboxSession
   import Foundation
   import Observation
 
   /// The rack as the Mac holds it: the `RackSession` every platform shares, and what only a Mac
-  /// has around it — the rack's Audio Unit in the app's `AVAudioEngine`, Audio Units as its
-  /// plug-ins, Core Audio reading its samples, the meters read as the Mac draws, and the groovebox
-  /// window its song is edited in.
+  /// has around it — Audio Units as its plug-ins, Core Audio reading its samples, and the groovebox
+  /// window its song is edited in. It plays through the `Studio`'s route once its window opens.
   @MainActor @Observable
   public final class MacRack {
     /// The rack itself: everything the window shows and edits.
     public let session: RackSession
-    /// Why the rack cannot be heard, if its Audio Unit could not be made.
-    private(set) var startFailure: String?
+    /// Why the rack cannot be heard: why nothing can, since it plays through the groovebox's device.
+    var startFailure: String? { groovebox?.outputError }
 
     /// The groovebox window: the song in it, and where the rack's song is edited.
-    @ObservationIgnored weak var groovebox: Player? {
+    @ObservationIgnored weak var groovebox: Session? {
       didSet {
         session.onUnlinkSong = { [weak self] in self?.groovebox?.unlinkRack() }
       }
     }
-    @ObservationIgnored private var node: AVAudioUnit?
-    /// The rack's Audio Unit, once it is made, and whether it is being.
-    @ObservationIgnored private(set) var unit: RackAudioUnit?
-    @ObservationIgnored private var attaching = false
-    @ObservationIgnored private var metering: Timer?
+    /// Whether the rack is playing through a device yet.
+    @ObservationIgnored private(set) var attached = false
 
     /// A rack whose patch is kept in `memory` between launches, silent until `attach` gives it
     /// somewhere to go. `sampleRate` is the host's, which is the engine's.
     public init(sampleRate: Double = 48000, memory: UserDefaults? = nil) {
       session = RackSession(
         sampleRate: sampleRate, plugins: AudioUnitHosting(), decoder: AudioFileDecoder(), memory: memory)
-      session.onSave = { [weak self] document, name in
-        self?.unit?.saved.withLock { $0 = (document, name) }
-      }
     }
 
     // MARK: Sound
 
-    /// Play through `engine`: the rack's Audio Unit, made once, playing the session's host.
-    /// Asynchronous, as making an Audio Unit is; the rack is heard from when it arrives.
-    public func attach(to engine: AVAudioEngine) {
-      guard unit == nil, !attaching else { return }
-      attaching = true
-      _ = Self.registered
-      AVAudioUnit.instantiate(with: RackAudioUnit.componentDescription, options: []) {
-        [weak self] made, failure in
-        Task { @MainActor in self?.attached(made, failure, to: engine) }
-      }
-    }
-
-    /// The unit registered in this process, once, as the engine's is.
-    private static let registered: Void = AUAudioUnit.registerSubclass(
-      RackAudioUnit.self, as: RackAudioUnit.componentDescription, name: "Driftbox Rack", version: 1)
-
-    private func attached(_ made: AVAudioUnit?, _ failure: Error?, to engine: AVAudioEngine) {
-      attaching = false
-      guard let made, let unit = made.auAudioUnit as? RackAudioUnit else {
-        startFailure = failure?.localizedDescription ?? "its audio unit could not be made"
-        return
-      }
-      unit.host = session.host
-      unit.restore = { [weak self] document, name in
-        Task { @MainActor in self?.session.restore(document, name: name) }
-      }
-      engine.attach(made)
-      engine.connect(made, to: engine.mainMixerNode, format: made.outputFormat(forBus: 0))
-      node = made
-      self.unit = unit
-      unit.saved.withLock { $0 = (PatchCodec.encode(session.patch), session.name) }
+    /// Play through `route` from now on, beside whatever else it plays. Once: the rack is not taken
+    /// off the device again when its window closes, as a synth keeps sounding with its lid down.
+    func attach(to route: any AudioRouting) {
+      guard !attached else { return }
+      attached = true
+      route.attach(session.host.renderSource)
       session.listen()
-      metering = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
-        Task { @MainActor in self?.session.tick() }
-      }
     }
 
     // MARK: The groovebox window

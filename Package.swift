@@ -188,8 +188,8 @@ let package = Package(
     .target(
       name: "DriftboxApp",
       dependencies: [
-        "DriftboxHost", "DriftboxHostMac", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq", "DriftboxScenes",
-        "DriftboxRack", "DriftboxSession", "DriftboxRackSession",
+        "DriftboxHost", "DriftboxHostMac", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq",
+        "DriftboxScenes", "DriftboxRack", "DriftboxSession", "DriftboxRackSession",
       ],
       // The rack's patches and module cards are `DriftboxRackSession`'s, as every platform ships them.
       resources: [.copy("Resources/AppIcon.icns")]),
@@ -298,8 +298,8 @@ let package = Package(
     .testTarget(
       name: "DriftboxHostMacTests",
       dependencies: [
-        "DriftboxHostMac", "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxRack", "DriftboxSeq",
-        "ConformanceSupport",
+        "DriftboxHostMac", "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxRack",
+        "DriftboxSeq", "ConformanceSupport",
       ]),
     .testTarget(
       name: "DriftboxDocumentTests",
@@ -307,8 +307,8 @@ let package = Package(
     .testTarget(
       name: "DriftboxAppTests",
       dependencies: [
-        "DriftboxApp", "DriftboxHost", "DriftboxSeq", "DriftboxDocument", "DriftboxRack", "DriftboxRackSession",
-        "ConformanceSupport",
+        "DriftboxApp", "DriftboxHost", "DriftboxSeq", "DriftboxDocument", "DriftboxRack",
+        "DriftboxRackSession", "DriftboxSession", "ConformanceSupport",
       ]
     ),
   ]

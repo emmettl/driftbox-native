@@ -64,6 +64,10 @@ jobs:
         run: swift format lint --strict -r Sources Tests Package.swift
       - name: Test
         run: swift test
+        # Strict actor isolation, as an app runs with: a closure made on the main actor and called
+        # from an audio or MIDI thread traps here, rather than only in the app.
+        env:
+          SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE: swift6
       - name: Audio targets stay constrained
         run: scripts/check-constrained.sh
 

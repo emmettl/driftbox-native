@@ -1,13 +1,14 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxDSP
   import DriftboxSeq
+  import DriftboxSession
   import SwiftUI
 
   /// Which pattern the grid shows: the one playing, followed, or one chosen to edit, as a row
   /// of chips with the playing one marked. Each chip's context menu holds what can be done to
   /// that pattern; double-clicking one renames it. Then the pattern list's tools.
   struct PatternBar: View {
-    let player: Player
+    let player: Session
     let song: Song
     @State private var renaming: String?
     @State private var name = ""
@@ -134,7 +135,7 @@
   /// Under the lanes: what shapes the pattern rather than what is in it — a voice to add, its
   /// length, and the 909's flam mode with the flam's width.
   struct PatternFooter: View {
-    let player: Player
+    let player: Session
     let song: Song
     let pattern: DriftboxSeq.Pattern
 
@@ -196,7 +197,7 @@
 
   /// What can be done to one drum lane, as a menu on its name.
   struct LaneMenu: View {
-    let player: Player
+    let player: Session
     let pattern: DriftboxSeq.Pattern
     let voiceId: String
     let label: () -> AnyView
@@ -240,7 +241,7 @@
 
   /// The 303 line's menu.
   struct BassMenu: View {
-    let player: Player
+    let player: Session
     let pattern: DriftboxSeq.Pattern
     let voiceId: String
 

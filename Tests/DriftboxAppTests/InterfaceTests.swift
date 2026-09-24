@@ -1,6 +1,7 @@
 #if canImport(AVFoundation)
   import DriftboxHost
   import DriftboxSeq
+  import DriftboxSession
   import Foundation
   import Testing
 
@@ -75,7 +76,7 @@
     }
 
     @Test func aClickOnA303LineLandsOnTheCellUnderIt() {
-      let player = Player(host: EngineHost(sampleRate: 48000))
+      let player = Session(host: EngineHost(sampleRate: 48000))
       let pattern = DriftboxSeq.Pattern(id: "p", name: "P", length: 16)
       let metrics = GridMetrics(steps: 16, width: GridMetrics.labelWidth + 16 * 30)
       let grid = BassGrid(player: player, pattern: pattern, voiceId: "303.a", metrics: metrics, playhead: -1)

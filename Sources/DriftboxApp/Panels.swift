@@ -1,12 +1,13 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxEngine
   import DriftboxSeq
+  import DriftboxSession
   import SwiftUI
 
   /// The column down the right of the window: the strip for whatever lane is selected, the
   /// master effects, and the pad.
   struct Inspector: View {
-    let player: Player
+    let player: Session
     let song: Song
 
     var body: some View {
@@ -79,7 +80,7 @@
 
   /// A voice's sends, set apart below its knobs: they change where it goes, not how it sounds.
   struct SendsRow: View {
-    let player: Player
+    let player: Session
     let voiceId: String
     let sends: SendLevels
     let tint: Color
@@ -118,7 +119,7 @@
 
   /// One drum voice's strip.
   struct VoicePanel: View {
-    let player: Player
+    let player: Session
     let voice: Voice
     let params: VoiceParams
     let sends: SendLevels
@@ -165,7 +166,7 @@
 
   /// A 303's strip, and the switch between the two.
   struct BassPanel: View {
-    let player: Player
+    let player: Session
     let voiceId: String
     let params: BassParams
     let sends: SendLevels
@@ -218,7 +219,7 @@
 
   /// The song's effects: drive and the compressor, the pattern-controlled filter, the two sends.
   struct FxPanel: View {
-    let player: Player
+    let player: Session
     let fx: FxParams
 
     var body: some View {
@@ -246,7 +247,7 @@
   /// the engine directly, since it is a performance control and not part of the song. The
   /// finger leaves a short glowing trail, which fades after it, so a sweep can be seen as one.
   struct PadPanel: View {
-    let player: Player
+    let player: Session
     @State private var touch: CGPoint?
     @State private var trail: [CGPoint] = []
     @State private var pressed = false

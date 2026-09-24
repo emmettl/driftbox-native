@@ -1,13 +1,14 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxEngine
   import DriftboxSeq
+  import DriftboxSession
   import SwiftUI
 
   /// The keyboard as an instrument. The number row strikes the drum voices the song uses, in grid
   /// order; the home row plays the 303 A the way the web app's keys do, with `z` and `x` shifting
   /// the octave. Handled at the window, so it works wherever focus is.
   struct Keys: ViewModifier {
-    let player: Player
+    let player: Session
     @State private var octave = 0
 
     static let bassKeys: [Character: Int] = [

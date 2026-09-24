@@ -2,6 +2,7 @@
   import AppKit
   import DriftboxEngine
   import DriftboxScenes
+  import DriftboxSession
   import MetalKit
   import Observation
   import SwiftUI
@@ -18,7 +19,7 @@
   @MainActor
   @Observable
   public final class Stage {
-    @ObservationIgnored let player: Player
+    @ObservationIgnored let player: Session
     @ObservationIgnored let renderer: SceneRenderer?
     /// The window the visuals go out to.
     @ObservationIgnored public private(set) lazy var output = VisualsWindow(stage: self)
@@ -44,7 +45,7 @@
     /// The last frame drawn, which every view shows.
     @ObservationIgnored private(set) var latest: MTLTexture?
 
-    public init(player: Player) {
+    public init(player: Session) {
       self.player = player
       renderer = try? SceneRenderer(now: CACurrentMediaTime())
       NotificationCenter.default.addObserver(
@@ -66,16 +67,7 @@
       let target = ring[next]
       next = (next + 1) % ring.count
 
-      let peaks = player.peaks
-      let position = player.position
-      let analyser = player.analyse()
-      let input = SceneInput(
-        time: CACurrentMediaTime(), peakLeft: peaks.left, peakRight: peaks.right,
-        events: player.takeEvents(), touch: player.padTouch, bar: position?.bar ?? 0,
-        step: position?.step ?? 0, running: player.isPlaying, bpm: player.tempo,
-        scoreBeat: player.scoreBeat(), levels: analyser?.levels() ?? (0, 0, 0),
-        wideLevels: analyser?.wideLevels() ?? (0, 0), bands: analyser?.bands(16) ?? [],
-        pixelRatio: pixelRatio)
+      let input = player.sceneInput(time: CACurrentMediaTime(), pixelRatio: pixelRatio)
       renderer.draw(input, into: target)
       latest = target
     }
