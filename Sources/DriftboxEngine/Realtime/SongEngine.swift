@@ -56,8 +56,16 @@ public struct SongEngine: ~Copyable {
 
   /// The song being played, owned by whoever loaded it. Nil plays silence.
   public private(set) var song: UnsafeMutablePointer<CompiledSong>?
-  /// The engine's clock, in frames since it was made. Never stops, playing or not.
+  /// The engine's clock, in frames since it was made, or since where it was set to start. Never
+  /// stops, playing or not.
   public private(set) var frame = 0
+
+  /// Start the clock at `frame` rather than zero, before anything is rendered: an engine playing a
+  /// performance again runs on the clock it was played on, since the master's inserts and the
+  /// delay's quanta keep time by it, as Web Audio's render quanta do.
+  public mutating func startClock(at frame: Int) {
+    self.frame = max(0, frame)
+  }
   public private(set) var isPlaying = false
   /// Where on the engine's clock the current pass through the song began.
   var passStart = 0
