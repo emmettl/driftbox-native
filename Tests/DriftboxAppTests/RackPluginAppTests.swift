@@ -124,16 +124,60 @@
       #expect(model.units["fx"] !== first)
     }
 
-    @Test func theCatalogueListsThisMacsEffects() {
+    @Test func theCatalogueListsThisMacsEffectsAndInstruments() {
       let apple = PluginCatalogue.effects.first { $0.vendor == "Apple" }?.entries.map(\.reference.id) ?? []
       #expect(apple.contains("aufx lpas appl"))
       #expect(apple.contains("aufx dely appl"))
       #expect(!PluginCatalogue.effects.contains { $0.entries.contains { $0.reference.id.hasPrefix("aumu") } })
+      let instruments = PluginCatalogue.instruments.flatMap(\.entries).map(\.reference.id)
+      #expect(instruments.contains("aumu dls  appl"))
+      #expect(instruments.allSatisfy { $0.hasPrefix("aumu") })
     }
 
-    @Test func thePickerHasACardForIt() {
+    @Test func thePickerHasACardForEach() {
       #expect(ModuleFace.shelves.first { $0.name == "Effects" }?.types.contains("plugin") == true)
+      #expect(ModuleFace.shelves.first { $0.name == "Sources" }?.types.contains("plugin-instrument") == true)
       #expect(RackLayout.size(of: "plugin") == RackLayout.Size(span: 1, rows: 2))
+      // Half width, as tall as its six jacks need.
+      #expect(RackLayout.size(of: "plugin-instrument") == RackLayout.Size(span: 1, rows: 4))
     }
+
+    // MARK: Instruments
+
+    /// An instrument comes played: wired from the rack's MIDI module, or a new one, and to an Out.
+    @Test func anInstrumentComesWiredToTheKeys() async throws {
+      let model = Self.model()
+      let synth = try #require(model.add("plugin-instrument"))
+      #expect(model.patch.modules.map(\.type) == ["midi", "plugin-instrument", "out"])
+      let keys = model.patch.modules[0].id
+      let wired = Set(
+        model.patch.cables.map { "\($0.from.module).\($0.from.port)>\($0.to.module).\($0.to.port)" })
+      #expect(
+        wired == [
+          "\(keys).pitch>\(synth).pitch", "\(keys).gate>\(synth).gate", "\(keys).vel>\(synth).velocity",
+          "\(synth).out>\(model.patch.modules[2].id).in",
+        ])
+      #expect(model.undoTitle == "Undo Add Plug-in Instrument", "one step, however much it added")
+
+      // A second shares the keys.
+      let another = try #require(model.add("plugin-instrument"))
+      #expect(model.patch.modules.filter { $0.type == "midi" }.count == 1)
+      #expect(
+        model.patch.cables.contains { $0.from.module == keys && $0.to == PortReference(another, "gate") })
+
+      model.choosePlugin(synth, Self.dls)
+      await model.pluginsReady()
+      guard case .ready = model.plugins[synth] else {
+        Issue.record("not ready: \(String(describing: model.plugins[synth]))")
+        return
+      }
+      #expect(model.host.externalModules == [synth])
+      #expect(
+        PluginFace.detail(nil, nil, instrument: true)
+          == "An Audio Unit instrument, played by the rack's notes")
+    }
+
+    static let dls = PluginReference(
+      format: "audio-unit", id: "aumu dls  appl", name: "DLSMusicDevice", vendor: "Apple")
   }
 #endif

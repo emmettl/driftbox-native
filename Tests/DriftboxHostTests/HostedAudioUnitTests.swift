@@ -135,7 +135,48 @@
       }
     }
 
+    static let dls = AudioComponentDescription(
+      componentType: kAudioUnitType_MusicDevice, componentSubType: 0x646c_7320,  // 'dls '
+      componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0)
+
+    /// An instrument played by the rack's MIDI module: silent until a key goes down, sounding once
+    /// it does, and let go of when it comes up.
+    @Test func anInstrumentPlaysTheRacksNotes() async throws {
+      let unit = try await HostedAudioUnit.instantiate(Self.dls, sampleRate: 48000)
+      let host = RackHost(sampleRate: 48000)
+      host.load(
+        Patch(
+          modules: [
+            PatchModule(id: "keys", type: "midi"), PatchModule(id: "synth", type: "plugin-instrument"),
+            PatchModule(id: "out", type: "out"),
+          ],
+          cables: [
+            PatchCable(from: PortReference("keys", "pitch"), to: PortReference("synth", "pitch")),
+            PatchCable(from: PortReference("keys", "gate"), to: PortReference("synth", "gate")),
+            PatchCable(from: PortReference("keys", "vel"), to: PortReference("synth", "velocity")),
+            PatchCable(from: PortReference("synth", "out"), to: PortReference("out", "in")),
+          ]))
+      host.setExternal("synth", unit.external)
+      let before = Self.render(host, blocks: 40)
+      #expect(Self.rms(before.left) == 0, "nothing played, nothing heard")
+
+      host.setParam("keys", "note", 60)
+      host.setParam("keys", "gate", 1)
+      let held = Self.render(host, blocks: 80)
+      #expect(Self.rms(held.left.suffix(4096)) > 0.001, "\(Self.rms(held.left.suffix(4096)))")
+      #expect(Self.rms(held.right.suffix(4096)) > 0.001)
+
+      host.setParam("keys", "gate", 0)
+      let released = Self.render(host, blocks: 1500)
+      #expect(
+        Self.rms(released.left.suffix(4096)) < Self.rms(held.left.suffix(4096)) * 0.05,
+        "let go of: \(Self.rms(released.left.suffix(4096)))")
+    }
+
     @Test func identifiersAreTheFourCharacterCodes() {
+      // A code may end in a space, as DLS's does.
+      #expect(HostedAudioUnit.identifier(Self.dls) == "aumu dls  appl")
+      #expect(HostedAudioUnit.component("aumu dls  appl")?.componentSubType == 0x646c_7320)
       #expect(HostedAudioUnit.identifier(Self.lowpass) == "aufx lpas appl")
       let back = HostedAudioUnit.component("aufx lpas appl")
       #expect(back?.componentType == kAudioUnitType_Effect)
@@ -143,6 +184,7 @@
       #expect(back?.componentManufacturer == kAudioUnitManufacturer_Apple)
       #expect(HostedAudioUnit.component("aufx lpas") == nil)
       #expect(HostedAudioUnit.component("aufx lpass appl") == nil)
+      #expect(HostedAudioUnit.component("aufx  lpas appl") == nil)
     }
   }
 #endif

@@ -419,11 +419,15 @@ public struct RackGraph: ~Copyable {
       samples: UnsafePointer(copy), count: samples.count, revision: dataRevision)
   }
 
-  /// Where a `plugin` module's processor is held, for a host to put one in: directly before the
-  /// graph is handed over, and from the render thread after.
+  /// Where a `plugin` or `plugin-instrument` module's processor is held, for a host to put one in:
+  /// directly before the graph is handed over, and from the render thread after.
   public func externalEntry(module: String) -> UnsafeMutablePointer<ExternalSlot>? {
     for index in 0..<nodeCount where nodeIds[index] == module {
-      if case .external(let processor) = nodes[index].processor { return processor.slot }
+      switch nodes[index].processor {
+      case .external(let processor): return processor.slot
+      case .instrument(let processor): return processor.external.slot
+      default: continue
+      }
     }
     return nil
   }

@@ -36,7 +36,16 @@
           "M14 9v8M24 9v8", "M9 17h20v6a10 10 0 0 1-20 0z", "M19 33v5",
           "M36 23c3-8 6-8 9 0s6 8 9 0",
         ]),
-        labels: [:])
+        labels: [:]),
+      ModuleFace(
+        type: "plugin-instrument", group: "Sources",
+        blurb:
+          "An Audio Unit instrument from this Mac, played by the rack's notes, every voice of them, with "
+          + "mod, bend and sustain. Comes wired to the keys.",
+        logo: Logo(paths: [
+          "M8 10h48v22H8z", "M16 10v14M24 10v14M40 10v14M48 10v14", "M32 10v22",
+        ]),
+        labels: [:]),
     ]
 
     static let byType: [String: ModuleFace] = Dictionary(

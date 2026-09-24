@@ -418,6 +418,19 @@
       guard let def = RackModules.registry[type] else { return nil }
       let id = Self.freshId(patch, type)
       structural("Add \(def.name)") { patch in
+        // An instrument comes played: from the rack's MIDI module, or a new one just before it.
+        if type == "plugin-instrument" {
+          let keys =
+            patch.modules.first { $0.type == "midi" }?.id
+            ?? {
+              let fresh = Self.freshId(patch, "midi")
+              patch.modules.append(PatchModule(id: fresh, type: "midi"))
+              return fresh
+            }()
+          for (from, to) in [("pitch", "pitch"), ("gate", "gate"), ("vel", "velocity")] {
+            patch.cables.append(PatchCable(from: PortReference(keys, from), to: PortReference(id, to)))
+          }
+        }
         patch.modules.append(PatchModule(id: id, type: type))
         guard ModuleFace.byType[type]?.group == "Sources", def.outlets.contains(where: { $0.id == "out" })
         else { return }
@@ -669,7 +682,7 @@
     /// rack changes which unit a module has, never how it is set.
     private func settlePlugins() {
       var wanted: [String: PluginReference] = [:]
-      for module in patch.modules where module.type == "plugin" {
+      for module in patch.modules where RackModules.pluginTypes.contains(module.type) {
         if let plugin = module.plugin { wanted[module.id] = plugin }
       }
       for id in Array(unitIds.keys) where wanted[id]?.id != unitIds[id] { dropUnit(id) }
