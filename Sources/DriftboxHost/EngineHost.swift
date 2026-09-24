@@ -54,12 +54,16 @@ public final class EngineHost: @unchecked Sendable {
   let monitor: UnsafeMutablePointer<Float>
   let monitorWritten = Atomic<Int>(0)
 
-  public init(sampleRate: Double, voiceCapacity: Int = 32) {
+  /// An engine at `sampleRate`, its clock starting at `clock`: zero for a new one, or the frame an
+  /// engine playing a performance again should stand at, to run on the clock it was played on.
+  public init(sampleRate: Double, voiceCapacity: Int = 32, clock: Int = 0) {
     self.sampleRate = sampleRate
     monitor = .allocate(capacity: Self.monitorFrames)
     monitor.initialize(repeating: 0, count: Self.monitorFrames)
     engine = .allocate(capacity: 1)
     engine.initialize(to: SongEngine(sampleRate: sampleRate, voiceCapacity: voiceCapacity))
+    engine.pointee.startClock(at: clock)
+    engineFrame.store(engine.pointee.frame, ordering: .relaxed)
     commands = .allocate(capacity: 1)
     commands.initialize(to: CommandRing())
     released = .allocate(capacity: 1)

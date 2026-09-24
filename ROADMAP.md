@@ -409,8 +409,14 @@ external displays, performance capture to video.
    the app's visuals are fed, and a renderer of its own draws each frame offscreen. The sound is
    rendered first and the frames' inputs kept, then the writer is fed whichever track it will take,
    since it holds one back until the other catches up and the sound's encoder keeps some in hand.
-   Next: a live performance captured as played — the pad, the keys, the edits — rather than the
-   song as written.
+   Then a performance as played: File › Record Performance keeps a `Take` in the session — the
+   engine as it stood, then every command it was sent and every song an edit loaded, each at the
+   engine frame it took effect on, and the scene switches — and stopping writes it as a movie. It is
+   played again on an engine of its own, its clock started where the live one stood, since the
+   master's inserts and the delay keep time by it as Web Audio's quanta do, after two seconds of the
+   song leading in; once the free-running state a take does not keep has settled, well inside half
+   a second, what is heard again is what was heard, to the last place of a float. Nothing is kept
+   but commands, so a take costs nothing to record however long it runs.
 4. **AUv3 export.** The engine and the rack are Audio Units already, in `DriftboxHostMac`; what is
    left is the extension that carries them into another app, which needs a bundle SwiftPM does not
    build.

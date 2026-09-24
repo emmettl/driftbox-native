@@ -91,6 +91,10 @@
       }
       .overlay(alignment: .bottom) {
         VStack(spacing: 8) {
+          if player.isRecording {
+            RecordingBadge(player: player) { files.stopRecording(through: stage) }
+              .transition(.move(edge: .bottom).combined(with: .opacity))
+          }
           if let done = stage.exporting {
             MovieProgress(done: done) { stage.stopExport() }
               .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -115,6 +119,7 @@
         value: stage.exportFailure ?? player.error ?? player.outputError
       )
       .animation(.spring(response: 0.35, dampingFraction: 0.8), value: stage.exporting == nil)
+      .animation(.spring(response: 0.35, dampingFraction: 0.8), value: player.isRecording)
     }
   }
 
@@ -833,6 +838,38 @@
       .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
       .accessibilityElement(children: .combine)
       .accessibilityLabel("Writing the movie, \(Int(done * 100)) percent")
+    }
+  }
+
+  /// A performance being recorded: for how long, and a way to stop and keep it.
+  struct RecordingBadge: View {
+    let player: Session
+    let stop: () -> Void
+
+    var body: some View {
+      HStack(spacing: 10) {
+        Circle().fill(Color.red).frame(width: 9, height: 9).shadow(color: .red, radius: 4)
+        // The engine's clock is not observed, so the time is read again twice a second.
+        TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+          Text("Recording \(Self.time(player.recordingSeconds))")
+            .font(Theme.mono(11)).foregroundStyle(Theme.ink).monospacedDigit()
+        }
+        Button("Stop…", action: stop).buttonStyle(.borderless).font(Theme.mono(11, .semibold))
+          .foregroundStyle(Theme.ink)
+          .help("Stop recording and save the performance as a movie")
+      }
+      .padding(.horizontal, 14).padding(.vertical, 9)
+      .background(Capsule().fill(Theme.ground.opacity(0.92)))
+      .overlay(Capsule().strokeBorder(Color.red.opacity(0.5)))
+      .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("Recording the performance")
+    }
+
+    /// Minutes and seconds.
+    static func time(_ seconds: Double) -> String {
+      let whole = max(0, Int(seconds))
+      return String(format: "%d:%02d", whole / 60, whole % 60)
     }
   }
 #endif

@@ -62,6 +62,11 @@
         Button("Export Movie…") { files.exportMovie(through: stage) }
           .keyboardShortcut("e", modifiers: [.command, .option])
           .disabled(player.song == nil || stage.exporting != nil)
+        Button(player.isRecording ? "Stop Recording…" : "Record Performance") {
+          if player.isRecording { files.stopRecording(through: stage) } else { stage.startRecording() }
+        }
+        .keyboardShortcut("r", modifiers: [.command, .option])
+        .disabled(player.song == nil || (!player.isRecording && stage.exporting != nil))
       }
 
       // The manager is the one the window hands the content; what these show is read back off it,

@@ -43,30 +43,40 @@
     }
 
     /// Write `song`, seen as `scene` — or the scene it names, for nil — to `url`, replacing what is
-    /// there. `progress` hears how far it has got, from 0 to 1, after each frame, and stops it by
-    /// answering false, when the half-written file is taken away and `CancellationError` thrown.
+    /// there: played once from the top and left to ring out, as a take nobody played. `progress`
+    /// hears how far it has got, from 0 to 1, and stops it by answering false, when the half-written
+    /// file is taken away and `CancellationError` thrown.
     static func write(
       _ song: Song, scene: String?, to url: URL, format: Format = Format(),
       progress: (Double) -> Bool = { _ in true }
     ) async throws {
+      try await write(
+        Take.song(song, sampleRate: Double(format.sampleRate), tail: format.tailSeconds), scene: scene,
+        to: url,
+        format: format, progress: progress)
+    }
+
+    /// Write a performance, played again on an engine of its own, to `url`: what was heard and seen,
+    /// seen as `scene` throughout if one is given, or as the take saw it if not.
+    static func write(
+      _ take: Take, scene: String? = nil, to url: URL, format: Format = Format(),
+      progress: (Double) -> Bool = { _ in true }
+    ) async throws {
       guard format.width > 0, format.height > 0, format.framesPerSecond > 0,
-        format.sampleRate % format.framesPerSecond == 0
+        format.sampleRate % format.framesPerSecond == 0, take.sampleRate == Double(format.sampleRate)
       else { throw Failure.format }
 
-      // The sound: an engine of its own, playing the song from the top.
-      let host = EngineHost(sampleRate: Double(format.sampleRate))
-      let session = Session(host: host)
-      session.open(song, named: "Movie")
-      session.play()
-      let songSeconds = SongRenderer.seconds(of: song)
-      let frames = Int(((songSeconds + format.tailSeconds) * Double(format.framesPerSecond)).rounded(.up))
-      // The frame the song ends on, from which its tails ring out rather than it starting again.
-      let stopAt = Int(songSeconds * Double(format.framesPerSecond))
+      // The performance first: nothing is written until it has been played through.
+      let played = try await perform(take, scene: scene, format: format, progress: { progress(0.1 * $0) })
+      let (inputs, left, right, frames, chunk) = (
+        played.inputs, played.left, played.right, played.inputs.count, format.samplesPerFrame
+      )
+      var scenes = played.scenes
 
       // The picture: a renderer of its own, drawing into a frame the CPU can read back.
       let renderer: SceneRenderer
       do {
-        renderer = try SceneRenderer(sceneId: scene ?? song.visual, now: 0)
+        renderer = try SceneRenderer(sceneId: scene ?? take.scene ?? take.song.visual, now: 0)
       } catch {
         throw Failure.noGPU
       }
@@ -98,38 +108,6 @@
       writer.startSession(atSourceTime: .zero)
       guard let pcm = Self.pcmFormat(format) else { throw Failure.format }
 
-      // First, the performance: the engine through the whole song, keeping the sound, and what the
-      // scene would have been fed at each frame's moment — everything rendered up to it. A frame's
-      // input is small; its picture is megabytes, so pictures are drawn only as the writer takes them.
-      let chunk = format.samplesPerFrame
-      var inputs: [SceneInput] = []
-      inputs.reserveCapacity(frames)
-      var left = [Float](repeating: 0, count: frames * chunk)
-      var right = [Float](repeating: 0, count: frames * chunk)
-      for index in 0..<frames {
-        session.tick()
-        inputs.append(
-          session.sceneInput(
-            time: Double(index) / Double(format.framesPerSecond), pixelRatio: format.pixelRatio))
-        // Then the sound between this frame and the next.
-        if index == stopAt { session.stop() }
-        left.withUnsafeMutableBufferPointer { l in
-          right.withUnsafeMutableBufferPointer { r in
-            host.render(
-              frames: chunk, left: l.baseAddress! + index * chunk, right: r.baseAddress! + index * chunk)
-          }
-        }
-        // The first tenth of the work, and a chance for the window to draw.
-        if index % 30 == 0 {
-          guard progress(0.1 * Double(index) / Double(frames)) else {
-            writer.cancelWriting()
-            try? FileManager.default.removeItem(at: url)
-            throw CancellationError()
-          }
-          await Task.yield()
-        }
-      }
-
       // Then the movie: each track fed as the writer will take it. It interleaves them, and stops
       // taking one until the other has caught up — the sound's encoder holds some back — so neither
       // may wait on the other; the sound is all there, and a picture is drawn when it is wanted.
@@ -140,6 +118,10 @@
         while picture < frames || sound < frames {
           var moved = false
           if picture < frames, video.isReadyForMoreMediaData {
+            while let first = scenes.first, first.from <= picture {
+              try? renderer.show(first.id ?? take.song.visual)
+              scenes.removeFirst()
+            }
             renderer.draw(inputs[picture], into: target)
             guard
               let buffer = try Self.pixelBuffer(of: target, renderer: renderer, pool: pixels.pixelBufferPool)
@@ -188,6 +170,95 @@
       guard writer.status == .completed else {
         throw Failure.writer(writer.error?.localizedDescription ?? "the movie was not finished")
       }
+    }
+
+    /// A take played again: its sound, and what the scene is fed at each frame and which scene it
+    /// shows from when. Played on an engine of its own, the engine set as the take found the one it
+    /// was played on, and everything done to it done again at the frame it took effect on.
+    struct Performance {
+      var inputs: [SceneInput]
+      var scenes: [(from: Int, id: String?)]
+      var left: [Float]
+      var right: [Float]
+    }
+
+    static func perform(
+      _ take: Take, scene: String? = nil, format: Format, progress: (Double) -> Bool = { _ in true }
+    ) async throws -> Performance {
+      // Up to two seconds of the song leading into where the take began, to be played and thrown
+      // away: the take began with the song's notes and tails already sounding, and they arrive with
+      // it. The engine's clock starts that far before the take's, so it reaches the take's start on
+      // the frame the live one did.
+      let preroll = take.playing ? min(take.songFrame, Int(2 * take.sampleRate)) : 0
+      let host = EngineHost(sampleRate: Double(format.sampleRate), clock: take.start - preroll)
+      let session = Session(host: host)
+      session.open(take.song, named: "Movie")
+      if let loop = take.loop { host.send(.loop(startBar: loop.start, bars: loop.bars)) }
+      if take.metronome { host.send(.metronome(true)) }
+      if take.playing {
+        host.send(.seek(songFrame: take.songFrame - preroll))
+        host.send(.play)
+        let discard = UnsafeMutablePointer<Float>.allocate(capacity: 2 * max(1, preroll))
+        defer { discard.deallocate() }
+        if preroll > 0 { host.render(frames: preroll, left: discard, right: discard + preroll) }
+      } else if take.songFrame > 0 {
+        host.send(.seek(songFrame: take.songFrame))
+      }
+      let chunk = format.samplesPerFrame
+      let frames = max(1, Int((Double(take.end - take.start) / Double(chunk)).rounded(.up)))
+
+      // First, the performance: the engine through the whole take, keeping the sound, and what the
+      // scene would have been fed at each frame's moment — everything rendered up to it. A frame's
+      // input is small; its picture is megabytes, so pictures are drawn only as the writer takes them.
+      var inputs: [SceneInput] = []
+      inputs.reserveCapacity(frames)
+      // Which scene to show from which frame on, when the take switched and no one scene was asked for.
+      var scenes: [(from: Int, id: String?)] = []
+      var left = [Float](repeating: 0, count: frames * chunk)
+      var right = [Float](repeating: 0, count: frames * chunk)
+      var next = 0
+      /// Render `count` frames of sound into the movie's, `at` frames in.
+      func render(_ count: Int, at: Int) {
+        guard count > 0 else { return }
+        left.withUnsafeMutableBufferPointer { l in
+          right.withUnsafeMutableBufferPointer { r in
+            host.render(frames: count, left: l.baseAddress! + at, right: r.baseAddress! + at)
+          }
+        }
+      }
+      for index in 0..<frames {
+        session.tick()
+        inputs.append(
+          session.sceneInput(
+            time: Double(index) / Double(format.framesPerSecond), pixelRatio: format.pixelRatio))
+        // Then the sound between this frame and the next, stopping at each thing done to the engine
+        // in it, at the frame it was done on.
+        let from = take.start + index * chunk
+        var done = 0
+        while next < take.events.count, take.events[next].frame < from + chunk {
+          let (frame, event) = take.events[next]
+          let at = min(chunk, max(done, frame - from))
+          render(at - done, at: index * chunk + done)
+          done = at
+          switch event {
+          // The pad through the session, which draws where it is touched.
+          case .command(.pad(let x, let y)): session.pad(x: x, y: y)
+          case .command(.padRelease): session.padRelease()
+          case .command(let command): host.send(command)
+          case .song(let song): session.takeUp(song)
+          case .scene(let id): if scene == nil { scenes.append((index + 1, id)) }
+          }
+          next += 1
+        }
+        render(chunk - done, at: index * chunk + done)
+        // A chance for the window to draw.
+        if index % 30 == 0 {
+          guard progress(Double(index) / Double(frames)) else { throw CancellationError() }
+          await Task.yield()
+        }
+      }
+
+      return Performance(inputs: inputs, scenes: scenes, left: left, right: right)
     }
 
     // MARK: - Picture

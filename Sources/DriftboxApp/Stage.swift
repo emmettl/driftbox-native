@@ -34,7 +34,10 @@
     @ObservationIgnored public private(set) lazy var output = VisualsWindow(stage: self)
     /// A scene chosen over the one the song names, or nil for the song's own. Put back to the
     /// song's own when a different song opens, since that one names its own.
-    public var sceneChoice: String?
+    public var sceneChoice: String? {
+      // A performance being recorded sees the switch too.
+      didSet { if sceneChoice != oldValue { player.noteScene(sceneId) } }
+    }
     /// Vibes: the visuals at full strength and the editor put away, the whole window a pad.
     public var performing = false
     /// The scene being shown: the one chosen, or the one the song names.
@@ -95,14 +98,34 @@
     /// the Finder once it is written. One at a time; it carries on while the song is edited or
     /// played, since it renders a copy of its own.
     func exportMovie(to url: URL) {
-      guard exporting == nil, let song = player.song else { return }
+      guard let song = player.song else { return }
+      let format = movieFormat
+      export(to: url) { [sceneId] progress in
+        try await MovieExport.write(song, scene: sceneId, to: url, format: format, progress: progress)
+      }
+    }
+
+    /// A performance recorded as it was played, as a movie: heard and seen as it was, scene switches
+    /// and all.
+    func exportPerformance(_ take: Take, to url: URL) {
+      let format = movieFormat
+      export(to: url) { progress in
+        try await MovieExport.write(take, to: url, format: format, progress: progress)
+      }
+    }
+
+    /// Record what is played from now, starting with the scene showing.
+    func startRecording() { player.startRecording(scene: sceneId) }
+
+    /// One movie at a time, written while the app carries on, then shown in the Finder.
+    private func export(to url: URL, _ write: @escaping @MainActor ((Double) -> Bool) async throws -> Void) {
+      guard exporting == nil else { return }
       exporting = 0
       exportFailure = nil
       exportStopped = false
-      let scene = sceneId
       Task {
         do {
-          try await MovieExport.write(song, scene: scene, to: url, format: movieFormat) { [weak self] done in
+          try await write { [weak self] done in
             guard let self else { return false }
             exporting = done
             return !exportStopped

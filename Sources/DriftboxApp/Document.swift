@@ -159,6 +159,18 @@
       stage.exportMovie(to: url)
     }
 
+    /// Stop recording the performance and ask where its movie goes. Cancelled, the take goes with it:
+    /// it is a performance, and there is no other copy of it.
+    func stopRecording(through stage: Stage) {
+      guard let take = player.stopRecording() else { return }
+      let panel = NSSavePanel()
+      panel.allowedContentTypes = [.quickTimeMovie]
+      panel.nameFieldStringValue = player.documentName + " performance.mov"
+      panel.message = "Save the performance as a movie. Cancel throws it away."
+      guard panel.runModal() == .OK, let url = panel.url else { return }
+      stage.exportPerformance(take, to: url)
+    }
+
     /// One WAV per voice the song uses, into a folder: each voice alone with its sends.
     func exportStems() {
       guard let song = player.song else { return }

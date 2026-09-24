@@ -126,7 +126,7 @@ public final class Session {
       guard !followsClock, followedBPM != nil else { return }
       let step = currentStep
       followedBPM = nil
-      if let song { host.load(song) }
+      if let song { load(song) }
       seek(toStep: step)
       if isPlaying { startEngine() }
     }
@@ -290,13 +290,13 @@ public final class Session {
     if let bpm = command.bpm { follow(bpm: bpm) }
     switch command.transport {
     case .start:
-      host.send(.seek(songFrame: 0))
+      send(.seek(songFrame: 0))
       startEngine()
     case .resume:
       if let step = command.step { seek(toStep: step) }
       startEngine()
     case .stop:
-      host.send(.stop)
+      send(.stop)
     case nil:
       break
     }
@@ -310,7 +310,7 @@ public final class Session {
     followedBPM = bpm
     var retimed = song
     retimed.bpm = bpm
-    host.load(retimed)
+    load(retimed)
     seek(toStep: step)
     if isPlaying { startEngine() }
   }
@@ -323,7 +323,7 @@ public final class Session {
   public func seek(toStep step: Int) {
     guard !timeline.times.isEmpty else { return }
     let index = min(max(0, step), timeline.times.count - 1)
-    host.send(.seek(songFrame: Int(timeline.times[index] * sampleRate)))
+    send(.seek(songFrame: Int(timeline.times[index] * sampleRate)))
   }
 
   /// As often as the app draws. Everything an interface reads is written only when it has changed:
@@ -510,7 +510,7 @@ public final class Session {
     song = loaded
     saved = loaded
     isEdited = false
-    host.load(loaded)
+    load(loaded)
   }
 
   /// Write the song back where it came from. Nothing without a file: that is Save As's question.
@@ -543,7 +543,7 @@ public final class Session {
   /// Jump to the start of a bar of the arrangement.
   public func seek(toBar bar: Int) {
     guard song != nil else { return }
-    host.send(.seek(songFrame: Int(timeline.start(ofBar: bar) * sampleRate)))
+    send(.seek(songFrame: Int(timeline.start(ofBar: bar) * sampleRate)))
   }
 
   /// Where each entry of the chain begins, in bars. A song with no chain is one pattern playing for
@@ -570,11 +570,11 @@ public final class Session {
   /// Play because someone asked to: from a stop, that counts in first if a count-in is set.
   public func play() {
     cursor.resume()
-    host.send(.start)
+    send(.start)
   }
 
   public func stop() {
-    host.send(.stop)
+    send(.stop)
     // Here rather than at the next tick: a stop a tick late is a stop that arrives behind ticks the
     // engine is never going to play.
     deliver(cursor.halt(at: HostTime.now()))
@@ -588,7 +588,7 @@ public final class Session {
   /// caught up with yet cannot leave the clock out held down.
   private func startEngine() {
     cursor.resume()
-    host.send(.play)
+    send(.play)
   }
 
   // MARK: Loop, metronome, count-in
@@ -597,7 +597,7 @@ public final class Session {
   public var metronome = false {
     didSet {
       guard metronome != oldValue else { return }
-      host.send(.metronome(metronome))
+      send(.metronome(metronome))
       remembering?.set(metronome, forKey: SessionDefaults.metronome)
     }
   }
@@ -606,7 +606,7 @@ public final class Session {
   public var countsIn = false {
     didSet {
       guard countsIn != oldValue else { return }
-      host.send(.countIn(bars: countsIn ? 1 : 0))
+      send(.countIn(bars: countsIn ? 1 : 0))
       remembering?.set(countsIn, forKey: SessionDefaults.countIn)
     }
   }
@@ -631,7 +631,7 @@ public final class Session {
   public var loop: LoopRange? {
     didSet {
       guard loop != oldValue else { return }
-      host.send(.loop(startBar: loop?.start ?? 0, bars: loop?.bars ?? 0))
+      send(.loop(startBar: loop?.start ?? 0, bars: loop?.bars ?? 0))
     }
   }
 
@@ -675,7 +675,7 @@ public final class Session {
     let hit = host.preparer.prepare(
       voice.build(song.kit.params[voice.id] ?? VoiceParams(), accent: accent ? 1 : 0.55), voiceId: voice.id,
       at: 0, sends: song.kit.sends[voice.id] ?? SendLevels(), chokeGroup: group)
-    host.send(.strike(hit))
+    send(.strike(hit))
   }
 
   /// Play a note on 303 A, now, with the song's panel for it.
@@ -687,18 +687,18 @@ public final class Session {
       let note = bassNote(
         params: params, step: step, previous: .rest, stepSeconds: secondsPerStep(bpm: song.bpm))
     else { return }
-    host.send(.note(line: 0, note))
+    send(.note(line: 0, note))
   }
 
   /// The performance filter's pad, touched at `x`, `y`, 0...1 from the bottom left.
   public func pad(x: Double, y: Double) {
     padTouch = SIMD2(Float(x), Float(y))
-    host.send(.pad(x: x, y: y))
+    send(.pad(x: x, y: y))
   }
 
   public func padRelease() {
     padTouch = nil
-    host.send(.padRelease)
+    send(.padRelease)
   }
 
   // MARK: - What the scenes read
@@ -886,10 +886,66 @@ public final class Session {
     isEdited = edited != saved
     refreshUndo()
     let position = songFrame
-    host.load(edited)
-    host.send(.seek(songFrame: position))
+    load(edited)
+    send(.seek(songFrame: position))
     if isPlaying { startEngine() }
     rackLink?.edited(edited)
+  }
+
+  // MARK: - The engine, and a take of what it is told
+
+  /// Everything the session tells the engine goes through here, so a take hears all of it.
+  private func send(_ command: Command) {
+    host.send(command)
+    recording?.events.append((host.engineFrame.load(ordering: .relaxed), .command(command)))
+  }
+
+  private func load(_ song: Song) {
+    host.load(song)
+    recording?.events.append((host.engineFrame.load(ordering: .relaxed), .song(song)))
+  }
+
+  /// The performance being recorded, while one is.
+  private var recording: Take?
+  public private(set) var isRecording = false
+  /// When the take began, on the engine's clock, for how long it has been going.
+  public var recordingSeconds: Double {
+    guard let recording else { return 0 }
+    return Double(max(0, host.engineFrame.load(ordering: .relaxed) - recording.start)) / sampleRate
+  }
+
+  /// Begin recording what is played from here: the engine as it stands, then everything done to it.
+  /// A command sent now takes effect at the start of the engine's next block, which is the frame its
+  /// clock has reached — or the one after, if a block is being rendered as it is sent, which is the
+  /// same block's latency the performance had live.
+  public func startRecording(scene: String? = nil) {
+    guard let song, !isRecording else { return }
+    recording = Take(
+      sampleRate: sampleRate, start: host.engineFrame.load(ordering: .relaxed),
+      end: host.engineFrame.load(ordering: .relaxed), song: song, songFrame: songFrame, playing: isPlaying,
+      loop: loop.map { ($0.start, $0.bars) }, metronome: metronome, scene: scene)
+    isRecording = true
+  }
+
+  /// A song a take loaded, as the take loaded it: into the engine and what the session shows, and
+  /// nothing else — an edit left the loop, the history and the rest as they were.
+  public func takeUp(_ song: Song) {
+    self.song = song
+    load(song)
+  }
+
+  /// The take, ended now; nil if none was being made.
+  public func stopRecording() -> Take? {
+    guard var finished = recording else { return nil }
+    finished.end = host.engineFrame.load(ordering: .relaxed)
+    recording = nil
+    isRecording = false
+    return finished
+  }
+
+  /// The visuals switched scene, for a take to see it too.
+  public func noteScene(_ id: String?) {
+    recording?.events.append((host.engineFrame.load(ordering: .relaxed), .scene(id)))
   }
 
   // MARK: - The rack's song
