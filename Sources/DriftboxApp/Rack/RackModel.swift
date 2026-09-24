@@ -55,6 +55,8 @@
     /// Where each `plugin` module's unit has got to, for its face. None for a module with no
     /// unit chosen.
     private(set) var plugins: [String: PluginStatus] = [:]
+    /// The macro waiting for a param to be moved in its unit's interface, if one is.
+    private(set) var learning: (module: String, macro: Int)?
 
     enum PluginStatus: Equatable {
       case loading
@@ -688,6 +690,8 @@
       for id in Array(unitIds.keys) where wanted[id]?.id != unitIds[id] { dropUnit(id) }
       for id in plugins.keys where wanted[id] == nil { plugins[id] = nil }
       for (id, reference) in wanted where unitIds[id] == nil { makeUnit(id, reference) }
+      // Undone or redone, a module's macros may point elsewhere.
+      for id in units.keys { applyMacros(id) }
     }
 
     private func makeUnit(_ id: String, _ reference: PluginReference) {
@@ -711,6 +715,7 @@
         switch made {
         case .success(let unit):
           units[id] = unit
+          applyMacros(id)
           host.setExternal(id, unit.external)
           plugins[id] = .ready(latency: unit.latency)
           watch(id, unit)
@@ -737,21 +742,25 @@
       watching[id] = nil
       changedUnits.remove(id)
       plugins[id] = nil
+      if learning?.module == id { learning = nil }
     }
 
     /// Hear about a unit being changed — from its interface, or anything else that sets its
     /// params — so its state reaches the patch soon after.
     private func watch(_ id: String, _ unit: HostedAudioUnit) {
       watching[id] = unit.unit.parameterTree?.token(
-        byAddingParameterObserver: Self.observer { [weak self] in self?.unitChanged(id) })
+        byAddingParameterObserver: Self.observer { [weak self] address in
+          self?.unitChanged(id)
+          self?.learned(id, address)
+        })
     }
 
     /// An observer for a unit to call on whatever thread it likes, which a closure written here, on
-    /// the main actor, would trap on: it hands `changed` to the main actor instead.
-    nonisolated private static func observer(_ changed: @escaping @MainActor @Sendable () -> Void)
-      -> AUParameterObserver
-    {
-      { _, _ in Task { @MainActor in changed() } }
+    /// the main actor, would trap on: it hands the param moved to the main actor instead.
+    nonisolated private static func observer(
+      _ changed: @escaping @MainActor @Sendable (AUParameterAddress) -> Void
+    ) -> AUParameterObserver {
+      { address, _ in Task { @MainActor in changed(address) } }
     }
 
     /// A unit's state is out of date in the patch: saved once things have been still for a moment.
@@ -779,6 +788,72 @@
         patch.modules[at].plugin?.state = unit.savedState
       }
       changedUnits = []
+    }
+
+    // MARK: Macros
+
+    /// Map macro `macro` (1 to 4) of a plug-in module onto one of its unit's params, or unmap it
+    /// (nil). One step of undo; the knob moves to where the param already is, so nothing jumps.
+    func mapMacro(_ moduleId: String, _ macro: Int, to parameter: AUParameter?) {
+      guard (1...4).contains(macro), let at = patch.modules.firstIndex(where: { $0.id == moduleId }),
+        patch.modules[at].plugin != nil
+      else { return }
+      var next = patch
+      var controls = next.modules[at].plugin?.controls.filter { $0.macro != macro } ?? []
+      if let parameter {
+        controls.append(PluginControl(macro: macro, key: parameter.keyPath, name: parameter.displayName))
+        controls.sort { $0.macro < $1.macro }
+        next.modules[at].params["macro\(macro)"] = HostedAudioUnit.fraction(of: parameter)
+      }
+      next.modules[at].plugin?.controls = controls
+      guard next != patch else { return }
+      record(parameter == nil ? "Unmap Macro \(macro)" : "Map Macro \(macro)")
+      settle(next)
+      applyMacros(moduleId)
+      save()
+    }
+
+    /// Map the next param moved in the unit's own interface onto macro `macro`, opening it.
+    func learnMacro(_ moduleId: String, _ macro: Int, open: Bool = true) {
+      learning = (moduleId, macro)
+      if open { showInterface(moduleId) }
+    }
+
+    func cancelLearning() { learning = nil }
+
+    /// A param moved in a unit, while one of its module's macros is waiting for one. The params its
+    /// other macros already turn are not learnt: they move when those macros do.
+    private func learned(_ moduleId: String, _ address: AUParameterAddress) {
+      guard let learning, learning.module == moduleId, let unit = units[moduleId],
+        let parameter = unit.parameters.values.first(where: { $0.address == address }),
+        let module = patch.modules.first(where: { $0.id == moduleId })
+      else { return }
+      let others = (module.plugin?.controls ?? []).filter { $0.macro != learning.macro }.map(\.key)
+      guard !others.contains(parameter.keyPath) else { return }
+      self.learning = nil
+      mapMacro(moduleId, learning.macro, to: parameter)
+    }
+
+    /// The param each of a unit's macros turns, found by key in the unit, into the host's mapping.
+    private func applyMacros(_ moduleId: String) {
+      guard let unit = units[moduleId],
+        let controls = patch.modules.first(where: { $0.id == moduleId })?.plugin?.controls
+      else { return }
+      let parameters = unit.parameters
+      for macro in 1...4 {
+        unit.map(macro - 1, to: controls.first { $0.macro == macro }.flatMap { parameters[$0.key] })
+      }
+    }
+
+    /// What macro `macro` of a module turns: the param, when its unit has it.
+    func macroParameter(_ moduleId: String, _ macro: Int) -> (
+      control: PluginControl, parameter: AUParameter?
+    )? {
+      guard
+        let control = patch.modules.first(where: { $0.id == moduleId })?.plugin?.controls
+          .first(where: { $0.macro == macro })
+      else { return nil }
+      return (control, units[moduleId]?.parameters[control.key])
     }
 
     /// Once every unit being made has arrived.

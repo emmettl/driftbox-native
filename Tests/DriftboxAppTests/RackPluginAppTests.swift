@@ -134,12 +134,90 @@
       #expect(instruments.allSatisfy { $0.hasPrefix("aumu") })
     }
 
+    // MARK: Macros
+
+    /// A macro mapped from the unit's own params: one step of undo, its knob where the param is,
+    /// the host told, and all of it kept with the patch.
+    @Test func aMacroIsMappedOntoOneOfTheUnitsParams() async throws {
+      let suite = "rack-plugin-tests-\(UUID().uuidString)"
+      let memory = try #require(UserDefaults(suiteName: suite))
+      defer { memory.removePersistentDomain(forName: suite) }
+      let model = Self.model(memory: memory)
+      let id = try #require(model.add("plugin"))
+      model.choosePlugin(id, Self.lowpass)
+      await model.pluginsReady()
+      let unit = try #require(model.units[id])
+      let cutoff = try #require(unit.parameters.values.first { $0.address == 0 })
+      cutoff.value = 1000
+
+      model.mapMacro(id, 1, to: cutoff)
+      let control = PluginControl(macro: 1, key: cutoff.keyPath, name: cutoff.displayName)
+      #expect(model.patch.modules[0].plugin?.controls == [control])
+      let knob = try #require(model.patch.modules[0].params["macro1"])
+      #expect(
+        abs(knob - HostedAudioUnit.fraction(of: cutoff)) < 1e-9, "no jump: the knob is where the param is")
+      #expect(knob > 0 && knob < 1)
+      #expect(unit.mapping(0) == 0)
+      #expect(model.macroParameter(id, 1)?.parameter === cutoff)
+      #expect(model.undoTitle == "Undo Map Macro 1")
+
+      model.undo()
+      #expect(model.patch.modules[0].plugin?.controls == [])
+      #expect(unit.mapping(0) == nil)
+      model.redo()
+      #expect(unit.mapping(0) == 0)
+
+      // Kept, and found again by key in a new instance.
+      let again = RackModel(memory: memory)
+      await again.pluginsReady()
+      #expect(again.patch.modules[0].plugin?.controls == [control])
+      #expect(again.units[id]?.mapping(0) == 0)
+
+      model.mapMacro(id, 1, to: nil)
+      #expect(unit.mapping(0) == nil)
+      #expect(model.undoTitle == "Undo Unmap Macro 1")
+    }
+
+    /// Waiting to learn, a macro takes the next param moved in the unit, except one another macro
+    /// already turns.
+    @Test func aMacroLearnsTheNextParamMoved() async throws {
+      let model = Self.model()
+      let id = try #require(model.add("plugin"))
+      model.choosePlugin(id, Self.lowpass)
+      await model.pluginsReady()
+      let unit = try #require(model.units[id])
+      let parameters = unit.parameters.values.sorted { $0.address < $1.address }
+      let (cutoff, resonance) = (parameters[0], parameters[1])
+      model.mapMacro(id, 1, to: cutoff)
+
+      model.learnMacro(id, 2, open: false)
+      #expect(model.learning?.macro == 2)
+      cutoff.value = 500
+      resonance.value = 6
+      for _ in 0..<40 where model.learning != nil { try await Task.sleep(for: .milliseconds(50)) }
+      #expect(model.learning == nil)
+      #expect(model.macroParameter(id, 2)?.control.key == resonance.keyPath)
+      #expect(model.macroParameter(id, 1)?.control.key == cutoff.keyPath, "the first left as it was")
+    }
+
+    @Test func aMacroSaysItsValueInTheParamsWords() async throws {
+      let model = Self.model()
+      let id = try #require(model.add("plugin"))
+      model.choosePlugin(id, Self.lowpass)
+      await model.pluginsReady()
+      let cutoff = try #require(model.units[id]?.parameters.values.first { $0.address == 0 })
+      #expect(
+        HostedAudioUnit.display(cutoff, at: 0).hasPrefix("10"), "\(HostedAudioUnit.display(cutoff, at: 0))")
+      #expect(HostedAudioUnit.display(cutoff, at: 1).hasPrefix("23760"))
+      #expect(HostedAudioUnit.display(cutoff, at: 1).hasSuffix("Hz"))
+    }
+
     @Test func thePickerHasACardForEach() {
       #expect(ModuleFace.shelves.first { $0.name == "Effects" }?.types.contains("plugin") == true)
       #expect(ModuleFace.shelves.first { $0.name == "Sources" }?.types.contains("plugin-instrument") == true)
-      #expect(RackLayout.size(of: "plugin") == RackLayout.Size(span: 1, rows: 2))
-      // Half width, as tall as its six jacks need.
-      #expect(RackLayout.size(of: "plugin-instrument") == RackLayout.Size(span: 1, rows: 4))
+      // Full width, for four macros beside the unit, and as tall as the jacks need.
+      #expect(RackLayout.size(of: "plugin") == RackLayout.Size(span: 2, rows: 3))
+      #expect(RackLayout.size(of: "plugin-instrument") == RackLayout.Size(span: 2, rows: 6))
     }
 
     // MARK: Instruments

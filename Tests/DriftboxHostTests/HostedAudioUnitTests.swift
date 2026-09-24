@@ -1,6 +1,6 @@
 #if canImport(AVFoundation)
   import AVFoundation
-  import DriftboxHost
+  @testable import DriftboxHost
   import DriftboxRack
   import Testing
 
@@ -108,6 +108,41 @@
       let gone = Self.render(host, blocks: 60)
       #expect(abs(gone.left.last!) < 1e-4, "silent without it")
       #expect(host.externalModules.isEmpty)
+    }
+
+    /// A macro turns the param it is mapped to: the low-pass's cutoff, from its knob and from CV,
+    /// across its range as the unit shows it.
+    @Test func aMacroTurnsTheParamItIsMappedTo() async throws {
+      let unit = try await HostedAudioUnit.instantiate(Self.lowpass, sampleRate: 48000)
+      let cutoff = try #require(unit.unit.parameterTree?.parameter(withAddress: 0))
+      unit.map(0, to: cutoff)
+      #expect(unit.mapping(0) == 0)
+      #expect(unit.mapping(1) == nil)
+      var patch = Self.patch(PatchModule(id: "hiss", type: "noise"))
+      patch.modules[1].params["macro1"] = 0
+      let host = RackHost(sampleRate: 48000)
+      host.load(patch)
+      host.setExternal("fx", unit.external)
+      let shut = Self.rms(Self.render(host, blocks: 80).left.suffix(4096))
+      #expect(abs(cutoff.value - cutoff.minValue) < 0.01, "at the bottom: \(cutoff.value)")
+
+      host.setParam("fx", "macro1", 1)
+      let open = Self.rms(Self.render(host, blocks: 80).left.suffix(4096))
+      #expect(abs(cutoff.value - cutoff.maxValue) < 1, "at the top: \(cutoff.value)")
+      #expect(shut < open * 0.1, "\(shut) against \(open)")
+
+      // From CV instead: the knob back at the bottom, and a level of a half on its inlet.
+      patch.modules[1].params["macro1"] = 0
+      patch.modules.append(PatchModule(id: "cv", type: "offset", params: ["offset": 0.5]))
+      patch.cables.append(PatchCable(from: PortReference("cv", "out"), to: PortReference("fx", "cv1")))
+      host.load(patch)
+      _ = Self.render(host, blocks: 10)
+      let expected = HostedAudioUnit.scaled(0.5, low: cutoff.minValue, high: cutoff.maxValue, shape: 2)
+      #expect(abs(cutoff.value - expected) / expected < 0.01, "\(cutoff.value), not \(expected)")
+      #expect(HostedAudioUnit.logarithmic(cutoff), "a frequency is crossed as the unit shows it")
+
+      unit.map(0, to: nil)
+      #expect(unit.mapping(0) == nil)
     }
 
     /// What the patch keeps is enough to make the same unit again, set as it was.

@@ -1,6 +1,7 @@
 #if canImport(AVFoundation)
   import AVFoundation
   import DriftboxRack
+  import Synchronization
 
   /// An Audio Unit, hosted for a `plugin` module — an effect, stereo in and out — or a
   /// `plugin-instrument` one, played by MIDI the module makes of the rack's notes: rendered a block at
@@ -34,6 +35,27 @@
       var beat: Double
       var running: Bool
       var wasRunning: Bool
+      /// How a param change reaches the unit from the render thread.
+      var parameters: AUScheduleParameterBlock
+      /// The four macros' mappings, and what the render thread last sent for each, and for which
+      /// mapping: a new mapping is sent at once, whatever the macro was.
+      var macros: UnsafeMutablePointer<MacroMapping>
+      var sent: UnsafeMutablePointer<Float>
+      var sentFor: UnsafeMutablePointer<Int>
+    }
+
+    /// One macro's mapping, written on the interface's thread and read on the render thread: the
+    /// param's address, its range as float bits, and how the range is crossed. `generation` is
+    /// written last and read first, so a mapping is read whole; `shape` 0 is unmapped.
+    struct MacroMapping: ~Copyable {
+      let generation = Atomic<Int>(0)
+      let shape = Atomic<UInt32>(0)
+      let address = Atomic<UInt64>(0)
+      let low = Atomic<UInt32>(0)
+      let high = Atomic<UInt32>(0)
+
+      static let linear: UInt32 = 1
+      static let logarithmic: UInt32 = 2
     }
 
     public enum Failure: Error, Equatable {
@@ -125,11 +147,18 @@
         state.deallocate()
         throw Failure.format
       }
+      let macros = UnsafeMutablePointer<MacroMapping>.allocate(capacity: 4)
+      for index in 0..<4 { (macros + index).initialize(to: MacroMapping()) }
+      let sent = UnsafeMutablePointer<Float>.allocate(capacity: 4)
+      sent.initialize(repeating: -1, count: 4)
+      let sentFor = UnsafeMutablePointer<Int>.allocate(capacity: 4)
+      sentFor.initialize(repeating: -1, count: 4)
       state.initialize(
         to: RenderState(
           renderBlock: unit.renderBlock, pull: pull, midi: unit.scheduleMIDIEventBlock, output: output,
           inlets: nil, input: (left, right),
-          maximumFrames: maximumFrames, sampleTime: 0, tempo: 120, beat: 0, running: false, wasRunning: false)
+          maximumFrames: maximumFrames, sampleTime: 0, tempo: 120, beat: 0, running: false, wasRunning: false,
+          parameters: unit.scheduleParameterBlock, macros: macros, sent: sent, sentFor: sentFor)
       )
     }
 
@@ -138,6 +167,10 @@
       free(state.pointee.output.unsafeMutablePointer)
       state.pointee.input.0.deallocate()
       state.pointee.input.1.deallocate()
+      state.pointee.macros.deinitialize(count: 4)
+      state.pointee.macros.deallocate()
+      state.pointee.sent.deallocate()
+      state.pointee.sentFor.deallocate()
       state.deinitialize(count: 1)
       state.deallocate()
     }
@@ -150,7 +183,7 @@
     /// One block through the unit, on the render thread. A failed render, or one longer than the
     /// unit was readied for, is silence.
     static let render: ExternalRender = {
-      context, inlets, outlets, frames, tempo, beat, running, events, count in
+      context, inlets, outlets, frames, tempo, beat, running, events, count, macros, macroCount in
       guard let context else { return }
       let state = context.assumingMemoryBound(to: RenderState.self)
       let left = outlets[0]
@@ -169,6 +202,25 @@
       let bytes = UInt32(frames * MemoryLayout<Float>.size)
       output[0] = AudioBuffer(mNumberChannels: 1, mDataByteSize: bytes, mData: UnsafeMutableRawPointer(left))
       output[1] = AudioBuffer(mNumberChannels: 1, mDataByteSize: bytes, mData: UnsafeMutableRawPointer(right))
+      // The macros that moved, or were mapped anew, onto their params, once a block. Not ramped: a
+      // version 2 unit, as Apple's own are, drops a ramped event rather than following it.
+      for macro in 0..<min(4, macroCount) {
+        let mapping = state.pointee.macros + macro
+        let generation = mapping.pointee.generation.load(ordering: .acquiring)
+        let shape = mapping.pointee.shape.load(ordering: .relaxed)
+        let value = macros[macro]
+        guard shape != 0,
+          value != state.pointee.sent[macro] || generation != state.pointee.sentFor[macro]
+        else { continue }
+        let low = Float(bitPattern: mapping.pointee.low.load(ordering: .relaxed))
+        let high = Float(bitPattern: mapping.pointee.high.load(ordering: .relaxed))
+        state.pointee.parameters(
+          AUEventSampleTimeImmediate, 0,
+          mapping.pointee.address.load(ordering: .relaxed),
+          HostedAudioUnit.scaled(value, low: low, high: high, shape: shape))
+        state.pointee.sent[macro] = value
+        state.pointee.sentFor[macro] = generation
+      }
       // The block's notes, each at its frame of the block, before the block is rendered.
       if let midi = state.pointee.midi, let events {
         for index in 0..<count {
@@ -202,6 +254,86 @@
       state.pointee.sampleTime += Double(frames)
       state.pointee.wasRunning = running
     }
+
+    // MARK: - Macros
+
+    /// Turn `parameter` with macro `macro` (0 to 3) from the next block, or nothing (nil).
+    public func map(_ macro: Int, to parameter: AUParameter?) {
+      guard (0..<4).contains(macro) else { return }
+      let mapping = state.pointee.macros + macro
+      if let parameter {
+        mapping.pointee.address.store(parameter.address, ordering: .relaxed)
+        mapping.pointee.low.store(parameter.minValue.bitPattern, ordering: .relaxed)
+        mapping.pointee.high.store(parameter.maxValue.bitPattern, ordering: .relaxed)
+        mapping.pointee.shape.store(
+          Self.logarithmic(parameter) ? MacroMapping.logarithmic : MacroMapping.linear, ordering: .relaxed)
+      } else {
+        mapping.pointee.shape.store(0, ordering: .relaxed)
+      }
+      mapping.pointee.generation.wrappingAdd(1, ordering: .releasing)
+    }
+
+    /// The address of the param macro `macro` (0 to 3) turns, or nil.
+    public func mapping(_ macro: Int) -> AUParameterAddress? {
+      guard (0..<4).contains(macro) else { return nil }
+      let mapping = state.pointee.macros + macro
+      _ = mapping.pointee.generation.load(ordering: .acquiring)
+      guard mapping.pointee.shape.load(ordering: .relaxed) != 0 else { return nil }
+      return mapping.pointee.address.load(ordering: .relaxed)
+    }
+
+    /// Whether a param is shown on a logarithmic scale, and so crossed as one: a frequency, say.
+    static func logarithmic(_ parameter: AUParameter) -> Bool {
+      parameter.flags.contains(.flag_DisplayLogarithmic) && parameter.minValue > 0
+        && parameter.maxValue > parameter.minValue
+    }
+
+    /// A macro's 0 to 1 as a param's value, across its range as the param would be shown.
+    static func scaled(_ value: Float, low: Float, high: Float, shape: UInt32) -> Float {
+      let fraction = max(0, min(1, value))
+      if shape == MacroMapping.logarithmic { return low * powf(high / low, fraction) }
+      return low + (high - low) * fraction
+    }
+
+    /// Where a param's value is as a macro's 0 to 1: the inverse, for a macro to start where the
+    /// param already is.
+    public static func fraction(of parameter: AUParameter) -> Double {
+      let low = Double(parameter.minValue)
+      let high = Double(parameter.maxValue)
+      guard high > low else { return 0 }
+      let value = max(low, min(high, Double(parameter.value)))
+      if logarithmic(parameter) { return log(value / low) / log(high / low) }
+      return (value - low) / (high - low)
+    }
+
+    /// The param a macro turns, as it would say its value at `fraction`: in its own words and units.
+    public static func display(_ parameter: AUParameter, at fraction: Double) -> String {
+      let shape = logarithmic(parameter) ? MacroMapping.logarithmic : MacroMapping.linear
+      let value = scaled(Float(fraction), low: parameter.minValue, high: parameter.maxValue, shape: shape)
+      var text = parameter.string(fromValue: [value])
+      // A unit that has no words of its own for a value gives none: then the number, to a sensible
+      // number of places for its size.
+      if text.isEmpty {
+        let magnitude = abs(value)
+        text = String(format: magnitude >= 100 ? "%.0f" : magnitude >= 10 ? "%.1f" : "%.2f", value)
+      }
+      if let unit = parameter.unitName, !unit.isEmpty { text += " " + unit }
+      return text
+    }
+
+    /// Every param a macro can turn, by key: found once, and again only when the unit's tree is
+    /// replaced, as a unit may do on changing preset.
+    public var parameters: [String: AUParameter] {
+      let tree = unit.parameterTree
+      if let cached = parameterCache, cached.tree === tree { return cached.parameters }
+      var out: [String: AUParameter] = [:]
+      for parameter in tree?.allParameters ?? [] where parameter.flags.contains(.flag_IsWritable) {
+        out[parameter.keyPath] = parameter
+      }
+      parameterCache = (tree, out)
+      return out
+    }
+    private var parameterCache: (tree: AUParameterTree?, parameters: [String: AUParameter])?
 
     // MARK: - What a patch keeps
 

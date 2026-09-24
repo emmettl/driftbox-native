@@ -7,7 +7,7 @@ import Testing
 /// module's place, between its inlets and its outlets, and an empty slot is silence.
 struct ExternalTests {
   /// Half of each inlet onto its outlet, and the transport it was given kept at `context`.
-  static let halve: ExternalRender = { context, inlets, outlets, frames, tempo, beat, running, _, _ in
+  static let halve: ExternalRender = { context, inlets, outlets, frames, tempo, beat, running, _, _, _, _ in
     for channel in 0..<2 {
       for i in 0..<frames { outlets[channel][i] = inlets[channel][i] * 0.5 }
     }
@@ -90,12 +90,13 @@ struct ExternalTests {
   @Test func thePatchKeepsThePlugin() throws {
     var module = PatchModule(id: "fx", type: "plugin")
     module.plugin = PluginReference(
-      format: "audio-unit", id: "aufx dely appl", name: "AUDelay", vendor: "Apple", state: "YnBsaXN0MDA=")
+      format: "audio-unit", id: "aufx dely appl", name: "AUDelay", vendor: "Apple", state: "YnBsaXN0MDA=",
+      controls: [PluginControl(macro: 2, key: "feedback", name: "Feedback")])
     let patch = Self.patch(through: module)
     let text = PatchCodec.encode(patch)
     #expect(
       text.contains(
-        #""plugin":{"format":"audio-unit","id":"aufx dely appl","name":"AUDelay","vendor":"Apple","state":"YnBsaXN0MDA="}"#
+        #""plugin":{"format":"audio-unit","id":"aufx dely appl","name":"AUDelay","vendor":"Apple","state":"YnBsaXN0MDA=","controls":[{"macro":2,"key":"feedback","name":"Feedback"}]}"#
       ))
     let back = try #require(PatchCodec.decode(text))
     #expect(back == patch)
@@ -109,13 +110,62 @@ struct ExternalTests {
     let read = try #require(PatchCodec.decode(damaged))
     #expect(read.modules[1].plugin == nil)
     #expect(read.modules[1].type == "plugin")
+
+    // A mapping to a macro the module does not have is dropped, and the rest kept.
+    let odd = text.replacingOccurrences(
+      of: #"[{"macro":2,"#, with: #"[{"macro":9,"key":"x","name":"X"},{"macro":2,"#)
+    #expect(PatchCodec.decode(odd)?.modules[1].plugin?.controls == module.plugin?.controls)
+  }
+
+  // MARK: - Macros
+
+  /// The macros as the last block ended, into `context`.
+  static let macrosSeen: ExternalRender = { context, _, outlets, frames, _, _, _, _, _, macros, count in
+    outlets[0].update(repeating: 0, count: frames)
+    outlets[1].update(repeating: 0, count: frames)
+    guard let seen = context?.assumingMemoryBound(to: Float.self) else { return }
+    for macro in 0..<count { seen[macro] = macros[macro] }
+  }
+
+  /// Each macro is its knob with its CV added, kept between 0 and 1, as the block ends.
+  @Test func eachMacroIsItsKnobAndItsCV() throws {
+    let patch = Patch(
+      modules: [
+        PatchModule(id: "half", type: "offset", params: ["offset": 0.5]),
+        PatchModule(id: "lots", type: "offset", params: ["offset": 2]),
+        PatchModule(
+          id: "fx", type: "plugin", params: ["macro1": 0.25, "macro2": 0.25, "macro3": 0.6, "macro4": 0]),
+        PatchModule(id: "out", type: "out"),
+      ],
+      cables: [
+        PatchCable(from: PortReference("half", "out"), to: PortReference("fx", "cv1")),
+        PatchCable(from: PortReference("lots", "out"), to: PortReference("fx", "cv2")),
+        PatchCable(from: PortReference("fx", "out"), to: PortReference("out", "in")),
+      ])
+    var graph = RackGraph(plan: compile(patch), sampleRate: 48000)
+    let seen = UnsafeMutablePointer<Float>.allocate(capacity: 4)
+    seen.initialize(repeating: -1, count: 4)
+    defer { seen.deallocate() }
+    let found = graph.externalEntry(module: "fx")
+    try #require(found).pointee = ExternalSlot(
+      render: Self.macrosSeen, context: UnsafeMutableRawPointer(seen))
+    _ = Self.render(&graph, blocks: 2)
+    #expect(Array(UnsafeBufferPointer(start: seen, count: 4)) == [0.75, 1, 0.6, 0])
+  }
+
+  @Test func theMacrosAreTheSameOnBothModules() throws {
+    for type in ["plugin", "plugin-instrument"] {
+      let def = try #require(RackModules.registry[type])
+      #expect(def.params.map(\.id) == ["macro1", "macro2", "macro3", "macro4"])
+      #expect(def.inlets.suffix(4).map(\.id) == ["cv1", "cv2", "cv3", "cv4"])
+    }
   }
 
   // MARK: - Instruments
 
   /// Every event a block brings, at its frame of the graph's clock, into `context`: a cursor, a
   /// count, then frame and message in pairs. The outlets silent.
-  static let record: ExternalRender = { context, _, outlets, frames, _, _, _, events, count in
+  static let record: ExternalRender = { context, _, outlets, frames, _, _, _, events, count, _, _ in
     outlets[0].update(repeating: 0, count: frames)
     outlets[1].update(repeating: 0, count: frames)
     guard let log = context?.assumingMemoryBound(to: Int.self) else { return }
