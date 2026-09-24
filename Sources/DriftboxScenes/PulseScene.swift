@@ -1,5 +1,6 @@
 import DriftboxEngine
 import DriftboxGPU
+import DriftboxText
 import Foundation
 
 /// The fallback scene on the GPU layer: the first scene to move across, and so the first to draw on
@@ -18,7 +19,7 @@ public final class PulseScene: GPUScene {
   private var lastHat = -1000.0
   private var lastNote = -1000.0
 
-  public init(device: any GPUDevice) throws {
+  public init(device: any GPUDevice, typesetter: any Typesetter) throws {
     pipeline = try device.makePipeline(GPUPipelineDescriptor(program: .pulse))
     uniforms.accent = Self.accent
   }

@@ -1,4 +1,5 @@
 import DriftboxGPU
+import DriftboxText
 import Foundation
 
 /// A scene made of geometry seen through a camera, on the GPU layer: the web's three.js scenes.
@@ -15,6 +16,8 @@ open class GPUGeometryScene: GPUScene {
   open class var background: SIMD3<Float> { SIMD3(0, 0, 0) }
 
   public let device: any GPUDevice
+  /// The platform's type, for the one scene that sets any.
+  public let typesetter: any Typesetter
   public var camera = Camera()
   /// The target's size in pixels this frame, which `sprite.glsl` sizes sprites against.
   public private(set) var viewport = SIMD2<Float>(1, 1)
@@ -22,8 +25,9 @@ open class GPUGeometryScene: GPUScene {
   public private(set) var touchAt = SIMD2<Float>(0.5, 0.5)
   public private(set) var touchEnergy: Float = 0
 
-  public required init(device: any GPUDevice) throws {
+  public required init(device: any GPUDevice, typesetter: any Typesetter) throws {
     self.device = device
+    self.typesetter = typesetter
     try build()
   }
 

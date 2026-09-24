@@ -4,6 +4,7 @@
   import DriftboxGPUGLES
   import DriftboxHost
   import DriftboxScenes
+  import DriftboxText
 
   /// Every scene on the GPU layer, on the phone's own GPU: each one draws, is not black, and moves
   /// when the music does, as `GPUSceneTests` holds them on the other backends.
@@ -11,7 +12,7 @@
   /// timed at the size the app draws it for this screen, and at every pixel of the screen, which is
   /// what says whether it keeps up with the display.
   enum SceneCheck {
-    static func run(width: Int, height: Int, density: Float) -> String {
+    static func run(width: Int, height: Int, density: Float, typesetter: any Typesetter) -> String {
       let device: GLESDevice
       do {
         device = try GLESDevice()
@@ -25,7 +26,7 @@
       ]
       for type in GPUScenes.all {
         do {
-          let scene = try type.init(device: device)
+          let scene = try type.init(device: device, typesetter: typesetter)
           let small = try device.makeTarget(width: 160, height: 90)
           var frames: [[UInt8]] = []
           for time in stride(from: 0.0, through: 3, by: 1.0 / 30) {

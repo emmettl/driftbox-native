@@ -107,7 +107,9 @@ let package = Package(
       ]),
     // The visuals: scenes driven by the engine's events, moving from Metal onto the GPU layer. On a
     // platform without Metal, the ones that have moved.
-    .target(name: "DriftboxScenes", dependencies: ["DriftboxDSP", "DriftboxEngine", "DriftboxGPU"]),
+    .target(
+      name: "DriftboxScenes",
+      dependencies: ["DriftboxDSP", "DriftboxEngine", "DriftboxGPU", "DriftboxText", "DriftboxCanvas"]),
 
     // A song document in, a WAV file out: something to listen to.
     .executableTarget(name: "driftbox-render", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
@@ -130,7 +132,8 @@ let package = Package(
     .executableTarget(
       name: "driftbox-play",
       dependencies: [
-        "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxGPU", "DriftboxScenes",
+        "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxGPU", "DriftboxScenes", "DriftboxText",
+        .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostAndroid", condition: .when(platforms: [.android])),
         .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
@@ -180,6 +183,8 @@ let package = Package(
       name: "DriftboxScenesTests",
       dependencies: [
         "DriftboxScenes", "DriftboxEngine", "DriftboxGPU", "DriftboxGPUD3D11", "DriftboxGPUMetal",
+        "DriftboxText",
+        .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
       ]),
     .testTarget(
       name: "DriftboxHostTests",

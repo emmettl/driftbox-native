@@ -264,9 +264,9 @@ Hothouse and Night Bus. `GPUSurfaceScene` keeps their clocks, bands, touch and h
 `surface.glsl`. Frost's crystals and Hothouse's leaves are cards, each placed by a matrix that steps
 per instance.
 
-Then sixteen of the web's seventeen three.js scenes, on `GPUGeometryScene`: Wireframe, Sunset,
-Web, Saturn, Lifeforms, Cubik, Stillwater, Cycles, Clouds, Longhand, Defcon, Dancers, Convoy,
-Machine, Jumpman and Trench.
+Then the web's seventeen three.js scenes, on `GPUGeometryScene`: Wireframe, Sunset, Web, Saturn,
+Lifeforms, Cubik, Stillwater, Cycles, Clouds, Longhand, Defcon, Dancers, Convoy, Machine, Jumpman,
+Trench and Graphic Lab. So every scene is on the layer.
 - **Camera and geometry.** The camera, the model matrices and the shapes they build (`Space.swift`)
   now use `Matrix4` and the standard library's vectors rather than Apple's `simd`. The Metal scenes
   reach the same code through a small bridge, so there is one copy of the arithmetic.
@@ -275,8 +275,12 @@ Machine, Jumpman and Trench.
   `point_coord`.
 - **Per-point data.** Buffers the Metal shaders read by vertex id became vertex attributes. Small
   tables became uniform arrays.
-- **Graphic Lab is still Metal only.** It draws a canvas of type through Core Text every frame.
-  `DriftboxCanvas` and the typesetters for Windows and Android are what it moves onto.
+- **Graphic Lab prints on `DriftboxCanvas`.** Its three editions draw on the canvas with the
+  platform's typesetter, and the page is laid over the frame, as the web hands its canvas to WebGL.
+  A scene is made with the platform's `Typesetter` for this: DirectWrite on Windows, Android's own
+  text stack on Android. The Mac gives a `NoTypesetter`, which sets nothing, until it has a Core
+  Text typesetter, which is why the Mac's comparison with the Metal scenes leaves Graphic Lab out
+  for now.
 
 Every scene on the layer plays the same six seconds as the Metal scenes' own test: kicks, hats,
 and a finger circling through the middle two seconds. On WARP each is held to drawing something
@@ -371,8 +375,8 @@ catalogue with the scene the song names drawn from it over the whole screen, and
 the performance filter's pad, as the window is on Windows; two fingers tapped step on to the next
 scene. A scene is drawn at no more than two pixels to a point, a Mac's Retina display's, and
 scaled up to the screen: on a Fairphone 6, which has three, every scene but Frost then keeps the
-display's 120 frames a second, and Frost 98. That is all of them but Graphic Lab, which sets its
-type through CoreText. Given a test's name, the app runs that instead and
+display's 120 frames a second, and Frost 98. That was before Graphic Lab moved across, which
+sets its type there with Android's own text stack. Given a test's name, the app runs that instead and
 says what happened.
 
 ```bash

@@ -9,6 +9,7 @@
   import DriftboxHostAndroid
   import DriftboxScenes
   import DriftboxSeq
+  import DriftboxText
   import Synchronization
 
   /// A song, played and seen: the engine through AAudio, and the scene it names drawn from what it
@@ -27,14 +28,15 @@
 
     /// `json` played, with the scene called `scene` drawn from it, or the one the song names, on
     /// a screen of `density` pixels to a point.
-    init?(json: String, scene: String?, density: Float) {
+    init?(json: String, scene: String?, density: Float, typesetter: any Typesetter) {
       guard let song = SongCodec.decode(json) else { return nil }
       host = EngineHost(sampleRate: 48000)
       route = AAudioRoute(hop: { [lost] _ in lost.raise() })
       host.load(song)
       host.send(.play)
       route.attach(host.renderSource)
-      renderer = Renderer(host: host, song: song, scene: scene ?? song.visual, density: density)
+      renderer = Renderer(
+        host: host, song: song, scene: scene ?? song.visual, density: density, typesetter: typesetter)
     }
 
     /// Stop drawing and playing, and wait until both have.
@@ -140,6 +142,8 @@
     private let song: Song
     private let firstScene: String?
     private let density: Float
+    /// What the scenes set their type with; Graphic Lab is the one that sets any.
+    private let typesetter: any Typesetter
     private let changes = Mutex(Change())
     private let running = Atomic<Bool>(true)
     /// Set while the app is out of view: a window kept, but nothing drawn in it.
@@ -151,11 +155,12 @@
     let touch = Mutex<SIMD2<Float>?>(nil)
     private var thread = pthread_t()
 
-    init(host: EngineHost, song: Song, scene: String?, density: Float) {
+    init(host: EngineHost, song: Song, scene: String?, density: Float, typesetter: any Typesetter) {
       self.host = host
       self.song = song
       firstScene = scene
       self.density = density
+      self.typesetter = typesetter
       pthread_create(
         &thread, nil,
         { context in
@@ -193,7 +198,7 @@
       do {
         device = try GLESDevice()
         presenter = try Presenter(device: device)
-        scene = try GPUScenes.type(for: firstScene).init(device: device)
+        scene = try GPUScenes.type(for: firstScene).init(device: device, typesetter: typesetter)
       } catch {
         said.withLock { $0 = "no GPU: \(error)" }
         drainChanges()
@@ -243,7 +248,7 @@
           let at = all.firstIndex { $0.id == type(of: scene).id } ?? 0
           let next = all[(at + step) % all.count]
           do {
-            scene = try next.init(device: device)
+            scene = try next.init(device: device, typesetter: typesetter)
           } catch {
             size = "and could not show \(next.name): \(error)"
           }

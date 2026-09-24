@@ -1,4 +1,5 @@
 import DriftboxGPU
+import DriftboxText
 
 /// A scene drawn through the GPU layer rather than straight into Metal, and so on every platform
 /// the layer has a backend for. What a scene is does not change — an id a song's `visual` hint
@@ -12,7 +13,9 @@ public protocol GPUScene: AnyObject {
   /// `r, g, b`, 0...1.
   static var accent: SIMD3<Float> { get }
 
-  init(device: any GPUDevice) throws
+  /// Made once, with the GPU it draws on and the platform's type, which the app chooses. Only a
+  /// scene that sets type uses the typesetter; a platform with none yet gives a `NoTypesetter`.
+  init(device: any GPUDevice, typesetter: any Typesetter) throws
   /// One frame into `target`, which it covers.
   func draw(_ input: SceneInput, into target: any GPUTarget, on device: any GPUDevice)
 }
@@ -31,13 +34,12 @@ public enum GPUScenes {
     OrreryScene.self, SwitchbackScene.self, DaydreamScene.self, SmallHoursScene.self,
     PaperCitiesScene.self, WeaveScene.self, FrostScene.self, HothouseScene.self, NightBusScene.self,
   ]
-  /// The web's three.js scenes, in the order `Scenes.geometry` has them: all but Graphic Lab,
-  /// which draws a canvas of text through Core Text and waits on a way to do that elsewhere.
+  /// The web's three.js scenes, in the order `Scenes.geometry` has them.
   static let geometry: [GPUGeometryScene.Type] = [
     WireframeScene.self, SunsetScene.self, WebScene.self, SaturnScene.self, LifeformsScene.self,
     CubikScene.self, StillwaterScene.self, CyclesScene.self, CloudsScene.self, LonghandScene.self,
     DefconScene.self, DancersScene.self, ConvoyScene.self, MachineScene.self, JumpmanScene.self,
-    TrenchScene.self,
+    TrenchScene.self, GraphicLabScene.self,
   ]
 
   public static func type(for id: String?) -> any GPUScene.Type {
