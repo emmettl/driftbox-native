@@ -35,10 +35,13 @@ extension Desktop {
       if let request = rackInterface.takeMenuRequest() {
         pop(request.menu, at: request.at, for: rackInterface)
       }
-      if let module = rackInterface.takeFileRequest(),
-        let url = window.chooseFile(ofTypes: [Self.audio])
-      {
-        rackInterface.load([url], into: module)
+      if let module = rackInterface.takeFileRequest() {
+        // A set for a Multisampler, several at once; one file for anything else.
+        let urls =
+          rackInterface.takesSeveral(module)
+          ? window.chooseFiles(ofTypes: [Self.audio])
+          : window.chooseFile(ofTypes: [Self.audio]).map { [$0] } ?? []
+        if !urls.isEmpty { rackInterface.load(urls, into: module) }
       }
       return true
     case .dropped(let urls, let at):

@@ -173,6 +173,10 @@
       Win32Files.open(owner: handle, types: types)
     }
 
+    public func chooseFiles(ofTypes types: [FileType]) -> [URL] {
+      Win32Files.openMany(owner: handle, types: types)
+    }
+
     public func chooseSaveLocation(for type: FileType, name: String) -> URL? {
       Win32Files.save(owner: handle, type: type, name: name)
     }

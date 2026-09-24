@@ -157,6 +157,8 @@ public struct RackStage {
       case prompt(detail: String)
       /// As a stepper's buttons are.
       case chip
+      /// A multisample zone on its map: where its root is across it, and the root's name.
+      case zone(root: Float, note: String)
     }
     public var frame: Rect
     public var label: String
@@ -190,6 +192,12 @@ public struct RackStage {
     public var step: Float = 4
     /// Its name, beside it at the left.
     public var caption: String?
+    /// What its value writes, where it is neither a slot's place nor a param: a zone's field, say.
+    public var writes: (@Sendable (Int) -> Press)?
+    /// Its value in words of its own: a note's name, a fraction.
+    public var text: (@Sendable (Int) -> String)?
+    /// Drawn as a field, a label and a large number, rather than a box.
+    public var field = false
     /// The first step of a beat, edged a little brighter.
     public var accent = false
     public var opacity: Float = 1

@@ -42,6 +42,9 @@ public protocol ShellWindow: AnyObject {
 
   /// A file to open, from the platform's own panel, of one of `types`. Nil when cancelled.
   func chooseFile(ofTypes types: [FileType]) -> URL?
+  /// Files to open, several at once where the platform's panel allows, of `types`. Empty when
+  /// cancelled.
+  func chooseFiles(ofTypes types: [FileType]) -> [URL]
   /// Where to save a file of `type`, starting from `name`. Nil when cancelled.
   func chooseSaveLocation(for type: FileType, name: String) -> URL?
   /// The platform's own question before work is lost: save the changes to `name`, throw them
@@ -71,5 +74,12 @@ public struct FileType: Sendable, Equatable {
   public init(name: String, extensions: [String]) {
     self.name = name
     self.extensions = extensions
+  }
+}
+
+extension ShellWindow {
+  /// One file, where a window has no panel for several.
+  public func chooseFiles(ofTypes types: [FileType]) -> [URL] {
+    chooseFile(ofTypes: types).map { [$0] } ?? []
   }
 }

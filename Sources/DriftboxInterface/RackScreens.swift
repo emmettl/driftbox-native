@@ -26,6 +26,7 @@ extension RackInterface {
       case "combi": drawRoutes(screen, face: face, on: canvas)
       case "sampler": drawSampleScreen(screen, face: face, on: canvas)
       case "audio-track": drawTrackScreen(screen, face: face, on: canvas)
+      case "multisampler": drawAtlasScreen(screen, face: face, on: canvas)
       default: break
       }
     }
@@ -301,6 +302,7 @@ extension RackInterface {
     case .pad(let live): return drawPad(button, live: live, hovered: hovered, on: canvas)
     case .slice(let accent): return drawSlice(button, accent: accent, on: canvas)
     case .prompt(let detail): return drawPrompt(button, detail: detail, hovered: hovered, on: canvas)
+    case .zone(let root, let note): return drawZone(button, root: root, note: note, on: canvas)
     case .chip:
       return Draw.chip(
         button.frame, label: button.label, isOn: false, hovered: hovered, down: false, tint: button.tint,

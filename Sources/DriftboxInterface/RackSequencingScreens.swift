@@ -109,6 +109,18 @@ extension RackInterface {
       canvas.fill = Theme.dim.faded(fade)
       canvas.fillText(caption, r.x - 4, r.midY + 3)
     }
+    if cell.field {
+      // A field: a large number, lit while it is dragged, on a faint ground under the pointer.
+      if lit {
+        canvas.fill = Theme.white(0.07)
+        canvas.fillRoundedRect(r.x, r.y, r.width, r.height, radius: 6)
+      }
+      canvas.align = .right
+      canvas.font = Theme.mono(12, weight: 600)
+      canvas.fill = lit ? Theme.nine : Theme.ink.faded(0.9)
+      canvas.fillText(cell.text?(cell.value) ?? "\(cell.value)", r.maxX - 6, r.midY + 4.5)
+      return
+    }
     let playing = cell.isStep && cell.value != 0
     canvas.fill = (playing ? Theme.three : Colour(0x000000, alpha: 0.35)).faded(fade)
     canvas.fillRoundedRect(r.x, r.y, r.width, r.height, radius: 3)
