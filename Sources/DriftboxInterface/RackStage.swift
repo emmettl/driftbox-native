@@ -1,3 +1,4 @@
+import DriftboxCanvas
 import DriftboxRack
 import DriftboxRackSession
 
@@ -49,6 +50,14 @@ public struct RackStage {
     public var param: ParamDef
     public var cell: Rect
     public var kind: Kind
+    /// The face's own colour for it, where it has one; the module's otherwise.
+    public var tint: Colour?
+    /// A shorter name than the param's, where the face already says whose control it is.
+    public var name: String?
+    /// Words for a choice's values, where the face has its own.
+    public var labels: [String]?
+    /// Faint when asleep: a pulse's width while the shape is not a pulse.
+    public var opacity: Float = 1
   }
 
   /// A module's front, in design space.
@@ -59,6 +68,10 @@ public struct RackStage {
     public var span: Int
     public var frame: Rect
     public var title: Rect
+    /// What the title says at its right: what its jacks add up to, or what a hand-built face is doing.
+    public var words: String
+    /// The words' colour, where they are lit.
+    public var wordsTint: Colour?
     public var controls: [Control]
   }
 
@@ -118,41 +131,42 @@ public struct RackStage {
     let modules = Dictionary(rack.patch.modules.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     faces = layout.placements.compactMap { placement in
       guard let module = modules[placement.id] else { return nil }
-      return Self.face(module, placement)
+      return Self.face(module, placement, rack: rack)
     }
   }
 
-  /// A module's front laid out as the generic face lays one out: its panel, inset from its place;
-  /// its title; and a cell for every param a hand could set, three across on a half-width module
-  /// and seven on a full one.
-  static func face(_ module: PatchModule, _ placement: RackLayout.Placement) -> Face {
+  /// A module's front: its panel, inset from its place; its title; and its controls, as its own
+  /// hand-built face lays them out, or as the generic face does — a cell for every param a hand
+  /// could set, three across on a half-width module and seven on a full one.
+  @MainActor
+  static func face(_ module: PatchModule, _ placement: RackLayout.Placement, rack: RackSession) -> Face {
     let frame = Rect(
       Float(placement.x) + 3, Float(placement.y) + 3, Float(placement.width) - 6, Float(placement.height) - 6)
     let def = RackModules.registry[module.type]
     let title = Rect(frame.x + 12, frame.y + 10, frame.width - 24, Float(RackLayout.title) - 10)
-    var controls: [Control] = []
-    if let def {
-      let columns = RackLayout.columns(for: placement.span)
-      let cellWidth = Float(RackLayout.cellWidth)
-      let cellHeight = Float(RackLayout.cellHeight)
-      let top = title.maxY + 6
-      for (index, param) in def.params.filter({ !$0.hidden }).enumerated() {
-        let cell = Rect(
-          frame.x + 12 + Float(index % columns) * cellWidth, top + Float(index / columns) * cellHeight,
-          cellWidth,
-          cellHeight)
-        controls.append(Control(param: param, cell: cell, kind: kind(of: param, in: cell)))
-      }
+    let top = title.maxY + 6
+    guard let def else {
+      return Face(
+        module: module, def: nil, span: placement.span, frame: frame, title: title, words: "", controls: [])
     }
+    if let built = RackFaces.face(module, def, x: frame.x + 12, top: top, rack: rack) {
+      return Face(
+        module: module, def: def, span: placement.span, frame: frame, title: title, words: built.words,
+        wordsTint: built.wordsTint, controls: built.cells.controls)
+    }
+    var cells = RackFaces.Cells(
+      def: def, x: frame.x + 12, top: top, columns: RackLayout.columns(for: placement.span))
+    for param in def.params where !param.hidden { cells.add(param.id) }
     return Face(
-      module: module, def: def, span: placement.span, frame: frame, title: title, controls: controls)
+      module: module, def: def, span: placement.span, frame: frame, title: title,
+      words: RackLayout.portSummary(def), controls: cells.controls)
   }
 
   /// A knob for a range; buttons for a choice of up to three; a stepper for more — a choice is not a
   /// knob with positions, and twelve buttons would not fit a cell.
-  static func kind(of param: ParamDef, in cell: Rect) -> Control.Kind {
+  static func kind(of param: ParamDef, in cell: Rect, diameter: Float = 34) -> Control.Kind {
     guard param.stepped else {
-      return .knob(dial: Rect(cell.x + (cell.width - 34) / 2, cell.y + 2, 34, 34))
+      return .knob(dial: Rect(cell.x + (cell.width - diameter) / 2, cell.y + 2, diameter, diameter))
     }
     let count = Int((param.max - param.min).rounded()) + 1
     if count <= 3 {

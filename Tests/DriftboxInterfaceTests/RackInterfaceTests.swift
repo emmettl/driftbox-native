@@ -312,4 +312,64 @@ struct RackInterfaceTests {
     Self.press(face, SIMD2(5, 690))
     #expect(face.rack.selection.isEmpty)
   }
+
+  /// A module with a face of its own, alone in a rack, and its face.
+  static func alone(_ type: String) throws -> (RackInterface, RackStage.Face) {
+    let rack = RackSession()
+    rack.open(Patch(modules: [PatchModule(id: "m", type: type)], cables: []), name: type)
+    let face = RackInterface(rack: rack)
+    face.size = SIMD2(1000, 700)
+    return (face, try #require(face.stage.faces.first))
+  }
+
+  /// Each hand-built face lays out what it says it shows, and all of it fits its panel.
+  @Test func handBuiltFacesShowWhatTheySay() throws {
+    for (type, shows) in RackFaces.shows {
+      let (_, face) = try Self.alone(type)
+      #expect(Set(face.controls.map(\.param.id)) == shows, "\(type)")
+      #expect(face.controls.count == shows.count, "\(type): each once")
+      for control in face.controls {
+        #expect(face.frame.contains(SIMD2(control.cell.maxX - 1, control.cell.maxY - 1)), "\(type)")
+      }
+    }
+    let (_, generic) = try Self.alone("noise")
+    #expect(generic.words == RackLayout.portSummary(RackModules.registry["noise"]!))
+  }
+
+  /// The VCO names its shape and lets the pulse width sleep while the shape is not a pulse; its tune
+  /// knob is the big one.
+  @Test func theVCOSaysItsShape() throws {
+    let (rack, face) = try Self.alone("vco")
+    #expect(face.words == "Saw")
+    let width = try #require(face.controls.first { $0.param.id == "width" })
+    #expect(width.opacity < 1)
+    let tune = try #require(face.controls.first { $0.param.id == "tune" })
+    guard case .knob(let dial) = tune.kind else { throw Unexpected() }
+    #expect(dial.width == 46)
+
+    rack.rack.set("m", "shape", to: 1)
+    let pulse = try #require(rack.stage.faces.first)
+    #expect(pulse.words == "Pulse")
+    #expect(pulse.controls.first { $0.param.id == "width" }?.opacity == 1)
+  }
+
+  /// The ladder says when it starts to sing on its own, in pink.
+  @Test func theLadderSquelches() throws {
+    let (rack, face) = try Self.alone("ladder")
+    #expect(face.words == "4-pole")
+    rack.rack.set("m", "resonance", to: 0.9)
+    let singing = try #require(rack.stage.faces.first)
+    #expect(singing.words == "squelch")
+    #expect(singing.controls.first { $0.param.id == "resonance" }?.tint == Theme.eight)
+  }
+
+  /// The MIDI module says where its notes come from, and names its channels.
+  @Test func theMIDIModuleSaysWhatIsComingIn() throws {
+    let (_, face) = try Self.alone("midi")
+    #expect(face.words == "keys" && face.wordsTint == nil)
+    let channel = try #require(face.controls.first { $0.param.id == "channel" })
+    #expect(channel.labels?.first == "Omni" && channel.labels?.count == 17)
+  }
+
+  struct Unexpected: Error {}
 }
