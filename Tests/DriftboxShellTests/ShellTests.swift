@@ -158,6 +158,52 @@ struct ShellTests {
       #expect(GetMenuState(file, 100, UINT(MF_BYCOMMAND)) & UINT(MF_GRAYED) == 0)
     }
 
+    /// A menu ticks what `isChecked` says is on as it opens, and unticks it again when it is not.
+    @Test func settingsAreTickedAsTheirMenuOpens() throws {
+      let (window, _) = try window()
+      defer { window.close() }
+      var metronome = true
+      window.isChecked = { $0 == "metronome" && metronome }
+      window.menuBar = MenuBar([
+        Menu("Transport", [.command("Metronome", id: "metronome"), .command("Count In", id: "countIn")])
+      ])
+      let transport = GetSubMenu(GetMenu(window.handle), 0)
+      SendMessageW(window.handle, UINT(WM_INITMENUPOPUP), WPARAM(UInt(bitPattern: transport)), 0)
+      #expect(GetMenuState(transport, 100, UINT(MF_BYCOMMAND)) & UINT(MF_CHECKED) != 0)
+      #expect(GetMenuState(transport, 101, UINT(MF_BYCOMMAND)) & UINT(MF_CHECKED) == 0)
+      metronome = false
+      SendMessageW(window.handle, UINT(WM_INITMENUPOPUP), WPARAM(UInt(bitPattern: transport)), 0)
+      #expect(GetMenuState(transport, 100, UINT(MF_BYCOMMAND)) & UINT(MF_CHECKED) == 0)
+    }
+
+    /// Closed by whoever is using it, the window asks first, and stays open if the answer is no;
+    /// closed by the app, it does not ask.
+    @Test func closingAsksFirst() throws {
+      let (window, _) = try window()
+      var asked = 0
+      var answer = false
+      window.shouldClose = {
+        asked += 1
+        return answer
+      }
+      SendMessageW(window.handle, UINT(WM_CLOSE), 0, 0)
+      #expect(asked == 1)
+      #expect(window.isOpen, "kept open")
+      answer = true
+      SendMessageW(window.handle, UINT(WM_CLOSE), 0, 0)
+      #expect(asked == 2)
+      #expect(!window.isOpen, "and closed once allowed")
+
+      let (other, _) = try self.window()
+      other.shouldClose = {
+        asked += 1
+        return false
+      }
+      other.close()
+      #expect(asked == 2, "the app closing it is not asked")
+      #expect(!other.isOpen)
+    }
+
     /// A shortcut pressed arrives as its command, through the window's own queue as a key would.
     @Test func aShortcutArrivesAsItsCommand() throws {
       let (window, heard) = try window()

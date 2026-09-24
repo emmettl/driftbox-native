@@ -452,8 +452,10 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    window in platform-neutral terms — pointers, keys and scrolling as events in points, a menu bar
    as data with shortcuts on the platform's own modifier, file panels, a loop that keeps drawing
    through a resize, and `post` — and `DriftboxWin32` answers it, tested against a hidden window.
-   `driftbox-play --window` uses all of it on Windows. Left: the Windows app itself, as a
-   composition root of its own rather than a mode of the player; a settings window; and then the
+   `driftbox-play --window` uses all of it on Windows. Then the Windows app itself, as a
+   composition root of its own: `DriftboxWindows` chooses Windows' parts and hands them to
+   `DriftboxDesktop`, the app on `Session` that every platform with a `ShellWindow` runs, with its
+   settings as menu items the shell ticks, and unsaved work asked about before it goes. Left: the
    interface, drawn on the GPU layer rather than built from a toolkit, which is in keeping with an
    instrument and keeps what the app depends on small — the grid, knobs, strip, rack and cables as
    surfaces, laid out and hit in points so that Android's touch interface can share them.
