@@ -50,6 +50,7 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxCanvas` | A 2D canvas on the GPU layer: Canvas2D's shapes, state, type and blends, the same on every platform. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxInterface` | The controls, drawn on the canvas in points over the scene: the transport bar and the step grid, laid out and hit from one layout, on `Session`. |
+| `Sources/DriftboxRackSession` | The rack as an app holds it, on every platform: the patch, its edits and undo, the keys, controllers, samples, song and transport, and the catalogue of patches; audio, plug-ins and file reading behind ports. |
 | `Sources/DriftboxDesktop` | Driftbox on a desktop with a `ShellWindow`: menus, the scene, the controls over it, the pad, on `Session`. |
 | `Sources/DriftboxTouch` | Driftbox on a touch screen: the scene, the controls over it, the pad, and what each finger is, on `Session`. Android's app uses it, and iOS's can. |
 | `Sources/DriftboxWindows` | The Windows app: Windows' parts, chosen and handed to `DriftboxDesktop`. |

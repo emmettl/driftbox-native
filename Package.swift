@@ -28,6 +28,7 @@ let package = Package(
     .library(name: "DriftboxCanvas", targets: ["DriftboxCanvas"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
     .library(name: "DriftboxSession", targets: ["DriftboxSession"]),
+    .library(name: "DriftboxRackSession", targets: ["DriftboxRackSession"]),
     .library(name: "DriftboxInterface", targets: ["DriftboxInterface"]),
     .library(name: "DriftboxDesktop", targets: ["DriftboxDesktop"]),
   ],
@@ -121,6 +122,16 @@ let package = Package(
       name: "DriftboxSession",
       dependencies: ["DriftboxDocument", "DriftboxEngine", "DriftboxHost", "DriftboxScenes", "DriftboxSeq"],
       resources: [.copy("Resources/Songs"), .copy("Resources/catalogue.json")]),
+
+    // The rack as an app holds it, on every platform: the patch and its edits and undo, the keys and
+    // the controllers, the samples, the song it carries, the transport; with the catalogue of patches.
+    // Where it sounds, which plug-ins it can host and which files it can read are the platform's ports.
+    .target(
+      name: "DriftboxRackSession",
+      dependencies: ["DriftboxDocument", "DriftboxEngine", "DriftboxHost", "DriftboxRack", "DriftboxSeq"],
+      resources: [
+        .copy("Resources/Patches"), .copy("Resources/patches.json"), .copy("Resources/modules.json"),
+      ]),
 
     // The controls, drawn on a canvas over the scene: the transport and the step grid, the same on
     // every platform, reading the session and editing it.
@@ -232,6 +243,12 @@ let package = Package(
         "DriftboxDesktop", "DriftboxInterface", "DriftboxSession", "DriftboxShell", "DriftboxGPU",
         "DriftboxHost", "DriftboxSeq",
         "DriftboxText", "DriftboxDocument", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxGPUGLES",
+      ]),
+    .testTarget(
+      name: "DriftboxRackSessionTests",
+      dependencies: [
+        "DriftboxRackSession", "ConformanceSupport", "DriftboxDocument", "DriftboxEngine", "DriftboxHost",
+        "DriftboxRack", "DriftboxSeq",
       ]),
     .testTarget(
       name: "DriftboxInterfaceTests",
