@@ -62,10 +62,12 @@
   ) -> jboolean {
     let text = env.string(json)
     let named = scene == nil ? nil : env.string(scene)
+    // Android 12 and the app's Java are what the typesetter needs; without them, scenes set no type.
+    // Made here, since `env` is Java's and does not cross into the main actor.
+    let android = AndroidTypesetter(env: env)
     return MainActor.assumeIsolated {
       stage?.stop()
-      // Android 12 and the app's Java are what the typesetter needs; without them, scenes set no type.
-      let typesetter: any Typesetter = AndroidTypesetter(env: env) ?? NoTypesetter()
+      let typesetter: any Typesetter = android ?? NoTypesetter()
       stage = Stage(json: text, scene: named, density: density, typesetter: typesetter)
       return stage == nil ? jboolean(JNI_FALSE) : jboolean(JNI_TRUE)
     }

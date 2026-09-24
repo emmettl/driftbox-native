@@ -526,8 +526,10 @@ each question, and the rest is Android's alone:
    Frost 98. Then the sixteen geometry scenes, as they moved to the layer on every platform at
    once: each passing on the Adreno, at no more than 3.2ms a frame drawn. Then type: a
    `Typesetter` on Android's own text stack, reached through the app's Java from whichever thread
-   draws, and passing what `TypesetterTests` holds every platform's to. Left: `GraphicLab`, which
-   moves onto `DriftboxCanvas` next, on every platform at once.
+   draws, and passing what `TypesetterTests` holds every platform's to. Then Graphic Lab on
+   `DriftboxCanvas`, its type set by that typesetter, so that all twenty-seven scenes pass on the
+   Adreno; Graphic Lab takes 5.6ms a frame drawn, warm, and 6.8 over its first sixty frames at a
+   size, while its glyphs go into the atlas.
 4. **The touch interface, designed with iOS.** See below.
 5. **Shipping.** The shell is a `GameActivity`, which hands the window, input and lifecycle to
    native code. Songs open and save through the storage access framework as `.driftbox`, and

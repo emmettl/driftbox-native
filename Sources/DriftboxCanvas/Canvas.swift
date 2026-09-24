@@ -2,6 +2,11 @@ import DriftboxGPU
 import DriftboxText
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// A colour as a canvas takes it: red, green, blue, 0...1, and straight alpha.
 public struct Colour: Hashable, Sendable {
   public var red: Float

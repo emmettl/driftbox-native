@@ -13,8 +13,9 @@
   /// of those asked for is there, a line is set in `fallback`.
   ///
   /// It may be called on any thread, as it is on the render thread: a thread Java did not start is
-  /// attached to Java on its first call, and let go of again as it ends.
-  public final class AndroidTypesetter: Typesetter {
+  /// attached to Java on its first call, and let go of again as it ends. That is what makes it
+  /// sendable: what Swift holds never changes, and Java's side sets and draws behind one lock.
+  public final class AndroidTypesetter: Typesetter, @unchecked Sendable {
     /// The family used when none of those asked for is one Android has.
     public static let fallback = "sans-serif"
 

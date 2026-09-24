@@ -54,8 +54,12 @@
     }
 
     /// How long `scene` takes a frame at `width` by `height`, over sixty of them, in milliseconds.
+    /// Timed once it has drawn a few at that size, since a scene's first frames at a size can be
+    /// making what the rest reuse: Graphic Lab's glyphs go into its atlas as they are first set,
+    /// and its first sixty frames at the app's size took 6.8ms each where warm ones took 5.6.
     static func time(_ scene: any GPUScene, on device: GLESDevice, width: Int, height: Int) throws -> String {
       let target = try device.makeTarget(width: width, height: height)
+      for index in 0..<10 { scene.draw(playing(at: 2.9 + Double(index) / 120), into: target, on: device) }
       _ = try device.readPixels(target)
       let began = HostTime.now()
       for index in 0..<60 { scene.draw(playing(at: 3 + Double(index) / 120), into: target, on: device) }
