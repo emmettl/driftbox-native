@@ -18,6 +18,8 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -48,6 +50,8 @@ public final class Main extends Activity {
   private AudioFocusRequest focus;
   /** The one there is while a song plays, for the notification's Stop to reach. Main thread only. */
   private static Main current;
+  /** Where a long press's menu opens from, moved to the finger. */
+  private View anchor;
 
   /** The notification's Stop: the song and everything playing it ended, and the app with them. */
   static void stopPlaying() {
@@ -96,7 +100,8 @@ public final class Main extends Activity {
       new Choreographer.FrameCallback() {
         @Override
         public void doFrame(long nanos) {
-          Native.frame();
+          String menu = Native.frame();
+          if (menu != null && anchor != null) Menus.show(anchor, menu, getResources().getDisplayMetrics().density);
           Choreographer.getInstance().postFrameCallback(this);
         }
       };
@@ -201,7 +206,12 @@ public final class Main extends Activity {
           }
           return true;
         });
-    setContentView(view);
+    // The scene and the controls, and over them a point-sized view that a long press's menu opens from.
+    FrameLayout root = new FrameLayout(this);
+    root.addView(view);
+    anchor = new View(this);
+    root.addView(anchor, new FrameLayout.LayoutParams(1, 1));
+    setContentView(root);
     if (Build.VERSION.SDK_INT >= 30) {
       getWindow().setDecorFitsSystemWindows(false);
       view.getWindowInsetsController().hide(WindowInsets.Type.systemBars());

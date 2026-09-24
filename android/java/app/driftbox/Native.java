@@ -35,8 +35,14 @@ final class Native {
    */
   static native boolean start(String song, String scene, float density, String resources);
 
-  /** A frame, drawn now: the {@code Choreographer}'s, once for each refresh of the display. */
-  static native void frame();
+  /**
+   * A frame, drawn now: the {@code Choreographer}'s, once for each refresh of the display. Returns
+   * the menu a long press has asked for since the last, as {@link Menus} reads it, or null.
+   */
+  static native String frame();
+
+  /** The command with this id chosen from the menu the last frame returned. */
+  static native void menuChosen(String id);
 
   /** Stop playing and drawing, and wait until both have. */
   static native void stop();

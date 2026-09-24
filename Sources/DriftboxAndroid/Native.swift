@@ -79,8 +79,18 @@
   }
 
   @_cdecl("Java_app_driftbox_Native_frame")
-  public func nativeFrame(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?) {
-    MainActor.assumeIsolated { stage?.frame() }
+  public func nativeFrame(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?) -> jstring? {
+    let menu: String? = MainActor.assumeIsolated {
+      stage?.frame()
+      return stage?.takeMenu()
+    }
+    return menu.flatMap { env.java($0) }
+  }
+
+  @_cdecl("Java_app_driftbox_Native_menuChosen")
+  public func nativeMenuChosen(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ id: jstring?) {
+    let chosen = env.string(id)
+    MainActor.assumeIsolated { stage?.choose(chosen) }
   }
 
   @_cdecl("Java_app_driftbox_Native_stop")

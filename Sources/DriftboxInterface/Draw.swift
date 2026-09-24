@@ -1,6 +1,11 @@
 import DriftboxCanvas
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// What every drawn interface draws its parts with: a panel of smoked glass, a chip, a knob. The
 /// groovebox's controls and the rack both draw with these, so the two look like one instrument.
 enum Draw {

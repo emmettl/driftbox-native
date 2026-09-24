@@ -48,6 +48,10 @@
       }
       self.device = device
       self.screen = screen
+      screen.onMenu = { [weak self, interface = screen.interface] menu, at in
+        self?.pendingMenu = MenuLines.write(
+          menu, at: at, isEnabled: interface.menuIsEnabled, isChecked: interface.menuIsChecked)
+      }
     }
 
     /// Stop playing and drawing, and let go of the window.
@@ -118,9 +122,27 @@
       if !drawing || surface == nil { session.tick() }
       let load = host.takeLoad()
       defer { frames = 0 }
+      // The slowest callback too, in tenths of a millisecond: one over its burst is a crackle, which
+      // a second's average hides.
+      let longest = Int((load.longestMilliseconds * 10).rounded())
       return
         "\(frames) frames of \(screen.sceneID) \(said), render \(Int(load.fraction * 100))% of the audio's "
-        + "time, \(route.xruns) underruns, \(route.details ?? route.error ?? "")"
+        + "time, longest \(longest / 10).\(longest % 10)ms, \(route.xruns) underruns, "
+        + (route.details ?? route.error ?? "")
+    }
+
+    /// A long press's menu, waiting for Java to show it as its own; see `MenuLines`.
+    private var pendingMenu: String?
+
+    /// The menu a long press has asked for since the last frame, as lines Java reads, or nil.
+    func takeMenu() -> String? {
+      defer { pendingMenu = nil }
+      return pendingMenu
+    }
+
+    /// What was chosen from it.
+    func choose(_ id: String) {
+      screen.interface.choose(id)
     }
   }
 
