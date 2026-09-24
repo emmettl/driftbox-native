@@ -8,9 +8,11 @@
   ///
   /// Low-latency mode, exclusive if the device will give it and shared if not, 32-bit float
   /// stereo at the engine's rate; AAudio converts if the device runs at another. The buffer starts
-  /// at one burst, the least a stream can have, and `tune` lets it out a burst at a time once the
-  /// render thread has fallen behind: on a Fairphone 6 one burst was enough for the heaviest song,
-  /// 2ms, and the speaker about 5ms behind the render.
+  /// at three bursts, and `tune` lets it out a burst at a time once the render thread has fallen
+  /// behind. One burst, the least a stream can have, crackled: on a Fairphone 6 with the app's
+  /// controls drawn, the slowest callback each second took 2.3 to 3.6ms of a 2ms burst, though the
+  /// render averaged half of one, and AAudio counted not one underrun for any of it. With two, the
+  /// slowest of a minute took 4.1ms of 4; three, 6ms, is room for it.
   ///
   /// AAudio makes the render thread and calls into it. It is kept to the big cores, which AAudio
   /// does not do by itself: on a Fairphone 6, left to the scheduler, it underran a hundred times a
@@ -87,7 +89,7 @@
         throw OutputError(message: "the stream runs at \(rate) Hz, not \(Int(sampleRate))")
       }
       let burst = Int(AAudioStream_getFramesPerBurst(opened))
-      _ = AAudioStream_setBufferSizeInFrames(opened, Int32(burst))
+      _ = AAudioStream_setBufferSizeInFrames(opened, Int32(burst * Self.startingBursts))
       self.callback = callback
       stream = opened
       shape = Shape(
@@ -126,11 +128,14 @@
       return true
     }
 
-    /// Sixteen bursts of buffer at once, or back to the one a stream starts with. See
+    /// The bursts of buffer a stream starts with.
+    static let startingBursts = 3
+
+    /// Sixteen bursts of buffer at once, or back to what a stream starts with. See
     /// `AAudioRoute.relaxed`.
     func relax(_ relaxed: Bool) {
       let room = Int(AAudioStream_getBufferCapacityInFrames(stream))
-      let wanted = relaxed ? min(shape.framesPerBurst * 16, room) : shape.framesPerBurst
+      let wanted = min(shape.framesPerBurst * (relaxed ? 16 : Self.startingBursts), room)
       let set = Int(AAudioStream_setBufferSizeInFrames(stream, Int32(wanted)))
       if set > 0 { shape.bufferFrames = set }
       xrunsTuned = xruns

@@ -416,7 +416,9 @@ standard library has no SIMD types and whose arm64 runtime cannot link Foundatio
 the SDK up the first time, as its own script would, and `android-env.sh` says how.
 
 Audio is AAudio: low-latency mode, exclusive if the device will give it, float stereo at 48 kHz.
-The buffer starts at one burst and grows a burst at a time if the stream underruns. AAudio makes
+The buffer starts at three bursts, 6ms, and grows a burst at a time if the stream underruns: one, the
+least a stream can have, crackled once the app drew its controls, though AAudio counted no
+underruns, and its slowest callbacks took up to 3.6ms of a 2ms burst; with two, 4.1ms of 4. AAudio makes
 the render thread; Driftbox keeps it to the big cores, since left to the scheduler it underran a
 hundred times a second, and reports each callback's work to a performance hint session. A stream
 whose device goes away ends and asks to be replaced, as on Windows. There is one device, the
