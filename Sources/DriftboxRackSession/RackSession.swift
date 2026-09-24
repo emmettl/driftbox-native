@@ -24,10 +24,34 @@ public protocol RackPluginUnit: AnyObject {
   var latency: Double { get }
   /// Its settings as the patch keeps them, as of now.
   var savedState: String? { get }
-  /// Called, on the main actor, when something changes its settings.
-  var onChange: (() -> Void)? { get set }
+  /// Its params, by the key the patch keeps them by.
+  var parameters: [String: RackPluginParameter] { get }
+  /// Point macro slot `slot` (0 to 3) at the param with `key`, or at nothing: the host turns it
+  /// as the macro moves.
+  func map(_ slot: Int, to key: String?)
+  /// Called, on the main actor, when something changes its settings: with the address of the
+  /// param that moved, where the unit says.
+  var onChange: ((_ moved: UInt64?) -> Void)? { get set }
   /// Let go of: its interface closed, and nothing more heard from it.
   func close()
+}
+
+/// One of a plug-in's own params, as a macro maps onto it.
+public struct RackPluginParameter: Equatable, Sendable {
+  /// What the patch keeps it by, which lasts from one run of the unit to the next.
+  public var key: String
+  public var name: String
+  /// The unit's own number for it, which it says moved.
+  public var address: UInt64
+  /// Where it is now, 0...1 across its range as the unit shows it.
+  public var fraction: Double
+
+  public init(key: String, name: String, address: UInt64, fraction: Double) {
+    self.key = key
+    self.name = name
+    self.address = address
+    self.fraction = fraction
+  }
 }
 
 public enum RackPluginFailure: Error, Equatable {
@@ -86,6 +110,8 @@ public final class RackSession {
   /// Where each `plugin` module's unit has got to, for its face. None for a module with no
   /// unit chosen.
   public private(set) var plugins: [String: PluginStatus] = [:]
+  /// The macro waiting for a param to be moved in its unit's interface, if one is.
+  public private(set) var learning: (module: String, macro: Int)?
 
   public enum PluginStatus: Equatable, Sendable {
     case loading
@@ -720,6 +746,8 @@ public final class RackSession {
     for id in Array(unitIds.keys) where wanted[id]?.id != unitIds[id] { dropUnit(id) }
     for id in plugins.keys where wanted[id] == nil { plugins[id] = nil }
     for (id, reference) in wanted where unitIds[id] == nil { makeUnit(id, reference) }
+    // Undone or redone, a module's macros may point elsewhere.
+    for id in units.keys { applyMacros(id) }
   }
 
   private func makeUnit(_ id: String, _ reference: PluginReference) {
@@ -745,9 +773,13 @@ public final class RackSession {
       switch made {
       case .success(let unit):
         units[id] = unit
+        applyMacros(id)
         host.setExternal(id, unit.external)
         plugins[id] = .ready(latency: unit.latency)
-        unit.onChange = { [weak self] in self?.unitChanged(id) }
+        unit.onChange = { [weak self] moved in
+          self?.unitChanged(id)
+          if let moved { self?.learned(id, moved) }
+        }
       case .failure(RackPluginFailure.missing):
         plugins[id] = .missing
       case .failure(RackPluginFailure.format):
@@ -768,6 +800,7 @@ public final class RackSession {
     unitIds[id] = nil
     changedUnits.remove(id)
     plugins[id] = nil
+    if learning?.module == id { learning = nil }
   }
 
   /// A unit's state is out of date in the patch: saved once things have been still for a moment.
@@ -795,6 +828,73 @@ public final class RackSession {
       patch.modules[at].plugin?.state = unit.savedState
     }
     changedUnits = []
+  }
+
+  // MARK: Macros
+
+  /// Map macro `macro` (1 to 4) of a plug-in module onto one of its unit's params, by its key, or
+  /// unmap it (nil). One step of undo; the knob moves to where the param already is, so nothing
+  /// jumps.
+  public func mapMacro(_ moduleId: String, _ macro: Int, to key: String?) {
+    guard (1...4).contains(macro), let at = patch.modules.firstIndex(where: { $0.id == moduleId }),
+      patch.modules[at].plugin != nil
+    else { return }
+    var next = patch
+    var controls = next.modules[at].plugin?.controls.filter { $0.macro != macro } ?? []
+    if let key {
+      guard let parameter = units[moduleId]?.parameters[key] else { return }
+      controls.append(PluginControl(macro: macro, key: key, name: parameter.name))
+      controls.sort { $0.macro < $1.macro }
+      next.modules[at].params["macro\(macro)"] = parameter.fraction
+    }
+    next.modules[at].plugin?.controls = controls
+    guard next != patch else { return }
+    record(key == nil ? "Unmap Macro \(macro)" : "Map Macro \(macro)")
+    settle(next)
+    applyMacros(moduleId)
+    save()
+  }
+
+  /// Map the next param moved in the unit's own interface onto macro `macro`. Opening the
+  /// interface is the app's.
+  public func learnMacro(_ moduleId: String, _ macro: Int) { learning = (moduleId, macro) }
+
+  public func cancelLearning() { learning = nil }
+
+  /// A param moved in a unit, while one of its module's macros is waiting for one. The params its
+  /// other macros already turn are not learnt: they move when those macros do.
+  private func learned(_ moduleId: String, _ address: UInt64) {
+    guard let learning, learning.module == moduleId, let unit = units[moduleId],
+      let parameter = unit.parameters.values.first(where: { $0.address == address }),
+      let module = patch.modules.first(where: { $0.id == moduleId })
+    else { return }
+    let others = (module.plugin?.controls ?? []).filter { $0.macro != learning.macro }.map(\.key)
+    guard !others.contains(parameter.key) else { return }
+    self.learning = nil
+    mapMacro(moduleId, learning.macro, to: parameter.key)
+  }
+
+  /// The param each of a unit's macros turns, found by key in the unit, into the host's mapping.
+  private func applyMacros(_ moduleId: String) {
+    guard let unit = units[moduleId],
+      let controls = patch.modules.first(where: { $0.id == moduleId })?.plugin?.controls
+    else { return }
+    let parameters = unit.parameters
+    for macro in 1...4 {
+      let key = controls.first { $0.macro == macro }?.key
+      unit.map(macro - 1, to: key.flatMap { parameters[$0] }?.key)
+    }
+  }
+
+  /// What macro `macro` of a module turns: the param, when its unit has it.
+  public func macroParameter(_ moduleId: String, _ macro: Int) -> (
+    control: PluginControl, parameter: RackPluginParameter?
+  )? {
+    guard
+      let control = patch.modules.first(where: { $0.id == moduleId })?.plugin?.controls
+        .first(where: { $0.macro == macro })
+    else { return nil }
+    return (control, units[moduleId]?.parameters[control.key])
   }
 
   /// Once every unit being made has arrived.

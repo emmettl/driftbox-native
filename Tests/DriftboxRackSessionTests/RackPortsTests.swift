@@ -28,11 +28,18 @@ struct RackPortsTests {
   final class Unit: RackPluginUnit {
     var latency: Double { 0.01 }
     var savedState: String? = "first"
-    var onChange: (() -> Void)?
+    var onChange: ((UInt64?) -> Void)?
+    /// A cutoff at a quarter of its range and a resonance at a half, and where each macro points.
+    var parameters = [
+      "cutoff": RackPluginParameter(key: "cutoff", name: "Cutoff", address: 1, fraction: 0.25),
+      "resonance": RackPluginParameter(key: "resonance", name: "Resonance", address: 2, fraction: 0.5),
+    ]
+    var mapped: [String?] = [nil, nil, nil, nil]
+    func map(_ slot: Int, to key: String?) { mapped[slot] = key }
     var closed = false
     var external: RackExternal {
       RackExternal(
-        render: { _, _, _, _, _, _, _, _, _ in }, context: Unmanaged.passUnretained(self).toOpaque(),
+        render: { _, _, _, _, _, _, _, _, _, _, _ in }, context: Unmanaged.passUnretained(self).toOpaque(),
         owner: self)
     }
     func close() { closed = true }
@@ -85,7 +92,7 @@ struct RackPortsTests {
 
     let unit = try #require(plugins.made.first)
     unit.savedState = "turned"
-    unit.onChange?()
+    unit.onChange?(nil)
     rack.setBypassed("gone", true)
     #expect(rack.patch.modules.first { $0.id == "good" }?.plugin?.state == "turned")
 
@@ -95,6 +102,38 @@ struct RackPortsTests {
     let alone = RackSession()
     alone.open(Patch(modules: [Self.effect("good")], cables: []), name: "FX")
     #expect(alone.plugins["good"] == .missing, "with no platform to make it, it is missing")
+  }
+
+  /// A macro maps onto one of its unit's params, starting where the param is, as one step of undo;
+  /// or learns the next param moved, but not one another macro already turns. The unit is told
+  /// where each points, again after an undo.
+  @Test func macrosMapOntoAUnitsParams() async throws {
+    let plugins = Plugins()
+    let rack = RackSession(plugins: plugins)
+    rack.open(Patch(modules: [Self.effect("good")], cables: []), name: "FX")
+    await rack.pluginsReady()
+    let unit = try #require(plugins.made.first)
+
+    rack.mapMacro("good", 1, to: "cutoff")
+    let module = try #require(rack.patch.modules.first)
+    #expect(module.plugin?.controls == [PluginControl(macro: 1, key: "cutoff", name: "Cutoff")])
+    #expect(module.params["macro1"] == 0.25, "the knob where the param is")
+    #expect(unit.mapped == ["cutoff", nil, nil, nil])
+    #expect(rack.undoTitle == "Undo Map Macro 1")
+    #expect(rack.macroParameter("good", 1)?.parameter?.name == "Cutoff")
+
+    rack.learnMacro("good", 2)
+    unit.onChange?(1)
+    #expect(rack.learning?.macro == 2, "the cutoff is macro 1's, so not learnt")
+    unit.onChange?(2)
+    #expect(rack.learning == nil)
+    #expect(unit.mapped == ["cutoff", "resonance", nil, nil])
+
+    rack.undo()
+    #expect(unit.mapped == ["cutoff", nil, nil, nil], "undone, the unit is told again")
+    rack.mapMacro("good", 1, to: nil)
+    #expect(rack.patch.modules.first?.plugin?.controls.isEmpty == true)
+    #expect(rack.undoTitle == "Undo Unmap Macro 1")
   }
 
   /// Every save is told, as a document and a name: what a platform keeps elsewhere too.
