@@ -417,9 +417,15 @@ external displays, performance capture to video.
    song leading in; once the free-running state a take does not keep has settled, well inside half
    a second, what is heard again is what was heard, to the last place of a float. Nothing is kept
    but commands, so a take costs nothing to record however long it runs.
-4. **AUv3 export.** The engine and the rack are Audio Units already, in `DriftboxHostMac`; what is
-   left is the extension that carries them into another app, which needs a bundle SwiftPM does not
-   build.
+4. **AUv3 export.** ← *here.* Begun with the rack: `Driftbox: Rack`, an instrument any Audio Unit
+   host can load, out of process. SwiftPM builds its executable, entered at `NSExtensionMain`, and
+   `scripts/bundle-app.sh` makes the `.appex` around it inside the app, signed ad hoc and sandboxed as
+   an Audio Unit extension must be, and registers it; `auval` passes it. Behind the unit a
+   `RackSession`, made at the rate the app asks for and made again at another, keeping its patch.
+   Having no face yet, its presets are the factory patches, chosen from the app's own menu; its
+   state is the patch. The app's MIDI plays it through its MIDI modules, carried off the render
+   thread through a ring, and it runs with the app's transport at the app's tempo. Next: its face,
+   the rack's own, in the app's window; and the groovebox's engine beside it.
 
 ### What the later milestones ask of the first
 

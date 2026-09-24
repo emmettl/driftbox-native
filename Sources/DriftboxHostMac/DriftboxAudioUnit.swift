@@ -12,7 +12,7 @@
   public final class DriftboxAudioUnit: AUAudioUnit {
     public static let componentDescription = AudioComponentDescription(
       componentType: kAudioUnitType_MusicDevice, componentSubType: 0x6472_6674,  // 'drft'
-      componentManufacturer: 0x6472_6662,  // 'drfb'
+      componentManufacturer: 0x4472_6662,  // 'Drfb': an OSType of all lower case is Apple's
       componentFlags: 0, componentFlagsMask: 0)
 
     /// The engine host, made when render resources are allocated for a known sample rate.

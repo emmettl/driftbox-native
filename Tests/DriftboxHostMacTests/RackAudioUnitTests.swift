@@ -114,9 +114,13 @@
     /// In an engine that stops and starts — as `AVAudioEngine` does on its own when the output
     /// device changes — the rack carries on, its host kept and its clock running on.
     @Test func itCarriesOnThroughAStopAndAStart() async throws {
+      // Under a subtype of the test's own: the real one is the AUv3 extension's, once the app has been
+      // built, and asking for it would load that, out of process, rather than this class.
+      var description = RackAudioUnit.componentDescription
+      description.componentSubType = 0x6472_6354  // 'drcT'
       AUAudioUnit.registerSubclass(
-        RackAudioUnit.self, as: RackAudioUnit.componentDescription, name: "Driftbox Rack", version: 1)
-      let node = try await AVAudioUnit.instantiate(with: RackAudioUnit.componentDescription, options: [])
+        RackAudioUnit.self, as: description, name: "Driftbox Rack (test)", version: 1)
+      let node = try await AVAudioUnit.instantiate(with: description, options: [])
       let unit = try #require(node.auAudioUnit as? RackAudioUnit)
       let host = RackHost(sampleRate: 48000)
       host.load(Self.patch)

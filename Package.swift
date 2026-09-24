@@ -194,6 +194,16 @@ let package = Package(
       ],
       // The rack's patches and module cards are `DriftboxRackSession`'s, as every platform ships them.
       resources: [.copy("Resources/AppIcon.icns")]),
+    // The rack as an AUv3 app extension, for other apps to load. Its entry point is Foundation's
+    // `NSExtensionMain`, not a `main` of its own; `scripts/bundle-app.sh` puts it in the app.
+    .target(
+      name: "DriftboxExtensions",
+      dependencies: ["DriftboxHostMac", "DriftboxHost", "DriftboxRackSession", "DriftboxDocument"]),
+    .executableTarget(
+      name: "DriftboxRackExtension", dependencies: ["DriftboxExtensions", "DriftboxHostMac"],
+      linkerSettings: [
+        .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"], .when(platforms: [.macOS]))
+      ]),
     // `@main` and nothing else, so that everything it starts can be reached from a test.
     .executableTarget(name: "Driftbox", dependencies: ["DriftboxApp"]),
     // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine on the
@@ -298,6 +308,9 @@ let package = Package(
       dependencies: [
         "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxRack", "ConformanceSupport",
       ]),
+    .testTarget(
+      name: "DriftboxExtensionsTests",
+      dependencies: ["DriftboxExtensions", "DriftboxHostMac", "DriftboxRackSession", "DriftboxDocument"]),
     .testTarget(
       name: "DriftboxHostMacTests",
       dependencies: [
