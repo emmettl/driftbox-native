@@ -27,6 +27,14 @@ public struct Rect: Equatable, Sendable {
   func outset(_ amount: Float) -> Rect {
     Rect(x - amount, y - amount, width + amount * 2, height + amount * 2)
   }
+
+  var midX: Float { x + width / 2 }
+  var midY: Float { y + height / 2 }
+
+  /// Shrunk by each side's padding, as a view is padded.
+  func inset(_ top: Float, _ left: Float, _ bottom: Float, _ right: Float) -> Rect {
+    Rect(x + left, y + top, max(0, width - left - right), max(0, height - top - bottom))
+  }
 }
 
 /// What pressing something on the interface does.
