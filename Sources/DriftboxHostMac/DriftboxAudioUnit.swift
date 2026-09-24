@@ -1,4 +1,5 @@
 #if canImport(AVFoundation)
+  import DriftboxHost
   import AVFoundation
   import DriftboxEngine
   import DriftboxSeq

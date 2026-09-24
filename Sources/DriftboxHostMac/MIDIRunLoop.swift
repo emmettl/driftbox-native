@@ -1,4 +1,5 @@
 #if canImport(CoreMIDI)
+  import DriftboxHost
   import CoreFoundation
   import Foundation
 

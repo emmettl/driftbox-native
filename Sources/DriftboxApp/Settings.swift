@@ -1,5 +1,6 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxHost
+  import DriftboxHostMac
   import SwiftUI
 
   /// What the app remembers between launches. Small on purpose: a setting the app cannot honour
@@ -94,14 +95,14 @@
         Section("Audio Out") {
           Picker("Play through", selection: device) {
             Text(player.systemOutput.map { "System (\($0.name))" } ?? "System").tag("")
-            ForEach(player.outputs, id: \.uid) { output in Text(output.name).tag(output.uid) }
+            ForEach(player.outputs, id: \.id) { output in Text(output.name).tag(output.id) }
             // A choice that is not plugged in is still the choice, and says so, rather than the
             // picker quietly showing something else.
-            if !output.isEmpty, !player.outputs.contains(where: { $0.uid == output }) {
+            if !output.isEmpty, !player.outputs.contains(where: { $0.id == output }) {
               Text("\(outputName.isEmpty ? "A device" : outputName) (not connected)").tag(output)
             }
           }
-          if !output.isEmpty, let playing = player.playingThrough, playing.uid != output {
+          if !output.isEmpty, let playing = player.playingThrough, playing.id != output {
             Text("Playing through \(playing.name) until it is back.").foregroundStyle(.secondary)
           }
         }
@@ -137,7 +138,7 @@
       Binding(
         get: { output },
         set: { uid in
-          if let chosen = player.outputs.first(where: { $0.uid == uid }) { outputName = chosen.name }
+          if let chosen = player.outputs.first(where: { $0.id == uid }) { outputName = chosen.name }
           if uid.isEmpty { outputName = "" }
           output = uid
         })

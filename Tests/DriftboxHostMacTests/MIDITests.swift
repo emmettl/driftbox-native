@@ -1,6 +1,7 @@
 #if canImport(CoreMIDI)
   import CoreMIDI
   @testable import DriftboxHost
+  @testable import DriftboxHostMac
   import DriftboxSeq
   import Foundation
   import Testing
@@ -35,19 +36,6 @@
       #expect(MIDIOutput.words(for: [0x40, 0x00]) == nil)
     }
 
-    /// The host clock is not nanoseconds on every machine, which is the whole reason these are
-    /// functions rather than arithmetic at the call site.
-    @Test func hostTimeRoundTrips() {
-      let base = MIDIOutput.now()
-      for seconds in [0.0, 0.0005, 0.2, 1.5, 30.0] {
-        let later = MIDIOutput.time(base, after: seconds)
-        #expect(abs(MIDIOutput.seconds(from: base, to: later) - seconds) < 1e-6, "\(seconds)")
-      }
-      // And backwards, for a stamp that has already passed.
-      let earlier = MIDIOutput.time(base, after: -0.1)
-      #expect(MIDIOutput.seconds(from: base, to: earlier) < 0)
-    }
-
     /// Out of the virtual source and back in through the input. This is the only test that
     /// touches the MIDI server at all, so it is also the only thing that says the client, the
     /// port and the source were really made.
@@ -62,11 +50,11 @@
       try await Task.sleep(for: .milliseconds(400))
 
       let sent: [ClockMessage] = [.position(step: 129), .continue, .tick, .tick, .stop]
-      let now = MIDIOutput.now()
+      let now = HostTime.now()
       for (index, message) in sent.enumerated() {
         // Spread them slightly: several messages stamped identically may arrive in any order,
         // and the order is the thing being checked.
-        let at = MIDIOutput.time(now, after: 0.01 + Double(index) * 0.005)
+        let at = HostTime.time(now, after: 0.01 + Double(index) * 0.005)
         #expect(output.send(message.bytes, to: .virtual, at: at), "\(message)")
       }
       try await Task.sleep(for: .milliseconds(600))
@@ -93,10 +81,10 @@
       input.onMessage = { bytes in messages.add(bytes) }
       try await Task.sleep(for: .milliseconds(400))
       let sent: [[UInt8]] = [[0x91, 60, 100], [0xB0, 1, 127], [0xE3, 0, 64], [0x81, 60, 0]]
-      let now = MIDIOutput.now()
+      let now = HostTime.now()
       for (index, bytes) in sent.enumerated() {
         #expect(
-          output.send(bytes, to: .virtual, at: MIDIOutput.time(now, after: 0.01 + Double(index) * 0.005)))
+          output.send(bytes, to: .virtual, at: HostTime.time(now, after: 0.01 + Double(index) * 0.005)))
       }
       try await Task.sleep(for: .milliseconds(600))
       let got = messages.all()
@@ -133,12 +121,12 @@
       #expect(input.sources.contains(name))
 
       input.ignoring = [name]
-      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: MIDIOutput.now()))
+      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: HostTime.now()))
       try await Task.sleep(for: .milliseconds(300))
       #expect(!received.all().contains(.stop), "ignored, so nothing")
 
       input.ignoring = []
-      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: MIDIOutput.now()))
+      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: HostTime.now()))
       try await Task.sleep(for: .milliseconds(300))
       #expect(received.all().contains(.stop), "heard again")
     }
@@ -158,13 +146,13 @@
 
       input.hiding = [id]
       #expect(input.sources.filter { $0.contains("Driftbox Clock") }.count == before - 1)
-      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: MIDIOutput.now()))
+      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: HostTime.now()))
       try await Task.sleep(for: .milliseconds(300))
       #expect(!received.all().contains(.stop))
 
       input.hiding = []
       #expect(input.sources.filter { $0.contains("Driftbox Clock") }.count == before)
-      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: MIDIOutput.now()))
+      #expect(output.send(ClockMessage.stop.bytes, to: .virtual, at: HostTime.now()))
       try await Task.sleep(for: .milliseconds(300))
       #expect(received.all().contains(.stop))
     }

@@ -4,6 +4,7 @@
   import DriftboxDocument
   import DriftboxEngine
   import DriftboxHost
+  import DriftboxHostMac
   import Foundation
   import Testing
 

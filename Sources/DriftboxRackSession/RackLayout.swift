@@ -1,6 +1,12 @@
 import DriftboxRack
 import Foundation
 
+#if canImport(CoreGraphics)
+  // `CGRect(x:y:width:height:)` and the rest are CoreGraphics' own on Apple's platforms, where
+  // Foundation alone gives the types without them.
+  import CoreGraphics
+#endif
+
 /// Where every module and every jack sits, in one design space shared by the front, the back
 /// and the cables: a port of the reference's `layout.ts` and of the sizes in its faceplate
 /// table, held to them exactly by `RackPanelTests`. Arithmetic rather than measurement, so a

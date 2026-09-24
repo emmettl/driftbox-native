@@ -1,4 +1,5 @@
 #if canImport(CoreMIDI)
+  import DriftboxHost
   import CoreMIDI
   import Foundation
 
@@ -9,12 +10,12 @@
   /// written. A clock driven from a thirty-a-second tick would otherwise arrive in bursts wearing
   /// all of the main thread's jitter, and a tempo read off ticks that arrive like that wanders.
   /// Handed to the MIDI server early with a timestamp, each message is played when it was stamped.
-  public final class MIDIOutput: @unchecked Sendable {
+  public final class MIDIOutput: MIDIOutputPort, @unchecked Sendable {
     /// Where bytes go: one of the machine's destinations by name, or the port Driftbox publishes.
-    public enum Destination: Hashable, Sendable {
-      case virtual
-      case port(String)
-    }
+    public typealias Destination = MIDIDestination
+
+    /// Core MIDI lets an application publish a source of its own, which is where `.virtual` goes.
+    public var offersVirtualSource: Bool { source != 0 }
 
     /// Every destination there is. Read again when the set of devices changes.
     public var destinations: [String] { lock.withLock { ports.map(\.name) } }
@@ -127,33 +128,5 @@
       let type: UInt32 = status >= 0xF0 ? 1 : 2
       return [(type << 28) | (UInt32(status) << 16) | (data1 << 8) | data2]
     }
-
-    // MARK: - The host clock
-
-    /// Now, on the clock CoreMIDI stamps against.
-    public static func now() -> UInt64 { mach_absolute_time() }
-
-    /// `seconds` after `base`, which is not nanoseconds: the host clock ticks at whatever rate the
-    /// machine says it does, and on Apple silicon that is twenty-four million a second.
-    public static func time(_ base: UInt64, after seconds: Double) -> UInt64 {
-      guard seconds.isFinite else { return base }
-      let ticks = (seconds * ticksPerSecond).rounded()
-      if ticks >= 0 { return base &+ UInt64(min(ticks, 1e18)) }
-      let back = UInt64(min(-ticks, 1e18))
-      return back < base ? base - back : 0
-    }
-
-    /// How long it is from `base` to `time`, negative when `time` has been and gone.
-    public static func seconds(from base: UInt64, to time: UInt64) -> Double {
-      let ahead = time >= base
-      let difference = Double(ahead ? time - base : base - time) / ticksPerSecond
-      return ahead ? difference : -difference
-    }
-
-    private static let ticksPerSecond: Double = {
-      var info = mach_timebase_info_data_t()
-      guard mach_timebase_info(&info) == KERN_SUCCESS, info.numer > 0, info.denom > 0 else { return 1e9 }
-      return 1e9 * Double(info.denom) / Double(info.numer)
-    }()
   }
 #endif

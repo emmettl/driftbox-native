@@ -1,9 +1,11 @@
 #if os(macOS)
+  import DriftboxHost
   import AVFoundation
   import CoreAudio
   import Foundation
 
-  /// A device sound can go out of.
+  /// A device sound can go out of, as Core Audio knows it: with the number it goes by this session,
+  /// which the port's `AudioDevice` does not need.
   public struct AudioOutput: Hashable, Sendable {
     /// What CoreAudio calls it this session. Not something to remember: the same interface is a
     /// different number after it has been unplugged and plugged back in.
@@ -17,6 +19,9 @@
       self.uid = uid
       self.name = name
     }
+
+    /// As every platform describes a device: remembered by its UID.
+    public var device: AudioDevice { AudioDevice(id: uid, name: name) }
   }
 
   /// The devices CoreAudio knows about, as the Sound settings list them.
@@ -43,16 +48,6 @@
           == noErr, id != kAudioObjectUnknown
       else { return nil }
       return output(id)
-    }
-
-    /// Which device to play through: the one chosen, while it is there to be played through,
-    /// and the system's otherwise. A chosen interface that has been unplugged is not a reason
-    /// to make no sound, and it is not forgotten either — when it comes back, so does the sound.
-    public static func pick(chosen: String?, among outputs: [AudioOutput], systemDefault: AudioOutput?)
-      -> AudioOutput?
-    {
-      if let chosen, let found = outputs.first(where: { $0.uid == chosen }) { return found }
-      return systemDefault
     }
 
     static func output(_ id: AudioDeviceID) -> AudioOutput? {
@@ -93,30 +88,45 @@
   /// somebody starts it again. All three end in `apply`, which works out where the sound should
   /// be going from scratch and puts it there, so it does not matter which of them arrived first
   /// or how many of them one unplugging sets off.
+  ///
+  /// It is the Mac's `AudioRouting`: sources attached to it are summed by a `Mixer`, as on every
+  /// platform, and played by one source node into the engine's mixer, which converts to whatever
+  /// the device runs at. Audio Units attached to the engine directly play beside them.
   @MainActor
-  public final class AudioRoute {
-    private let engine: AVAudioEngine
+  public final class AudioRoute: AudioRouting {
+    /// The engine it keeps playing, for Audio Units to be attached to.
+    public let engine: AVAudioEngine
     /// The device chosen, by its UID; nil for whatever the system is playing through.
     public var chosen: String? {
       didSet { if chosen != oldValue { apply() } }
     }
     /// Every device there is, as of the last change to any of them.
-    public private(set) var outputs: [AudioOutput] = []
+    public private(set) var devices: [AudioDevice] = []
     /// The device the sound is going out of.
-    public private(set) var current: AudioOutput?
+    public private(set) var current: AudioDevice?
     /// The device the system is playing through, which is where the sound goes when nothing
     /// else has been chosen, or what has been is not there.
-    public private(set) var systemDefault: AudioOutput?
+    public private(set) var systemDefault: AudioDevice?
     /// Why there is no sound, if there is none.
     public private(set) var error: String?
     /// Called after every `apply`, for whoever is showing any of the above.
     public var onChange: (() -> Void)?
+    /// The rate attached sources render at; the engine's mixer converts to the device's.
+    public let sampleRate: Double
+    /// How long after a frame is rendered it is heard: what the output says it adds.
+    public var latency: Double { engine.outputNode.presentationLatency }
 
     private let listeners = Listeners()
+    private let mixer = Mixer()
+    private var node: AVAudioSourceNode?
+    /// Each device's number this session, by UID: what the engine's output unit is set by.
+    private var numbers: [String: AudioDeviceID] = [:]
 
-    public init(engine: AVAudioEngine, chosen: String? = nil) {
+    /// A route keeping `engine` playing through `chosen`, or the system's device.
+    public init(engine: AVAudioEngine = AVAudioEngine(), chosen: String? = nil, sampleRate: Double = 48000) {
       self.engine = engine
       self.chosen = chosen
+      self.sampleRate = sampleRate
       let changed: @Sendable () -> Void = { [weak self] in
         // CoreAudio's blocks are given the main queue, and the engine's notification is posted
         // on whatever thread noticed the change.
@@ -126,22 +136,84 @@
       apply()
     }
 
+    isolated deinit {
+      mixer.rendering.store(false, ordering: .releasing)
+    }
+
+    public func attach(_ source: RenderSource) {
+      if node == nil { makeNode() }
+      mixer.add(source)
+    }
+
+    public func detach(_ context: UnsafeMutableRawPointer) {
+      mixer.remove(context)
+    }
+
+    /// The one node every attached source plays through: the mixer's sum, two channels at the
+    /// route's rate. Its block captures the mixer and scratch it owns, nothing of the route's.
+    private func makeNode() {
+      guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2) else { return }
+      let scratch = Scratch()
+      let mixer = mixer
+      let node = AVAudioSourceNode(format: format) { _, _, count, list in
+        let buffers = UnsafeMutableAudioBufferListPointer(list)
+        guard buffers.count >= 2, let left = buffers[0].mData?.assumingMemoryBound(to: Float.self),
+          let right = buffers[1].mData?.assumingMemoryBound(to: Float.self)
+        else { return kAudioUnitErr_InvalidParameter }
+        // In pieces no longer than the scratch, for a device that asks for more than it holds.
+        var done = 0
+        let frames = Int(count)
+        while done < frames {
+          let piece = min(Scratch.frames, frames - done)
+          mixer.render(
+            frames: piece, left: left + done, right: right + done, scratchLeft: scratch.left,
+            scratchRight: scratch.right)
+          done += piece
+        }
+        mixer.buffers.add(1, ordering: .releasing)
+        return noErr
+      }
+      engine.attach(node)
+      engine.connect(node, to: engine.mainMixerNode, format: format)
+      self.node = node
+      apply()
+    }
+
+    /// Two channels of scratch for the mixer to render each source into, kept for the node's life.
+    private final class Scratch: @unchecked Sendable {
+      static let frames = 4096
+      let left = UnsafeMutablePointer<Float>.allocate(capacity: frames)
+      let right = UnsafeMutablePointer<Float>.allocate(capacity: frames)
+
+      deinit {
+        left.deallocate()
+        right.deallocate()
+      }
+    }
+
     /// Point the engine at the device it should be playing through, and make sure it is.
     public func apply() {
-      defer { onChange?() }
-      outputs = AudioOutputs.all()
-      systemDefault = AudioOutputs.systemDefault()
+      defer {
+        // Whether a buffer will come along to say an old table of sources is done with.
+        mixer.rendering.store(engine.isRunning, ordering: .releasing)
+        onChange?()
+      }
+      let outputs = AudioOutputs.all()
+      numbers = Dictionary(outputs.map { ($0.uid, $0.id) }, uniquingKeysWith: { a, _ in a })
+      devices = outputs.map(\.device)
+      systemDefault = AudioOutputs.systemDefault()?.device
       guard
-        let target = AudioOutputs.pick(chosen: chosen, among: outputs, systemDefault: systemDefault)
+        let target = AudioDevices.pick(chosen: chosen, among: devices, systemDefault: systemDefault),
+        let number = numbers[target.id]
       else {
         current = nil
         error = "There is nothing to play through."
         return
       }
       do {
-        if device != target.id {
+        if device != number {
           engine.stop()
-          try setDevice(target.id)
+          try setDevice(number)
         }
         if !engine.isRunning {
           // The mixer's connection to the output keeps the format it was made at, the old

@@ -16,6 +16,7 @@ let package = Package(
     .library(name: "DriftboxRack", targets: ["DriftboxRack"]),
     .library(name: "DriftboxDocument", targets: ["DriftboxDocument"]),
     .library(name: "DriftboxHost", targets: ["DriftboxHost"]),
+    .library(name: "DriftboxHostMac", targets: ["DriftboxHostMac"]),
     .library(name: "DriftboxHostWindows", targets: ["DriftboxHostWindows"]),
     .library(name: "DriftboxHostAndroid", targets: ["DriftboxHostAndroid"]),
     .library(name: "DriftboxGPU", targets: ["DriftboxGPU"]),
@@ -45,6 +46,12 @@ let package = Package(
     .target(name: "DriftboxHost", dependencies: ["DriftboxEngine", "DriftboxDocument", "DriftboxRack"]),
     // The host on Windows: WASAPI and WinMM behind the ports `DriftboxHost` declares. The C target is
     // only the system headers Swift's WinSDK module leaves out; every call is made from Swift.
+    // The host on the Mac: Core Audio, Core MIDI and Audio Units behind the ports `DriftboxHost`
+    // declares, and the engine and the rack as Audio Units of their own. Nothing off Apple's
+    // platforms.
+    .target(
+      name: "DriftboxHostMac",
+      dependencies: ["DriftboxHost", "DriftboxEngine", "DriftboxRack", "DriftboxSeq", "DriftboxDocument"]),
     .systemLibrary(name: "CWASAPI"),
     .target(
       name: "DriftboxHostWindows",
@@ -181,8 +188,8 @@ let package = Package(
     .target(
       name: "DriftboxApp",
       dependencies: [
-        "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq", "DriftboxScenes", "DriftboxRack",
-        "DriftboxSession", "DriftboxRackSession",
+        "DriftboxHost", "DriftboxHostMac", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq", "DriftboxScenes",
+        "DriftboxRack", "DriftboxSession", "DriftboxRackSession",
       ],
       // The rack's patches and module cards are `DriftboxRackSession`'s, as every platform ships them.
       resources: [.copy("Resources/AppIcon.icns")]),
@@ -194,6 +201,7 @@ let package = Package(
       name: "driftbox-play",
       dependencies: [
         "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxGPU", "DriftboxScenes", "DriftboxText",
+        .target(name: "DriftboxHostMac", condition: .when(platforms: [.macOS])),
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostAndroid", condition: .when(platforms: [.android])),
@@ -286,6 +294,12 @@ let package = Package(
       name: "DriftboxHostTests",
       dependencies: [
         "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxRack", "ConformanceSupport",
+      ]),
+    .testTarget(
+      name: "DriftboxHostMacTests",
+      dependencies: [
+        "DriftboxHostMac", "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxRack", "DriftboxSeq",
+        "ConformanceSupport",
       ]),
     .testTarget(
       name: "DriftboxDocumentTests",

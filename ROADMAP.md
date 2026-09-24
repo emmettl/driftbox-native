@@ -431,9 +431,13 @@ each step stand on the last. The README's "Platforms" says how it is divided.
      it.
    - `Player`'s tests of its logic run against `Session` on every platform.
 
-   Left, and needing a Mac: the Mac's adapters moved into a target of their own and made to
-   conform, and the Mac app moved onto `Session`, its `Player` gone. The rack's model stays with
-   the Mac app until then.
+   Then the Mac's adapters into `DriftboxHostMac`, conforming: `AudioRoute` is the Mac's
+   `AudioRouting`, summing its sources through the `Mixer` into one source node in its engine, and
+   `MIDIInput` and `MIDIOutput` are its MIDI ports, on `HostTime`'s clock and the shared
+   `MIDIDestination`; the Audio Units — the engine's, the rack's, and those the rack hosts — go
+   with them, leaving `DriftboxHost` with nothing of any one platform. The rack's model moved onto
+   `RackSession` already. Left, and needing a Mac: the groovebox moved onto `Session`, its `Player`
+   gone.
 3. **A GPU layer under the scenes.** ← *here.* The scenes use a small part of Metal: buffers,
    render pipelines, per-draw constants, indexed draws, depth, blending. `DriftboxGPU` says that
    much and no more, in what Metal, Direct3D 11 and OpenGL ES 3.0 all do alike — sprites as
