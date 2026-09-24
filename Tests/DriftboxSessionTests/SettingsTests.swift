@@ -49,7 +49,7 @@ struct SettingsTests {
       _ = Session(host: EngineHost(sampleRate: 48000), audio: Speakers(), midiIn: Cables(), memory: memory)
       let keys = [
         "visuals.run", "midi.listens", "midi.ignored", "clock.sends", "transport.metronome",
-        "transport.countIn", "clock.destination", "audio.output",
+        "transport.countIn", "clock.destination", "audio.output", "audio.output.name",
       ]
       for key in keys {
         #expect(memory.object(forKey: key) == nil, "\(key) was written")
@@ -70,6 +70,25 @@ struct SettingsTests {
       #expect(!session.followsClock)
       #expect(session.clockDestination == .virtual)
       #expect(session.outputDevice == nil)
+    }
+  }
+
+  /// The device chosen is remembered by its name as well, so that a session with it unplugged can
+  /// say which device it is; choosing the system's forgets both.
+  @Test func theChosenDeviceIsNamedWhileItIsGone() {
+    withMemory { memory in
+      let speakers = Speakers()
+      speakers.devices = [AudioDevice(id: "usb", name: "USB Speakers")]
+      let first = Session(host: EngineHost(sampleRate: 48000), audio: speakers, memory: memory)
+      first.outputDevice = "usb"
+      #expect(first.outputDeviceName == "USB Speakers")
+      #expect(memory.string(forKey: "audio.output.name") == "USB Speakers")
+
+      let second = Session(host: EngineHost(sampleRate: 48000), audio: Speakers(), memory: memory)
+      #expect(second.outputDevice == "usb" && second.outputs.isEmpty)
+      #expect(second.outputDeviceName == "USB Speakers", "named while it is not plugged in")
+      second.outputDevice = nil
+      #expect(second.outputDeviceName == nil && memory.string(forKey: "audio.output.name") == "")
     }
   }
 

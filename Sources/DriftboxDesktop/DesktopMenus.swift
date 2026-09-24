@@ -38,6 +38,10 @@ public enum DesktopMenus {
   /// What a list with nothing in it shows, which can be neither chosen nor ticked.
   public static let noInputs = "midi.noInputs"
   public static let noOutputs = "midi.noOutputs"
+  /// Whether the scene runs behind the controls; it always does while they are away.
+  public static let visuals = "view.visuals"
+  /// What the Audio menu says of where the sound is going, which is not a choice.
+  public static let audioNote = "audio.note"
 
   public static let songPrefix = "song."
   public static let scenePrefix = "scene."
@@ -102,6 +106,8 @@ public enum DesktopMenus {
               ? .command("Show Back", id: rackBack, shortcut: Shortcut(.tab, []))
               : .command("Show Controls", id: controls, shortcut: Shortcut(.tab, [])),
             .separator,
+            .command("Run the Visuals", id: visuals),
+            .separator,
             .command("Next Scene", id: nextScene, shortcut: Shortcut(.right)),
             .command("Previous Scene", id: previousScene, shortcut: Shortcut(.left)),
             .separator,
@@ -135,7 +141,7 @@ public enum DesktopMenus {
           Menu(
             "Audio",
             [.command("System Output", id: systemOutput), .separator]
-              + session.outputs.map { .command($0.name, id: outputPrefix + $0.id) }),
+              + session.outputs.map { .command($0.name, id: outputPrefix + $0.id) } + missingOutput(session)),
           Menu(
             "MIDI",
             [
@@ -157,5 +163,24 @@ public enum DesktopMenus {
                     : session.clockDestinations.map { .command($0, id: clockPrefix + $0) })),
             ]),
         ])
+  }
+}
+
+extension DesktopMenus {
+  /// A device chosen and not plugged in is still the choice, and says so, rather than the menu
+  /// quietly ticking nothing; with what the sound goes out of until it is back. And why nothing
+  /// can be heard, while nothing can.
+  @MainActor
+  static func missingOutput(_ session: Session) -> [MenuItem] {
+    var items: [MenuItem] = []
+    if let chosen = session.outputDevice, !session.outputs.contains(where: { $0.id == chosen }) {
+      items.append(
+        .command("\(session.outputDeviceName ?? "A Device") (Not Connected)", id: outputPrefix + chosen))
+      if let playing = session.playingThrough {
+        items.append(.command("Playing Through \(playing.name) Until It Is Back", id: audioNote))
+      }
+    }
+    if let error = session.outputError { items.append(.command(error, id: audioNote)) }
+    return items.isEmpty ? [] : [.separator] + items
   }
 }
