@@ -560,8 +560,12 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    clicked as the Mac's cells are, one drag one undo. The players have theirs: the Chord Loom's
    voices and its held Alter, the Arp Field's rhythm and the figure it walks — both from
    `RackPreview`, now shared and held to the reference on every platform — and the Combinator's
-   rotaries, buttons, MIDI learn and routing written out. Next: the samplers and the groovebox,
-   and the Combinator's routing editor, which show as the generic face or not at all until then.
+   rotaries, buttons, MIDI learn and routing written out. The Slice Lab and the Audio Track have
+   theirs, a WAV chosen from the face or dropped on it — the window takes files dropped from
+   Explorer, and a song dropped where no face takes it opens — and the window now drains the main
+   dispatch queue each frame, so `@MainActor` work that awaits, as loading a file does, finishes.
+   Next: the Multisampler's Key Atlas, the groovebox and the Combinator's routing editor, which
+   show as the generic face or not at all until then.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift

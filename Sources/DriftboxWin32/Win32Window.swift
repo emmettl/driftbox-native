@@ -4,6 +4,13 @@
   import Synchronization
   import WinSDK
 
+  /// Everything waiting on the main dispatch queue, run: what `@MainActor` work is waiting on, which
+  /// libdispatch runs from CoreFoundation's run loop. That loop is no use in a Win32 app's own:
+  /// on Windows it takes window messages too, past `TranslateAccelerator`, so shortcuts would go
+  /// missing. This is the entry point it drains the queue by, and nothing more.
+  @_silgen_name("_dispatch_main_queue_callback_4CF")
+  private func drainMainQueue(_ message: UnsafeMutableRawPointer?)
+
   /// A top-level window and the messages that arrive for it: `ShellWindow` on Windows.
   ///
   /// The process is made aware of each monitor's DPI before the first window, so a window's size
@@ -74,6 +81,8 @@
       handle = made
       mailbox.open(made)
       self.scale = Float(GetDpiForWindow(made)) / 96
+      // Files dropped on it, from Explorer: a sample onto a sampler, a song onto the window.
+      DragAcceptFiles(made, true)
       var client = RECT()
       GetClientRect(made, &client)
       self.width = Int(client.right - client.left)
@@ -102,6 +111,10 @@
     /// Windows' own applications take them. False once the window has been closed.
     @discardableResult
     public func pump() -> Bool {
+      // What the main actor has been handed — the rest of an async load, once its file is read —
+      // which waits on the main dispatch queue, and nothing else here drains it. Only the main thread
+      // may; a window pumped from another, as a test's may be, leaves it be.
+      if Thread.isMainThread { drainMainQueue(nil) }
       var message = MSG()
       while PeekMessageW(&message, nil, 0, 0, UINT(PM_REMOVE)) {
         if let accelerators = menus?.accelerators, !isText(message),
@@ -309,6 +322,20 @@
               modifiers: Win32Input.modifiers())))
         return 0
 
+      case UINT(WM_DROPFILES):
+        guard let drop = HDROP(bitPattern: UInt(wParam)) else { return 0 }
+        defer { DragFinish(drop) }
+        var at = POINT()
+        DragQueryPoint(drop, &at)
+        let count = DragQueryFileW(drop, 0xFFFF_FFFF, nil, 0)
+        let urls = (0..<count).map { index in
+          let length = DragQueryFileW(drop, index, nil, 0)
+          var name = [WCHAR](repeating: 0, count: Int(length) + 1)
+          DragQueryFileW(drop, index, &name, length + 1)
+          return URL(fileURLWithPath: String(decoding: name.prefix(Int(length)), as: UTF16.self))
+        }
+        if !urls.isEmpty { onEvent?(.dropped(urls, at: point(SIMD2(Float(at.x), Float(at.y))))) }
+        return 0
       case UINT(WM_COMMAND):
         let id = Int(wParam & 0xFFFF)
         if let command = menus?.command(id), isEnabled?(command.id) ?? true {

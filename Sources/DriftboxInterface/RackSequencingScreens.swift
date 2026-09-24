@@ -103,6 +103,12 @@ extension RackInterface {
   func drawCell(_ cell: RackStage.Cell, lit: Bool, on canvas: Canvas) {
     let r = cell.frame
     let fade = cell.opacity
+    if let caption = cell.caption {
+      canvas.align = .right
+      canvas.font = Theme.mono(7.5)
+      canvas.fill = Theme.dim.faded(fade)
+      canvas.fillText(caption, r.x - 4, r.midY + 3)
+    }
     let playing = cell.isStep && cell.value != 0
     canvas.fill = (playing ? Theme.three : Colour(0x000000, alpha: 0.35)).faded(fade)
     canvas.fillRoundedRect(r.x, r.y, r.width, r.height, radius: 3)

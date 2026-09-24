@@ -90,6 +90,8 @@ public struct RackStage {
     public var markTint: Colour?
     /// The name the title gives, where the face has one of its own.
     public var name: String?
+    /// A light before the words: lit when the module has what it needs, as a loaded sample.
+    public var light: Bool?
     /// Where a face that meters draws what it reads: a tuner's display, a meter's, a looper's.
     public var screen: Rect?
     /// Buttons that set a param to a value, as a looper's transport does.
@@ -110,13 +112,17 @@ public struct RackStage {
     case hold(param: String)
     /// Learn a controller for a param: or stop waiting for one, or, with Shift, forget it.
     case learn(param: String)
+    /// Choose a file to load into the module.
+    case choose
+    /// Take the sample to be this many bars long.
+    case sampleBars(Int)
 
     /// The param it sets, if it sets one.
     public var param: String? {
       switch self {
       case .set(let param, _): param
       case .data(_, _, _, let then, _): then
-      case .page, .learn: nil
+      case .page, .learn, .choose, .sampleBars: nil
       case .hold(let param): param
       }
     }
@@ -145,6 +151,12 @@ public struct RackStage {
       case learn(armed: Bool, bound: Bool)
       /// A combinator's button, marked when it drives anything.
       case pad(live: Bool)
+      /// One of a sampler's slices, a beat's first edged brighter.
+      case slice(accent: Bool)
+      /// A screen with nothing on it yet, asking for a file: its label, and `detail` under it.
+      case prompt(detail: String)
+      /// As a stepper's buttons are.
+      case chip
     }
     public var frame: Rect
     public var label: String
@@ -172,6 +184,12 @@ public struct RackStage {
     public var click: Press?
     /// Drawn as a step, lit when it plays, or as a plain number.
     public var isStep = false
+    /// A param it sets rather than a slot it writes: `offset` and `scale` times its value.
+    public var param: (id: String, offset: Double, scale: Double)?
+    /// Points of drag, in the rack's units, for one step of it.
+    public var step: Float = 4
+    /// Its name, beside it at the left.
+    public var caption: String?
     /// The first step of a beat, edged a little brighter.
     public var accent = false
     public var opacity: Float = 1
@@ -267,7 +285,7 @@ public struct RackStage {
         module: module, def: def, span: placement.span, frame: frame, title: title, words: built.words,
         wordsTint: built.wordsTint, wordsFont: built.wordsFont, controls: built.cells.controls,
         mark: built.mark,
-        markTint: built.markTint, name: built.name,
+        markTint: built.markTint, name: built.name, light: built.light,
         screen: built.screen, buttons: built.buttons, cells: built.dataCells)
     }
     var cells = RackFaces.Cells(
