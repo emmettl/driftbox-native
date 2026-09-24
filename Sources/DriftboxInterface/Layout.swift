@@ -147,6 +147,8 @@ public struct Layout {
   /// Where the song's name and the transport's readout go, between the chips.
   public var title: Rect
   public var readout: Rect
+  /// The numbers dragged in the readout: the tempo, unless an outside clock sets it, and the swing.
+  public var numbers: [Knob] = []
 
   /// The song's strip under the transport, and its sections, or nil with no song.
   public var strip: Rect?
@@ -204,6 +206,14 @@ public struct Layout {
     let middle = max(left, (left + fxChip.x - 12) / 2)
     title = Rect(left, bar.y, max(0, middle - left), bar.height)
     readout = Rect(middle, bar.y, max(0, fxChip.x - 12 - middle), bar.height)
+    if session.song != nil {
+      let swing = Rect(readout.maxX - 82, chipY, 82, chipHeight)
+      numbers.append(Knob(target: .songSwing, dial: swing, cell: swing))
+      if session.followedBPM == nil {
+        let tempo = Rect(swing.x - 4 - 76, chipY, 76, chipHeight)
+        numbers.insert(Knob(target: .tempo, dial: tempo, cell: tempo), at: 0)
+      }
+    }
 
     guard let song = session.song else { return }
     let strip = Rect(margin, bar.maxY + margin, bar.width, Self.stripHeight)
@@ -291,6 +301,7 @@ public struct Layout {
   /// What pressing at `point` would do, if anything.
   public func action(at point: SIMD2<Float>) -> Action? {
     if let chip = chips.first(where: { $0.frame.contains(point) }) { return chip.action }
+    if let number = numbers.first(where: { $0.cell.contains(point) }) { return .knob(number.target) }
     if let section = sections.first(where: { $0.frame.contains(point) }) { return .seek(bar: section.start) }
     if let inspector, inspector.frame.contains(point) {
       if let chip = inspector.chips.first(where: { $0.frame.contains(point) }) { return chip.action }

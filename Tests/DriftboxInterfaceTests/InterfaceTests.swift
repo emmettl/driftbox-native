@@ -441,6 +441,40 @@ struct InterfaceTests {
     #expect(!interface.showsEffects && interface.layout.inspector?.voice == "909.bd", "the voice's again")
   }
 
+  /// The tempo and the swing are numbers dragged up and down in the transport: half a unit a
+  /// point, whole units only, heard when let go, and not put back by a second press, since a
+  /// number has no place it belongs.
+  @Test func theTempoAndSwingAreDragged() throws {
+    let interface = try Self.interface()
+    let session = interface.session
+    let layout = interface.layout
+    #expect(layout.numbers.map(\.target) == [.tempo, .songSwing])
+    let tempo = try #require(layout.numbers.first { $0.target == .tempo })
+    #expect(tempo.cell.maxX <= layout.readout.maxX && tempo.cell.y >= layout.bar.y)
+    let at = Self.centre(tempo.cell)
+
+    _ = interface.pointer(PointerEvent(phase: .began, location: at))
+    _ = interface.pointer(PointerEvent(phase: .moved, location: at - SIMD2(0, 19)))
+    #expect(interface.turning?.value == 130, "nine and a half, to the nearest whole")
+    _ = interface.pointer(PointerEvent(phase: .ended, location: at - SIMD2(0, 19)))
+    #expect(session.song?.bpm == 130)
+    #expect(session.undoTitle == "Undo Set Tempo")
+    Self.click(interface, at)
+    Self.click(interface, at)
+    #expect(session.song?.bpm == 130, "two presses leave it be")
+
+    let swing = Self.centre(try #require(layout.numbers.first { $0.target == .songSwing }).cell)
+    _ = interface.pointer(PointerEvent(phase: .began, location: swing))
+    _ = interface.pointer(PointerEvent(phase: .moved, location: swing + SIMD2(0, 40)))
+    _ = interface.pointer(PointerEvent(phase: .ended, location: swing + SIMD2(0, 40)))
+    #expect(session.song?.swing == 0, "no less than none")
+    _ = interface.pointer(PointerEvent(phase: .began, location: swing))
+    _ = interface.pointer(PointerEvent(phase: .moved, location: swing - SIMD2(0, 30)))
+    _ = interface.pointer(PointerEvent(phase: .ended, location: swing - SIMD2(0, 30)))
+    #expect(session.song?.swing == 0.15)
+    #expect(session.undoTitle == "Undo Set Swing")
+  }
+
   /// Narrow, the columns keep to a size that can still be hit; wide, they stop growing.
   @Test func theColumnsStretchBetweenLimits() {
     #expect(GridMetrics(steps: 16, width: 200).stride == GridMetrics.minimumStride)

@@ -64,7 +64,7 @@ public struct KnobSpec: Sendable {
   ]
 }
 
-/// What a knob turns, in the song.
+/// What a knob turns, in the song; or a number dragged up and down, which is a knob with no knob.
 public enum KnobTarget: Hashable, Sendable {
   /// One of a drum voice's six.
   case voice(String, Int)
@@ -76,16 +76,42 @@ public enum KnobTarget: Hashable, Sendable {
   case swing(String)
   /// One of the song's effects.
   case fx(Int)
+  /// The song's tempo, in beats a minute.
+  case tempo
+  /// The song's swing, in percent.
+  case songSwing
 
   public var spec: KnobSpec {
     switch self {
     case .voice(_, let knob): KnobSpec.voice[knob]
     case .bass(_, let knob): KnobSpec.bass[knob]
     case .send(_, let knob): KnobSpec.sends[knob]
-    case .swing: KnobSpec(label: "Swing")
+    case .swing, .songSwing: KnobSpec(label: "Swing")
     case .fx(let knob): KnobSpec.fx[knob]
+    case .tempo: KnobSpec(label: "BPM")
     }
   }
+
+  /// Where it can go. A knob's travel is 0...1; a number's is its own.
+  public var range: ClosedRange<Double> {
+    switch self {
+    case .tempo: 20...300
+    case .songSwing: 0...100
+    default: 0...1
+    }
+  }
+
+  /// How far a point of drag takes it. A knob's whole travel is 170 points; a number moves half
+  /// a unit a point, as a hardware tempo display's data wheel does, and only in whole units.
+  public var perPoint: Double {
+    switch self {
+    case .tempo, .songSwing: 0.5
+    default: 1.0 / 170
+    }
+  }
+
+  /// Whether it is a number, which moves in whole units, rather than a knob.
+  public var isNumber: Bool { self == .tempo || self == .songSwing }
 
   /// Where it is in `song`.
   public func value(in song: Song) -> Double {
@@ -95,26 +121,36 @@ public enum KnobTarget: Hashable, Sendable {
     case .send(let id, let knob): (song.kit.sends[id] ?? SendLevels())[knob]
     case .swing(let id): song.kit.swing[id] ?? 0.5
     case .fx(let knob): song.fx[knob]
+    case .tempo: song.bpm
+    case .songSwing: song.swing * 100
     }
   }
 
-  /// Where it started life, which a double-click puts it back to.
-  public var rest: Double {
+  /// Where it started life, which a double-click puts it back to; nil for a number, which has no
+  /// place it belongs.
+  public var rest: Double? {
     switch self {
     case .voice(_, let knob): VoiceParams.defaults[knob]
     case .bass(_, let knob): BassParams.defaults[knob]
     case .send(_, let knob): SendLevels.defaults[knob]
     case .swing: 0.5
     case .fx(let knob): FxParams.defaults[knob]
+    case .tempo, .songSwing: nil
     }
   }
 
   /// What it says it is at `value` in `song`. A voice's swing says how much the voice swings, with
   /// a dot before it while it swings as the song does.
   public func format(_ value: Double, in song: Song) -> String {
-    guard case .swing = self else { return spec.format(value) }
-    let effective = Int((max(0, min(1, song.swing + (value - 0.5) * 2)) * 100).rounded())
-    return value == 0.5 ? "· \(effective)" : "\(effective)"
+    switch self {
+    case .swing:
+      let effective = Int((max(0, min(1, song.swing + (value - 0.5) * 2)) * 100).rounded())
+      return value == 0.5 ? "· \(effective)" : "\(effective)"
+    case .tempo, .songSwing:
+      return "\(Int(value.rounded()))"
+    default:
+      return spec.format(value)
+    }
   }
 
   /// What its edit is called, for Undo.
@@ -122,6 +158,8 @@ public enum KnobTarget: Hashable, Sendable {
     switch self {
     case .send: "Set \(spec.label) Send"
     case .swing: "Set Voice Swing"
+    case .tempo: "Set Tempo"
+    case .songSwing: "Set Swing"
     default: "Set \(spec.label)"
     }
   }
@@ -145,6 +183,10 @@ public enum KnobTarget: Hashable, Sendable {
       song.kit.swing[id] = value
     case .fx(let knob):
       song.fx[knob] = value
+    case .tempo:
+      song.bpm = value.rounded()
+    case .songSwing:
+      song.swing = value.rounded() / 100
     }
   }
 }

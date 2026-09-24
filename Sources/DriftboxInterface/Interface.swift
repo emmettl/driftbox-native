@@ -75,9 +75,13 @@ public final class Interface {
       return true
     case .moved:
       if var turn = turning, turn.pointer == event.id {
-        // Up turns it up. Option held turns it a quarter as fast, for fine work.
-        let travel = Self.travel * (event.modifiers.contains(.option) ? 4 : 1)
-        turn.value = max(0, min(1, turn.from + Double((turn.fromY - event.location.y) / travel)))
+        // Up turns it up. Option held turns it slower, for fine work: a knob a quarter as fast, a
+        // number a fifth.
+        let target = turn.target
+        let fine = event.modifiers.contains(.option) ? (target.isNumber ? 0.2 : 0.25) : 1
+        let moved = turn.from + Double(turn.fromY - event.location.y) * target.perPoint * fine
+        let value = min(target.range.upperBound, max(target.range.lowerBound, moved))
+        turn.value = target.isNumber ? value.rounded() : value
         turning = turn
       }
       return pressed?.pointer == event.id
@@ -112,9 +116,6 @@ public final class Interface {
   public private(set) var turning: Turn?
   /// A knob pressed and let go without turning, and when: a second, soon after, puts it back.
   private var lastTap: (target: KnobTarget, at: ContinuousClock.Instant)?
-  /// Points of drag for a knob's whole travel.
-  public static let travel: Float = 170
-
   private func finish(_ turn: Turn) {
     if turn.value != turn.from {
       session.edit(turn.target.editName) { turn.target.set(turn.value, in: &$0) }
@@ -124,8 +125,8 @@ public final class Interface {
     let now = ContinuousClock.now
     if let last = lastTap, last.target == turn.target, now - last.at < .milliseconds(400) {
       lastTap = nil
-      if turn.from != turn.target.rest {
-        session.edit(turn.target.editName) { turn.target.set(turn.target.rest, in: &$0) }
+      if let rest = turn.target.rest, turn.from != rest {
+        session.edit(turn.target.editName) { turn.target.set(rest, in: &$0) }
       }
     } else {
       lastTap = (turn.target, now)
@@ -258,22 +259,55 @@ public final class Interface {
     canvas.fillText(session.song == nil ? "No song" : session.documentName, layout.title.x, baseline)
     canvas.restore()
 
-    guard session.song != nil else { return }
+    guard let song = session.song else { return }
     canvas.save()
     canvas.clip(layout.readout.x, layout.readout.y, layout.readout.width, layout.readout.height)
-    canvas.font = Theme.mono(11)
+    // The tempo and the swing, set by dragging; or, while an outside clock sets the tempo, what it
+    // is, in the 303's amber, which is nobody's to drag.
+    for number in layout.numbers {
+      drawNumber(number, song: song, on: canvas)
+    }
+    var right = layout.numbers.map(\.cell.x).min() ?? layout.readout.maxX
+    if let followed = session.followedBPM {
+      canvas.align = .right
+      canvas.font = Theme.mono(14, weight: 600)
+      canvas.fill = Theme.three
+      let text = String(format: "%.1f", followed)
+      let width = canvas.measure(text)
+      canvas.fillText(text, right - 12, baseline + 1)
+      canvas.font = Theme.mono(8.5, weight: 500)
+      canvas.fill = Theme.dim
+      canvas.fillText("EXT", right - 18 - width, baseline)
+      right -= 100
+    }
     canvas.align = .right
-    let bpm = session.tempo
-    let tempo = bpm == bpm.rounded() ? "\(Int(bpm))" : String(format: "%.1f", bpm)
-    canvas.fill = Theme.dim
-    canvas.fillText("\(tempo) BPM", layout.readout.maxX, baseline)
-    let tempoWidth = canvas.measure("\(tempo) BPM")
+    canvas.font = Theme.mono(11)
     let bar = (session.position?.bar ?? 0) + 1
     let step = (session.position?.step ?? 0) + 1
     canvas.fill = session.isPlaying ? Theme.live : Theme.ink
-    canvas.fillText(
-      "BAR \(bar)  \(step)/\(layout.pattern?.length ?? 16)", layout.readout.maxX - tempoWidth - 18, baseline)
+    canvas.fillText("BAR \(bar)  \(step)/\(layout.pattern?.length ?? 16)", right - 14, baseline)
     canvas.restore()
+  }
+
+  /// A number set by dragging it up and down, as a hardware tempo display is set with its data
+  /// wheel: its name small, its value large, lit while it is being dragged.
+  private func drawNumber(_ number: Layout.Knob, song: Song, on canvas: Canvas) {
+    let frame = number.cell
+    let dragging = turning?.target == number.target
+    let value = dragging ? turning!.value : number.target.value(in: song)
+    if dragging || isHovered(frame) {
+      canvas.fill = Theme.white(0.07)
+      canvas.fillRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: 6)
+    }
+    let baseline = frame.y + frame.height / 2 + 5
+    canvas.align = .left
+    canvas.font = Theme.mono(8.5, weight: 500)
+    canvas.fill = Theme.dim
+    canvas.fillText(number.target.spec.label.uppercased(), frame.x + 7, baseline - 1)
+    canvas.align = .right
+    canvas.font = Theme.mono(14, weight: 600)
+    canvas.fill = dragging ? Theme.nine : Theme.ink.faded(0.9)
+    canvas.fillText(number.target.format(value, in: song), frame.maxX - 7, baseline + 1)
   }
 
   /// A button as the web draws one: a dark rounded chip with a hairline edge that brightens under
