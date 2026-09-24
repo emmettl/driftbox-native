@@ -552,9 +552,11 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    its module. The faces the reference builds by hand are coming across as `RackFaces`, laid out
    into the same controls: the VCO, Ladder, Out and MIDI have theirs, and the faces that meter —
    the tuner, the VU meter's needle, lights and scope, and the looper's screen and transport —
-   draw what the render thread last copied out, the rack ticked with every frame. Next: the
-   sequencers and players, the samplers and the groovebox, which show as the generic face until
-   then.
+   draw what the render thread last copied out, the rack ticked with every frame. The faces that
+   edit what a module plays have theirs too: the Tracker's lanes a bar at a time, the Arranger's
+   sections, the Scale Player's keyboard and the Note Echo's pulses, their numbers dragged and
+   clicked as the Mac's cells are, one drag one undo. Next: the players, the samplers and the
+   groovebox, which show as the generic face until then.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift

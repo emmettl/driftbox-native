@@ -20,6 +20,11 @@ public enum RackTarget: Equatable, Sendable {
   case option(module: String, param: String, value: Int)
   /// A choice of more than three, stepped down or up.
   case step(module: String, param: String, by: Int)
+  /// One of a face's own buttons, by its place in the face's list.
+  case button(module: String, index: Int)
+  /// One of a face's numbers, dragged for its value and clicked to act: a tracker's step, an
+  /// arranger's section.
+  case cell(module: String, index: Int)
 }
 
 /// Where everything on the rack is, for a window `size` points across: the header in points, and
@@ -76,22 +81,85 @@ public struct RackStage {
     /// A model mark after the name, in its own colour.
     public var mark: String?
     public var markTint: Colour?
+    /// The name the title gives, where the face has one of its own.
+    public var name: String?
     /// Where a face that meters draws what it reads: a tuner's display, a meter's, a looper's.
     public var screen: Rect?
     /// Buttons that set a param to a value, as a looper's transport does.
     public var buttons: [Button] = []
+    public var cells: [Cell] = []
   }
 
-  /// A button on a face that sets one param to one value.
+  /// What a press on one of a face's own buttons or numbers does.
+  public enum Press: Equatable, Sendable {
+    /// Set a param.
+    case set(param: String, value: Double)
+    /// Write a data slot, one step of undo called `name`; and then set a param, where `then` says one.
+    case data(slot: String, values: [Double], name: String, then: String? = nil, to: Double = 0)
+    /// Show another bar of a face's steps.
+    case page(Int)
+
+    /// The param it sets, if it sets one.
+    public var param: String? {
+      switch self {
+      case .set(let param, _): param
+      case .data(_, _, _, let then, _): then
+      case .page: nil
+      }
+    }
+  }
+
+  /// A button on a face of its own.
   public struct Button {
+    public enum Style: Equatable, Sendable {
+      /// A looper's transport: small capitals, lit in its colour.
+      case transport
+      /// As a choice's buttons are.
+      case option
+      /// Words only, as a tracker lane's mode is.
+      case tag
+      /// A key of a scale's keyboard.
+      case key(black: Bool, root: Bool)
+      /// One of an echo's pulses, as tall as its velocity.
+      case pulse(amount: Double)
+    }
     public var frame: Rect
     public var label: String
-    public var param: String
-    public var value: Int
+    public var press: Press?
     public var isOn: Bool
     public var tint: Colour
     /// The label's colour while it is off, where it is not the usual.
     public var text: Colour?
+    public var style: Style = .transport
+    /// Faint when it does nothing, or its lane is muted.
+    public var opacity: Float = 1
+  }
+
+  /// A number on a face that a drag changes and a click acts on, written into a data slot.
+  public struct Cell {
+    public var frame: Rect
+    public var value: Int
+    public var range: ClosedRange<Int>
+    /// Where it is written: the slot, the place in it, and what the slot is padded with to reach it.
+    public var slot: String
+    public var index: Int
+    public var padTo: Int
+    public var pad: Double
+    public var name: String
+    public var click: Press?
+    /// Drawn as a step, lit when it plays, or as a plain number.
+    public var isStep = false
+    /// The first step of a beat, edged a little brighter.
+    public var accent = false
+    public var opacity: Float = 1
+
+    /// The slot with this cell set to `value`.
+    func written(_ value: Int, in data: [Double]) -> [Double] {
+      var values = data
+      while values.count < max(padTo, index + 1) { values.append(pad) }
+      values[index] = Double(value)
+      return values
+    }
   }
 
   public var size: SIMD2<Float>
@@ -117,7 +185,8 @@ public struct RackStage {
   public var maxScroll: Float
 
   @MainActor
-  public init(rack: RackSession, size: SIMD2<Float>, scroll: Float = 0) {
+  /// `pages` is the bar each face with more than one shows, by module.
+  public init(rack: RackSession, size: SIMD2<Float>, scroll: Float = 0, pages: [String: Int] = [:]) {
     self.size = size
     let margin = Self.margin
     header = Rect(margin, margin, max(0, size.x - margin * 2), Self.headerHeight)
@@ -150,7 +219,7 @@ public struct RackStage {
     let modules = Dictionary(rack.patch.modules.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     faces = layout.placements.compactMap { placement in
       guard let module = modules[placement.id] else { return nil }
-      return Self.face(module, placement, rack: rack)
+      return Self.face(module, placement, rack: rack, page: pages[module.id] ?? 0)
     }
   }
 
@@ -158,7 +227,9 @@ public struct RackStage {
   /// hand-built face lays them out, or as the generic face does — a cell for every param a hand
   /// could set, three across on a half-width module and seven on a full one.
   @MainActor
-  static func face(_ module: PatchModule, _ placement: RackLayout.Placement, rack: RackSession) -> Face {
+  static func face(
+    _ module: PatchModule, _ placement: RackLayout.Placement, rack: RackSession, page: Int = 0
+  ) -> Face {
     let frame = Rect(
       Float(placement.x) + 3, Float(placement.y) + 3, Float(placement.width) - 6, Float(placement.height) - 6)
     let def = RackModules.registry[module.type]
@@ -168,12 +239,12 @@ public struct RackStage {
       return Face(
         module: module, def: nil, span: placement.span, frame: frame, title: title, words: "", controls: [])
     }
-    if let built = RackFaces.face(module, def, frame: frame, top: top, rack: rack) {
+    if let built = RackFaces.face(module, def, frame: frame, top: top, rack: rack, page: page) {
       return Face(
         module: module, def: def, span: placement.span, frame: frame, title: title, words: built.words,
         wordsTint: built.wordsTint, controls: built.cells.controls, mark: built.mark,
-        markTint: built.markTint,
-        screen: built.screen, buttons: built.buttons)
+        markTint: built.markTint, name: built.name,
+        screen: built.screen, buttons: built.buttons, cells: built.dataCells)
     }
     var cells = RackFaces.Cells(
       def: def, x: frame.x + 12, top: top, columns: RackLayout.columns(for: placement.span))
@@ -212,8 +283,11 @@ public struct RackStage {
     let at = design(point)
     guard let face = faces.first(where: { $0.frame.contains(at) }) else { return nil }
     let id = face.module.id
-    if let button = face.buttons.first(where: { $0.frame.contains(at) }) {
-      return .option(module: id, param: button.param, value: button.value)
+    if let index = face.buttons.firstIndex(where: { $0.frame.contains(at) }) {
+      return .button(module: id, index: index)
+    }
+    if let index = face.cells.firstIndex(where: { $0.frame.contains(at) }) {
+      return .cell(module: id, index: index)
     }
     for control in face.controls where control.cell.contains(at) {
       let param = control.param.id

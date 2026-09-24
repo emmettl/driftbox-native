@@ -19,11 +19,18 @@ extension RackInterface {
         drawPeak(face, reading: reading, on: canvas)
         drawMeter(screen, face: face, reading: reading, on: canvas)
       case "looper": drawLooper(screen, face: face, reading: reading, on: canvas)
+      case "scale-player": drawScaleScreen(screen, face: face, on: canvas)
+      case "note-echo": drawEchoScreen(screen, face: face, on: canvas)
       default: break
       }
     }
+    if face.module.type == "arranger" { drawArrangerLabels(face, on: canvas) }
     for button in face.buttons {
       drawButton(button, hovered: hovered.map(button.frame.contains) ?? false, on: canvas)
+    }
+    for (index, cell) in face.cells.enumerated() {
+      let held = turning?.target == .cell(module: face.module.id, index: index)
+      drawCell(cell, lit: held || hovered.map(cell.frame.contains) == true, on: canvas)
     }
   }
 
@@ -276,6 +283,12 @@ extension RackInterface {
 
   /// A transport button: small capitals, lit in its colour when it is the one chosen.
   func drawButton(_ button: RackStage.Button, hovered: Bool, on canvas: Canvas) {
+    switch button.style {
+    case .transport: break
+    case .option, .tag: return drawOption(button, hovered: hovered, on: canvas)
+    case .key(let black, let root): return drawKey(button, black: black, root: root, on: canvas)
+    case .pulse(let amount): return drawPulse(button, amount: amount, on: canvas)
+    }
     let r = button.frame
     if button.isOn {
       canvas.fill = button.tint.faded(0.25)

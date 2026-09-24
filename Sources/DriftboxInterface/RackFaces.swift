@@ -17,6 +17,10 @@ public enum RackFaces {
     "tuner": ["reference", "mute"],
     "meter": ["mode", "gain", "release"],
     "looper": ["mode", "clear", "feedback", "dry", "loop"],
+    "tracker": Set(["length", "pattern"] + (1...4).flatMap { ["mute\($0)", "unit\($0)"] }),
+    "arranger": ["length"],
+    "scale-player": ["key", "scale", "filter"],
+    "note-echo": Set(echoKnobs),
   ]
 
   static let shapes = ["Saw", "Pulse", "Tri"]
@@ -71,16 +75,19 @@ public enum RackFaces {
     var wordsTint: Colour?
     var cells: Cells
     var mark: String?
+    var name: String?
     var markTint: Colour?
     var screen: Rect?
     var buttons: [RackStage.Button] = []
+    var dataCells: [RackStage.Cell] = []
   }
 
-  /// The face `def`'s module has of its own, on its panel `frame` from `top` down; nil for the generic.
+  /// The face `def`'s module has of its own, on its panel `frame` from `top` down, showing bar `page`
+  /// where it has more than one; nil for the generic.
   @MainActor
-  static func face(_ module: PatchModule, _ def: ModuleDef, frame: Rect, top: Float, rack: RackSession)
-    -> Built?
-  {
+  static func face(
+    _ module: PatchModule, _ def: ModuleDef, frame: Rect, top: Float, rack: RackSession, page: Int = 0
+  ) -> Built? {
     // Inside the panel's padding, as the Mac's faces sit in theirs.
     let x = frame.x + 12
     let width = frame.width - 24
@@ -142,7 +149,7 @@ public enum RackFaces {
       cells.add("release", tint: Theme.three)
       let reading = rack.readings[module.id]
       return Built(
-        words: RackDisplay.meterLabel(reading?.level ?? 0), cells: cells, mark: "VU—3",
+        words: RackDisplay.meterLabel(reading?.level ?? 0), cells: cells, mark: "VU—3", name: "Signal Bureau",
         screen: Rect(x, top, max(0, width - controls - 10), bottom - top))
     case "looper":
       // The loop station: what is in the loop, its transport, and its mix.
@@ -162,17 +169,26 @@ public enum RackFaces {
             left + Float(index % 2) * (buttonWidth + 4), top + Float(index / 2) * (rowHeight + 4),
             buttonWidth,
             rowHeight),
-          label: loopModes[index], param: "mode", value: index, isOn: mode == index,
+          label: loopModes[index], press: .set(param: "mode", value: Double(index)), isOn: mode == index,
           tint: index == 1 || index == 3 ? Theme.eight : Theme.nine)
       }
       // Clear is pressed, not held: each press turns the param over, and the looper hears the turn.
       buttons.append(
         RackStage.Button(
-          frame: Rect(left, top + (rowHeight + 4) * 2, transport, rowHeight), label: "CLEAR", param: "clear",
-          value: value("clear") >= 0.5 ? 0 : 1, isOn: false, tint: Theme.eight, text: Theme.eight.faded(0.7)))
+          frame: Rect(left, top + (rowHeight + 4) * 2, transport, rowHeight), label: "CLEAR",
+          press: .set(param: "clear", value: value("clear") >= 0.5 ? 0 : 1), isOn: false, tint: Theme.eight,
+          text: Theme.eight.faded(0.7)))
       return Built(
         words: "stereo · session", cells: cells, mark: "LS—30",
         screen: Rect(x, top, max(0, left - 9 - x), bottom - top), buttons: buttons)
+    case "tracker":
+      return tracker(module, def, x: x, width: width, top: top, bottom: bottom, rack: rack, page: page)
+    case "arranger":
+      return arranger(module, def, x: x, width: width, top: top, bottom: bottom, rack: rack)
+    case "scale-player":
+      return scalePlayer(module, def, x: x, width: width, top: top, rack: rack)
+    case "note-echo":
+      return noteEcho(module, def, x: x, width: width, top: top, rack: rack)
     default:
       return nil
     }
