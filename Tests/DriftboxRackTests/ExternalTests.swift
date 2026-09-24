@@ -161,12 +161,11 @@ struct ExternalTests {
     graph.setParam(slot: note, value: 48, voice: 0)
     graph.setParam(slot: note, value: 55, voice: 1)
     graph.setParam(slot: velocity, value: 0.5, voice: 0)
-    // On block boundaries: a stepped param changed partway through a block keeps its old value at
-    // the head of every block after, in the reference's graph as in this one.
-    graph.setParam(slot: gate, value: 1, voice: 0, frame: 256)
-    graph.setParam(slot: gate, value: 1, voice: 1, frame: 384)
-    graph.setParam(slot: gate, value: 0, voice: 0, frame: 640)
-    graph.setParam(slot: gate, value: 0, voice: 1, frame: 896)
+    // Partway through blocks, and held across the blocks after: emmettl/driftbox#309.
+    graph.setParam(slot: gate, value: 1, voice: 0, frame: 200)
+    graph.setParam(slot: gate, value: 1, voice: 1, frame: 300)
+    graph.setParam(slot: gate, value: 0, voice: 0, frame: 600)
+    graph.setParam(slot: gate, value: 0, voice: 1, frame: 900)
     // Legato: the held voice's pitch glides up two semitones across a block, each note it passes
     // ending the one before.
     graph.setParam(slot: note, value: 57, voice: 1, frame: 512)
@@ -182,8 +181,8 @@ struct ExternalTests {
       events == [
         // A fresh instance lets go of anything left sounding, then says where mod, bend and sustain are.
         [0, 0xB0_7B00], [0, 0xB0_0100], [0, 0xE0_0040], [0, 0xB0_4000],
-        [256, 0x90_3040], [384, 0x90_3766], [543, 0x80_3700], [543, 0x90_3866], [607, 0x80_3800],
-        [607, 0x90_3966], [640, 0x80_3000], [896, 0x80_3900],
+        [200, 0x90_3040], [300, 0x90_3766], [543, 0x80_3700], [543, 0x90_3866], [600, 0x80_3000],
+        [607, 0x80_3800], [607, 0x90_3966], [900, 0x80_3900],
       ], "\(events.map { ($0[0], String($0[1], radix: 16)) })")
   }
 }
