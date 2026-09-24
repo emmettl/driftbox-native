@@ -269,14 +269,18 @@ public final class Interface {
     case .loop: session.loopSection()
     case .metronome: session.metronome.toggle()
     case .select(let voice):
-      // Its knobs, in the effects' place if they are there.
+      // Its knobs, in the effects' place if they are there. On a phone, where they are a sheet
+      // at the foot of the screen, the 303 keyboard goes: there is no room for both.
       session.selectedVoice = session.selectedVoice == voice && !showsEffects ? nil : voice
       showsEffects = false
+      bassSelection = nil
     case .show(let voice):
       session.selectedVoice = voice
       showsEffects = false
+      bassSelection = nil
     case .effects:
       showsEffects.toggle()
+      bassSelection = nil
     case .filterStep(let pattern, let index):
       session.editPattern(pattern, "Set Filter Step") { $0.cyclingPCF(at: index) }
     case .step(let pattern, let voice, let index):
@@ -355,6 +359,9 @@ public final class Interface {
       return
     }
     bassSelection = (voice, index)
+    // The keyboard in place of the knobs' sheet, which there is no room for beside it.
+    session.selectedVoice = nil
+    showsEffects = false
     page = index / GridMetrics.pageSteps
     followsPage = false
     if !keepingOctave, let note = session.shownPattern?.bassStep(voice, at: index).note.map({ Int($0) }),

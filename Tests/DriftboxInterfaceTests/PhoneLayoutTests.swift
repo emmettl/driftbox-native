@@ -114,6 +114,38 @@ struct PhoneLayoutTests {
     #expect(interface.session.song?.bpm == 130, "twenty points up, ten beats a minute faster")
   }
 
+  /// A voice's knobs, and the effects, as a sheet across the foot of the screen, with the grid
+  /// above it rather than under it; and a knob on it turned with a finger.
+  @Test func theKnobsAreASheet() throws {
+    let interface = try Self.phone()
+    let lane = try #require(interface.layout.lanes.first)
+    InterfaceTests.click(interface, InterfaceTests.centre(lane.header))
+    var layout = interface.layout
+    var sheet = try #require(layout.inspector)
+    #expect(sheet.voice == lane.voice.id)
+    #expect(sheet.frame.x == layout.bar.x && sheet.frame.width == layout.bar.width, "across the screen")
+    #expect(sheet.frame.maxY == 828 - Layout.margin, "at its foot: \(sheet.frame)")
+    let grid = try #require(layout.grid)
+    #expect(grid.maxY <= sheet.frame.y, "the grid above it: \(grid)")
+    #expect(sheet.knobs.allSatisfy { $0.cell.width >= 80 && $0.cell.maxX <= sheet.frame.maxX }, "roomy knobs")
+
+    let level = try #require(sheet.knobs.first)
+    let before = level.target.value(in: try #require(interface.session.song))
+    let from = InterfaceTests.centre(level.cell)
+    interface.pointer(Self.finger(.began, from))
+    interface.pointer(Self.finger(.moved, from - SIMD2(0, 34)))
+    interface.pointer(Self.finger(.ended, from - SIMD2(0, 34)))
+    let after = level.target.value(in: try #require(interface.session.song))
+    #expect(after > before || after == level.target.range.upperBound, "turned up: \(before) to \(after)")
+
+    let fx = try #require(layout.chips.first { $0.action == .effects })
+    InterfaceTests.click(interface, InterfaceTests.centre(fx.frame))
+    layout = interface.layout
+    sheet = try #require(layout.inspector)
+    #expect(sheet.voice == nil && sheet.frame.maxY == 828 - Layout.margin, "the effects the same way")
+    #expect(try #require(layout.grid).maxY <= sheet.frame.y)
+  }
+
   @Test func aDesktopIsUnchanged() throws {
     let layout = try InterfaceTests.interface().layout
     #expect(!layout.compact && layout.pageChips.isEmpty)

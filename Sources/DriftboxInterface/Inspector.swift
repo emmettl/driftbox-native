@@ -27,6 +27,22 @@ extension Layout {
     public var divider: Float?
     /// Small captions: what a group of knobs is.
     public var labels: [Label] = []
+
+    /// The same panel with its top at `top`: on a phone, where it is a sheet at the foot of the
+    /// screen rather than a column down the right.
+    func moved(to top: Float) -> Inspector {
+      let dy = top - frame.y
+      func move(_ rect: Rect) -> Rect { Rect(rect.x, rect.y + dy, rect.width, rect.height) }
+      var moved = self
+      moved.frame = move(frame)
+      moved.chips = chips.map {
+        Chip(frame: move($0.frame), label: $0.label, action: $0.action, isOn: $0.isOn)
+      }
+      moved.knobs = knobs.map { Knob(target: $0.target, dial: move($0.dial), cell: move($0.cell)) }
+      moved.divider = divider.map { $0 + dy }
+      moved.labels = labels.map { Label(text: $0.text, x: $0.x, y: $0.y + dy) }
+      return moved
+    }
   }
 
   public struct Label {
@@ -39,9 +55,10 @@ extension Layout {
   static let padding: Float = 14
   static let knobCell: Float = 70
 
-  /// The panel for `id`, a drum voice or a 303, at the top right under the transport; nil for
-  /// anything else.
-  static func inspector(for id: String, top: Float, right: Float) -> Inspector? {
+  /// The panel for `id`, a drum voice or a 303, at the top right under the transport, `width`
+  /// across; nil for anything else.
+  static func inspector(for id: String, top: Float, right: Float, width: Float = inspectorWidth) -> Inspector?
+  {
     let machine: String
     let title: String
     let targets: [KnobTarget]
@@ -57,9 +74,9 @@ extension Layout {
       return nil
     }
 
-    let x = right - inspectorWidth
+    let x = right - width
     let inner = x + padding
-    let innerWidth = inspectorWidth - padding * 2
+    let innerWidth = width - padding * 2
     var y = top + padding
 
     // The head: what it is on the left, and on the right what can be done with it.
@@ -92,13 +109,16 @@ extension Layout {
     let divider = y
     y += 9
     let sends: [KnobTarget] = [.send(id, 0), .send(id, 1), .swing(id)]
+    // Spread across a wider panel, a phone's sheet, where a finger wants the room.
+    let sendWidth: Float = width > inspectorWidth ? (innerWidth - 30) / 3 : 64
     for (index, target) in sends.enumerated() {
-      let cell = Rect(inner + 30 + Float(index) * 64, y, 64, 62)
-      knobs.append(Knob(target: target, dial: Rect(cell.x + 16, cell.y, 32, 32), cell: cell))
+      let cell = Rect(inner + 30 + Float(index) * sendWidth, y, sendWidth, 62)
+      knobs.append(
+        Knob(target: target, dial: Rect(cell.x + (sendWidth - 32) / 2, cell.y, 32, 32), cell: cell))
     }
     y += 62 + padding
     return Inspector(
-      voice: id, frame: Rect(x, top, inspectorWidth, y - top), machine: machine, title: title, chips: chips,
+      voice: id, frame: Rect(x, top, width, y - top), machine: machine, title: title, chips: chips,
       knobs: knobs, divider: divider, labels: [Label(text: "OUT", x: inner, y: divider + 29)])
   }
 }
@@ -106,10 +126,10 @@ extension Layout {
 extension Layout {
   /// The song's effects, as the Mac's panel groups them: the inserts, the pattern-controlled
   /// filter, the delay and the reverb, a row of knobs each under its name.
-  static func effects(top: Float, right: Float) -> Inspector {
-    let x = right - inspectorWidth
+  static func effects(top: Float, right: Float, width: Float = inspectorWidth) -> Inspector {
+    let x = right - width
     let inner = x + padding
-    let innerWidth = inspectorWidth - padding * 2
+    let innerWidth = width - padding * 2
     var y = top + padding
     let close = Chip(
       frame: Rect(inner + innerWidth - 26, y, 26, 24), label: "×", action: .effects, isOn: false)
@@ -135,7 +155,7 @@ extension Layout {
     }
     y += padding - 8
     return Inspector(
-      voice: nil, frame: Rect(x, top, inspectorWidth, y - top), machine: "MASTER", title: "Effects",
+      voice: nil, frame: Rect(x, top, width, y - top), machine: "MASTER", title: "Effects",
       chips: [close], knobs: knobs, divider: nil, labels: labels)
   }
 }

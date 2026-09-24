@@ -113,6 +113,16 @@ struct BassKeyboardTests {
     #expect(interface.keyboard == nil, "and put away")
   }
 
+  /// The keyboard and a voice's knobs want the same room on a phone, so either puts the other away.
+  @Test func theKeyboardAndTheKnobsTakeTurns() throws {
+    let interface = try Self.phone()
+    _ = try Self.open(interface, step: 0)
+    interface.perform(.select(voice: "909.bd"))
+    #expect(interface.keyboard == nil && interface.layout.inspector != nil, "the knobs, and no keyboard")
+    interface.perform(.bassStep(voice: "303.a", index: 3))
+    #expect(interface.keyboard != nil && interface.layout.inspector == nil, "the keyboard, and no knobs")
+  }
+
   @Test func aDesktopHasNoKeyboard() throws {
     var song = InterfaceTests.song()
     song.patterns[0].bass["303.a"] = Array(repeating: BassStep(), count: 16)
