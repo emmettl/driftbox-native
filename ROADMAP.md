@@ -484,8 +484,12 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    one: turning, transposing, clearing, copying, loop lengths, repeats, moving and removing.
    Left: renaming, the sections' machines, settings, the rack and its cables, and a grid wider
    than the window.
-5. **Shipping.** The Swift runtime beside the executable; signing; winget; the `.driftbox` file
-   association. Songs are already `.driftbox` — the web app's documents byte for byte, under a name
+5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
+   resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
+   the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift
+   installed: the program, its resource bundle, and the runtime DLLs it loads, found from their
+   import tables. Left: signing, winget, and an installer to register the type. Songs are already
+   `.driftbox` — the web app's documents byte for byte, under a name
    Windows can associate without claiming every `.json`. `SongFile` in `DriftboxDocument` holds
    the rule for every platform: saved as `.driftbox`; `.song.json` and the web's `.json` still
    opened, and saved back under the name they came with.

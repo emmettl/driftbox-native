@@ -380,6 +380,14 @@
         windowClass.lpfnWndProc = procedure
         windowClass.hInstance = GetModuleHandleW(nil)
         windowClass.hCursor = LoadCursorW(nil, UnsafePointer(bitPattern: 32512))  // IDC_ARROW
+        // The program's own icon, resource 1, where it has one: the title bar's and the taskbar's.
+        // Without it, Windows' default.
+        windowClass.hIcon = LoadIconW(windowClass.hInstance, UnsafePointer(bitPattern: 1))
+        windowClass.hIconSm = LoadImageW(
+          windowClass.hInstance, UnsafePointer(bitPattern: 1), UINT(IMAGE_ICON),
+          GetSystemMetrics(SM_CXSMICON),
+          GetSystemMetrics(SM_CYSMICON), 0
+        )?.assumingMemoryBound(to: HICON__.self)
         windowClass.lpszClassName = name
         RegisterClassExW(&windowClass)
       }

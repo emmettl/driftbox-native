@@ -7,3 +7,4 @@ DerivedData/
 *.xcuserstate
 conformance/generated/
 node_modules/
+dist/

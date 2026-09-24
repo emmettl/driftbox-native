@@ -147,6 +147,11 @@ let package = Package(
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
+      ],
+      // Its icon, and whatever else Windows keeps in a program: windows/Driftbox.res, which
+      // scripts/windows-icon.mjs makes. The linker takes a compiled resource file as it takes an object.
+      linkerSettings: [
+        .unsafeFlags([Context.packageDirectory + "/windows/Driftbox.res"], .when(platforms: [.windows]))
       ]),
 
     // A song document in, a WAV file out: something to listen to.
