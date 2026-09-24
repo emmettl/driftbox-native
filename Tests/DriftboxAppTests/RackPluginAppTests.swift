@@ -2,6 +2,7 @@
   import AVFoundation
   import DriftboxDocument
   import DriftboxHost
+  import DriftboxHostMac
   import DriftboxRack
   import DriftboxRackSession
   import Foundation

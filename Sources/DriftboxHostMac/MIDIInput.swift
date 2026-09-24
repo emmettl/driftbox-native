@@ -1,4 +1,5 @@
 #if canImport(CoreMIDI)
+  import DriftboxHost
   import CoreMIDI
   import DriftboxSeq
   import Foundation
@@ -13,7 +14,7 @@
   /// Everything here is read on that thread and written on another, so all of it sits behind
   /// one lock — the callbacks too, since a message can arrive between making this and setting
   /// them.
-  public final class MIDIInput: Sendable {
+  public final class MIDIInput: MIDIInputPort, Sendable {
     private struct State {
       /// Each connected source's name, by the endpoint its messages are tagged with.
       var names: [MIDIEndpointRef: String] = [:]

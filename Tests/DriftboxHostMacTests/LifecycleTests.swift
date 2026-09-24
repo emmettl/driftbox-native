@@ -3,6 +3,7 @@
   import ConformanceSupport
   import DriftboxDocument
   import DriftboxHost
+  import DriftboxHostMac
   import Foundation
   import Testing
 

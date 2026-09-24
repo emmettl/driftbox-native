@@ -3,6 +3,7 @@
   import DriftboxDocument
   import DriftboxEngine
   import DriftboxHost
+  import DriftboxHostMac
   import DriftboxRackSession
   import DriftboxScenes
   import DriftboxSeq
@@ -91,12 +92,12 @@
       didSet { route?.chosen = outputDevice }
     }
     /// Every device there is to play through, kept up to date as they come and go.
-    private(set) var outputs: [AudioOutput] = []
+    private(set) var outputs: [AudioDevice] = []
     /// The one the sound is going out of: the chosen one while it is there, the system's while
     /// it is not.
-    private(set) var playingThrough: AudioOutput?
+    private(set) var playingThrough: AudioDevice?
     /// The device the system plays through, which is what "the system's" means today.
-    private(set) var systemOutput: AudioOutput?
+    private(set) var systemOutput: AudioDevice?
     /// Why nothing can be heard, while nothing can. Apart from `error`, because it goes away on
     /// its own when a device comes back.
     private(set) var outputError: String?
@@ -163,7 +164,7 @@
         if sendsClock {
           followsClock = false
         } else {
-          deliver(cursor.stop(at: MIDIOutput.now()))
+          deliver(cursor.stop(at: HostTime.now()))
         }
       }
     }
@@ -174,7 +175,7 @@
         guard clockDestination != oldValue else { return }
         // Ticks queued at the destination being left would go on arriving after we had stopped
         // talking to it, so it is stopped properly and the new one is located from scratch.
-        deliver(cursor.stop(at: MIDIOutput.now()), to: oldValue)
+        deliver(cursor.stop(at: HostTime.now()), to: oldValue)
       }
     }
 
@@ -206,7 +207,7 @@
           let route = AudioRoute(engine: audio, chosen: outputDevice)
           route.onChange = { [weak self, weak route] in
             guard let self, let route else { return }
-            outputs = route.outputs
+            outputs = route.devices
             playingThrough = route.current
             systemOutput = route.systemDefault
             outputError = route.error
@@ -361,7 +362,7 @@
     private func driveClock() {
       guard let out = clockOut else { return }
       if clockDestinations != out.destinations { clockDestinations = out.destinations }
-      let now = MIDIOutput.now()
+      let now = HostTime.now()
       // Anything that leaves the transport without a song to run is a stop as much as the button
       // is: what is listening should not be left ticking through a song nobody is playing.
       // A count-in is not the song yet: what is listening starts with it, not with the clicks.
@@ -371,7 +372,7 @@
       }
       // Where the song is at the speakers, not at the render block: the engine has rendered past
       // what is being heard by the device's latency, and the clock belongs with the music.
-      let sounding = MIDIOutput.time(now, after: audio.outputNode.presentationLatency)
+      let sounding = HostTime.time(now, after: audio.outputNode.presentationLatency)
       deliver(
         cursor.advance(
           timeline: timeline, songTime: Double(songFrame) / sampleRate, now: now, sounding: sounding))
@@ -640,7 +641,7 @@
       send(.stop)
       // Here rather than at the next tick: a stop a thirtieth of a second late is a stop that
       // arrives behind ticks the engine is never going to play.
-      deliver(cursor.halt(at: MIDIOutput.now()))
+      deliver(cursor.halt(at: HostTime.now()))
     }
 
     /// Everything that starts the engine goes through here, so that a stop the transport has not

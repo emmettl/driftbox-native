@@ -1,6 +1,7 @@
 #if canImport(AVFoundation)
   import AVFoundation
   import DriftboxHost
+  import DriftboxHostMac
   import DriftboxRack
   import Foundation
   import Synchronization

@@ -1,5 +1,11 @@
 import Foundation
 
+#if canImport(CoreGraphics)
+  // `CGRect(x:y:width:height:)` and the rest are CoreGraphics' own on Apple's platforms, where
+  // Foundation alone gives the types without them.
+  import CoreGraphics
+#endif
+
 /// How a cable hangs, and how it swings when the rack turns: a port of the reference's
 /// `cable.ts`. A cubic with both control points pushed down, sagging more the further apart its
 /// ends are, and after a flip a damped pendulum per cable, each with a period and a start of its

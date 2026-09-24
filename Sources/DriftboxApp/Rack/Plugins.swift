@@ -3,6 +3,7 @@
   import AppKit
   import CoreAudioKit
   import DriftboxHost
+  import DriftboxHostMac
   import DriftboxRack
   import DriftboxRackSession
   import SwiftUI

@@ -1,5 +1,11 @@
 import Foundation
 
+#if canImport(CoreGraphics)
+  // `CGRect(x:y:width:height:)` and the rest are CoreGraphics' own on Apple's platforms, where
+  // Foundation alone gives the types without them.
+  import CoreGraphics
+#endif
+
 /// What the hand-built faceplates make of a reading: the reference's `tuner-display.ts`,
 /// `meter-display.ts` and `looper-display.ts`, which are pure and so are these.
 public enum RackDisplay {

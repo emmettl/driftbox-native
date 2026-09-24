@@ -6,6 +6,7 @@
   import DriftboxGPU
   import DriftboxGPUMetal
   import DriftboxHost
+  import DriftboxHostMac
   import DriftboxScenes
   import DriftboxText
   import Foundation
