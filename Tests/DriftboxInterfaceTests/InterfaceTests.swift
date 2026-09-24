@@ -245,6 +245,47 @@ struct InterfaceTests {
     #expect(interface.layout.scroll == 0)
   }
 
+  /// The number row strikes the grid's drums and the home row plays 303 A, `z` and `x` moving it
+  /// an octave, as far as one each way; anything held, repeating or let go is not played.
+  @Test func theKeysArePlayed() throws {
+    let session = try Self.interface(Self.bassSong()).session
+    func render() {
+      var left = [Float](repeating: 0, count: 512)
+      var right = [Float](repeating: 0, count: 512)
+      left.withUnsafeMutableBufferPointer { l in
+        right.withUnsafeMutableBufferPointer { r in
+          session.host.render(frames: 512, left: l.baseAddress!, right: r.baseAddress!)
+        }
+      }
+      session.tick()
+    }
+    session.stop()
+    render()
+    _ = session.takeEvents()
+
+    var keys = KeyboardInstrument()
+    func press(_ event: KeyEvent) -> Bool { keys.play(event, on: session) }
+    #expect(press(KeyEvent(key: .character("1"))))
+    render()
+    #expect(session.takeEvents().contains { $0.kind == .hit }, "the first lane struck")
+    #expect(press(KeyEvent(key: .character("a"))))
+    render()
+    #expect(session.takeEvents().contains { $0.kind == .note }, "303 A played")
+
+    #expect(!press(KeyEvent(key: .character("1"), modifiers: .control)))
+    #expect(!press(KeyEvent(key: .character("1"), isRepeat: true)))
+    #expect(!press(KeyEvent(key: .character("1"), isDown: false)))
+    #expect(!press(KeyEvent(key: .character("q"))))
+    #expect(!press(KeyEvent(key: .space)), "the transport's")
+    render()
+    #expect(session.takeEvents().isEmpty)
+
+    for _ in 0..<3 { _ = press(KeyEvent(key: .character("z"))) }
+    #expect(keys.octave == -1)
+    for _ in 0..<3 { _ = press(KeyEvent(key: .character("x"))) }
+    #expect(keys.octave == 1)
+  }
+
   /// Narrow, the columns keep to a size that can still be hit; wide, they stop growing.
   @Test func theColumnsStretchBetweenLimits() {
     #expect(GridMetrics(steps: 16, width: 200).stride == GridMetrics.minimumStride)

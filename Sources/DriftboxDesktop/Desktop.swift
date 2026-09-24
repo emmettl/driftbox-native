@@ -39,6 +39,8 @@ public final class Desktop {
   var scene: any GPUScene
   public private(set) var sceneID: String
   let began = HostTime.now()
+  /// The keyboard, played.
+  var keys = KeyboardInstrument()
   /// Where the pointer is pressed on the pad, 0...1 from the bottom left, while it is.
   var touch: SIMD2<Float>?
 
@@ -142,6 +144,8 @@ public final class Desktop {
       if !interface.pointer(pointer) { pad(pointer) }
     case .scroll(let scroll):
       _ = interface.scroll(scroll)
+    case .key(let key):
+      _ = keys.play(key, on: session)
     default:
       break
     }

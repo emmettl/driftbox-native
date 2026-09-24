@@ -305,6 +305,15 @@ struct DesktopTests {
     }
   }
 
+  /// The keyboard the window hears is the instrument's.
+  @Test func theKeysReachTheInstrument() throws {
+    for device in try Self.devices() {
+      let (desktop, window, _) = try Self.desktop(on: device)
+      window.onEvent?(.key(KeyEvent(key: .character("x"))))
+      #expect(desktop.keys.octave == 1)
+    }
+  }
+
   /// A resize reaches the surface at the next frame.
   @Test func aResizeReachesTheSurface() throws {
     for device in try Self.devices() {
