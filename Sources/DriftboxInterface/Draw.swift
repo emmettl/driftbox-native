@@ -39,7 +39,7 @@ enum Draw {
   /// (0...1) lit in `tint`, a pointer, and its name and value underneath.
   static func knob(
     _ dial: Rect, value: Double, label: String, text: String, tint: Colour, active: Bool, hovered: Bool,
-    opacity: Float = 1, on canvas: Canvas
+    opacity: Float = 1, labelWidth: Float? = nil, on canvas: Canvas
   ) {
     // Faint all through when asleep: every colour is taken down together.
     func a(_ colour: Colour) -> Colour { colour.faded(opacity) }
@@ -76,9 +76,25 @@ enum Draw {
     canvas.align = .center
     canvas.font = Theme.mono(8.5, weight: 500)
     canvas.fill = a(Theme.dim)
-    canvas.fillText(label.uppercased(), centre.x, dial.maxY + 12)
+    canvas.fillText(
+      labelWidth.map { fit(label.uppercased(), width: $0, size: 8.5, weight: 500, on: canvas) }
+        ?? label.uppercased(),
+      centre.x, dial.maxY + 12)
     canvas.font = Theme.mono(9.5)
     canvas.fill = a(active ? Theme.ink : Theme.ink.faded(0.55))
     canvas.fillText(text, centre.x, dial.maxY + 25)
+  }
+
+  /// `text` in the mono face at `size`, fitted to `width` as the Mac's labels are: shrunk as far as
+  /// seven tenths, then cut short. Sets the canvas's font to the size it is drawn at.
+  static func fit(_ text: String, width: Float, size: Float, weight: Int, on canvas: Canvas) -> String {
+    canvas.font = Theme.mono(size, weight: weight)
+    let full = canvas.measure(text)
+    guard full > width, full > 0 else { return text }
+    canvas.font = Theme.mono(size * max(0.7, width / full), weight: weight)
+    guard canvas.measure(text) > width else { return text }
+    var shown = text
+    while shown.count > 1, canvas.measure(shown + "…") > width { shown.removeLast() }
+    return shown + "…"
   }
 }

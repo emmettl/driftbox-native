@@ -1,6 +1,7 @@
 import DriftboxCanvas
 import DriftboxRack
 import DriftboxRackSession
+import DriftboxText
 
 /// The faces the reference builds by hand, laid out as the Mac's are: each says something the
 /// definition cannot — which knob matters, what a setting is doing, what is coming in.
@@ -21,6 +22,9 @@ public enum RackFaces {
     "arranger": ["length"],
     "scale-player": ["key", "scale", "filter"],
     "note-echo": Set(echoKnobs),
+    "chord-player": Set(chordKnobs + ["alter"]),
+    "arp": Set(arpKnobs.map(\.id)),
+    "combi": Set((1...4).flatMap { ["rotary\($0)", "button\($0)"] }),
   ]
 
   static let shapes = ["Saw", "Pulse", "Tri"]
@@ -33,13 +37,15 @@ public enum RackFaces {
     let x: Float
     let top: Float
     let columns: Int
+    let cellWidth: Float
     private(set) var controls: [RackStage.Control] = []
     private var column = 0
     private var y: Float
     private var rowHeight: Float = 0
 
-    init(def: ModuleDef, x: Float, top: Float, columns: Int) {
+    init(def: ModuleDef, x: Float, top: Float, columns: Int, cellWidth: Float = Float(RackLayout.cellWidth)) {
       self.def = def
+      self.cellWidth = cellWidth
       self.x = x
       self.top = top
       self.columns = max(1, columns)
@@ -50,7 +56,7 @@ public enum RackFaces {
     /// the face already says whose control it is.
     mutating func add(
       _ id: String, tint: Colour? = nil, diameter: Float = 34, labels: [String]? = nil, name: String? = nil,
-      opacity: Float = 1
+      opacity: Float = 1, display: (@Sendable (Double) -> String)? = nil, whole: Bool = false
     ) {
       guard let param = def.params.first(where: { $0.id == id }) else { return }
       if column == columns {
@@ -58,13 +64,13 @@ public enum RackFaces {
         column = 0
         rowHeight = 0
       }
-      let width = Float(RackLayout.cellWidth)
+      let width = cellWidth
       let height = max(Float(RackLayout.cellHeight), diameter + 28)
       let cell = Rect(x + Float(column) * width, y, width, height)
       controls.append(
         RackStage.Control(
           param: param, cell: cell, kind: RackStage.kind(of: param, in: cell, diameter: diameter), tint: tint,
-          name: name, labels: labels, opacity: opacity))
+          name: name, labels: labels, opacity: opacity, display: display, whole: whole))
       column += 1
       rowHeight = max(rowHeight, height)
     }
@@ -73,6 +79,7 @@ public enum RackFaces {
   struct Built {
     var words: String
     var wordsTint: Colour?
+    var wordsFont: FontRequest?
     var cells: Cells
     var mark: String?
     var name: String?
@@ -189,6 +196,12 @@ public enum RackFaces {
       return scalePlayer(module, def, x: x, width: width, top: top, rack: rack)
     case "note-echo":
       return noteEcho(module, def, x: x, width: width, top: top, rack: rack)
+    case "chord-player":
+      return chordPlayer(module, def, x: x, width: width, top: top, rack: rack)
+    case "arp":
+      return arp(module, def, x: x, width: width, top: top, rack: rack)
+    case "combi":
+      return combinator(module, def, x: x, width: width, top: top, bottom: bottom, rack: rack)
     default:
       return nil
     }

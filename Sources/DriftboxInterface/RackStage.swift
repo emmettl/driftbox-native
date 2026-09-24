@@ -1,6 +1,7 @@
 import DriftboxCanvas
 import DriftboxRack
 import DriftboxRackSession
+import DriftboxText
 
 /// What pressing something on the rack does, or which control it turns.
 public enum RackTarget: Equatable, Sendable {
@@ -63,6 +64,10 @@ public struct RackStage {
     public var labels: [String]?
     /// Faint when asleep: a pulse's width while the shape is not a pulse.
     public var opacity: Float = 1
+    /// Its value in words of its own, where the param's range is not what it means.
+    public var display: (@Sendable (Double) -> String)?
+    /// Turned in whole numbers.
+    public var whole = false
   }
 
   /// A module's front, in design space.
@@ -77,6 +82,8 @@ public struct RackStage {
     public var words: String
     /// The words' colour, where they are lit.
     public var wordsTint: Colour?
+    /// The words' font, where it is not the usual.
+    public var wordsFont: FontRequest?
     public var controls: [Control]
     /// A model mark after the name, in its own colour.
     public var mark: String?
@@ -98,13 +105,19 @@ public struct RackStage {
     case data(slot: String, values: [Double], name: String, then: String? = nil, to: Double = 0)
     /// Show another bar of a face's steps.
     case page(Int)
+    /// Set a param to one while the button is held, and back to nothing when it is let go: one
+    /// step of undo.
+    case hold(param: String)
+    /// Learn a controller for a param: or stop waiting for one, or, with Shift, forget it.
+    case learn(param: String)
 
     /// The param it sets, if it sets one.
     public var param: String? {
       switch self {
       case .set(let param, _): param
       case .data(_, _, _, let then, _): then
-      case .page: nil
+      case .page, .learn: nil
+      case .hold(let param): param
       }
     }
   }
@@ -122,6 +135,16 @@ public struct RackStage {
       case key(black: Bool, root: Bool)
       /// One of an echo's pulses, as tall as its velocity.
       case pulse(amount: Double)
+      /// A button held down, round, as a chord player's Alter is.
+      case capsule
+      /// One of a chord's voices: its lane, its note as the label, and its octave from the root.
+      case voice(lane: Int, badge: String)
+      /// One of an arp's rhythm steps: the note it would play as the label, and its octave.
+      case arpStep(number: Int, octave: Int)
+      /// A control's MIDI learn: waiting for a controller, or holding one it learnt.
+      case learn(armed: Bool, bound: Bool)
+      /// A combinator's button, marked when it drives anything.
+      case pad(live: Bool)
     }
     public var frame: Rect
     public var label: String
@@ -242,7 +265,8 @@ public struct RackStage {
     if let built = RackFaces.face(module, def, frame: frame, top: top, rack: rack, page: page) {
       return Face(
         module: module, def: def, span: placement.span, frame: frame, title: title, words: built.words,
-        wordsTint: built.wordsTint, controls: built.cells.controls, mark: built.mark,
+        wordsTint: built.wordsTint, wordsFont: built.wordsFont, controls: built.cells.controls,
+        mark: built.mark,
         markTint: built.markTint, name: built.name,
         screen: built.screen, buttons: built.buttons, cells: built.dataCells)
     }
@@ -269,7 +293,8 @@ public struct RackStage {
     }
     return .stepper(
       value: Rect(cell.x + 2, cell.y + 6, cell.width - 4, 14),
-      down: Rect(cell.x + 6, cell.y + 24, 21, 16), up: Rect(cell.x + 31, cell.y + 24, 21, 16))
+      down: Rect(cell.x + cell.width / 2 - 23, cell.y + 24, 21, 16),
+      up: Rect(cell.x + cell.width / 2 + 2, cell.y + 24, 21, 16))
   }
 
   /// A point on the window, in the rack's design space.

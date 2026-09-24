@@ -42,6 +42,12 @@ public final class RackInterface {
   public private(set) var pages: [String: Int] = [:]
   /// A number being dragged has moved far enough to be a drag, not a click.
   private var cellMoved = false
+  /// A button held down, and the param it holds: let go of wherever the pointer is.
+  private var holding: (pointer: Int, module: String, param: String)?
+  /// The knob being turned turns in whole numbers.
+  private var turningWhole = false
+  /// The keys held with the press: Shift makes a learn chip forget.
+  private var pressModifiers: Modifiers = []
 
   public init(rack: RackSession) {
     self.rack = rack
@@ -70,9 +76,13 @@ public final class RackInterface {
         return
       }
       pressed = (event.id, target)
+      pressModifiers = event.modifiers
       switch target {
       case .knob(let module, let param):
         guard let value = value(module, param) else { break }
+        turningWhole =
+          stage.faces.first { $0.module.id == module }?.controls.first { $0.param.id == param }?.whole
+          ?? false
         turning = (event.id, target!, event.location.y, value, value)
       case .tempo:
         turning = (event.id, .tempo, event.location.y, rack.tempo, rack.tempo)
@@ -80,6 +90,13 @@ public final class RackInterface {
         guard let cell = cell(module, index, in: stage) else { break }
         cellMoved = false
         turning = (event.id, target!, event.location.y, Double(cell.value), Double(cell.value))
+      case .button(let module, let index):
+        // A button held is heard from the press, and let go of wherever the pointer is then.
+        guard let face = stage.faces.first(where: { $0.module.id == module }),
+          face.buttons.indices.contains(index), case .hold(let param) = face.buttons[index].press
+        else { break }
+        rack.turn(module, param, to: 1)
+        holding = (event.id, module, param)
       case .module(let id):
         rack.select(id, adding: event.modifiers.contains(.control))
       case nil:
@@ -104,6 +121,7 @@ public final class RackInterface {
         let fraction = span == 0 ? 0 : (turn.from - def.min) / span
         let moved = max(0, min(1, fraction + rise / Double(Self.travel) * (fine ? 0.25 : 1)))
         turn.value = def.min + moved * span
+        if turningWhole { turn.value = RackDisplay.jsRound(turn.value) }
         // Heard as it turns, as the Mac's knobs are: the first move is what undo goes back to.
         rack.turn(module, param, to: turn.value)
       case .cell(let module, let index):
@@ -132,6 +150,12 @@ public final class RackInterface {
       }
       guard let press = pressed, press.pointer == event.id else { return }
       pressed = nil
+      if let held = holding, held.pointer == event.id {
+        holding = nil
+        rack.turn(held.module, held.param, to: 0)
+        rack.endTurn()
+        return
+      }
       if let turn = turning, turn.pointer == event.id {
         turning = nil
         finish(turn)
@@ -140,6 +164,11 @@ public final class RackInterface {
       }
     case .cancelled:
       pressed = nil
+      if let held = holding {
+        holding = nil
+        rack.turn(held.module, held.param, to: 0)
+        rack.endTurn()
+      }
       back = nil
       backPointer = nil
       if turning != nil { rack.endTurn() }
@@ -196,6 +225,16 @@ public final class RackInterface {
       if let then { rack.set(module, then, to: to) }
     case .page(let page):
       pages[module] = page
+    case .hold:
+      break  // Held from the press itself, not its lift.
+    case .learn(let param):
+      if pressModifiers.contains(.shift) {
+        rack.clearCcBinding(module, param)
+      } else if rack.ccLearning == PortReference(module, param) {
+        rack.cancelCcLearn()
+      } else {
+        rack.startCcLearn(module, param)
+      }
     }
   }
 
@@ -456,7 +495,7 @@ public final class RackInterface {
       canvas.fillText(mark, title.x + name + 8, baseline)
     }
     canvas.align = .right
-    canvas.font = face.wordsTint == nil ? Theme.mono(9) : Theme.mono(10, weight: 600)
+    canvas.font = face.wordsFont ?? (face.wordsTint == nil ? Theme.mono(9) : Theme.mono(10, weight: 600))
     canvas.fill = face.wordsTint?.faded(dim) ?? Theme.dim.faded(0.8 * dim)
     canvas.fillText(face.words, title.maxX, baseline)
     canvas.fill = Theme.edge
@@ -495,8 +534,10 @@ public final class RackInterface {
       let span = def.max - def.min
       Draw.knob(
         dial, value: span == 0 ? 0 : (value - def.min) / span, label: control.name ?? def.name,
-        text: RackDisplay.value(def, value), tint: tint, active: active,
-        hovered: hovered.map(control.cell.contains) ?? false, opacity: opacity, on: canvas)
+        text: control.display?(value) ?? RackDisplay.value(def, value), tint: tint, active: active,
+        hovered: hovered.map(control.cell.contains) ?? false, opacity: opacity,
+        labelWidth: control.cell.width - 4,
+        on: canvas)
     case .options(let buttons):
       for (index, button) in buttons.enumerated() {
         let on = Int(value.rounded()) == Int(def.min) + index
@@ -531,9 +572,9 @@ public final class RackInterface {
 
   private func name(_ name: String, in cell: Rect, on canvas: Canvas) {
     canvas.align = .center
-    canvas.font = Theme.mono(8.5, weight: 500)
+    let shown = Draw.fit(name.uppercased(), width: cell.width - 6, size: 8.5, weight: 500, on: canvas)
     canvas.fill = Theme.dim
-    canvas.fillText(name.uppercased(), cell.x + cell.width / 2, cell.y + 57)
+    canvas.fillText(shown, cell.x + cell.width / 2, cell.y + 57)
   }
 
   /// A choice's words for its `index`th value, or the number it is.
