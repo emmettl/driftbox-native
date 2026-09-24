@@ -42,6 +42,27 @@ public enum Action: Equatable, Sendable {
   case filterStep(pattern: String, index: Int)
   /// Show a voice's knobs, or hide them if they are showing.
   case select(voice: String)
+  /// Set a 303 step's note, or pause it if that note is already set there.
+  case note(pattern: String, voice: String, index: Int, note: Int)
+  case bassAccent(pattern: String, voice: String, index: Int)
+  case bassSlide(pattern: String, voice: String, index: Int)
+}
+
+/// A 303 line's rows, as the Mac draws them: two octaves of notes from the top, then a row each
+/// for accent and slide.
+public enum BassMetrics {
+  /// The notes, top row first.
+  public static let notes = Array((0...24).reversed())
+  public static let noteHeight: Float = 7
+  public static let noteStride: Float = 8.5
+  public static let flagHeight: Float = 13
+  public static let flagStride: Float = 16
+  public static var notesHeight: Float { Float(notes.count) * noteStride }
+  /// Where the flag rows start, below a small gap under the notes.
+  public static var flagsTop: Float { notesHeight + 4 }
+  public static var height: Float { flagsTop + flagStride * 2 }
+  /// The black keys, counting up from C, whose rows are shaded as on a piano roll.
+  public static let blackKeys: Set<Int> = [1, 3, 6, 8, 10]
 }
 
 /// Where the grid's columns fall, as the Mac's grid has them: a step lines up with the same step
@@ -91,6 +112,17 @@ public struct Layout {
     public var header: Rect
   }
 
+  public struct BassLine {
+    /// `303.a` or `303.b`.
+    public var voice: String
+    public var frame: Rect
+    public var header: Rect
+    /// Where the notes and flags are: the first step's column at its left.
+    public var cells: Rect
+
+    public var name: String { voice == "303.a" ? "303 A" : "303 B" }
+  }
+
   public var size: SIMD2<Float>
   public var bar: Rect
   public var chips: [Chip]
@@ -105,11 +137,17 @@ public struct Layout {
   public var ruler: Rect?
   public var lanes: [Lane] = []
   public var filterLane: Rect?
+  public var bassLines: [BassLine] = []
   /// The step the playhead is on, in the pattern shown, or nil when it is not playing there.
   public var playhead: Int?
+  /// How far the grid's content is scrolled up inside its panel, kept to what there is.
+  public var scroll: Float = 0
+  /// How far it can be.
+  public var maxScroll: Float = 0
 
+  /// The layout for a window `size` points across, the grid scrolled up by `scroll`.
   @MainActor
-  public init(session: Session, size: SIMD2<Float>) {
+  public init(session: Session, size: SIMD2<Float>, scroll: Float = 0) {
     self.size = size
     let margin = Self.margin
     bar = Rect(margin, margin, max(0, size.x - margin * 2), Self.barHeight)
@@ -140,26 +178,46 @@ public struct Layout {
     let metrics = GridMetrics(steps: pattern.length, width: width - Self.inset * 2)
     self.metrics = metrics
     let voices = allVoices.enumerated().filter { pattern.tracks[$0.element.id] != nil }
+    let lines = ["303.a", "303.b"].filter { pattern.bass[$0] != nil }
     let laneHeight = metrics.stepHeight + 4
     let filterHeight = metrics.stepHeight * 0.8
-    let content = 8 + 5 + Float(voices.count) * (laneHeight + 5) + 5 + filterHeight
-    let height = content + Self.inset * 2
-    let top = max(bar.maxY + margin, size.y - margin - height)
-    let grid = Rect(margin, top, width, height)
+    let lineHeight = BassMetrics.height + 12
+    let content =
+      8 + 5 + Float(voices.count) * (laneHeight + 5) + 5 + filterHeight
+      + Float(lines.count) * (10 + lineHeight)
+    // As tall as what is in it, up to the room under the transport; past that, it scrolls.
+    let room = max(0, size.y - margin - (bar.maxY + margin))
+    let height = min(content + Self.inset * 2, room)
+    let grid = Rect(margin, size.y - margin - height, width, height)
     self.grid = grid
+    maxScroll = max(0, content + Self.inset * 2 - height)
+    self.scroll = min(max(0, scroll), maxScroll)
 
     let x = grid.x + Self.inset
-    var y = grid.y + Self.inset
+    let inner = width - Self.inset * 2
+    var y = grid.y + Self.inset - self.scroll
     ruler = Rect(x + GridMetrics.labelWidth + 4, y, metrics.stride * Float(metrics.steps), 8)
     y += 8 + 5
     for (index, voice) in voices {
       lanes.append(
         Lane(
-          voice: voice, index: index, frame: Rect(x, y, width - Self.inset * 2, laneHeight),
+          voice: voice, index: index, frame: Rect(x, y, inner, laneHeight),
           header: Rect(x + 4, y + 2, GridMetrics.labelWidth, metrics.stepHeight)))
       y += laneHeight + 5
     }
-    filterLane = Rect(x, y + 5, width - Self.inset * 2, filterHeight)
+    filterLane = Rect(x, y + 5, inner, filterHeight)
+    y += 5 + filterHeight
+    for voice in lines {
+      y += 10
+      let frame = Rect(x, y, inner, lineHeight)
+      bassLines.append(
+        BassLine(
+          voice: voice, frame: frame, header: Rect(x + 4, y + 6, GridMetrics.labelWidth, 28),
+          cells: Rect(
+            x + 4 + GridMetrics.labelWidth, y + 6, metrics.stride * Float(metrics.steps) - GridMetrics.gap,
+            BassMetrics.height)))
+      y += lineHeight
+    }
   }
 
   /// Where a lane's `index`th step is.
@@ -192,7 +250,55 @@ public struct Layout {
     {
       return .filterStep(pattern: pattern.id, index: index)
     }
+    for line in bassLines {
+      if line.header.contains(point) { return .select(voice: line.voice) }
+      if line.cells.contains(point) {
+        return bassAction(at: point, in: line, pattern: pattern, metrics: metrics)
+      }
+    }
     return nil
+  }
+
+  /// A note's row, the accent's or the slide's, in the column under `point`; nothing in the gap
+  /// between two columns.
+  private func bassAction(
+    at point: SIMD2<Float>, in line: BassLine, pattern: DriftboxSeq.Pattern, metrics: GridMetrics
+  ) -> Action? {
+    let local = point - SIMD2(line.cells.x, line.cells.y)
+    let column = local.x / metrics.stride
+    guard column >= 0, Int(column) < pattern.length,
+      column - column.rounded(.down) <= metrics.cell / metrics.stride
+    else { return nil }
+    let index = Int(column)
+    if local.y < BassMetrics.notesHeight {
+      let row = Int(max(0, local.y) / BassMetrics.noteStride)
+      guard row < BassMetrics.notes.count else { return nil }
+      return .note(pattern: pattern.id, voice: line.voice, index: index, note: BassMetrics.notes[row])
+    }
+    if local.y >= BassMetrics.flagsTop, local.y < BassMetrics.flagsTop + BassMetrics.flagStride {
+      return .bassAccent(pattern: pattern.id, voice: line.voice, index: index)
+    }
+    if local.y >= BassMetrics.flagsTop + BassMetrics.flagStride, local.y < BassMetrics.height {
+      return .bassSlide(pattern: pattern.id, voice: line.voice, index: index)
+    }
+    return nil
+  }
+
+  /// Where the `index`th step's cell for `note` is, in a 303 line.
+  public func noteCell(_ note: Int, step index: Int, in line: BassLine) -> Rect {
+    guard let metrics, let row = BassMetrics.notes.firstIndex(of: note) else { return Rect(0, 0, 0, 0) }
+    return Rect(
+      line.cells.x + Float(index) * metrics.stride, line.cells.y + Float(row) * BassMetrics.noteStride,
+      metrics.cell, BassMetrics.noteHeight)
+  }
+
+  /// Where the `index`th step's accent flag is, or its slide flag below it.
+  public func flagCell(step index: Int, slide: Bool, in line: BassLine) -> Rect {
+    guard let metrics else { return Rect(0, 0, 0, 0) }
+    return Rect(
+      line.cells.x + Float(index) * metrics.stride,
+      line.cells.y + BassMetrics.flagsTop + (slide ? BassMetrics.flagStride : 0), metrics.cell,
+      BassMetrics.flagHeight)
   }
 
   private func column(at x: Float, lane: Rect, metrics: GridMetrics) -> Int? {

@@ -15,6 +15,8 @@ public enum Theme {
   public static let eight = Colour(0xff7ad9)
   public static let nine = Colour(0x5ff0d0)
   public static let three = Colour(0xffb02e)
+  /// A 303 slide.
+  public static let violet = Colour(0xa995ff)
 
   /// The playhead, and anything else that is "now".
   public static let live = nine

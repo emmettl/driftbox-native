@@ -30,11 +30,22 @@ public final class Interface {
   /// A press the interface has, and what it was pressed on.
   public private(set) var pressed: (pointer: Int, action: Action?)?
 
+  /// How far the grid is scrolled up inside its panel.
+  public private(set) var scroll: Float = 0
+
   public init(session: Session) {
     self.session = session
   }
 
-  public var layout: Layout { Layout(session: session, size: size) }
+  public var layout: Layout { Layout(session: session, size: size, scroll: scroll) }
+
+  /// Scroll the grid, if `event` is over it. False for anywhere else.
+  @discardableResult
+  public func scroll(_ event: ScrollEvent) -> Bool {
+    guard isShowing, let grid = layout.grid, grid.contains(event.location) else { return false }
+    scroll = Layout(session: session, size: size, scroll: scroll + event.delta.y).scroll
+    return true
+  }
 
   // MARK: - The pointer
 
@@ -84,6 +95,30 @@ public final class Interface {
       session.editPattern(pattern, flamming ? "Set Flam" : "Set Step") {
         flamming ? $0.togglingFlam(voice, at: index) : $0.cyclingStep(voice, at: index)
       }
+    case .note(let pattern, let voice, let index, let note):
+      editBass(pattern, voice, index, "Set Note") { step in
+        // The note that is already set, pressed again, pauses the step and keeps its pitch.
+        if Int(step.note ?? -1) == note, step.sounds {
+          step = step.settingGate(false)
+        } else {
+          step.note = Double(note)
+          step = step.settingGate(true)
+        }
+      }
+    case .bassAccent(let pattern, let voice, let index):
+      editBass(pattern, voice, index, "Set Accent") { $0.accent.toggle() }
+    case .bassSlide(let pattern, let voice, let index):
+      editBass(pattern, voice, index, "Set Slide") { $0 = $0.settingSlide(!$0.slide) }
+    }
+  }
+
+  private func editBass(
+    _ pattern: String, _ voice: String, _ index: Int, _ name: String, _ change: (inout BassStep) -> Void
+  ) {
+    session.editPattern(pattern, name) { pattern in
+      var step = pattern.bassStep(voice, at: index)
+      change(&step)
+      return pattern.settingBassStep(voice, at: index, to: step)
     }
   }
 
@@ -93,6 +128,8 @@ public final class Interface {
   public func draw(on canvas: Canvas) {
     guard isShowing else { return }
     let layout = layout
+    // Kept to what there is, should the window have grown or the pattern shrunk.
+    scroll = layout.scroll
     held = pressed.flatMap { press in
       hover.flatMap { layout.action(at: $0) == press.action ? press.action : nil }
     }
@@ -235,7 +272,107 @@ public final class Interface {
           action: .filterStep(pattern: pattern.id, index: index), on: canvas)
       }
     }
+    for line in layout.bassLines {
+      drawBassLine(line, layout, pattern: pattern, metrics: metrics, on: canvas)
+    }
     canvas.restore()
+
+    // Where the grid is scrolled to, when it is taller than its panel.
+    if layout.maxScroll > 0 {
+      let track = grid.height - 24
+      let thumb = max(24, track * grid.height / (grid.height + layout.maxScroll))
+      let top = grid.y + 12 + (track - thumb) * layout.scroll / layout.maxScroll
+      canvas.fill = Theme.white(0.18)
+      canvas.fillRoundedRect(grid.maxX - 7, top, 3, thumb, radius: 1.5)
+    }
+  }
+
+  /// A 303 line: for each step, whether it sounds, its pitch across two octaves, accent and slide,
+  /// on the drums' columns, so a note sits under the kick it plays against. A paused step shows
+  /// where its pitch is, as an outline.
+  private func drawBassLine(
+    _ line: Layout.BassLine, _ layout: Layout, pattern: DriftboxSeq.Pattern, metrics: GridMetrics,
+    on canvas: Canvas
+  ) {
+    let selected = session.selectedVoice == line.voice
+    if selected {
+      canvas.fill = Theme.white(0.06)
+      canvas.fillRoundedRect(line.frame.x, line.frame.y, line.frame.width, line.frame.height, radius: 8)
+    }
+    // The header: the machine, the line's name, and the octaves and the flag rows named level with
+    // their rows.
+    let header = line.header
+    canvas.align = .left
+    canvas.font = Theme.mono(8.5, weight: 600)
+    canvas.fill = Theme.three
+    canvas.fillText("TB-303", header.x, header.y + 9)
+    canvas.font = Theme.mono(12, weight: 600)
+    canvas.fill = selected || isHovered(header) ? Theme.ink : Theme.ink.faded(0.8)
+    canvas.fillText(line.name, header.x, header.y + 24)
+    let right = line.cells.x - 14
+    let cells = line.cells
+    canvas.align = .right
+    canvas.font = Theme.mono(8)
+    canvas.fill = Theme.dim.faded(0.7)
+    for note in [24, 12, 0] {
+      canvas.fillText("C\(note / 12 + 1)", right, cells.y + Float(24 - note) * BassMetrics.noteStride + 6)
+    }
+    canvas.font = Theme.mono(8, weight: 500)
+    canvas.fill = Theme.dim
+    canvas.fillText("ACCENT", right, cells.y + BassMetrics.flagsTop + 10)
+    canvas.fillText("SLIDE", right, cells.y + BassMetrics.flagsTop + BassMetrics.flagStride + 10)
+
+    // The keyboard behind the cells: the black keys' rows darker.
+    canvas.fill = Colour(0x000000, alpha: 0.28)
+    for (row, note) in BassMetrics.notes.enumerated() where BassMetrics.blackKeys.contains(note % 12) {
+      canvas.fillRect(
+        cells.x, cells.y + Float(row) * BassMetrics.noteStride - 1, cells.width, BassMetrics.noteStride)
+    }
+    if let playhead = layout.playhead, playhead < pattern.length {
+      // Lighter than the drums' playhead: a column this tall at full strength would be the
+      // brightest thing in the window, and it only says where the drums already say.
+      let x = cells.x + Float(playhead) * metrics.stride - 1
+      canvas.fill = Theme.live.faded(0.09)
+      canvas.fillRoundedRect(x, cells.y - 1, metrics.cell + 2, BassMetrics.notesHeight, radius: 3)
+      canvas.stroke = Theme.live.faded(0.3)
+      canvas.lineWidth = 1
+      canvas.strokeRoundedRect(x, cells.y - 1, metrics.cell + 2, BassMetrics.notesHeight, radius: 3)
+    }
+
+    var lit: [(Rect, Bool)] = []
+    for index in 0..<pattern.length {
+      let step = pattern.bassStep(line.voice, at: index)
+      let blank = Theme.white(index % 4 == 0 ? 0.07 : 0.035)
+      for note in BassMetrics.notes {
+        let cell = layout.noteCell(note, step: index, in: line)
+        if Int(step.note ?? -1) == note {
+          lit.append((cell, step.sounds))
+        } else {
+          canvas.fill = isHovered(cell) ? Theme.white(0.16) : blank
+          canvas.fillRoundedRect(cell.x, cell.y, cell.width, cell.height, radius: 2)
+        }
+      }
+      for slide in [false, true] {
+        let flag = layout.flagCell(step: index, slide: slide, in: line)
+        let on = slide ? step.slide : step.accent
+        canvas.fill = on ? (slide ? Theme.violet : Theme.three) : isHovered(flag) ? Theme.white(0.14) : blank
+        canvas.fillRoundedRect(flag.x, flag.y, flag.width, flag.height, radius: 3)
+      }
+    }
+    // The notes last, glowing, over everything; a paused one only an outline of where it would be.
+    for (cell, sounds) in lit {
+      if sounds {
+        let glow = cell.outset(3)
+        canvas.fill = Theme.three.faded(0.28)
+        canvas.fillRoundedRect(glow.x, glow.y, glow.width, glow.height, radius: 5)
+        canvas.fill = Colour(0xffde96)
+        canvas.fillRoundedRect(cell.x, cell.y, cell.width, cell.height, radius: 2, foot: Theme.three)
+      } else {
+        canvas.stroke = Theme.three.faded(0.55)
+        canvas.lineWidth = 1
+        canvas.strokeRoundedRect(cell.x, cell.y, cell.width, cell.height, radius: 2)
+      }
+    }
   }
 
   /// One step: off, on, or accented, lit top to bottom; the playhead's column outlined in teal all
