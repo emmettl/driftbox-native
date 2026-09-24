@@ -4,9 +4,9 @@ import DriftboxSeq
 /// on a keyboard. One octave and the C above it, at a finger's size, with the chips for everything
 /// else a step has: the one before and after, a rest, the octave, accent and slide.
 ///
-/// It sits above the grid, over the scene, so the step it is setting stays in sight; when the grid
-/// leaves no room there, it covers the song's strip instead. It is arithmetic, as `Layout` is: the
-/// drawing and the finger read the same one.
+/// It sits above the grid, over the scene, in room the layout leaves it by making the grid shorter,
+/// so the step it is setting stays in sight. It is arithmetic, as `Layout` is: the drawing and the
+/// finger read the same one.
 public struct BassKeyboard {
   public struct Key {
     public var frame: Rect
@@ -43,10 +43,9 @@ public struct BassKeyboard {
     self.octave = min(1, max(0, octave))
     step = pattern.bassStep(voice, at: index)
     let width = layout.bar.width
-    // Over the scene above the grid, or, with no room there, over the strip.
+    // Over the scene above the grid, in the room the layout leaves it there.
     let above = (layout.grid?.y ?? layout.size.y) - Layout.margin - Self.height
-    let top = above >= strip.maxY + Layout.margin ? above : strip.y
-    frame = Rect(layout.bar.x, top, width, Self.height)
+    frame = Rect(layout.bar.x, max(strip.maxY + Layout.margin, above), width, Self.height)
 
     let inner = Rect(frame.x + 10, frame.y + 10, width - 20, Self.height - 20)
     let id = pattern.id

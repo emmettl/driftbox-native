@@ -87,7 +87,7 @@ public final class Interface {
   func layout(scroll: Float, scrollX: Float? = nil) -> Layout {
     Layout(
       session: session, size: size, scroll: scroll, scrollX: scrollX ?? self.scrollX, effects: showsEffects,
-      renaming: renaming, page: page)
+      renaming: renaming, page: page, keyboard: bassSelection != nil)
   }
 
   /// Where the chip that brings the controls back is, while performing.
@@ -362,6 +362,17 @@ public final class Interface {
     {
       octave = note > 12 ? 1 : 0
     }
+    // Its line scrolled into sight, in the shorter grid the keyboard leaves.
+    let layout = layout
+    guard let line = layout.bassLines.first(where: { $0.voice == voice }), let rows = layout.gridContent
+    else {
+      return
+    }
+    if line.cells.maxY > rows.maxY - 8 {
+      scroll = self.layout(scroll: scroll + line.cells.maxY - rows.maxY + 12).scroll
+    } else if line.cells.y < rows.y + 8 {
+      scroll = self.layout(scroll: scroll - (rows.y - line.cells.y) - 12).scroll
+    }
   }
 
   private func editBass(
@@ -630,7 +641,11 @@ public final class Interface {
   /// The keyboard a 303 step's note is set on: the step and its note named, the chips, and the keys,
   /// with the step's own note lit on them while it sounds.
   private func drawKeyboard(_ keyboard: BassKeyboard, on canvas: Canvas) {
-    panel(keyboard.frame, on: canvas)
+    // Solid, unlike the panels over the scene: it is what a finger is on, and nothing shows through.
+    let frame = keyboard.frame
+    canvas.fill = Theme.panel.opaque
+    canvas.fillRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: 12)
+    panel(frame, on: canvas)
     let title = keyboard.title
     canvas.align = .left
     canvas.font = Theme.mono(8.5, weight: 600)

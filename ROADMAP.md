@@ -655,6 +655,16 @@ points wide where a finger wants 44, the 303's notes are rows 7 points high, the
 with a wheel, and a context menu is a right click. Drawing the controls over the scene costs a
 frame now and then at 120 a second.
 
+Decided, phone first: the grid a page of eight steps at a time, a 303 step's note set on a
+keyboard as the machine is programmed, and an edit mode and a perform mode. Done so far, and seen
+on a Fairphone 6: under 600 points across, `Layout` is a phone's — eight steps a page, 37 points
+by 40, their names above them, chosen by chip, swipe or the playhead; the grid dragged rather than
+wheeled; a PERFORM chip that leaves the screen to the scene and the pad bar an EDIT chip — and a
+303 step tapped opens `BassKeyboard` above the grid, which makes room for it: an octave and the C
+above, a key setting the note, sounding it, and moving on to the next step, with chips for the
+step before and after, a rest, the octave, accent and slide. Left: long press for the context
+menus, the tempo and swing somewhere on a phone, the inspector as a sheet, and a tablet's layout.
+
 ### What Milestone 5 asks of Milestone 4
 
 - **The GPU layer takes a third backend** without its protocol changing. Nothing goes in it that

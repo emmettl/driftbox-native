@@ -240,12 +240,13 @@ public struct Layout {
 
   /// The layout for a window `size` points across, the grid scrolled up by `scroll` and left by
   /// `scrollX`, the song's effects down the right if `effects` or the selected voice's knobs if not,
-  /// and a pattern's chip showing the name typed for it, if one is being renamed. On a phone the
+  /// grid does not scroll sideways but shows its `page`th eight steps, and with `keyboard` it leaves
+  /// room above itself for the 303 keyboard.
   /// grid does not scroll sideways but shows its `page`th eight steps.
   @MainActor
   public init(
     session: Session, size: SIMD2<Float>, scroll: Float = 0, scrollX: Float = 0, effects: Bool = false,
-    renaming: (pattern: String, text: String)? = nil, page: Int = 0
+    renaming: (pattern: String, text: String)? = nil, page: Int = 0, keyboard: Bool = false
   ) {
     self.size = size
     compact = size.x < Self.compactWidth
@@ -282,7 +283,8 @@ public struct Layout {
       }
     }
     layOutGrid(
-      session: session, scroll: scroll, scrollX: scrollX, effects: effects, renaming: renaming, page: page)
+      session: session, scroll: scroll, scrollX: scrollX, effects: effects, renaming: renaming, page: page,
+      keyboard: keyboard)
   }
 
   /// The transport across a window: play and back to the top at the left, the effects, the click
@@ -318,7 +320,7 @@ public struct Layout {
   private mutating func layOutGrid(
     session: Session, scroll: Float, scrollX: Float, effects: Bool,
     renaming: (pattern: String, text: String)?,
-    page: Int
+    page: Int, keyboard: Bool
   ) {
     let margin = Self.margin
     // Inside the grid's panel: less on a phone, where every point across is a step's.
@@ -362,7 +364,9 @@ public struct Layout {
     // As tall as what is in it and its pattern bar, up to the room under the strip; past that, it
     // scrolls under the pattern bar.
     let head = Self.patternBarHeight + 16
-    let room = max(0, size.y - margin - below)
+    // On a phone, less while the 303 keyboard is open above it: the grid scrolls, and nothing covers it.
+    let reserved = compact && keyboard ? BassKeyboard.height + margin : 0
+    let room = max(0, size.y - margin - below - reserved)
     let height = min(head + content + inset + 8, room)
     let grid = Rect(margin, size.y - margin - height, width, height)
     self.grid = grid

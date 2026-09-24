@@ -1,3 +1,4 @@
+import DriftboxEngine
 import DriftboxInterface
 import DriftboxSeq
 import DriftboxSession
@@ -50,6 +51,27 @@ struct BassKeyboardTests {
     #expect(keyboard.frame.maxY <= grid.y, "above the grid, clear of it: \(keyboard.frame), \(grid)")
     #expect(keyboard.keys.count == 13, "an octave and the C above")
     #expect(keyboard.keys.filter { !$0.black }.allSatisfy { $0.frame.width >= 38 }, "each a finger wide")
+  }
+
+  /// With every drum in the pattern the grid would fill the phone; open, the keyboard makes it
+  /// shorter rather than covering it, and scrolls the 303 line into sight.
+  @Test func aTallGridMakesRoomForTheKeyboard() throws {
+    var song = InterfaceTests.song()
+    for voice in allVoices { song.patterns[0].tracks[voice.id] = Array(repeating: .off, count: 16) }
+    song.patterns[0].bass["303.a"] = Array(repeating: BassStep(note: 0), count: 16)
+    let interface = try InterfaceTests.interface(song)
+    interface.size = SIMD2(372, 828)
+    // Below the bottom of the phone until it is scrolled to: chosen as a tap on it would.
+    interface.perform(.bassStep(voice: "303.a", index: 2))
+    let keyboard = try #require(interface.keyboard)
+    let layout = interface.layout
+    let grid = try #require(layout.grid)
+    let strip = try #require(layout.strip)
+    #expect(keyboard.frame.y >= strip.maxY && keyboard.frame.maxY <= grid.y, "between the strip and the grid")
+    let line = try #require(layout.bassLines.first)
+    let rows = try #require(layout.gridContent)
+    #expect(
+      line.cells.y >= rows.y && line.cells.maxY <= rows.maxY, "the 303 line in sight: \(line.cells), \(rows)")
   }
 
   @Test func aKeySetsTheNoteAndMovesOn() throws {

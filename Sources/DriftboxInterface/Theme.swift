@@ -66,4 +66,11 @@ extension Colour {
     out.alpha *= amount
     return out
   }
+
+  /// The same colour, with nothing showing through it.
+  var opaque: Colour {
+    var out = self
+    out.alpha = 1
+    return out
+  }
 }
