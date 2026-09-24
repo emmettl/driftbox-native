@@ -259,6 +259,27 @@ struct ShellTests {
       #expect(!window.isOpen)
     }
 
+    /// A context menu is made greyed and ticked as it is asked, its commands numbered past any menu
+    /// bar's, in the order they come, submenus and all.
+    @Test func aContextMenuIsMadeGreyedAndTicked() throws {
+      let menu = Menu(
+        "Lane",
+        [
+          .command("Copy", id: "copy"), .command("Paste", id: "paste"), .separator,
+          .submenu(Menu("Length", [.command("8", id: "8"), .command("16", id: "16")])),
+        ])
+      let (popup, commands) = Win32Menus.popUp(menu, isEnabled: { $0 != "paste" }, isChecked: { $0 == "16" })
+      defer { DestroyMenu(popup) }
+      #expect(commands.map(\.id) == ["copy", "paste", "8", "16"])
+      let first = UINT(Win32Menus.popUpFirstID)
+      #expect(Win32Menus.popUpFirstID > Win32Menus.firstID + 1000, "clear of any menu bar's")
+      #expect(GetMenuState(popup, first, UINT(MF_BYCOMMAND)) & UINT(MF_GRAYED) == 0)
+      #expect(GetMenuState(popup, first + 1, UINT(MF_BYCOMMAND)) & UINT(MF_GRAYED) != 0)
+      let inner = try #require(GetSubMenu(popup, 3))
+      #expect(GetMenuState(inner, first + 3, UINT(MF_BYCOMMAND)) & UINT(MF_CHECKED) != 0)
+      #expect(GetMenuState(inner, first + 2, UINT(MF_BYCOMMAND)) & UINT(MF_CHECKED) == 0)
+    }
+
     struct Broken: Error {}
 
     @Test func aFramesErrorEndsTheLoop() throws {

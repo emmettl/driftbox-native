@@ -171,6 +171,23 @@
       }
     }
 
+    /// Windows' own context menu, where the pointer is, answered before this returns: the command
+    /// chosen comes back rather than arriving as a `WM_COMMAND`.
+    public func popUp(
+      _ menu: Menu, at point: SIMD2<Float>, isEnabled: (String) -> Bool, isChecked: (String) -> Bool
+    ) -> String? {
+      let (popup, commands) = Win32Menus.popUp(menu, isEnabled: isEnabled, isChecked: isChecked)
+      defer { DestroyMenu(popup) }
+      var at = POINT(x: LONG(point.x * scale), y: LONG(point.y * scale))
+      ClientToScreen(handle, &at)
+      let flags = UINT(TPM_RETURNCMD) | UINT(TPM_NONOTIFY) | UINT(TPM_RIGHTBUTTON)
+      // With TPM_RETURNCMD the BOOL it returns is the command's number, which Swift brings in as a
+      // WindowsBool: the same 32 bits, read back as the number they are.
+      let returned = TrackPopupMenu(popup, flags, at.x, at.y, 0, handle, nil)
+      let chosen = Int(unsafeBitCast(returned, to: Int32.self)) - Win32Menus.popUpFirstID
+      return commands.indices.contains(chosen) ? commands[chosen].id : nil
+    }
+
     /// A frame, unless one is already being drawn: the modal loop's timer can fire while a frame
     /// is presenting, and a frame drawn inside another would draw into a target still in use.
     private func draw(_ frame: () throws -> Void) throws {

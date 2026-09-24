@@ -473,8 +473,11 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    right, turned by dragging, on arcs the canvas draws. The song is a strip of its sections to
    play from, with the loop bracketed over it, and the grid is headed by its patterns, to follow
    or choose or add to. FX puts the song's effects in the voice panel's place, in their groups.
-   The tempo and the swing are numbers dragged in the transport, as a data wheel sets them.
-   Left: editing the chain, settings, the rack and its cables, and a grid wider than the window.
+   The tempo and the swing are numbers dragged in the transport, as a data wheel sets them. The
+   secondary button gives a lane, a 303 line, a section or a pattern its menu, as Windows shows
+   one: turning, transposing, clearing, copying, loop lengths, repeats, moving and removing.
+   Left: renaming, the sections' machines, settings, the rack and its cables, and a grid wider
+   than the window.
 5. **Shipping.** The Swift runtime beside the executable; signing; winget; the `.driftbox` file
    association. Songs are already `.driftbox` — the web app's documents byte for byte, under a name
    Windows can associate without claiming every `.json`. `SongFile` in `DriftboxDocument` holds

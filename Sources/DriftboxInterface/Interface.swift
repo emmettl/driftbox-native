@@ -39,6 +39,10 @@ public final class Interface {
   public private(set) var scroll: Float = 0
   /// Whether the song's effects are down the right, where the selected voice's knobs would be.
   public var showsEffects = false
+  /// The context menu last made: what each of its commands does, and which are greyed or ticked.
+  var menuActions: [String: () -> Void] = [:]
+  var menuDisabled: Set<String> = []
+  var menuChecked: Set<String> = []
 
   public init(session: Session) {
     self.session = session

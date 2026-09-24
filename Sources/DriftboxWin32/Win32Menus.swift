@@ -46,21 +46,54 @@
       }
     }
 
+    // MARK: - A menu of its own
+
+    /// Where a context menu's commands are numbered from: past any menu bar's, so that nothing
+    /// meant for the one is taken for the other.
+    static let popUpFirstID = 30000
+
+    /// `menu` as a context menu, each item greyed and ticked as it is now, and its commands in the
+    /// order they are numbered from `popUpFirstID`. The caller destroys the menu.
+    static func popUp(
+      _ menu: Menu, isEnabled: (String) -> Bool, isChecked: (String) -> Bool
+    ) -> (menu: HMENU, commands: [MenuItem.Command]) {
+      let commands = menu.commands
+      let popup = build(menu, numbering: commands, from: popUpFirstID)
+      func mark(_ popup: HMENU) {
+        for position in 0..<max(0, GetMenuItemCount(popup)) {
+          if let inner = GetSubMenu(popup, position) {
+            mark(inner)
+            continue
+          }
+          let id = Int(GetMenuItemID(popup, position))
+          let index = id - popUpFirstID
+          guard commands.indices.contains(index) else { continue }
+          let state = isEnabled(commands[index].id) ? MF_ENABLED : MF_GRAYED
+          EnableMenuItem(popup, UINT(id), UINT(MF_BYCOMMAND) | UINT(state))
+          let tick = isChecked(commands[index].id) ? MF_CHECKED : MF_UNCHECKED
+          CheckMenuItem(popup, UINT(id), UINT(MF_BYCOMMAND) | UINT(tick))
+        }
+      }
+      mark(popup)
+      return (popup, commands)
+    }
+
     // MARK: - Building
 
-    private static func build(_ menu: Menu, numbering: [MenuItem.Command]) -> HMENU {
+    private static func build(_ menu: Menu, numbering: [MenuItem.Command], from first: Int = firstID) -> HMENU
+    {
       let popup = CreatePopupMenu()!
       for item in menu.items {
         switch item {
         case .command(let command):
-          let id = firstID + (numbering.firstIndex(of: command) ?? 0)
+          let id = first + (numbering.firstIndex(of: command) ?? 0)
           label(for: command).withCString(encodedAs: UTF16.self) { text in
             _ = AppendMenuW(popup, UINT(MF_STRING), UINT_PTR(id), text)
           }
         case .separator:
           AppendMenuW(popup, UINT(MF_SEPARATOR), 0, nil)
         case .submenu(let inner):
-          append(popup, title: inner.title, popup: build(inner, numbering: numbering))
+          append(popup, title: inner.title, popup: build(inner, numbering: numbering, from: first))
         }
       }
       return popup

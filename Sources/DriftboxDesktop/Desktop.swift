@@ -139,6 +139,9 @@ public final class Desktop {
       perform(id)
     case .resized(let width, let height, _):
       resized = (width, height)
+    case .pointer(let pointer) where pointer.button == 1:
+      // The secondary button asks what can be done with what it is on, and is nothing to the pad.
+      if pointer.phase == .began { contextMenu(at: pointer.location) }
     case .pointer(let pointer):
       // A press on the controls is theirs; anywhere else, the window is the pad.
       if !interface.pointer(pointer) { pad(pointer) }
@@ -149,6 +152,15 @@ public final class Desktop {
     default:
       break
     }
+  }
+
+  /// The menu for what is at `point`, shown as the window shows one, and what is chosen from it done.
+  func contextMenu(at point: SIMD2<Float>) {
+    guard let menu = interface.menu(at: point) else { return }
+    let chosen = window.popUp(
+      menu, at: point, isEnabled: { [interface] in interface.menuIsEnabled($0) },
+      isChecked: { [interface] in interface.menuIsChecked($0) })
+    if let chosen { interface.choose(chosen) }
   }
 
   /// The window as the pad: 0...1 from the bottom left, as the engine and the scenes take it.

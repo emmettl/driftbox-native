@@ -44,6 +44,12 @@ public protocol ShellWindow: AnyObject {
   /// The platform's own question before work is lost: save the changes to `name`, throw them
   /// away, or think again.
   func askToSave(_ name: String) -> SaveAnswer
+  /// `menu` at `point`, in points from the window's top left, as the platform shows a context
+  /// menu, until something is chosen from it or it is dismissed: the chosen command's id, or nil.
+  /// Its items are greyed and ticked as `isEnabled` and `isChecked` say, asked as it is made.
+  func popUp(
+    _ menu: Menu, at point: SIMD2<Float>, isEnabled: (String) -> Bool, isChecked: (String) -> Bool
+  ) -> String?
 }
 
 /// What someone said when asked whether to save their changes.
