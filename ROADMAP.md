@@ -437,9 +437,10 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    Left:
    - Graphic Lab, which sets type through Core Text every frame. Decided: only glyphs are a
      platform's, and the canvas is drawn on the GPU layer, where the Windows app's interface will
-     draw too. Done so far: `DriftboxText`'s `Typesetter` with DirectWrite behind it, and
-     `DriftboxCanvas`, the part of Canvas2D Graphic Lab draws with, on the layer. Next, Graphic Lab
-     on the canvas, and a Core Text typesetter for the Mac.
+     draw too. Done so far: `DriftboxText`'s `Typesetter`, with DirectWrite behind it on Windows
+     and Android's own text stack on Android, and `DriftboxCanvas`, the part of Canvas2D Graphic
+     Lab draws with, on the layer. Next, Graphic Lab on the canvas, and a Core Text typesetter for
+     the Mac.
    - `--window` on the Mac showing the song's scene rather than Pulse, and the Metal `Scene`
      gone at the end.
 4. **The window, drawn.** ← *here.* The shell first: `DriftboxShell` says what the app asks of a
@@ -525,8 +526,10 @@ each question, and the rest is Android's alone:
    phone's screen Frost took 21ms a frame and two more over the display's 8.3; drawn at two
    pixels to a point, as a Retina Mac draws them, and scaled up, nine keep 120 frames a second and
    Frost 98. Then the sixteen geometry scenes, as they moved to the layer on every platform at
-   once: each passing on the Adreno, at no more than 3.2ms a frame drawn. Left: `GraphicLab`,
-   which sets its type with CoreText and needs another way to set text.
+   once: each passing on the Adreno, at no more than 3.2ms a frame drawn. Then type: a
+   `Typesetter` on Android's own text stack, reached through the app's Java from whichever thread
+   draws, and passing what `TypesetterTests` holds every platform's to. Left: `GraphicLab`, which
+   moves onto `DriftboxCanvas` next, on every platform at once.
 4. **The touch interface, designed with iOS.** See below.
 5. **Shipping.** The shell is a `GameActivity`, which hands the window, input and lifecycle to
    native code. Songs open and save through the storage access framework as `.driftbox`, and

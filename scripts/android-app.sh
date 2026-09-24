@@ -6,6 +6,7 @@
 #     scripts/android-app.sh midi-loopback      # and run the MIDI ports against Driftbox Loopback
 #     scripts/android-app.sh gpu                # or the GPU contract on the phone's GPU
 #     scripts/android-app.sh scenes             # or every scene drawn, checked and timed
+#     scripts/android-app.sh text               # or the typesetter, held to what every platform's is
 #
 # No Gradle: the SDK's own tools, in the order Gradle would call them. Beyond what
 # `android-env.sh` needs, a JDK (JAVA_HOME, or the newest under Programs/Java), and the Android
@@ -28,15 +29,15 @@ app="$out/app"
 rm -rf "$app"
 mkdir -p "$app/classes" "$app/dex" "$app/stage/lib/arm64-v8a" "$app/stage/assets/songs"
 
-# The native library: everything the player has, the GPU layer on OpenGL ES, the scenes on it, and
-# the app's own module on top. The app checks the GPU contract with the contract tests' own
-# programs.
+# The native library: everything the player has, the GPU layer on OpenGL ES, the scenes on it,
+# type through Android's own, and the app's own module on top. The app checks the GPU contract with
+# the contract tests' own programs.
 extra_DriftboxAndroid=Tests/DriftboxGPUTests/Generated/ShaderPrograms.swift
 # shellcheck disable=SC2086
-compile $core DriftboxGPU DriftboxGPUGLES DriftboxScenes DriftboxAndroid
+compile $core DriftboxGPU DriftboxGPUGLES DriftboxScenes DriftboxText DriftboxTextAndroid DriftboxAndroid
 link "$app/stage/lib/arm64-v8a/libdriftbox.so" "$out/DriftboxGPU.o" "$out/DriftboxGPUGLES.o" \
-  "$out/DriftboxScenes.o" "$out/DriftboxAndroid.o" -lGLESv3 -landroid -emit-library \
-  -Xlinker -soname=libdriftbox.so
+  "$out/DriftboxScenes.o" "$out/DriftboxText.o" "$out/DriftboxTextAndroid.o" "$out/DriftboxAndroid.o" \
+  -lGLESv3 -landroid -emit-library -Xlinker -soname=libdriftbox.so
 cp "$libcxx" "$app/stage/lib/arm64-v8a/"
 # Symbols are half of what the libraries weigh, and the NDK's libc++ comes with all of its own.
 for library in "$app"/stage/lib/arm64-v8a/*.so; do "$llvm/bin/llvm-strip.exe" --strip-unneeded "$library"; done

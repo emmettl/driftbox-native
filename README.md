@@ -44,6 +44,7 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxWin32` | That on Windows: the Windows shell. |
 | `Sources/DriftboxText` | What the app asks of a platform's type: a line set in a font, and a glyph's coverage. |
 | `Sources/DriftboxTextWindows` | That on DirectWrite: type on Windows. |
+| `Sources/DriftboxTextAndroid` | That on Android's own text stack, through the app's Java: type on Android. |
 | `Sources/CDirectWrite` | The part of DirectWrite that is called, declared in C, since its own headers are C++. Declarations only. |
 | `Sources/DriftboxCanvas` | A 2D canvas on the GPU layer: Canvas2D's shapes, state, type and blends, the same on every platform. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
@@ -213,9 +214,26 @@ order of preference with a weight and a size in pixels. It must then:
 text renderer written in Swift that collects the glyphs, and a glyph run analysis rasterises each
 glyph. DirectWrite's headers are C++ only, so `CDirectWrite` declares the part of it that is called,
 transcribed in vtable order. COM never changes that order, and a slot in the wrong place fails the
-first test that reaches it. `TypesetterTests` holds a typesetter to how type behaves rather than to
-one font's numbers: it falls back through its families, scales exactly, kerns AV, measures trailing
-spaces, and stands an I on its baseline.
+first test that reaches it.
+
+`DriftboxTextAndroid` answers it with Android's own text stack, through the app's Java, since the
+NDK can find a font but has nothing to shape or draw one with. `TextRunShaper` sets the line, with
+Minikin and HarfBuzz underneath, and `Canvas.drawGlyphs` draws a glyph into an alpha bitmap. Both
+need Android 12. A family is looked up in the names `fonts.xml` gives, which include the web's
+usual ones as aliases: Arial and Helvetica are Roboto. Two details of drawing a glyph as it was set:
+- **Weight.** The font a shaped run hands back is the file and not how it was used. Roboto is
+  variable, so its `wght` axis is set again to the weight Minikin gave it, and a face with nothing
+  that heavy is emboldened again.
+- **Threads.** Swift calls in from any thread. The render thread is attached to Java on its first
+  call and let go of as it ends.
+
+On a Fairphone 6, a line costs 35µs and 4µs a glyph when Minikin has laid its text out before,
+and about 170µs when it has not; a glyph's coverage costs 90µs.
+
+`TypesetterTests` holds a typesetter to how type behaves rather than to one font's numbers: it falls
+back through its families, scales exactly, kerns AV, measures trailing spaces, stands an I on its
+baseline, and draws a heavier weight with more ink. Swift Testing does not run on a phone, so
+`scripts/android-app.sh text` runs the same checks there, on a thread of Swift's own.
 
 `DriftboxCanvas` is the rest of drawing type, and of drawing in two dimensions: the part of Canvas2D
 that Driftbox draws with, on the GPU layer.
@@ -257,8 +275,8 @@ Machine, Jumpman and Trench.
   `point_coord`.
 - **Per-point data.** Buffers the Metal shaders read by vertex id became vertex attributes. Small
   tables became uniform arrays.
-- **Graphic Lab is still Metal only.** It draws a canvas of type through Core Text every frame,
-  and needs a way to set type on the other platforms first.
+- **Graphic Lab is still Metal only.** It draws a canvas of type through Core Text every frame.
+  `DriftboxCanvas` and the typesetters for Windows and Android are what it moves onto.
 
 Every scene on the layer plays the same six seconds as the Metal scenes' own test: kicks, hats,
 and a finger circling through the middle two seconds. On WARP each is held to drawing something
@@ -363,6 +381,7 @@ adb shell am start -n app.driftbox/.Main --es song smallhours --es scene hothous
 scripts/android-app.sh midi-loopback    # test the MIDI ports against the app's own loopback
 scripts/android-app.sh gpu              # or the GPU contract on the phone's GPU
 scripts/android-app.sh scenes           # or every scene drawn, checked and timed there
+scripts/android-app.sh text             # or the typesetter, held to what every platform's is
 ```
 
 Two threads: Java's main thread owns the engine's commands and the audio route, and a render

@@ -39,6 +39,11 @@
     env.java(SceneCheck.run(width: Int(width), height: Int(height), density: density))
   }
 
+  @_cdecl("Java_app_driftbox_Native_textCheck")
+  public func nativeTextCheck(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?) -> jstring? {
+    env.java(TextCheck.run(env: env))
+  }
+
   // A song on the screen: all of these on Java's main thread, which is the main actor's.
 
   /// The song playing and being drawn, if one is.
