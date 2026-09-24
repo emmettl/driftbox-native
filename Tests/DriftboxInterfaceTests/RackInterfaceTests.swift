@@ -499,5 +499,71 @@ struct RackInterfaceTests {
     #expect(Self.data(rack, "steps") == steps)
   }
 
+  /// The Chord Loom names the chord a setting voices, and Alter is heard while it is held and let
+  /// go of with the press.
+  @Test func theChordLoomVoicesItsChord() throws {
+    let (rack, _) = try Self.alone("chord-player")
+    rack.rack.set("m", "key", to: 0)
+    rack.rack.set("m", "scale", to: 0)
+    rack.rack.set("m", "notes", to: 3)
+    let stage = rack.stage
+    let face = stage.faces[0]
+    #expect(face.name == "Chord Loom")
+    #expect(face.buttons.prefix(3).map(\.label) == ["C", "E", "G"])
+    #expect(face.buttons[3].label == "—" && !face.buttons[3].isOn)
+    let alter = try #require(face.buttons.first { $0.label == "ALTER" })
+    let def = try #require(RackModules.registry["chord-player"]?.params.first { $0.id == "alter" })
+    let at = Self.window(stage, Self.centre(alter.frame))
+    rack.pointer(PointerEvent(phase: .began, location: at))
+    #expect(rack.rack.value(rack.rack.patch.modules[0], def) == 1, "heard from the press")
+    #expect(rack.stage.faces[0].buttons[1].label == "D#", "a major third, minor")
+    rack.pointer(PointerEvent(phase: .ended, location: at + SIMD2(0, 200)))
+    #expect(rack.rack.value(rack.rack.patch.modules[0], def) == 0, "let go of wherever the pointer is")
+  }
+
+  /// An Arp's step rests and plays again by a click, the figure moving on past it; one past the
+  /// pattern's length does nothing.
+  @Test func theArpsStepsRest() throws {
+    let (rack, _) = try Self.alone("arp")
+    rack.rack.set("m", "patternLength", to: 8)
+    let stage = rack.stage
+    let face = stage.faces[0]
+    #expect(face.buttons.count == 16)
+    Self.press(rack, Self.window(stage, Self.centre(face.buttons[1].frame)))
+    let pattern = Self.data(rack, "pattern")
+    #expect(pattern.count == 16 && pattern[1] == 0)
+    let rested = rack.stage.faces[0]
+    #expect(rested.buttons[1].label == "—")
+    #expect(rested.buttons[2].label == face.buttons[1].label, "the figure holds through a rest")
+    #expect(face.buttons[12].press == nil)
+  }
+
+  /// A Combinator's rotary turns in whole steps and says so as a percentage; its buttons toggle;
+  /// and a learn chip waits for a controller until pressed again.
+  @Test func theCombinatorsControls() throws {
+    let (rack, face) = try Self.alone("combi")
+    let stage = rack.stage
+    let rotary = try #require(face.controls.first { $0.param.id == "rotary1" })
+    #expect(rotary.whole && rotary.display?(127) == "100%")
+    guard case .knob(let dial) = rotary.kind else { throw Unexpected() }
+    let at = Self.window(stage, Self.centre(dial))
+    Self.press(rack, at, to: at - SIMD2(0, 13))
+    let value = rack.rack.value(rack.rack.patch.modules[0], rotary.param)
+    #expect(value == value.rounded() && value > 64)
+
+    let pad = try #require(face.buttons.first { $0.label == "2" })
+    Self.press(rack, Self.window(stage, Self.centre(pad.frame)))
+    let button = try #require(RackModules.registry["combi"]?.params.first { $0.id == "button2" })
+    #expect(rack.rack.value(rack.rack.patch.modules[0], button) == 1)
+
+    let chip = try #require(face.buttons.first { $0.press == .learn(param: "rotary3") })
+    #expect(chip.label == "learn")
+    Self.press(rack, Self.window(stage, Self.centre(chip.frame)))
+    #expect(rack.rack.ccLearning == PortReference("m", "rotary3"))
+    #expect(rack.stage.faces[0].buttons.contains { $0.label == "turn one…" })
+    Self.press(rack, Self.window(stage, Self.centre(chip.frame)))
+    #expect(rack.rack.ccLearning == nil)
+  }
+
   struct Unexpected: Error {}
 }

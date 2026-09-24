@@ -346,22 +346,9 @@
       .help("Click to edit a Custom scale")
     }
 
-    /// The reference's `scalePlayerMask`: which of the twelve notes from the key a scale has, with
-    /// an empty custom map falling back to major.
-    nonisolated static let presets: [[Int]] = [
-      [0, 2, 4, 5, 7, 9, 11], [0, 2, 3, 5, 7, 8, 10], [0, 2, 4, 6, 7, 9, 11], [0, 2, 4, 5, 7, 9, 10],
-      [0, 1, 4, 5, 7, 8, 10], [0, 2, 3, 5, 7, 9, 10], [0, 1, 3, 5, 7, 8, 10], [0, 2, 3, 5, 7, 8, 11],
-      [0, 2, 3, 5, 7, 9, 11], [0, 2, 4, 7, 9], [0, 3, 5, 7, 10], [0, 1, 5, 7, 8],
-      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-    ]
-
+    /// Which of the twelve notes from the key a scale has: the shared `RackPreview`'s.
     nonisolated static func mask(_ scale: Int, _ custom: [Double]) -> [Double] {
-      let which = max(0, min(13, scale))
-      let degrees: [Int] =
-        which < presets.count
-        ? presets[which]
-        : custom.contains(where: { $0 >= 0.5 }) ? custom.indices.filter { custom[$0] >= 0.5 } : presets[0]
-      return (0..<12).map { degrees.contains($0) ? 1 : 0 }
+      RackPreview.scaleMask(scale, custom)
     }
   }
 

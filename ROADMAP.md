@@ -555,8 +555,11 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    draw what the render thread last copied out, the rack ticked with every frame. The faces that
    edit what a module plays have theirs too: the Tracker's lanes a bar at a time, the Arranger's
    sections, the Scale Player's keyboard and the Note Echo's pulses, their numbers dragged and
-   clicked as the Mac's cells are, one drag one undo. Next: the players, the samplers and the
-   groovebox, which show as the generic face until then.
+   clicked as the Mac's cells are, one drag one undo. The players have theirs: the Chord Loom's
+   voices and its held Alter, the Arp Field's rhythm and the figure it walks — both from
+   `RackPreview`, now shared and held to the reference on every platform — and the Combinator's
+   rotaries, buttons, MIDI learn and routing written out. Next: the samplers and the groovebox,
+   and the Combinator's routing editor, which show as the generic face or not at all until then.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift

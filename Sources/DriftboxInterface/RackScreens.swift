@@ -21,6 +21,9 @@ extension RackInterface {
       case "looper": drawLooper(screen, face: face, reading: reading, on: canvas)
       case "scale-player": drawScaleScreen(screen, face: face, on: canvas)
       case "note-echo": drawEchoScreen(screen, face: face, on: canvas)
+      case "chord-player": drawChordScreen(screen, face: face, on: canvas)
+      case "arp": drawArpScreen(screen, face: face, on: canvas)
+      case "combi": drawRoutes(screen, face: face, on: canvas)
       default: break
       }
     }
@@ -288,6 +291,12 @@ extension RackInterface {
     case .option, .tag: return drawOption(button, hovered: hovered, on: canvas)
     case .key(let black, let root): return drawKey(button, black: black, root: root, on: canvas)
     case .pulse(let amount): return drawPulse(button, amount: amount, on: canvas)
+    case .capsule: return drawCapsule(button, on: canvas)
+    case .voice(let lane, let badge): return drawVoice(button, lane: lane, badge: badge, on: canvas)
+    case .arpStep(let number, let octave):
+      return drawArpStep(button, number: number, octave: octave, on: canvas)
+    case .learn(let armed, let bound): return drawLearn(button, armed: armed, bound: bound, on: canvas)
+    case .pad(let live): return drawPad(button, live: live, hovered: hovered, on: canvas)
     }
     let r = button.frame
     if button.isOn {
