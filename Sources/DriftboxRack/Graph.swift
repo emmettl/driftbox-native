@@ -486,7 +486,13 @@ public struct RackGraph: ~Copyable {
           continue
         }
         if isStepped {
-          if offset > 0 { buffer.update(repeating: value, count: offset) }
+          if offset > 0 {
+            buffer.update(repeating: value, count: offset)
+            // The old value is at the head of the buffer now, so the next block must fill it again,
+            // or every block after keeps the old setting up to the offset for as long as this holds:
+            // emmettl/driftbox#309.
+            ramped[index] = true
+          }
           (buffer + offset).update(repeating: target, count: frames - offset)
         } else {
           if offset > 0 { buffer.update(repeating: value, count: offset) }

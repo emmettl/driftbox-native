@@ -386,7 +386,10 @@ external displays, performance capture to video.
    instrument, at the frame they happen and at their velocity, gliding pitch ending one note for the
    next, with mod, bend and sustain beside them; a new instance lets go of whatever an old one left
    sounding. The notes reach the unit through its own MIDI scheduling, ahead of each block, and its
-   face shows what it has sounding on a strip of keys.
+   face shows what it has sounding on a strip of keys. Timing notes to the frame found a bug in the
+   reference's graph, fixed there (emmettl/driftbox#309) and here together: a stepped param changed
+   partway through a block kept its old value at the head of every block after, so a held gate
+   retriggered every block.
 
 ### What the later milestones ask of the first
 
