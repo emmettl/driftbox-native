@@ -148,6 +148,17 @@
       }
     }
 
+    /// The song and its visuals, as a movie: asked where, then written by the stage while the app
+    /// carries on.
+    func exportMovie(through stage: Stage) {
+      guard player.song != nil else { return }
+      let panel = NSSavePanel()
+      panel.allowedContentTypes = [.quickTimeMovie]
+      panel.nameFieldStringValue = player.documentName + ".mov"
+      guard panel.runModal() == .OK, let url = panel.url else { return }
+      stage.exportMovie(to: url)
+    }
+
     /// One WAV per voice the song uses, into a folder: each voice alone with its sends.
     func exportStems() {
       guard let song = player.song else { return }

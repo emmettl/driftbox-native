@@ -90,19 +90,31 @@
         return true
       }
       .overlay(alignment: .bottom) {
-        if let error = player.error ?? player.outputError {
-          Label(error, systemImage: "exclamationmark.triangle.fill")
-            .font(Theme.mono(11))
-            .foregroundStyle(Theme.ink)
-            .padding(.horizontal, 14).padding(.vertical, 9)
-            .background(Capsule().fill(Color(red: 0.55, green: 0.1, blue: 0.2).opacity(0.9)))
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.15)))
-            .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
-            .padding(18)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+        VStack(spacing: 8) {
+          if let done = stage.exporting {
+            MovieProgress(done: done) { stage.stopExport() }
+              .transition(.move(edge: .bottom).combined(with: .opacity))
+          }
+          if let error = stage.exportFailure ?? player.error ?? player.outputError {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+              .font(Theme.mono(11))
+              .foregroundStyle(Theme.ink)
+              .padding(.horizontal, 14).padding(.vertical, 9)
+              .background(Capsule().fill(Color(red: 0.55, green: 0.1, blue: 0.2).opacity(0.9)))
+              .overlay(Capsule().strokeBorder(Color.white.opacity(0.15)))
+              .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+              // A movie that failed is put away by a click; the others go when they are mended.
+              .onTapGesture { stage.exportFailure = nil }
+              .transition(.move(edge: .bottom).combined(with: .opacity))
+          }
         }
+        .padding(18)
       }
-      .animation(.spring(response: 0.35, dampingFraction: 0.8), value: player.error ?? player.outputError)
+      .animation(
+        .spring(response: 0.35, dampingFraction: 0.8),
+        value: stage.exportFailure ?? player.error ?? player.outputError
+      )
+      .animation(.spring(response: 0.35, dampingFraction: 0.8), value: stage.exporting == nil)
     }
   }
 
@@ -796,6 +808,31 @@
         Color(red: 1, green: 138 / 255, blue: 106 / 255),
       ]
       return palette[index % palette.count]
+    }
+  }
+
+  /// A movie being written: how far, and a way to stop it.
+  struct MovieProgress: View {
+    let done: Double
+    let stop: () -> Void
+
+    var body: some View {
+      HStack(spacing: 10) {
+        Image(systemName: "film").foregroundStyle(Theme.nine)
+        Text(done < 0.1 ? "Playing the song through…" : "Writing the movie…")
+          .font(Theme.mono(11)).foregroundStyle(Theme.ink)
+        ProgressView(value: done).progressViewStyle(.linear).tint(Theme.nine).frame(width: 140)
+        Text("\(Int(done * 100))%").font(Theme.mono(10)).foregroundStyle(Theme.dim).monospacedDigit()
+          .frame(width: 34, alignment: .trailing)
+        Button("Stop", action: stop).buttonStyle(.borderless).font(Theme.mono(11, .semibold))
+          .foregroundStyle(Theme.ink)
+      }
+      .padding(.horizontal, 14).padding(.vertical, 9)
+      .background(Capsule().fill(Theme.ground.opacity(0.92)))
+      .overlay(Capsule().strokeBorder(Color.white.opacity(0.15)))
+      .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("Writing the movie, \(Int(done * 100)) percent")
     }
   }
 #endif
