@@ -48,6 +48,16 @@ final class NoType: Typesetter {
   func coverage(_ glyph: Glyph, offset: Float) -> GlyphCoverage? { nil }
 }
 
+/// Sets nothing either, but counts the lines it is asked to set.
+final class CountingType: Typesetter {
+  var set: [String] = []
+  func line(_ text: String, font: FontRequest) -> TextLine {
+    set.append("\(text) at \(font.size)")
+    return TextLine(glyphs: [], width: Float(text.count), ascent: 0, descent: 0, family: "none")
+  }
+  func coverage(_ glyph: Glyph, offset: Float) -> GlyphCoverage? { nil }
+}
+
 /// A page's pixel at `(x, y)` from the top left, as red, green, blue, alpha, 0...255.
 func pixel(_ bytes: [UInt8], _ x: Int, _ y: Int, width: Int) -> SIMD4<Int> {
   let at = (y * width + x) * 4
@@ -72,6 +82,44 @@ struct CanvasTests {
     try canvas.begin(width: size, height: size)
     body(canvas)
     return try device.readPixels(canvas.finish())
+  }
+
+  /// A line is set once and drawn again from what was set, for as long as each page uses it; a
+  /// line a whole page goes without is let go of, and set again if it comes back.
+  @Test func aLineIsSetOnceWhilePagesUseIt() throws {
+    for device in try Devices.all() {
+      let typesetter = CountingType()
+      let canvas = try Canvas(device: device, typesetter: typesetter)
+      let small = FontRequest(families: ["Arial"], size: 12)
+      var large = small
+      large.size = 24
+
+      try canvas.begin(width: 16, height: 16)
+      canvas.font = small
+      canvas.fillText("BPM", 0, 10)
+      canvas.fillText("BPM", 0, 12)
+      #expect(canvas.measure("BPM") == 3, "measured from the line set")
+      canvas.font = large
+      canvas.fillText("BPM", 0, 14)
+      #expect(typesetter.set == ["BPM at 12.0", "BPM at 24.0"], "once in each font")
+
+      try canvas.begin(width: 16, height: 16)
+      canvas.font = small
+      canvas.fillText("BPM", 0, 10)
+      canvas.fillText("00:01", 0, 12)
+      #expect(typesetter.set.count == 3, "the page before's line kept, and only the new one set")
+
+      try canvas.begin(width: 16, height: 16)
+      canvas.font = small
+      canvas.fillText("00:02", 0, 12)
+      try canvas.begin(width: 16, height: 16)
+      canvas.font = small
+      canvas.fillText("BPM", 0, 10)
+      #expect(
+        typesetter.set.suffix(2) == ["00:02 at 12.0", "BPM at 12.0"],
+        "a line a page went without is set again: \(typesetter.set)")
+      _ = canvas.finish()
+    }
   }
 
   /// A rectangle covers the pixels inside it, and half covers a pixel its edge halves.
