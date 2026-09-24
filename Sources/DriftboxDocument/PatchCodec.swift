@@ -139,7 +139,13 @@ public enum PatchCodec {
     {
       out.plugin = PluginReference(
         format: format, id: id, name: plugin["name"]?.string ?? "", vendor: plugin["vendor"]?.string ?? "",
-        state: plugin["state"]?.string)
+        state: plugin["state"]?.string,
+        controls: (plugin["controls"]?.array ?? []).compactMap { value in
+          guard let control = value.object, let macro = control["macro"]?.finite, macro == macro.rounded(),
+            (1...4).contains(Int(macro)), let key = control["key"]?.string, !key.isEmpty
+          else { return nil }
+          return PluginControl(macro: Int(macro), key: key, name: control["name"]?.string ?? key)
+        })
     }
     return out
   }
@@ -213,6 +219,16 @@ public enum PatchCodec {
       object["name"] = .string(plugin.name)
       object["vendor"] = .string(plugin.vendor)
       if let state = plugin.state { object["state"] = .string(state) }
+      if !plugin.controls.isEmpty {
+        object["controls"] = .array(
+          plugin.controls.map { control in
+            var entry = JSONObject()
+            entry["macro"] = .number(Double(control.macro))
+            entry["key"] = .string(control.key)
+            entry["name"] = .string(control.name)
+            return .object(entry)
+          })
+      }
       out["plugin"] = .object(object)
     }
     return .object(out)

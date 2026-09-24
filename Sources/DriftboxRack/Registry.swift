@@ -34,7 +34,8 @@ public enum RackModules {
     case "offset": .offset
     case "sample-hold": .sampleHold(SampleHold())
     case "delay": .delay(Delay(sampleRate: sampleRate))
-    case "plugin": .external(ExternalProcessor())
+    // The stereo inlet takes the first two slots.
+    case "plugin": .external(ExternalProcessor(cvBase: 2))
     case "plugin-instrument": .instrument(InstrumentProcessor())
     default:
       makeShaping(type, sampleRate: sampleRate, id: id, voice: voice).map { .shaping($0) }

@@ -90,13 +90,34 @@ public struct PluginReference: Equatable, Sendable {
   public var vendor: String
   /// Base64, as the host wrote it; nil for a plug-in never asked.
   public var state: String?
+  /// Which of the plug-in's own params each of the module's macros turns.
+  public var controls: [PluginControl]
 
-  public init(format: String, id: String, name: String, vendor: String, state: String? = nil) {
+  public init(
+    format: String, id: String, name: String, vendor: String, state: String? = nil,
+    controls: [PluginControl] = []
+  ) {
     self.format = format
     self.id = id
     self.name = name
     self.vendor = vendor
     self.state = state
+    self.controls = controls
+  }
+}
+
+/// One macro mapped onto one of a plug-in's params: by the param's key, which the format keeps
+/// the same from one instance to the next, and its name as it was, for when it cannot be found.
+public struct PluginControl: Equatable, Sendable {
+  /// 1 to 4.
+  public var macro: Int
+  public var key: String
+  public var name: String
+
+  public init(macro: Int, key: String, name: String) {
+    self.macro = macro
+    self.key = key
+    self.name = name
   }
 }
 

@@ -390,6 +390,13 @@ external displays, performance capture to video.
    reference's graph, fixed there (emmettl/driftbox#309) and here together: a stepped param changed
    partway through a block kept its old value at the head of every block after, so a held gate
    retriggered every block.
+   Then macros: four knobs on either plug-in module, each with a CV inlet, mapped onto the unit's own
+   params — chosen from its tree of them, or learnt by moving one in its interface — and kept in the
+   patch by each param's key. Being ordinary params, they undo, learn a controller, take a
+   Combinator routing and record as automation like any other knob. The render thread sends a
+   macro that moves, knob and CV together, to its param once a block, across the param's range as
+   the unit shows it, logarithmic for a frequency; a version 2 unit drops a ramped change, so none
+   is ramped. A knob names what it turns and says its value in that param's words.
 
 ### What the later milestones ask of the first
 

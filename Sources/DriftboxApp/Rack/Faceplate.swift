@@ -98,8 +98,11 @@
     /// The control for one param, as the generic face draws it, in a cell of the usual size.
     @ViewBuilder
     /// `named` puts a shorter name under it, where the face already says whose control it is.
+    /// `display` says a value in words of its own, where the param's range is not what it means.
     func control(
-      _ id: String, tint: Color? = nil, diameter: CGFloat = 34, options: [String]? = nil, named: String? = nil
+      _ id: String, tint: Color? = nil, diameter: CGFloat = 34, options: [String]? = nil,
+      named: String? = nil,
+      display: (@Sendable (Double) -> String)? = nil
     ) -> some View {
       if let param = param(id) {
         let shown =
@@ -110,7 +113,7 @@
           } ?? param
         ParamControl(
           def: shown, value: value(id), labels: options ?? ModuleFace.byType[def.type]?.labels[id],
-          tint: tint ?? self.tint, diameter: diameter, routed: model.isRouted(module.id, id)
+          tint: tint ?? self.tint, diameter: diameter, routed: model.isRouted(module.id, id), display: display
         ) { value, final in
           if final { model.set(module.id, id, to: value) } else { model.turn(module.id, id, to: value) }
         } end: {
@@ -185,6 +188,8 @@
     /// A Combinator drives it. Marked rather than disabled, as the reference marks it: it still
     /// turns, and the routing takes it back, and a dead knob would say less about why.
     var routed = false
+    /// The value in words, in place of the param's own.
+    var display: (@Sendable (Double) -> String)? = nil
     /// A value, and whether it is the last of a gesture.
     let change: (Double, Bool) -> Void
     let end: () -> Void
@@ -209,7 +214,11 @@
         let span = def.max - def.min
         RotaryKnob(
           spec: KnobSpec(
-            label: def.name, format: { [def] fraction in Self.display(def, def.min + fraction * span) }),
+            label: def.name,
+            format: { [def, display] fraction in
+              let value = def.min + fraction * span
+              return display?(value) ?? Self.display(def, value)
+            }),
           value: span == 0 ? 0 : max(0, min(1, (value - def.min) / span)), tint: tint,
           rest: span == 0 ? nil : (def.defaultValue - def.min) / span, diameter: diameter,
           live: { change(def.min + $0 * span, false) },

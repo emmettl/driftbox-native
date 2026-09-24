@@ -146,7 +146,6 @@
       let reference = face.module.plugin
       let status = face.model.plugins[face.module.id]
       let instrument = face.def.type == "plugin-instrument"
-      let kind = instrument ? "instrument" : "effect"
       PanelTitle(name: instrument ? "Instrument" : "Plug-in", mark: "AU") {
         HStack(spacing: 5) {
           Circle().fill(Self.lit(status) ? Theme.nine : Theme.dim.opacity(0.4)).frame(width: 5, height: 5)
@@ -155,25 +154,42 @@
         }
         .font(Theme.mono(8)).foregroundStyle(Theme.dim)
       }
-      VStack(alignment: .leading, spacing: 3) {
-        Text(reference?.name ?? "No plug-in")
-          .font(Theme.mono(12, .semibold)).foregroundStyle(Theme.ink).lineLimit(1)
-        Text(Self.detail(reference, status, instrument: instrument))
-          .font(Theme.mono(8.5)).foregroundStyle(Theme.dim).lineLimit(2)
-          .fixedSize(horizontal: false, vertical: true)
+      HStack(alignment: .top, spacing: 10) {
+        VStack(alignment: .leading, spacing: 3) {
+          Text(reference?.name ?? "No plug-in")
+            .font(Theme.mono(12, .semibold)).foregroundStyle(Theme.ink).lineLimit(1)
+          Text(Self.detail(reference, status, instrument: instrument))
+            .font(Theme.mono(8.5)).foregroundStyle(Theme.dim).lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+          Spacer(minLength: 6)
+          buttons(reference: reference, status: status, instrument: instrument)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 0) {
+          ForEach(1...4, id: \.self) { macro in self.macro(macro, ready: Self.lit(status)) }
+        }
       }
+      // An effect's buttons at the foot of its face; an instrument's above its keys.
+      .frame(maxHeight: instrument ? RackLayout.cellHeight + 30 : .infinity)
       if instrument {
         let notes = face.reading?.notes ?? []
         NoteStrip(notes: notes)
-          .frame(height: 44)
-          .padding(.top, 8)
+          .frame(minHeight: 44, maxHeight: 120)
+          .padding(.top, 10)
           .accessibilityLabel(
             notes.isEmpty ? "No notes sounding" : notes.map(RackKeyboard.name).joined(separator: ", "))
         Text(notes.isEmpty ? " " : notes.map(RackKeyboard.name).joined(separator: " "))
           .font(Theme.mono(8.5)).foregroundStyle(Theme.nine).lineLimit(1)
       }
       Spacer(minLength: 0)
-      HStack(spacing: 6) {
+    }
+
+    /// Choosing a unit, opening it, and mapping its macros.
+    private func buttons(reference: PluginReference?, status: RackModel.PluginStatus?, instrument: Bool)
+      -> some View
+    {
+      let kind = instrument ? "instrument" : "effect"
+      return HStack(spacing: 6) {
         Menu {
           let units = instrument ? PluginCatalogue.instruments : PluginCatalogue.effects
           if units.isEmpty { Text("No Audio Unit \(kind)s on this Mac") }
@@ -192,12 +208,64 @@
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Choose an Audio Unit \(kind) on this Mac")
-        // Only a unit that is running has controls to show.
+        // Only a unit that is running has controls to show, or to map.
         if Self.lit(status) {
           Button("Open") { face.model.showInterface(face.module.id) }
             .buttonStyle(OptionStyle(on: false, tint: Theme.nine))
             .help("Open the plug-in's own controls in a window")
+          Menu {
+            ForEach(1...4, id: \.self) { macro in
+              Menu(macroTitle(macro)) { macroMenu(macro) }
+            }
+          } label: {
+            Text("Map…").font(Theme.mono(9, .semibold))
+          }
+          .menuStyle(.button)
+          .buttonStyle(OptionStyle(on: false, tint: Theme.nine))
+          .menuIndicator(.hidden)
+          .fixedSize()
+          .help("Choose what each macro turns in the plug-in")
         }
+      }
+    }
+
+    /// Macro `macro`'s knob, named for what it turns and saying the value in that param's words.
+    private func macro(_ macro: Int, ready: Bool) -> some View {
+      let mapped = face.model.macroParameter(face.module.id, macro)
+      let learning = face.model.learning.map { $0.module == face.module.id && $0.macro == macro } ?? false
+      let display: (@Sendable (Double) -> String)? = mapped?.parameter.map { parameter in
+        let held = HeldParameter(parameter: parameter)
+        return { HostedAudioUnit.display(held.parameter, at: $0) }
+      }
+      return face.control(
+        "macro\(macro)", tint: learning ? Theme.three : Theme.nine,
+        named: learning ? "Learn…" : mapped?.control.name ?? "Macro \(macro)", display: display
+      )
+      .opacity(mapped == nil && !learning ? 0.5 : 1)
+      .contextMenu { if ready { macroMenu(macro) } }
+      .help(
+        learning
+          ? "Move a control in the plug-in's window and macro \(macro) turns it"
+          : mapped.map { "Macro \(macro) turns \($0.control.name)" } ?? "Macro \(macro): not mapped yet")
+    }
+
+    private func macroTitle(_ macro: Int) -> String {
+      face.model.macroParameter(face.module.id, macro).map { "Macro \(macro): \($0.control.name)" }
+        ?? "Macro \(macro)"
+    }
+
+    /// Map macro `macro` from the unit's own tree of params, learn it from its interface, or unmap it.
+    @ViewBuilder
+    private func macroMenu(_ macro: Int) -> some View {
+      let id = face.module.id
+      if let tree = face.model.units[id]?.unit.parameterTree {
+        Menu("Map To") {
+          ParameterMenu(nodes: tree.children) { face.model.mapMacro(id, macro, to: $0) }
+        }
+      }
+      Button("Learn from the Plug-in") { face.model.learnMacro(id, macro) }
+      if face.model.macroParameter(id, macro) != nil {
+        Button("Unmap") { face.model.mapMacro(id, macro, to: nil) }
       }
     }
 
@@ -269,6 +337,29 @@
         }
       }
       .animation(.easeOut(duration: 0.08), value: notes)
+    }
+  }
+
+  /// A param for a closure that has to be `Sendable` to be kept: only ever called on the main actor,
+  /// by the knob that shows it.
+  struct HeldParameter: @unchecked Sendable {
+    let parameter: AUParameter
+  }
+
+  /// A unit's params as its own tree groups them, a submenu to a group.
+  struct ParameterMenu: View {
+    let nodes: [AUParameterNode]
+    let choose: (AUParameter) -> Void
+
+    var body: some View {
+      ForEach(nodes, id: \.keyPath) { node in
+        if let group = node as? AUParameterGroup {
+          // Behind `AnyView`, as a view whose body holds itself has no type to name.
+          Menu(group.displayName) { AnyView(ParameterMenu(nodes: group.children, choose: choose)) }
+        } else if let parameter = node as? AUParameter, parameter.flags.contains(.flag_IsWritable) {
+          Button(parameter.displayName) { choose(parameter) }
+        }
+      }
     }
   }
 #endif

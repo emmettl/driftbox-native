@@ -9,15 +9,17 @@ import DriftboxDSP
 
 /// One block of an external processor: its `context`; the module's inlet buffers and its outlet
 /// buffers, one per slot as `Slots` has them, never to write to the first nor leave any of the
-/// second unwritten; the block's frames; where the transport is, for a plug-in keeping time; and
-/// the MIDI the block plays, as `MIDIEvent` packs it, in order of frame.
+/// second unwritten; the block's frames; where the transport is, for a plug-in keeping time; the
+/// MIDI the block plays, as `MIDIEvent` packs it, in order of frame; and where the module's macros
+/// end the block, each knob and its CV together, between 0 and 1.
 public typealias ExternalRender =
   @convention(c) (
     _ context: UnsafeMutableRawPointer?,
     _ inlets: UnsafePointer<UnsafeMutablePointer<Float>>,
     _ outlets: UnsafePointer<UnsafeMutablePointer<Float>>,
     _ frames: Int, _ tempo: Double, _ beat: Double, _ running: Bool,
-    _ events: UnsafePointer<UInt64>?, _ eventCount: Int
+    _ events: UnsafePointer<UInt64>?, _ eventCount: Int,
+    _ macros: UnsafePointer<Float>, _ macroCount: Int
   ) -> Void
 
 /// A three-byte MIDI message at a frame of the block, packed into one word so a block's worth is a
@@ -61,31 +63,47 @@ public struct ExternalProcessor {
   /// Held apart from the processor, which is copied in and out of its case every block, so the
   /// host has one fixed place to swap a plug-in into.
   let slot: UnsafeMutablePointer<ExternalSlot>
+  /// The four macros as the block ends, and which inlet slot the first one's CV is in.
+  static let macroCount = 4
+  let macros: UnsafeMutablePointer<Float>
+  let cvBase: Int
 
-  init() {
+  /// `cvBase`: the slot of the first macro's CV inlet, after the module's own inlets.
+  init(cvBase: Int) {
     slot = .allocate(capacity: 1)
     slot.initialize(to: .empty)
+    macros = .allocate(capacity: Self.macroCount)
+    macros.initialize(repeating: 0, count: Self.macroCount)
+    self.cvBase = cvBase
   }
 
   @_noAllocation
   func process(_ inlets: Slots, _ outlets: Slots, _ params: Slots, _ context: ProcessContext) {
     let current = slot.pointee
     guard let render = current.render else { return silence(outlets, context.frames) }
-    call(render, current.context, inlets, outlets, context, events: nil, count: 0)
+    call(render, current.context, inlets, outlets, params, context, events: nil, count: 0)
   }
 
   @_noAllocation
   func call(
     _ render: ExternalRender, _ external: UnsafeMutableRawPointer?, _ inlets: Slots, _ outlets: Slots,
-    _ context: ProcessContext, events: UnsafePointer<UInt64>?, count: Int
+    _ params: Slots, _ context: ProcessContext, events: UnsafePointer<UInt64>?, count: Int
   ) {
     let transport = context.transport
+    // Each macro where the block ends: its knob, and its CV added, kept between 0 and 1.
+    let last = max(0, context.frames - 1)
+    for macro in 0..<Self.macroCount {
+      let knob = macro < params.count ? Double(params[macro][last]) : 0
+      let cv = cvBase + macro < inlets.count ? Double(inlets[cvBase + macro][last]) : 0
+      let sum = knob + cv
+      macros[macro] = sum.isFinite ? Float(max(0, min(1, sum))) : 0
+    }
     // The one call on the render path the checker cannot see into: what it reaches is the host's,
     // which answers for it being as careful as everything here.
     _unsafePerformance {
       render(
         external, UnsafePointer(inlets.base), UnsafePointer(outlets.base), context.frames, transport.tempo,
-        transport.beat, transport.running, events, count)
+        transport.beat, transport.running, events, count, UnsafePointer(macros), Self.macroCount)
     }
   }
 
@@ -95,7 +113,10 @@ public struct ExternalProcessor {
     for outlet in 0..<outlets.count { outlets[outlet].update(repeating: 0, count: frames) }
   }
 
-  func release() { slot.deallocate() }
+  func release() {
+    slot.deallocate()
+    macros.deallocate()
+  }
 }
 
 /// The `plugin-instrument` module running: the rack's notes, every voice of them, made into MIDI
@@ -105,7 +126,8 @@ public struct ExternalProcessor {
 /// inlets, block by block. A new instance first lets go of every note a previous one left sounding,
 /// since an edit that rebuilds the graph must not leave the plug-in holding one for ever.
 public struct InstrumentProcessor {
-  let external = ExternalProcessor()
+  /// After pitch, gate, velocity, mod, bend and sustain.
+  let external = ExternalProcessor(cvBase: 6)
   static let capacity = 512
   static let voiceLimit = 32
   let events: UnsafeMutablePointer<UInt64>
@@ -197,7 +219,7 @@ public struct InstrumentProcessor {
     let current = external.slot.pointee
     guard let render = current.render else { return external.silence(outlets, frames) }
     external.call(
-      render, current.context, inlets, outlets, context, events: UnsafePointer(events), count: count)
+      render, current.context, inlets, outlets, params, context, events: UnsafePointer(events), count: count)
   }
 
   @_noAllocation
@@ -229,20 +251,24 @@ extension RackModules {
       inlets: [
         Port("pitch", "V/Oct"), Port("gate", "Gate"), Port("velocity", "Velocity"), Port("mod", "Mod"),
         Port("bend", "Pitch Bend"), Port("sustain", "Sustain"),
-      ],
-      outlets: [Port("out", "Out", stereo: true)], params: [])
+      ] + macroInlets,
+      outlets: [Port("out", "Out", stereo: true)], params: macroParams)
     // One instance, reading every voice: the plug-in does its own voicing.
     def.poly = false
     def.voiceCollector = true
     return def
   }()
 
+  /// Four macros, each a knob with a CV inlet, which the patch maps onto the plug-in's own params.
+  static let macroParams = (1...4).map { ParamDef("macro\($0)", "Macro \($0)", min: 0, max: 1, default: 0) }
+  static let macroInlets = (1...4).map { Port("cv\($0)", "Macro \($0) CV") }
+
   /// A stereo effect: a plug-in between a stereo inlet and a stereo outlet. What it is, and its
-  /// state, are the module's `plugin` in the patch, not its params, which it has none of.
+  /// state, are the module's `plugin` in the patch; its params are the four macros.
   static let plugin: ModuleDef = {
     var def = ModuleDef(
-      type: "plugin", name: "Plug-in", inlets: [Port("in", "In", stereo: true)],
-      outlets: [Port("out", "Out", stereo: true)], params: [])
+      type: "plugin", name: "Plug-in", inlets: [Port("in", "In", stereo: true)] + macroInlets,
+      outlets: [Port("out", "Out", stereo: true)], params: macroParams)
     // One instance, however many voices: a plug-in is one thing with one state.
     def.poly = false
     return def
