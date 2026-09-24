@@ -3,6 +3,7 @@ import DriftboxDocument
 import DriftboxGPU
 import DriftboxHost
 import DriftboxInterface
+import DriftboxRackSession
 import DriftboxScenes
 import DriftboxSession
 import DriftboxShell
@@ -43,12 +44,19 @@ public final class Desktop {
   var keys = KeyboardInstrument()
   /// Where the pointer is pressed on the pad, 0...1 from the bottom left, while it is.
   var touch: SIMD2<Float>?
+  /// The rack, if the app has one: sounding beside the groovebox, and shown in its place while
+  /// `showsRack`.
+  public let rack: RackSession?
+  public let rackInterface: RackInterface?
+  public internal(set) var showsRack = false
 
   public init(
     session: Session, window: any ShellWindow, device: any GPUDevice, surface: any GPUSurface,
-    typesetter: any Typesetter
+    typesetter: any Typesetter, rack: RackSession? = nil
   ) throws {
     self.session = session
+    self.rack = rack
+    rackInterface = rack.map(RackInterface.init)
     self.window = window
     self.device = device
     self.surface = surface
@@ -74,6 +82,7 @@ public final class Desktop {
   public func run() throws {
     try window.run { try drawFrame() }
     session.close()
+    rack?.close()
   }
 
   // MARK: - A frame
@@ -88,7 +97,10 @@ public final class Desktop {
     }
     showScene()
     let time = HostTime.seconds(from: began, to: HostTime.now())
-    scene.draw(session.sceneInput(time: time, pixelRatio: window.scale), into: frame, on: device)
+    // The rack covers the window while it shows: the scene waits.
+    if !showsRack {
+      scene.draw(session.sceneInput(time: time, pixelRatio: window.scale), into: frame, on: device)
+    }
     let target = try surface.target()
     presenter.present(frame, into: target, on: device)
     try drawInterface(into: target)
@@ -98,7 +110,16 @@ public final class Desktop {
   /// The controls, drawn on a page the size of the window in its pixels, in points, and laid over
   /// the scene.
   func drawInterface(into target: any GPUTarget) throws {
-    interface.size = SIMD2(Float(window.width), Float(window.height)) / window.scale
+    let points = SIMD2(Float(window.width), Float(window.height)) / window.scale
+    interface.size = points
+    if showsRack, let rackInterface {
+      rackInterface.size = points
+      try canvas.begin(width: target.width, height: target.height)
+      canvas.scale(window.scale, window.scale)
+      rackInterface.draw(on: canvas)
+      presenter.overlay(canvas.finish(), into: target, on: device)
+      return
+    }
     guard interface.isShowing else { return }
     try canvas.begin(width: target.width, height: target.height)
     canvas.scale(window.scale, window.scale)
@@ -120,9 +141,9 @@ public final class Desktop {
   /// from what the window has, which the window checks itself for the menus.
   func refresh() {
     if window.takesText != interface.takesText { window.takesText = interface.takesText }
-    let title = Self.title(for: session)
+    let title = showsRack ? rack.map(Self.title(for:)) ?? "Driftbox" : Self.title(for: session)
     if window.title != title { window.title = title }
-    window.menuBar = DesktopMenus.bar(for: session)
+    window.menuBar = DesktopMenus.bar(for: session, rack: rack, showsRack: showsRack)
   }
 
   /// As Windows' own programs title a document's window: its name, marked while it has changes
@@ -135,6 +156,7 @@ public final class Desktop {
   // MARK: - What the window hears
 
   func handle(_ event: ShellEvent) {
+    if showsRack, handleRack(event) { return }
     switch event {
     case .command(let id):
       perform(id)
@@ -203,9 +225,10 @@ public final class Desktop {
       _ = saveAs()
     case DesktopMenus.exit:
       if mayLoseChanges() { window.close() }
-    case DesktopMenus.undo: session.undo()
-    case DesktopMenus.redo: session.redo()
-    case DesktopMenus.toggle: session.toggle()
+    case DesktopMenus.undo: if showsRack, let rack { rack.undo() } else { session.undo() }
+    case DesktopMenus.redo: if showsRack, let rack { rack.redo() } else { session.redo() }
+    case DesktopMenus.toggle: if showsRack, let rack { rack.toggleRunning() } else { session.toggle() }
+    case DesktopMenus.showRack: setShowsRack(!showsRack)
     case DesktopMenus.start: session.seek(toStep: 0)
     case DesktopMenus.previousSection: session.skip(sections: -1)
     case DesktopMenus.nextSection: session.skip(sections: 1)
@@ -228,7 +251,11 @@ public final class Desktop {
   /// The commands that carry what they are about in their id: a song, a scene, a device, a source,
   /// a destination.
   func performNamed(_ id: String) {
-    if let entryID = DesktopMenus.value(id, after: DesktopMenus.songPrefix) {
+    if let patchID = DesktopMenus.value(id, after: DesktopMenus.patchPrefix) {
+      guard let entry = PatchEntry.all.first(where: { $0.id == patchID }) else { return }
+      rack?.open(entry)
+      setShowsRack(true)
+    } else if let entryID = DesktopMenus.value(id, after: DesktopMenus.songPrefix) {
       guard let entry = session.entries.first(where: { $0.id == entryID }), mayLoseChanges() else { return }
       session.open(entry)
     } else if let sceneID = DesktopMenus.value(id, after: DesktopMenus.scenePrefix) {
@@ -255,9 +282,11 @@ public final class Desktop {
 
   func isEnabled(_ id: String) -> Bool {
     switch id {
-    case DesktopMenus.undo: session.canUndo
-    case DesktopMenus.redo: session.canRedo
-    case DesktopMenus.save, DesktopMenus.saveAs, DesktopMenus.toggle, DesktopMenus.start,
+    case DesktopMenus.undo: showsRack ? rack?.canUndo ?? false : session.canUndo
+    case DesktopMenus.redo: showsRack ? rack?.canRedo ?? false : session.canRedo
+    case DesktopMenus.toggle: showsRack || session.song != nil
+    case DesktopMenus.showRack: rack != nil
+    case DesktopMenus.save, DesktopMenus.saveAs, DesktopMenus.start,
       DesktopMenus.previousSection, DesktopMenus.nextSection, DesktopMenus.loop:
       session.song != nil
     case DesktopMenus.noInputs, DesktopMenus.noOutputs: false
@@ -272,6 +301,7 @@ public final class Desktop {
     case DesktopMenus.loop: return session.loop != nil
     case DesktopMenus.songsScene: return chosenScene == nil
     case DesktopMenus.controls: return interface.isShowing
+    case DesktopMenus.showRack: return showsRack
     case DesktopMenus.systemOutput: return session.outputDevice == nil
     case DesktopMenus.listen: return session.listensToMIDI
     case DesktopMenus.followClock: return session.followsClock

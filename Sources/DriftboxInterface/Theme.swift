@@ -9,6 +9,8 @@ import DriftboxText
 public enum Theme {
   /// The panels have no blur behind them here, so they are a little darker than the Mac's glass to
   /// read as well over a bright scene.
+  /// The instrument's dark, behind everything that is not the scene.
+  public static let ground = Colour(0x07040f)
   public static let panel = Colour(0x0e0a1e, alpha: 0.74)
   public static let edge = Colour(0xffffff, alpha: 0.09)
   public static let ink = Colour(0xe8e4ff)

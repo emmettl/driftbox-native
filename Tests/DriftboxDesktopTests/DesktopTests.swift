@@ -1,6 +1,7 @@
 import DriftboxDocument
 import DriftboxGPU
 import DriftboxHost
+import DriftboxRackSession
 import DriftboxSeq
 import DriftboxSession
 import DriftboxShell
@@ -344,6 +345,52 @@ struct DesktopTests {
         #expect(desktop.session.undoTitle == "Undo Clear Lane")
         #expect(desktop.session.padTouch == nil)
       }
+    }
+  }
+
+  /// With a rack, the Rack menu shows it in the groovebox's place and opens its patches; while it
+  /// shows, the window's title, its Edit menu, its Space and its pointer are the rack's; and the
+  /// groovebox comes back as it was. Without one, there is no Rack menu.
+  @Test func theRackShowsInTheGrooveboxesPlace() throws {
+    for device in try Self.devices() {
+      let (plain, plainWindow, _) = try Self.desktop(on: device)
+      defer { withExtendedLifetime(plain) {} }
+      #expect(!plainWindow.commandIDs.contains(DesktopMenus.showRack))
+
+      let window = StandInWindow()
+      let surface = StandInSurface(device: device, width: 320, height: 180)
+      let desktop = try Desktop(
+        session: Session(host: EngineHost(sampleRate: 48000)), window: window, device: device,
+        surface: surface,
+        typesetter: NoTypesetter(), rack: RackSession())
+      let rack = try #require(desktop.rack)
+      #expect(window.commandIDs.contains(DesktopMenus.patchPrefix + "acid"))
+      #expect(window.isChecked?(DesktopMenus.showRack) == false)
+
+      window.choose(DesktopMenus.showRack)
+      #expect(desktop.showsRack && window.isChecked?(DesktopMenus.showRack) == true)
+      try desktop.drawFrame()
+      #expect(window.title == "\(rack.name) - Driftbox Rack")
+      #expect(surface.presented == 1)
+
+      window.choose(DesktopMenus.toggle)
+      #expect(rack.running, "Space is the rack's")
+      #expect(!desktop.session.isPlaying)
+      window.onEvent?(.pointer(PointerEvent(phase: .began, location: SIMD2(160, 170))))
+      window.onEvent?(.pointer(PointerEvent(phase: .ended, location: SIMD2(160, 170))))
+      #expect(desktop.session.padTouch == nil, "and not the pad's")
+
+      window.choose(DesktopMenus.patchPrefix + "acid")
+      #expect(rack.name == PatchEntry.all.first { $0.id == "acid" }?.name)
+      rack.setTempo(99)
+      try desktop.drawFrame()
+      #expect(window.title(of: DesktopMenus.undo) == "Undo Set Tempo")
+      window.choose(DesktopMenus.undo)
+      #expect(rack.tempo != 99, "undone in the rack")
+
+      window.choose(DesktopMenus.showRack)
+      try desktop.drawFrame()
+      #expect(!desktop.showsRack && window.title == "Driftbox")
     }
   }
 

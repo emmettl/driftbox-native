@@ -534,7 +534,12 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    edits a `RackSession`, held by a `MacRack` with what only a Mac has around it — the rack's Audio
    Unit, Audio Units as its plug-ins, Core Audio reading its samples and the groovebox window — and
    its own copies of the model, the helpers and the patch catalogue are gone.
-   Next: the rack drawn on the canvas, its fronts, its back and its cables.
+   The rack is in the Windows app: its own session through the same output, heard beside the
+   groovebox, and Rack ▸ Show Rack (Ctrl+R) puts it in the groovebox's place, drawn on the canvas
+   by `RackInterface` — a header with its transport, tempo, keys and Add, and every module's front
+   where `RackLayout` puts it, with a knob, buttons or a stepper for each param, a menu each, and
+   the keys playing it as the Mac's do. Next: the back, its jacks and cables and patching; then the
+   faces the reference builds by hand, which show as the generic face until then.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift
