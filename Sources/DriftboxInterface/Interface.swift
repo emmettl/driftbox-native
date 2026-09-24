@@ -61,6 +61,9 @@ public final class Interface {
   /// A finger dragged on the grid rather than tapped: which, from where, where it was last, and
   /// which way it went once it had gone far enough to say.
   private var drag: (pointer: Int, from: SIMD2<Float>, last: SIMD2<Float>, across: Bool?)?
+  /// On a phone, the 303 step the keyboard is setting, if it is showing, and the keyboard's octave.
+  public private(set) var bassSelection: (voice: String, index: Int)?
+  public private(set) var octave = 0
   /// Whether the song's effects are down the right, where the selected voice's knobs would be.
   public var showsEffects = false
   /// A pattern being renamed, and its name as it has been typed so far.
@@ -84,11 +87,27 @@ public final class Interface {
   func layout(scroll: Float, scrollX: Float? = nil) -> Layout {
     Layout(
       session: session, size: size, scroll: scroll, scrollX: scrollX ?? self.scrollX, effects: showsEffects,
-      renaming: renaming, page: page)
+      renaming: renaming, page: page, keyboard: bassSelection != nil)
   }
 
   /// Where the chip that brings the controls back is, while performing.
   public var editChip: Rect { Rect(size.x - Layout.margin - 64, Layout.margin, 64, 32) }
+
+  /// On a phone, the keyboard the selected 303 step's note is set on, while one is selected.
+  public var keyboard: BassKeyboard? { keyboard(in: layout) }
+
+  func keyboard(in layout: Layout) -> BassKeyboard? {
+    guard layout.compact, let selection = bassSelection else { return nil }
+    return BassKeyboard(layout: layout, voice: selection.voice, index: selection.index, octave: octave)
+  }
+
+  /// What a press at `point` does: the keyboard's, where it covers the rest, or the layout's.
+  func action(at point: SIMD2<Float>, in layout: Layout) -> Action? {
+    if let keyboard = keyboard(in: layout), keyboard.frame.contains(point), let pattern = layout.pattern {
+      return keyboard.action(at: point, pattern: pattern.id)
+    }
+    return layout.action(at: point)
+  }
 
   /// Scroll the grid, if `event` is over it. False for anywhere else.
   @discardableResult
@@ -116,6 +135,11 @@ public final class Interface {
       // A press anywhere keeps the name being typed, as leaving a field does.
       if renaming != nil { finishRenaming() }
       let layout = layout
+      if let keyboard = keyboard(in: layout), keyboard.frame.contains(event.location) {
+        // The keyboard sits over the rest, and a press on it is its own.
+        pressed = (event.id, self.action(at: event.location, in: layout))
+        return true
+      }
       guard layout.panels.contains(where: { $0.contains(event.location) }) else { return false }
       let action = layout.action(at: event.location)
       pressed = (event.id, action)
@@ -170,7 +194,7 @@ public final class Interface {
       if let turn = turning, turn.pointer == event.id {
         turning = nil
         finish(turn)
-      } else if let action = press.action, layout.action(at: event.location) == action {
+      } else if let action = press.action, self.action(at: event.location, in: layout) == action {
         perform(action, modifiers: event.modifiers)
       }
       return true
@@ -271,6 +295,14 @@ public final class Interface {
           step = step.settingGate(true)
         }
       }
+      // From the keyboard: heard as it is set, and on to the next step, as a 303 takes its notes.
+      if let selection = bassSelection, selection.voice == voice, selection.index == index,
+        let shown = session.shownPattern
+      {
+        let step = shown.bassStep(voice, at: index)
+        if step.sounds { session.playNote(semitone: note - 12, accent: step.accent) }
+        select(bass: voice, (index + 1) % shown.length, keepingOctave: true)
+      }
     case .bassAccent(let pattern, let voice, let index):
       editBass(pattern, voice, index, "Set Accent") { $0.accent.toggle() }
     case .hit(let voice):
@@ -306,6 +338,40 @@ public final class Interface {
       followsPage = false
     case .perform:
       performing = true
+    case .bassStep(let voice, let index):
+      select(bass: voice, index)
+    case .bassGate(let pattern, let voice, let index):
+      editBass(pattern, voice, index, "Set Rest") { $0 = $0.settingGate(!$0.sounds) }
+    case .octave(let octave):
+      self.octave = min(1, max(0, octave))
+    }
+  }
+
+  /// On a phone, the 303 step the keyboard sets, with the grid turned to its page and, unless it is
+  /// kept, the keyboard to the octave its note is in; nil puts the keyboard away.
+  private func select(bass voice: String, _ index: Int?, keepingOctave: Bool = false) {
+    guard let index else {
+      bassSelection = nil
+      return
+    }
+    bassSelection = (voice, index)
+    page = index / GridMetrics.pageSteps
+    followsPage = false
+    if !keepingOctave, let note = session.shownPattern?.bassStep(voice, at: index).note.map({ Int($0) }),
+      !(octave * 12...octave * 12 + 12).contains(note)
+    {
+      octave = note > 12 ? 1 : 0
+    }
+    // Its line scrolled into sight, in the shorter grid the keyboard leaves.
+    let layout = layout
+    guard let line = layout.bassLines.first(where: { $0.voice == voice }), let rows = layout.gridContent
+    else {
+      return
+    }
+    if line.cells.maxY > rows.maxY - 8 {
+      scroll = self.layout(scroll: scroll + line.cells.maxY - rows.maxY + 12).scroll
+    } else if line.cells.y < rows.y + 8 {
+      scroll = self.layout(scroll: scroll - (rows.y - line.cells.y) - 12).scroll
     }
   }
 
@@ -342,13 +408,16 @@ public final class Interface {
     scroll = layout.scroll
     scrollX = layout.scrollX
     held = pressed.flatMap { press in
-      hover.flatMap { layout.action(at: $0) == press.action ? press.action : nil }
+      hover.flatMap { action(at: $0, in: layout) == press.action ? press.action : nil }
     }
     drawBar(layout, on: canvas)
     drawStrip(layout, on: canvas)
     drawGrid(layout, on: canvas)
     if let inspector = layout.inspector, let song = session.song {
       drawInspector(inspector, song: song, on: canvas)
+    }
+    if let keyboard = keyboard(in: layout) {
+      drawKeyboard(keyboard, on: canvas)
     }
   }
 
@@ -555,6 +624,48 @@ public final class Interface {
     }
   }
 
+  /// The keyboard a 303 step's note is set on: the step and its note named, the chips, and the keys,
+  /// with the step's own note lit on them while it sounds.
+  private func drawKeyboard(_ keyboard: BassKeyboard, on canvas: Canvas) {
+    // Solid, unlike the panels over the scene: it is what a finger is on, and nothing shows through.
+    let frame = keyboard.frame
+    canvas.fill = Theme.panel.opaque
+    canvas.fillRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: 12)
+    panel(frame, on: canvas)
+    let title = keyboard.title
+    canvas.align = .left
+    canvas.font = Theme.mono(8.5, weight: 600)
+    canvas.fill = Theme.three
+    canvas.fillText(keyboard.voice == "303.a" ? "303 A" : "303 B", title.x, title.y + 11)
+    canvas.font = Theme.mono(13, weight: 600)
+    canvas.fill = Theme.ink
+    let step = keyboard.step
+    let named = step.note.map { BassKeyboard.name(Int($0)) } ?? "—"
+    canvas.fillText("STEP \(keyboard.index + 1)  \(step.sounds ? named : "REST")", title.x, title.y + 28)
+    for chip in keyboard.chips {
+      self.chip(chip, on: canvas)
+    }
+    let lit = step.sounds ? step.note.map { Int($0) } : nil
+    for key in keyboard.keys where !key.black {
+      let frame = key.frame
+      canvas.fill = key.note == lit ? Colour(0xffde96) : Theme.white(0.82)
+      canvas.fillRoundedRect(
+        frame.x, frame.y, frame.width, frame.height, radius: 5,
+        foot: key.note == lit ? Theme.three : Theme.white(0.6))
+      if key.note % 12 == 0 {
+        canvas.font = Theme.mono(9, weight: 600)
+        canvas.fill = Colour(0x1a1206, alpha: 0.6)
+        canvas.align = .center
+        canvas.fillText(BassKeyboard.name(key.note), frame.x + frame.width / 2, frame.maxY - 8)
+      }
+    }
+    for key in keyboard.keys where key.black {
+      let frame = key.frame
+      canvas.fill = key.note == lit ? Theme.three : Colour(0x16161e)
+      canvas.fillRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: 4)
+    }
+  }
+
   /// A 303 line on a phone: a step to a cell, as the machine's own step buttons are, each saying its
   /// note, lit while it sounds and outlined while it is paused, with its accent as an amber foot and
   /// its slide as a violet mark to the right.
@@ -601,6 +712,13 @@ public final class Interface {
       if step.slide {
         canvas.fill = Theme.violet
         canvas.fillRoundedRect(cell.maxX - 6, cell.y + 6, 3, cell.height - 12, radius: 1.5)
+      }
+      // The step the keyboard is setting.
+      if let selection = bassSelection, selection.voice == line.voice, selection.index == index {
+        canvas.stroke = Theme.live
+        canvas.lineWidth = 2
+        let ring = cell.outset(2)
+        canvas.strokeRoundedRect(ring.x, ring.y, ring.width, ring.height, radius: 8)
       }
     }
   }
