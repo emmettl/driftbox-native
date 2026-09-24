@@ -402,10 +402,17 @@ each step stand on the last. The README's "Platforms" says how it is divided.
 2. **Audio and MIDI behind ports.** Done on Windows. `DriftboxHost` declares what a platform's audio and
    MIDI must do — `AudioRouting`, `MIDIInputPort`, `MIDIOutputPort`, `HostTime`, `RenderSource` —
    and `DriftboxHostWindows` does it with WASAPI and WinMM, tested against the device and against
-   the clock. `driftbox-play` plays the catalogue through it. Left: the Mac's adapters moved into
-   a target of their own and made to conform, so that `Player`, `RackModel` and `ClockCursor` use
-   the ports and nothing else; then the parts of `Player` that are not views move out of
-   `DriftboxApp`, where they are gated on AVFoundation, into a target every platform shares.
+   the clock. `driftbox-play` plays the catalogue through it. Then the parts of `Player` that are
+   not views, into `DriftboxSession`, a target every platform shares:
+   - `Session` is `Player` on the ports, with its own undo, since Windows' Foundation has no
+     `UndoManager`, and settings kept under the Mac app's own keys.
+   - `ClockCursor` and the catalogue of songs moved there too; the Mac's `Player` reads them from
+     it.
+   - `Player`'s tests of its logic run against `Session` on every platform.
+
+   Left, and needing a Mac: the Mac's adapters moved into a target of their own and made to
+   conform, and the Mac app moved onto `Session`, its `Player` gone. The rack's model stays with
+   the Mac app until then.
 3. **A GPU layer under the scenes.** ← *here.* The scenes use a small part of Metal: buffers,
    render pipelines, per-draw constants, indexed draws, depth, blending. `DriftboxGPU` says that
    much and no more, in what Metal, Direct3D 11 and OpenGL ES 3.0 all do alike — sprites as
