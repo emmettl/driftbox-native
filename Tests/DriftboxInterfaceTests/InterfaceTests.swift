@@ -68,7 +68,7 @@ struct InterfaceTests {
     interface.size = SIMD2(800, 600)
     let layout = interface.layout
     #expect(layout.grid == nil)
-    #expect(layout.chips.map(\.label) == ["PLAY", "TOP", "CLICK", "LOOP"])
+    #expect(layout.chips.map(\.label) == ["PLAY", "TOP", "FX", "CLICK", "LOOP"])
     #expect(layout.panels == [layout.bar])
     #expect(layout.bar.maxX == 788, "the window's width, less its margins")
   }
@@ -407,6 +407,38 @@ struct InterfaceTests {
     #expect(session.song?.patterns.count == 3)
     #expect(session.editing == session.song?.patterns.last?.id, "shown, to be worked on")
     #expect(session.undoTitle == "Undo Add Pattern")
+  }
+
+  /// FX puts the song's effects down the right, in their groups, where a voice's knobs would be; a
+  /// knob there turns the song's effect, in its own units. A lane's name brings its voice back.
+  @Test func theEffectsAreAPanelOfTheirOwn() throws {
+    let interface = try Self.interface()
+    let session = interface.session
+    func fx() -> Layout.Chip? { interface.layout.chips.first { $0.label == "FX" } }
+    Self.click(interface, Self.centre(try #require(fx()).frame))
+    #expect(interface.showsEffects && fx()?.isOn == true)
+    let panel = try #require(interface.layout.inspector)
+    #expect(panel.machine == "MASTER" && panel.voice == nil)
+    #expect(panel.knobs.map(\.target) == [0, 6, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11].map { KnobTarget.fx($0) })
+    #expect(panel.labels.map(\.text) == ["INSERT", "FILTER", "DELAY", "REVERB"])
+
+    let cutoff = try #require(panel.knobs.first { $0.target == .fx(2) })
+    let song = try #require(session.song)
+    #expect(cutoff.target.format(0, in: song) == "60Hz")
+    let at = Self.centre(cutoff.dial)
+    _ = interface.pointer(PointerEvent(phase: .began, location: at))
+    _ = interface.pointer(PointerEvent(phase: .moved, location: at - SIMD2(0, 34)))
+    _ = interface.pointer(PointerEvent(phase: .ended, location: at - SIMD2(0, 34)))
+    #expect(abs((session.song?.fx.pcfCutoff ?? 0) - min(1, FxParams.defaults.pcfCutoff + 0.2)) < 1e-6)
+    #expect(session.undoTitle == "Undo Set Cutoff")
+
+    let kick = try #require(interface.layout.lanes.first { $0.voice.id == "909.bd" })
+    Self.click(interface, Self.centre(kick.header))
+    #expect(!interface.showsEffects && interface.layout.inspector?.voice == "909.bd")
+    Self.click(interface, Self.centre(try #require(fx()).frame))
+    let close = try #require(interface.layout.inspector?.chips.first { $0.label == "×" })
+    Self.click(interface, Self.centre(close.frame))
+    #expect(!interface.showsEffects && interface.layout.inspector?.voice == "909.bd", "the voice's again")
   }
 
   /// Narrow, the columns keep to a size that can still be hit; wide, they stop growing.

@@ -62,6 +62,8 @@ public enum Action: Equatable, Sendable {
   case showPattern(String)
   /// Add a pattern the length of the one shown, and show it.
   case addPattern
+  /// Show the song's effects down the right, or put them away.
+  case effects
 }
 
 /// A 303 line's rows, as the Mac draws them: two octaves of notes from the top, then a row each
@@ -176,9 +178,10 @@ public struct Layout {
   /// How far it can be.
   public var maxScroll: Float = 0
 
-  /// The layout for a window `size` points across, the grid scrolled up by `scroll`.
+  /// The layout for a window `size` points across, the grid scrolled up by `scroll`, and the song's
+  /// effects down the right if `effects`, or the selected voice's knobs if not.
   @MainActor
-  public init(session: Session, size: SIMD2<Float>, scroll: Float = 0) {
+  public init(session: Session, size: SIMD2<Float>, scroll: Float = 0, effects: Bool = false) {
     self.size = size
     let margin = Self.margin
     bar = Rect(margin, margin, max(0, size.x - margin * 2), Self.barHeight)
@@ -192,13 +195,15 @@ public struct Layout {
     ]
     let loopChip = Rect(bar.maxX - 10 - 56, chipY, 56, chipHeight)
     let clickChip = Rect(loopChip.x - 6 - 64, chipY, 64, chipHeight)
+    let fxChip = Rect(clickChip.x - 6 - 44, chipY, 44, chipHeight)
+    chips.append(Chip(frame: fxChip, label: "FX", action: .effects, isOn: effects && session.song != nil))
     chips.append(Chip(frame: clickChip, label: "CLICK", action: .metronome, isOn: session.metronome))
     chips.append(Chip(frame: loopChip, label: "LOOP", action: .loop, isOn: session.loop != nil))
     self.chips = chips
     let left = bar.x + 136
-    let middle = max(left, (left + clickChip.x - 12) / 2)
+    let middle = max(left, (left + fxChip.x - 12) / 2)
     title = Rect(left, bar.y, max(0, middle - left), bar.height)
-    readout = Rect(middle, bar.y, max(0, clickChip.x - 12 - middle), bar.height)
+    readout = Rect(middle, bar.y, max(0, fxChip.x - 12 - middle), bar.height)
 
     guard let song = session.song else { return }
     let strip = Rect(margin, bar.maxY + margin, bar.width, Self.stripHeight)
@@ -208,9 +213,10 @@ public struct Layout {
     (sections, totalBars) = Self.sections(of: song, in: sectionsFrame)
     let below = strip.maxY + margin
 
-    inspector = session.selectedVoice.flatMap {
-      Self.inspector(for: $0, top: below, right: bar.maxX)
-    }
+    inspector =
+      effects
+      ? Self.effects(top: below, right: bar.maxX)
+      : session.selectedVoice.flatMap { Self.inspector(for: $0, top: below, right: bar.maxX) }
     guard let pattern = session.shownPattern else { return }
     self.pattern = pattern
     // The playhead only means something on the pattern that is playing, and only while it is.
