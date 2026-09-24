@@ -464,12 +464,13 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    interface, drawn on the GPU layer rather than built from a toolkit, which is in keeping with an
    instrument and keeps what the app depends on small. `DriftboxInterface` draws it on the canvas
    in points, laid out afresh each frame from the session and hit from the same layout, so that
-   Android's touch interface can share it: the transport bar and the step grid so far, over the
+   Android's touch interface can share it: the transport bar and the step grid so far — drum
+   lanes, the filter's lane and the 303 lines, scrolling when taller than the window — over the
    scene as smoked glass, with the View menu's Show Controls (Tab) taking them away to perform.
    The canvas gained rounded panels with a fill that runs top to bottom, borders, and type set at
    the size it lands under an even scale, so that the interface is as sharp at 150% as at 100%.
-   Left: the 303 lines, knobs, the song strip, settings, keyboard playing, the rack and its cables,
-   and scrolling the grid when it is taller or wider than the window.
+   Left: knobs, the song strip, settings, keyboard playing, the rack and its cables, and a grid
+   wider than the window.
 5. **Shipping.** The Swift runtime beside the executable; signing; winget; the `.driftbox` file
    association. Songs are already `.driftbox` — the web app's documents byte for byte, under a name
    Windows can associate without claiming every `.json`. `SongFile` in `DriftboxDocument` holds

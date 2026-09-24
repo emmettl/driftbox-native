@@ -140,6 +140,8 @@ public final class Desktop {
     case .pointer(let pointer):
       // A press on the controls is theirs; anywhere else, the window is the pad.
       if !interface.pointer(pointer) { pad(pointer) }
+    case .scroll(let scroll):
+      _ = interface.scroll(scroll)
     default:
       break
     }

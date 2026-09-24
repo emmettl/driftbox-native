@@ -172,6 +172,79 @@ struct InterfaceTests {
     #expect(chip("LOOP")?.isOn == true)
   }
 
+  /// The song with one 303 line, or two, silent.
+  static func bassSong(lines: [String] = ["303.a"]) -> Song {
+    var song = song()
+    for line in lines { song.patterns[0].bass[line] = [BassStep](repeating: .rest, count: 16) }
+    return song
+  }
+
+  /// A 303 line sits under the filter's lane, on the drums' columns: a press on a note's row sets
+  /// that note, and on the note already set pauses it, keeping its pitch; the rows under the notes
+  /// set accent and slide; its name shows its knobs.
+  @Test func a303LineIsPlayedOnItsRows() throws {
+    let interface = try Self.interface(Self.bassSong())
+    let session = interface.session
+    let layout = interface.layout
+    let line = try #require(layout.bassLines.first)
+    #expect(layout.bassLines.map(\.voice) == ["303.a"])
+    let filter = try #require(layout.filterLane)
+    #expect(line.frame.y > filter.maxY)
+    #expect(layout.noteCell(12, step: 3, in: line).x == layout.step(3, in: layout.lanes[0].frame).x)
+
+    let c2 = Self.centre(layout.noteCell(12, step: 3, in: line))
+    #expect(layout.action(at: c2) == .note(pattern: "p", voice: "303.a", index: 3, note: 12))
+    Self.click(interface, c2)
+    #expect(session.shownPattern?.bassStep("303.a", at: 3) == BassStep(note: 12))
+    #expect(session.undoTitle == "Undo Set Note")
+    Self.click(interface, c2)
+    #expect(session.shownPattern?.bassStep("303.a", at: 3).sounds == false, "paused")
+    #expect(session.shownPattern?.bassStep("303.a", at: 3).note == 12, "its pitch kept")
+    Self.click(interface, Self.centre(layout.noteCell(19, step: 3, in: line)))
+    #expect(session.shownPattern?.bassStep("303.a", at: 3) == BassStep(note: 19), "another note sounds")
+
+    Self.click(interface, Self.centre(layout.flagCell(step: 3, slide: false, in: line)))
+    #expect(session.shownPattern?.bassStep("303.a", at: 3).accent == true)
+    Self.click(interface, Self.centre(layout.flagCell(step: 5, slide: true, in: line)))
+    let slid = session.shownPattern?.bassStep("303.a", at: 5)
+    #expect(slid?.slide == true && slid?.sounds == false, "a slide on a rest: a silent root to glide from")
+
+    Self.click(interface, Self.centre(line.header))
+    #expect(session.selectedVoice == "303.a")
+
+    let gap = layout.noteCell(12, step: 3, in: line).maxX + 1
+    #expect(layout.action(at: SIMD2(gap, c2.y)) == nil, "nothing between two columns")
+  }
+
+  /// Taller than the window, the grid keeps to the room under the transport and scrolls, as far
+  /// as there is to scroll and no further; a step scrolled into view is where it is drawn.
+  @Test func aTallGridScrolls() throws {
+    let interface = try Self.interface(Self.bassSong(lines: ["303.a", "303.b"]))
+    let before = interface.layout
+    let grid = try #require(before.grid)
+    #expect(grid.y == before.bar.maxY + Layout.margin, "all the room under the transport")
+    #expect(before.maxScroll > 0)
+
+    #expect(
+      !interface.scroll(ScrollEvent(location: SIMD2(400, 30), delta: SIMD2(0, 40))), "not over the grid")
+    #expect(interface.scroll(ScrollEvent(location: Self.centre(grid), delta: SIMD2(0, 40))))
+    let after = interface.layout
+    #expect(after.scroll == 40)
+    #expect(after.lanes[0].frame.y == before.lanes[0].frame.y - 40)
+
+    interface.scroll(ScrollEvent(location: Self.centre(grid), delta: SIMD2(0, 10_000)))
+    let bottom = interface.layout
+    #expect(bottom.scroll == bottom.maxScroll, "no further than there is")
+    let last = try #require(bottom.bassLines.last)
+    #expect(last.frame.maxY <= grid.maxY - Layout.inset + 0.01, "the last line in view")
+    let cell = Self.centre(bottom.flagCell(step: 0, slide: false, in: last))
+    Self.click(interface, cell)
+    #expect(interface.session.shownPattern?.bassStep("303.b", at: 0).accent == true)
+
+    interface.scroll(ScrollEvent(location: Self.centre(grid), delta: SIMD2(0, -10_000)))
+    #expect(interface.layout.scroll == 0)
+  }
+
   /// Narrow, the columns keep to a size that can still be hit; wide, they stop growing.
   @Test func theColumnsStretchBetweenLimits() {
     #expect(GridMetrics(steps: 16, width: 200).stride == GridMetrics.minimumStride)
