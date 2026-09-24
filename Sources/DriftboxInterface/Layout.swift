@@ -356,10 +356,17 @@ public struct Layout {
     (sections, totalBars) = Self.sections(of: song, in: sectionsFrame)
     let below = strip.maxY + margin
 
+    // A column down the right; on a phone, a sheet across the foot of the screen, the grid above it.
+    let panelWidth = compact ? bar.width : Self.inspectorWidth
     inspector =
       effects
-      ? Self.effects(top: below, right: bar.maxX)
-      : session.selectedVoice.flatMap { Self.inspector(for: $0, top: below, right: bar.maxX) }
+      ? Self.effects(top: below, right: bar.maxX, width: panelWidth)
+      : session.selectedVoice.flatMap {
+        Self.inspector(for: $0, top: below, right: bar.maxX, width: panelWidth)
+      }
+    if compact, let sheet = inspector { inspector = sheet.moved(to: size.y - margin - sheet.frame.height) }
+    // Where the grid's foot is: the screen's, or on a phone the sheet's top.
+    let foot = compact ? (inspector?.frame.y ?? size.y) : size.y
     guard let pattern = session.shownPattern else { return }
     self.pattern = pattern
     // The playhead only means something on the pattern that is playing, and only while it is.
@@ -389,9 +396,9 @@ public struct Layout {
     let head = Self.patternBarHeight + 16
     // On a phone, less while the 303 keyboard is open above it: the grid scrolls, and nothing covers it.
     let reserved = compact && keyboard ? BassKeyboard.height + margin : 0
-    let room = max(0, size.y - margin - below - reserved)
+    let room = max(0, foot - margin - below - reserved)
     let height = min(head + content + inset + 8, room)
-    let grid = Rect(margin, size.y - margin - height, width, height)
+    let grid = Rect(margin, foot - margin - height, width, height)
     self.grid = grid
     maxScroll = max(0, head + content + inset + 8 - height)
     self.scroll = min(max(0, scroll), maxScroll)
