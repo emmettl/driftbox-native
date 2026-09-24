@@ -34,6 +34,10 @@ mkdir -p "$app/classes" "$app/dex" "$app/stage/lib/arm64-v8a" "$app/stage/assets
 # the scene, the touch screen that puts them together, and the app's own module on top. The app
 # checks the GPU contract with the contract tests' own programs.
 extra_DriftboxAndroid=Tests/DriftboxGPUTests/Generated/ShaderPrograms.swift
+# The rack's controls are left out, and the rack session with them: it takes CoreGraphics' points,
+# JSONSerialization, Bundle and UserDefaults from Foundation, which on Android are the old
+# Foundation and its 48MB of internationalisation, and the phone does not show the rack yet.
+skip_DriftboxInterface='/Rack[A-Za-z]*\.swift$'
 modules="DriftboxGPU DriftboxGPUGLES DriftboxText DriftboxTextAndroid DriftboxCanvas DriftboxScenes DriftboxShell \
   DriftboxSession DriftboxInterface DriftboxTouch DriftboxAndroid"
 # shellcheck disable=SC2086

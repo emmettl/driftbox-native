@@ -88,17 +88,21 @@ common="$common -Xfrontend -disable-autolink-library -Xfrontend Foundation"
 common="$common -Xfrontend -disable-autolink-library -Xfrontend FoundationInternationalization"
 
 # Each module named, compiled whole into $out/<module>.o with its interface beside it: its sources,
-# and any a caller names in `extra_<module>`.
+# but for any whose paths match the pattern a caller names in `skip_<module>`, and any a caller
+# names in `extra_<module>`.
 compile() {
   for module in "$@"; do
     # Gone first, so that a module that fails cannot leave the last build's in its place.
     rm -f "$out/$module.o" "$out/$module.swiftmodule"
     extra="$(eval echo "\${extra_$module:-}")"
+    skip="$(eval echo "\${skip_$module:-}")"
+    sources="$(find "Sources/$module" -name '*.swift' | sort)"
+    [ -z "$skip" ] || sources="$(echo "$sources" | grep -vE "$skip")"
     # shellcheck disable=SC2086
     if ! "$swiftc" $common -enable-experimental-feature Extern -wmo -O -parse-as-library -swift-version 6 \
       -module-name "$module" -I "$out" \
       -emit-module -emit-module-path "$out/$module.swiftmodule" -c -o "$out/$module.o" \
-      $(find "Sources/$module" -name '*.swift' | sort) $extra >"$out/$module.log" 2>&1; then
+      $sources $extra >"$out/$module.log" 2>&1; then
       cat "$out/$module.log" >&2
       echo "$module did not build" >&2
       exit 1

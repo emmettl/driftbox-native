@@ -42,6 +42,17 @@ public final class Touchscreen {
   /// Fingers down somewhere other than the pad or the controls: a second finger on the scene.
   var otherFingers: Set<Int> = []
 
+  /// How long a finger rests on the controls before it asks what can be done with what it is on, as
+  /// a secondary click does on a desktop.
+  public static let longPress: Double = 0.5
+  /// A finger resting on the controls: which, where, and since when, until it moves or lifts.
+  var resting: (id: Int, at: SIMD2<Float>, since: Double)?
+  /// Seconds on a clock of the touch screen's own; a test sets its own.
+  var clock: () -> Double = { HostTime.seconds(from: 0, to: HostTime.now()) }
+  /// A long press's menu, and where it was pressed, for the platform to show as its own: whatever
+  /// is chosen from it goes to `interface.choose`.
+  public var onMenu: ((Menu, SIMD2<Float>) -> Void)?
+
   public init(
     session: Session, device: any GPUDevice, typesetter: any Typesetter, scale: Float, scene: String? = nil
   ) throws {
@@ -78,6 +89,7 @@ public final class Touchscreen {
   /// A frame into `surface`: the session caught up, the scene drawn from it, and the controls over it.
   public func draw(into surface: any GPUSurface) throws {
     session.tick()
+    checkLongPress()
     showScene()
     let drawn = Self.drawn(width: surface.width, height: surface.height, scale: scale)
     if frame?.width != drawn.width || frame?.height != drawn.height {
@@ -120,7 +132,15 @@ public final class Touchscreen {
   public func touch(_ event: PointerEvent) {
     var event = event
     event.kind = .touch
-    if interface.pointer(event) { return }
+    if let rest = resting, rest.id == event.id {
+      let moved = event.location - rest.at
+      // Moved as far as a drag, or lifted: not resting any more.
+      if event.phase != .moved || (moved * moved).sum() > 100 { resting = nil }
+    }
+    if interface.pointer(event) {
+      if event.phase == .began { resting = (event.id, event.location, clock()) }
+      return
+    }
     switch event.phase {
     case .began where padFinger == nil:
       pad(event)
@@ -135,6 +155,17 @@ public final class Touchscreen {
         otherFingers.remove(event.id)
       }
     }
+  }
+
+  /// A finger that has rested long enough on the controls: the menu for what it is on, if that has
+  /// one, handed to the platform, and the press given up, so that lifting it does not also do what
+  /// it was on. Asked every frame, since a finger that rests says nothing until it moves.
+  public func checkLongPress() {
+    guard let rest = resting, clock() - rest.since >= Self.longPress else { return }
+    resting = nil
+    guard !interface.performing, let menu = interface.menu(at: rest.at) else { return }
+    _ = interface.pointer(PointerEvent(phase: .cancelled, id: rest.id, kind: .touch, location: rest.at))
+    onMenu?(menu, rest.at)
   }
 
   /// The surface as the pad: 0...1 from the bottom left, as the engine and the scenes take it.
