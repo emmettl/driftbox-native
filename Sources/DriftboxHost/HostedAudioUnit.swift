@@ -2,8 +2,9 @@
   import AVFoundation
   import DriftboxRack
 
-  /// An Audio Unit effect, hosted for a `plugin` module: stereo in, stereo out, rendered a block at a
-  /// time on the rack's render thread by its own render block, and remembered in the patch by its
+  /// An Audio Unit, hosted for a `plugin` module — an effect, stereo in and out — or a
+  /// `plugin-instrument` one, played by MIDI the module makes of the rack's notes: rendered a block at
+  /// a time on the rack's render thread by its own render block, and remembered in the patch by its
   /// component and its state.
   ///
   /// Everything that allocates happens here on the interface's thread — instantiating, the formats,
@@ -20,6 +21,8 @@
     struct RenderState {
       var renderBlock: AURenderBlock
       var pull: AURenderPullInputBlock
+      /// How MIDI reaches the unit ahead of a render, for one that takes it.
+      var midi: AUScheduleMIDIEventBlock?
       /// Two buffers, pointed at the module's outlets for each block.
       var output: UnsafeMutableAudioBufferListPointer
       /// The module's inlets for the block being rendered, copied into `input` for the unit to read.
@@ -124,7 +127,8 @@
       }
       state.initialize(
         to: RenderState(
-          renderBlock: unit.renderBlock, pull: pull, output: output, inlets: nil, input: (left, right),
+          renderBlock: unit.renderBlock, pull: pull, midi: unit.scheduleMIDIEventBlock, output: output,
+          inlets: nil, input: (left, right),
           maximumFrames: maximumFrames, sampleTime: 0, tempo: 120, beat: 0, running: false, wasRunning: false)
       )
     }
@@ -145,7 +149,8 @@
 
     /// One block through the unit, on the render thread. A failed render, or one longer than the
     /// unit was readied for, is silence.
-    static let render: ExternalRender = { context, inlets, outlets, frames, tempo, beat, running in
+    static let render: ExternalRender = {
+      context, inlets, outlets, frames, tempo, beat, running, events, count in
       guard let context else { return }
       let state = context.assumingMemoryBound(to: RenderState.self)
       let left = outlets[0]
@@ -164,6 +169,18 @@
       let bytes = UInt32(frames * MemoryLayout<Float>.size)
       output[0] = AudioBuffer(mNumberChannels: 1, mDataByteSize: bytes, mData: UnsafeMutableRawPointer(left))
       output[1] = AudioBuffer(mNumberChannels: 1, mDataByteSize: bytes, mData: UnsafeMutableRawPointer(right))
+      // The block's notes, each at its frame of the block, before the block is rendered.
+      if let midi = state.pointee.midi, let events {
+        for index in 0..<count {
+          let event = events[index]
+          var message = MIDIEvent.bytes(event)
+          withUnsafeBytes(of: &message) { raw in
+            midi(
+              AUEventSampleTimeImmediate + AUEventSampleTime(MIDIEvent.frame(event)), 0, 3,
+              raw.baseAddress!.assumingMemoryBound(to: UInt8.self))
+          }
+        }
+      }
       var flags = AudioUnitRenderActionFlags()
       var time = AudioTimeStamp()
       time.mSampleTime = state.pointee.sampleTime
@@ -222,11 +239,13 @@
     }
 
     /// The component a patch's identifier names, or nil for one that is not three codes of four.
+    /// Read by position, not by splitting on spaces: a code may end in one, as DLS's `dls ` does.
     public static func component(_ identifier: String) -> AudioComponentDescription? {
-      let parts = identifier.split(separator: " ", omittingEmptySubsequences: false)
-      guard parts.count == 3 else { return nil }
-      let codes = parts.compactMap { code(String($0)) }
-      guard codes.count == 3 else { return nil }
+      let bytes = Array(identifier.utf8)
+      guard bytes.count == 14, bytes[4] == 0x20, bytes[9] == 0x20 else { return nil }
+      let codes = [bytes[0..<4], bytes[5..<9], bytes[10..<14]].map {
+        $0.reduce(OSType(0)) { $0 << 8 | OSType($1) }
+      }
       return AudioComponentDescription(
         componentType: codes[0], componentSubType: codes[1], componentManufacturer: codes[2],
         componentFlags: 0, componentFlagsMask: 0)
@@ -237,10 +256,5 @@
       return String(decoding: bytes, as: UTF8.self)
     }
 
-    static func code(_ text: String) -> OSType? {
-      let bytes = Array(text.utf8)
-      guard bytes.count == 4 else { return nil }
-      return bytes.reduce(0) { $0 << 8 | OSType($1) }
-    }
   }
 #endif

@@ -135,10 +135,12 @@ public struct MeterReading: Sendable {
   public var clarity: Double?
   public var loopPosition: Double?
   public var loopSeconds: Double?
+  /// The notes an instrument has sounding, lowest first.
+  public var notes: [Int]?
 
   public init(
     level: Double, peak: Double, envelope: Double, waveform: [Float], frequency: Double? = nil,
-    clarity: Double? = nil, loopPosition: Double? = nil, loopSeconds: Double? = nil
+    clarity: Double? = nil, loopPosition: Double? = nil, loopSeconds: Double? = nil, notes: [Int]? = nil
   ) {
     self.level = level
     self.peak = peak
@@ -148,5 +150,6 @@ public struct MeterReading: Sendable {
     self.clarity = clarity
     self.loopPosition = loopPosition
     self.loopSeconds = loopSeconds
+    self.notes = notes
   }
 }

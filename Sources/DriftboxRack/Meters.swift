@@ -21,6 +21,8 @@ public enum MeterMirror {
   case looper(LooperShot)
   /// Four machines' readings, which are four entries in what a host reads rather than one.
   case groovebox(GrooveboxModule)
+  /// The notes an instrument has sounding, voice by voice.
+  case instrument(UnsafeMutablePointer<Int>)
 
   /// A mirror for `processor`, or nil for one that shows nothing.
   static func make(for processor: RackProcessor, sampleRate: Double) -> MeterMirror? {
@@ -29,6 +31,13 @@ public enum MeterMirror {
     case .control(.tuner): .tuner(Tuner(sampleRate: sampleRate))
     case .space(.looper): .looper(LooperShot(sampleRate: sampleRate))
     case .sources(.groovebox): .groovebox(GrooveboxModule(sampleRate: sampleRate))
+    case .instrument:
+      .instrument(
+        {
+          let notes = UnsafeMutablePointer<Int>.allocate(capacity: 32)
+          notes.initialize(repeating: -1, count: 32)
+          return notes
+        }())
     default: nil
     }
   }
@@ -69,6 +78,8 @@ public enum MeterMirror {
       mirror.envelopes = source.envelopes
       for point in 0..<4 * 48 { mirror.waveforms[point] = source.waveforms[point] }
       self = .groovebox(mirror)
+    case (.instrument(let notes), .instrument(let source)):
+      for voice in 0..<32 { notes[voice] = source.notes[voice] }  // `InstrumentProcessor.voiceLimit`
     default:
       break
     }
@@ -83,6 +94,15 @@ public enum MeterMirror {
     case .looper(let mirror): [(id, mirror.meter())]
     case .groovebox(let mirror):
       GrooveboxModule.sections.enumerated().map { ("\(id):\($1)", mirror.reading($0)) }
+    case .instrument(let notes):
+      [
+        (
+          id,
+          MeterReading(
+            level: 0, peak: 0, envelope: 0, waveform: [],
+            notes: Array(Set(UnsafeBufferPointer(start: notes, count: 32).filter { $0 >= 0 })).sorted())
+        )
+      ]
     }
   }
 
@@ -92,6 +112,7 @@ public enum MeterMirror {
     case .tuner(let mirror): mirror.release()
     case .looper(let mirror): mirror.waveform.deallocate()
     case .groovebox(let mirror): mirror.release()
+    case .instrument(let notes): notes.deallocate()
     }
   }
 }

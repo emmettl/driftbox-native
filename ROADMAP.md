@@ -380,7 +380,13 @@ external displays, performance capture to video.
    own interface in a window, or the system's generic one where it draws none. Choosing a unit is a
    step of undo; the unit's own settings are its own, so undoing in the rack never changes them,
    and they reach the patch shortly after they change. A unit the Mac lacks is said to be missing,
-   silent and kept exactly. Next, instruments: a unit played by the rack's notes.
+   silent and kept exactly.
+   Then instruments: the `plugin-instrument` module, on the Sources shelf and wired to the keys as
+   it arrives, turns every voice of the rack's pitch and gate into notes for an Audio Unit
+   instrument, at the frame they happen and at their velocity, gliding pitch ending one note for the
+   next, with mod, bend and sustain beside them; a new instance lets go of whatever an old one left
+   sounding. The notes reach the unit through its own MIDI scheduling, ahead of each block, and its
+   face shows what it has sounding on a strip of keys.
 
 ### What the later milestones ask of the first
 
