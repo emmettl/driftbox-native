@@ -1,6 +1,7 @@
 import DriftboxEngine
 import DriftboxGPU
 import DriftboxScenes
+import DriftboxText
 import Testing
 
 #if os(Windows)
@@ -34,7 +35,7 @@ struct PulseSceneTests {
 
   @Test func pulseReactsToWhatIsPlayed() throws {
     for device in try Self.devices() {
-      let scene = try PulseScene(device: device)
+      let scene = try PulseScene(device: device, typesetter: NoTypesetter())
       let target = try device.makeTarget(width: 160, height: 90)
       func frame(at time: Double, events: [EngineEvent] = []) throws -> [UInt8] {
         scene.draw(SceneInput(time: time, events: events), into: target, on: device)
@@ -76,7 +77,7 @@ struct PulseSceneTests {
       let texture = try #require(metal.makeTexture(descriptor: description))
 
       let device = try MetalDevice(device: metal)
-      let scene = try PulseScene(device: device)
+      let scene = try PulseScene(device: device, typesetter: NoTypesetter())
       let target = try device.makeTarget(width: 160, height: 90)
 
       let kick = allVoices.firstIndex { $0.id == "909.bd" }!

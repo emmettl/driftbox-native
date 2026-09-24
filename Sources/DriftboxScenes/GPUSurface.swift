@@ -1,4 +1,5 @@
 import DriftboxGPU
+import DriftboxText
 import Foundation
 
 // C's maths, which Foundation brings with it on Apple's platforms and not on Android.
@@ -42,7 +43,7 @@ open class GPUSurfaceScene: GPUScene {
   private var hitLast: Float = -1
   private var hitNext = 0
 
-  public required init(device: any GPUDevice) throws {
+  public required init(device: any GPUDevice, typesetter: any Typesetter) throws {
     pipeline = try device.makePipeline(GPUPipelineDescriptor(program: Self.program))
     if let program = Self.cardProgram, Self.cardCount > 0 {
       let columns = (0..<4).map { column in

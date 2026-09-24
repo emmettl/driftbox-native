@@ -1,8 +1,13 @@
 import DriftboxEngine
 import DriftboxGPU
 import DriftboxScenes
+import DriftboxText
 import Foundation
 import Testing
+
+#if os(Windows)
+  import DriftboxTextWindows
+#endif
 
 #if canImport(Metal)
   import DriftboxGPUMetal
@@ -15,6 +20,16 @@ import Testing
 /// drawing at all. With `DRIFTBOX_SCENE_SHOTS` set to a directory, each is also written there as
 /// BMPs at three moments, which is how anyone looks at one without a window.
 struct GPUSceneTests {
+  /// The platform's typesetter where it has one, for Graphic Lab's type; none, and Graphic Lab
+  /// prints its sheets without it, elsewhere.
+  static func typesetter() throws -> any Typesetter {
+    #if os(Windows)
+      return try DirectWriteTypesetter()
+    #else
+      return NoTypesetter()
+    #endif
+  }
+
   /// Everything but Pulse, which has a test of its own, since a frame of it with nothing playing
   /// is meant to be dark.
   static var moved: [any GPUScene.Type] { GPUScenes.all.filter { $0.id != PulseScene.id } }
@@ -59,7 +74,7 @@ struct GPUSceneTests {
     let size = shots == nil ? SIMD2(160, 90) : SIMD2(640, 360)
     for device in try PulseSceneTests.devices() {
       for type in Self.moved {
-        let scene = try type.init(device: device)
+        let scene = try type.init(device: device, typesetter: GPUSceneTests.typesetter())
         let target = try device.makeTarget(width: size.x, height: size.y)
         var frames: [[UInt8]] = []
         try Self.play(scene, into: target, on: device) { moment, _ in
@@ -92,7 +107,10 @@ struct GPUSceneTests {
   /// The cards' buffer is made once, to fit; a window of any shape lays out as many as that.
   @Test func cardsFitTheirBuffers() throws {
     for device in try PulseSceneTests.devices() {
-      let scenes: [GPUSurfaceScene] = [try FrostScene(device: device), try HothouseScene(device: device)]
+      let scenes: [GPUSurfaceScene] = [
+        try FrostScene(device: device, typesetter: NoTypesetter()),
+        try HothouseScene(device: device, typesetter: NoTypesetter()),
+      ]
       for scene in scenes {
         for aspect: Float in [0.5, 1, 16.0 / 9, 3] {
           #expect(scene.cards(aspect: aspect).count == type(of: scene).cardCount)
@@ -132,7 +150,9 @@ struct GPUSceneTests {
     @Test func theLayersScenesDrawWhatTheMetalOnesDraw() throws {
       guard let metal = MTLCreateSystemDefaultDevice() else { return }
       let device = try MetalDevice(device: metal)
-      for type in GPUSceneTests.moved {
+      // Not Graphic Lab yet: its type is Core Text's in Metal, and the Mac has no typesetter on the
+      // layer until there is a Core Text one, so the two would differ by every letter.
+      for type in GPUSceneTests.moved where type.id != GraphicLabScene.id {
         #expect(Scenes.type(for: type.id).id == type.id, "\(type.id) is a Metal scene too")
         #expect(Scenes.type(for: type.id).name == type.name)
         #expect(Scenes.type(for: type.id).accent == type.accent)
@@ -143,7 +163,7 @@ struct GPUSceneTests {
         description.usage = [.renderTarget, .shaderRead]
         description.storageMode = .shared
         let texture = try #require(metal.makeTexture(descriptor: description))
-        let scene = try type.init(device: device)
+        let scene = try type.init(device: device, typesetter: GPUSceneTests.typesetter())
         let target = try device.makeTarget(width: 160, height: 90)
 
         var time = 0.0

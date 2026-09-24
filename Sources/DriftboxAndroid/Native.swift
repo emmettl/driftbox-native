@@ -2,6 +2,8 @@
   import CAMidi
   import CGLES
   import DriftboxHostAndroid
+  import DriftboxText
+  import DriftboxTextAndroid
 
   // What `app.driftbox.Native` in `android/` declares, one function each, and everything this app
   // shares between them. The names are JNI's: `Java_`, the class, the method.
@@ -36,7 +38,9 @@
   public func nativeSceneCheck(
     _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ width: jint, _ height: jint, _ density: jfloat
   ) -> jstring? {
-    env.java(SceneCheck.run(width: Int(width), height: Int(height), density: density))
+    let typesetter: any Typesetter = AndroidTypesetter(env: env) ?? NoTypesetter()
+    return env.java(
+      SceneCheck.run(width: Int(width), height: Int(height), density: density, typesetter: typesetter))
   }
 
   @_cdecl("Java_app_driftbox_Native_textCheck")
@@ -60,7 +64,9 @@
     let named = scene == nil ? nil : env.string(scene)
     return MainActor.assumeIsolated {
       stage?.stop()
-      stage = Stage(json: text, scene: named, density: density)
+      // Android 12 and the app's Java are what the typesetter needs; without them, scenes set no type.
+      let typesetter: any Typesetter = AndroidTypesetter(env: env) ?? NoTypesetter()
+      stage = Stage(json: text, scene: named, density: density, typesetter: typesetter)
       return stage == nil ? jboolean(JNI_FALSE) : jboolean(JNI_TRUE)
     }
   }

@@ -7,6 +7,7 @@
   import DriftboxGPUMetal
   import DriftboxHost
   import DriftboxScenes
+  import DriftboxText
   import Foundation
   import ImageIO
   import QuartzCore
@@ -175,7 +176,7 @@
       let device = try MetalDevice()
       var size = pixels()
       let surface = try device.makeSurface(layer: layer, width: size.width, height: size.height)
-      let scene = try PulseScene(device: device)
+      let scene = try PulseScene(device: device, typesetter: NoTypesetter())
       let presenter = try Presenter(device: device)
       var frame = try device.makeTarget(width: size.width, height: size.height)
 
@@ -251,6 +252,8 @@
   import DriftboxScenes
   import DriftboxSeq
   import DriftboxShell
+  import DriftboxText
+  import DriftboxTextWindows
   import DriftboxWin32
   import Foundation
 
@@ -382,7 +385,9 @@
     static func watch(_ host: EngineHost, song: Song, in window: Win32Window, until: Date?) throws {
       let device = try D3D11Device()
       let surface = try device.makeSurface(window: window.handle, width: window.width, height: window.height)
-      var scene: any GPUScene = try GPUScenes.type(for: song.visual).init(device: device)
+      let typesetter = try DirectWriteTypesetter()
+      var scene: any GPUScene = try GPUScenes.type(for: song.visual).init(
+        device: device, typesetter: typesetter)
       let presenter = try Presenter(device: device)
       var frame = try device.makeTarget(width: window.width, height: window.height)
       var resized: (width: Int, height: Int)?
@@ -393,7 +398,7 @@
 
       func show(_ next: any GPUScene.Type) {
         do {
-          scene = try next.init(device: device)
+          scene = try next.init(device: device, typesetter: typesetter)
           print("  showing \(next.name)")
         } catch {
           print("  could not show \(next.name): \(error)")

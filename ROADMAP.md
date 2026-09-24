@@ -435,12 +435,10 @@ each step stand on the last. The README's "Platforms" says how it is divided.
      Convoy's dust and Machine's sparks use. Both are in the contract tests.
 
    Left:
-   - Graphic Lab, which sets type through Core Text every frame. Decided: only glyphs are a
-     platform's, and the canvas is drawn on the GPU layer, where the Windows app's interface will
-     draw too. Done so far: `DriftboxText`'s `Typesetter`, with DirectWrite behind it on Windows
-     and Android's own text stack on Android, and `DriftboxCanvas`, the part of Canvas2D Graphic
-     Lab draws with, on the layer. Next, Graphic Lab on the canvas, and a Core Text typesetter for
-     the Mac.
+   - A Core Text typesetter for the Mac, so that Graphic Lab sets its type there too. Graphic Lab is
+     on the layer now, printed on `DriftboxCanvas` with DirectWrite's type on Windows and Android's
+     own on Android. Only glyphs are a platform's; the canvas is drawn on the layer, where the
+     Windows app's interface will draw too.
    - `--window` on the Mac showing the song's scene rather than Pulse, and the Metal `Scene`
      gone at the end.
 4. **The window, drawn.** ← *here.* The shell first: `DriftboxShell` says what the app asks of a

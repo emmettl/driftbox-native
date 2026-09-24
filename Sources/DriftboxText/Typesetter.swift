@@ -101,3 +101,15 @@ public struct GlyphCoverage: Sendable {
 
   public subscript(x: Int, y: Int) -> UInt8 { bytes[y * width + x] }
 }
+
+/// A typesetter that sets nothing: for a platform that has none of its own yet, where type is
+/// simply not drawn — every line is empty and no glyph covers anything.
+public final class NoTypesetter: Typesetter {
+  public init() {}
+
+  public func line(_ text: String, font request: FontRequest) -> TextLine {
+    TextLine(glyphs: [], width: 0, ascent: 0, descent: 0, family: "")
+  }
+
+  public func coverage(_ glyph: Glyph, offset: Float) -> GlyphCoverage? { nil }
+}
