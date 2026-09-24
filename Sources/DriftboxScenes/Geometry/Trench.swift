@@ -199,12 +199,12 @@
       firing = warp > 0.002 && drop > 0.35
       beam.opacity = 0.95 * min(1, warp * 1.35)
       guard firing else { return }
-      fire(world: world, projection: projection, view: view, up: up, aspect: aspect)
+      fire(world: world, projection: projection, up: up, aspect: aspect)
     }
 
     /// Rewrite every strand of every beam, from the corners of the frame to the finger.
     private func fire(
-      world: simd_float4x4, projection: simd_float4x4, view: simd_float4x4, up: SIMD3<Float>,
+      world: simd_float4x4, projection: simd_float4x4, up: SIMD3<Float>,
       aspect: Float
     ) {
       let halfHeight = tan(camera.fovDegrees * .pi / 360) * Self.muzzleDistance
@@ -212,10 +212,14 @@
 
       // three's `unproject`: any depth on the line through that screen point gives the same
       // direction from the eye, so Metal's 0...1 depth convention does not matter here.
+      // Unprojected into the camera's own space and turned into the world's rather than through
+      // the inverse of projection and view, as three does in doubles: in Float, a point a fraction
+      // of a unit in front of an eye thousands of units out loses most of its digits when the eye
+      // is taken off it again, and the beams landed wherever that rounding put them.
       let ndc = SIMD4<Float>(touchAt.x * 2 - 1, touchAt.y * 2 - 1, 0.5, 1)
-      let unprojected = (projection * view).inverse * ndc
-      let aim = simd_normalize(
-        SIMD3(unprojected.x, unprojected.y, unprojected.z) / unprojected.w - camera.position)
+      let eye = projection.inverse * ndc
+      let toward = world * SIMD4(eye.x / eye.w, eye.y / eye.w, eye.z / eye.w, 0)
+      let aim = simd_normalize(SIMD3(toward.x, toward.y, toward.z))
       let target = camera.position + aim * 70
 
       let positions = beamPositions.contents().bindMemory(
