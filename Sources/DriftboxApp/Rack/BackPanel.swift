@@ -1,6 +1,7 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import AppKit
   import DriftboxRack
+  import DriftboxRackSession
   import SwiftUI
 
   /// The back of the rack: every module's bay with its jacks, inlets down the left in teal and
@@ -10,7 +11,7 @@
   /// swing behind. Beside every inlet is a trim pot, bipolar, dragged up and down, double-clicked
   /// back to unity. Drawn in the layout's design units, scaled as one piece.
   struct BackPanel: View {
-    let model: RackModel
+    let model: RackSession
     let layout: RackLayout.Layout
     let scale: Double
 
@@ -137,7 +138,7 @@
 
     /// A cable's angle now: its swing since the rack turned, and the carried module's jiggle.
     private func angle(_ cable: PatchCable, _ from: CGPoint, _ to: CGPoint, at date: Date) -> Double {
-      let seed = Cable.seed(RackModel.key(cable))
+      let seed = Cable.seed(RackSession.key(cable))
       var angle = 0.0
       if let flipped = model.flippedAt {
         let elapsed = date.timeIntervalSince(flipped) * 1000
@@ -189,7 +190,7 @@
       // Cables, each twice: a dark lead under the bright one, so one crossing another stays two.
       for (index, cable) in model.patch.cables.enumerated() {
         guard let (from, to) = ends(cable, in: jacks) else { continue }
-        let key = RackModel.key(cable)
+        let key = RackSession.key(cable)
         let angle = angle(cable, from, to, at: date)
         let path = Cable.path(from, to, angle: angle)
         let hovered =
@@ -416,7 +417,7 @@
     }
 
     private func pull(_ cable: PatchCable, _ from: CGPoint, _ to: CGPoint) {
-      smoke.append(Evaporation(from: from, to: to, key: RackModel.key(cable), started: Date()))
+      smoke.append(Evaporation(from: from, to: to, key: RackSession.key(cable), started: Date()))
       model.disconnect(cable)
       keepAnimating(for: Evaporation.seconds)
     }

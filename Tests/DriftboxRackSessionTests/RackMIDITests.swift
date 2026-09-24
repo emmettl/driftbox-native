@@ -1,3 +1,4 @@
+import DriftboxRack
 import Foundation
 import Testing
 
@@ -37,5 +38,56 @@ struct RackMIDITests {
     #expect(RackMIDI.events([0xB3, 123, 0]) == [.allOff(channel: 4), .control(123, value: 0, channel: 4)])
     #expect(RackMIDI.events([0xB0, 74, 20]) == [.control(74, value: 20, channel: 1)])
     #expect(RackMIDI.events([0xF8]).isEmpty)
+  }
+
+  /// Two keyboards on two channels, each through a gate of its own: a note on one channel opens
+  /// only its own, and holding one does not steal the other's single voice.
+  @MainActor @Test func eachChannelPlaysItsOwnModules() {
+    func voice(_ n: Int) -> [PatchModule] {
+      [
+        PatchModule(id: "keys\(n)", type: "midi", params: ["channel": Double(n)]),
+        PatchModule(id: "osc\(n)", type: "vco"),
+        PatchModule(id: "amp\(n)", type: "vca", params: ["gain": 0]),
+        PatchModule(id: "out\(n)", type: "out"),
+      ]
+    }
+    func wires(_ n: Int) -> [PatchCable] {
+      [
+        PatchCable(from: PortReference("keys\(n)", "pitch"), to: PortReference("osc\(n)", "pitch")),
+        PatchCable(from: PortReference("osc\(n)", "out"), to: PortReference("amp\(n)", "in")),
+        PatchCable(from: PortReference("keys\(n)", "gate"), to: PortReference("amp\(n)", "cv")),
+        PatchCable(from: PortReference("amp\(n)", "out"), to: PortReference("out\(n)", "in")),
+      ]
+    }
+    let model = RackSession()
+    model.open(Patch(modules: voice(1) + voice(2), cables: wires(1) + wires(2)), name: "Two")
+    model.listen()
+    let frames = 4800
+    let left = UnsafeMutablePointer<Float>.allocate(capacity: frames)
+    let right = UnsafeMutablePointer<Float>.allocate(capacity: frames)
+    defer {
+      left.deallocate()
+      right.deallocate()
+    }
+    func loud() -> Bool {
+      model.host.render(frames: frames, left: left, right: right)
+      return (0..<frames).contains { abs(left[$0]) > 0.01 }
+    }
+    #expect(!loud())
+    model.midi([0x91, 48, 100])
+    #expect(loud())
+    model.midi([0x81, 48, 0])
+    _ = loud()
+    #expect(!loud())
+    // One voice a channel, and a note on each: both sound, neither steals.
+    model.midi([0x90, 48, 100])
+    model.midi([0x91, 55, 100])
+    #expect(model.sounding.sorted() == [48, 55])
+    // Channel 3 has nobody listening.
+    model.midi([0x92, 60, 100])
+    model.midi([0xB0, 123, 0])
+    #expect(model.sounding.sorted() == [55, 60])
+    model.allNotesOff()
+    #expect(model.sounding.isEmpty)
   }
 }

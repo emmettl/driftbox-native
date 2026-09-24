@@ -8,11 +8,13 @@ app=.build-release/Driftbox.app
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp .build-release/release/Driftbox "$app/Contents/MacOS/Driftbox"
-# The resource bundle is looked for beside the executable, as Bundle.module expects. It is the
-# library's rather than the executable's, because the catalogue is read by the code that moved.
-bundle=$(find .build-release -maxdepth 4 -name "DriftboxKit_DriftboxApp.bundle" | head -1)
-cp -R "$bundle" "$app/Contents/MacOS/"
-cp -R "$bundle" "$app/Contents/Resources/"
+# Every target's resource bundle — the app's, the session's songs, the rack session's patches and
+# cards — beside the executable, where Bundle.module looks first. A bundle left out is found at its
+# absolute build path instead, which works on this machine and nowhere else.
+for bundle in .build-release/release/DriftboxKit_*.bundle; do
+  cp -R "$bundle" "$app/Contents/MacOS/"
+  cp -R "$bundle" "$app/Contents/Resources/"
+done
 # The icon, where the Finder and the Dock look for one. `scripts/make-icon.swift` draws it.
 cp Sources/DriftboxApp/Resources/AppIcon.icns "$app/Contents/Resources/"
 cat > "$app/Contents/Info.plist" <<PLIST

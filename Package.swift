@@ -182,12 +182,10 @@ let package = Package(
       name: "DriftboxApp",
       dependencies: [
         "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq", "DriftboxScenes", "DriftboxRack",
-        "DriftboxSession",
+        "DriftboxSession", "DriftboxRackSession",
       ],
-      resources: [
-        .copy("Resources/AppIcon.icns"),
-        .copy("Resources/Patches"), .copy("Resources/patches.json"), .copy("Resources/modules.json"),
-      ]),
+      // The rack's patches and module cards are `DriftboxRackSession`'s, as every platform ships them.
+      resources: [.copy("Resources/AppIcon.icns")]),
     // `@main` and nothing else, so that everything it starts can be reached from a test.
     .executableTarget(name: "Driftbox", dependencies: ["DriftboxApp"]),
     // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine on the
@@ -295,7 +293,7 @@ let package = Package(
     .testTarget(
       name: "DriftboxAppTests",
       dependencies: [
-        "DriftboxApp", "DriftboxHost", "DriftboxSeq", "DriftboxDocument", "DriftboxRack",
+        "DriftboxApp", "DriftboxHost", "DriftboxSeq", "DriftboxDocument", "DriftboxRack", "DriftboxRackSession",
         "ConformanceSupport",
       ]
     ),

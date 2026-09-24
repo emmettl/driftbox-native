@@ -1,4 +1,5 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
+  import DriftboxRackSession
   import SwiftUI
   import UniformTypeIdentifiers
 

@@ -3,6 +3,7 @@
   import DriftboxDocument
   import DriftboxEngine
   import DriftboxHost
+  import DriftboxRackSession
   import DriftboxScenes
   import DriftboxSeq
   import DriftboxSession
@@ -231,7 +232,7 @@
       midi.onSourcesChange = { [weak self] names in
         Task { @MainActor in
           self?.midiSources = names
-          self?.rack?.midiSources = names
+          self?.rack?.session.midiSources = names
         }
       }
       midiSources = midi.sources
@@ -266,7 +267,7 @@
     /// voices the grid shows, from note 21 up. A note's velocity past 0.8 is an accent.
     private func midiNote(_ note: Int, velocity: Double) {
       // The rack plays what arrives while its window is in front; the groovebox otherwise.
-      guard listensToMIDI, velocity > 0, rack?.inFront != true else { return }
+      guard listensToMIDI, velocity > 0, rack?.session.inFront != true else { return }
       let accent = velocity >= 0.8
       if note >= 33 {
         playNote(semitone: note - 33 - 12, accent: accent)
@@ -277,7 +278,7 @@
 
     /// Every channel message, for the rack while its window is in front.
     private func midiMessage(_ bytes: [UInt8]) {
-      guard listensToMIDI, let rack, rack.inFront else { return }
+      guard listensToMIDI, let rack = rack?.session, rack.inFront else { return }
       rack.midi(bytes)
     }
 
@@ -442,15 +443,15 @@
 
     /// The rack, played through the same device as the song, after the song's master: its own
     /// source on this engine, so choosing an output moves both.
-    public func attach(_ rack: RackModel) {
+    public func attach(_ rack: MacRack) {
       rack.groovebox = self
       rack.attach(to: audio)
-      rack.midiSources = midiSources
+      rack.session.midiSources = midiSources
       self.rack = rack
     }
 
     /// The rack, once its window has been opened: where MIDI goes while that window is in front.
-    private weak var rack: RackModel?
+    private weak var rack: MacRack?
 
     /// The song that was open when the app last quit, as it was last saved — and stopped at the
     /// top, because sound nobody asked for is the one thing not worth restoring. A document comes

@@ -3,6 +3,7 @@
   import DriftboxDocument
   import DriftboxHost
   import DriftboxRack
+  import DriftboxRackSession
   import Foundation
   import Testing
 
@@ -16,10 +17,16 @@
     static let lowpass = PluginReference(
       format: "audio-unit", id: "aufx lpas appl", name: "AULowpass", vendor: "Apple")
 
-    static func model(memory: UserDefaults? = nil) -> RackModel {
-      let model = RackModel(memory: memory)
+    /// A rack hosting the Mac's Audio Units, as the app's does.
+    static func model(memory: UserDefaults? = nil) -> RackSession {
+      let model = RackSession(plugins: AudioUnitHosting(), memory: memory)
       model.open(Patch(modules: [], cables: []), name: "Empty")
       return model
+    }
+
+    /// The Audio Unit a module's plug-in is.
+    static func unit(_ model: RackSession, _ id: String) -> HostedAudioUnit? {
+      (model.units[id] as? AudioUnitPlugin)?.hosted
     }
 
     static func cutoff(_ unit: HostedAudioUnit?) -> AUParameter? {
@@ -39,7 +46,7 @@
         Issue.record("not ready: \(String(describing: model.plugins[id]))")
         return
       }
-      #expect(model.units[id]?.reference.id == "aufx lpas appl")
+      #expect(Self.unit(model, id)?.reference.id == "aufx lpas appl")
       #expect(model.host.externalModules == [id])
       #expect(model.undoTitle == "Undo Choose AULowpass")
 
@@ -72,22 +79,22 @@
       let id = try #require(model.add("plugin"))
       model.choosePlugin(id, Self.lowpass)
       await model.pluginsReady()
-      try #require(Self.cutoff(model.units[id])).value = 321
+      try #require(Self.cutoff(Self.unit(model, id))).value = 321
 
       // Heard about through the unit's own parameter tree, and saved once it settles.
       var kept: PluginReference?
       for _ in 0..<40 where kept?.state == nil {
         try await Task.sleep(for: .milliseconds(100))
-        kept = memory.string(forKey: RackModel.savedKey).flatMap(PatchCodec.decode)?.modules.first?.plugin
+        kept = memory.string(forKey: RackSession.savedKey).flatMap(PatchCodec.decode)?.modules.first?.plugin
       }
       #expect(kept?.id == "aufx lpas appl")
       #expect(kept?.state != nil)
       #expect(
         model.canUndo && model.undoTitle == "Undo Choose AULowpass", "keeping a unit's state is no edit")
 
-      let again = RackModel(memory: memory)
+      let again = RackSession(plugins: AudioUnitHosting(), memory: memory)
       await again.pluginsReady()
-      #expect(Self.cutoff(again.units[id])?.value == 321)
+      #expect(Self.cutoff(Self.unit(again, id))?.value == 321)
     }
 
     /// A unit this Mac does not have: silent, said so, and kept exactly for one that does.
@@ -107,6 +114,7 @@
       // As is one named in a way this build cannot read.
       module.plugin?.id = "not three codes"
       model.open(Patch(modules: [module], cables: []), name: "Garbled")
+      await model.pluginsReady()
       #expect(model.plugins["fx"] == .missing)
     }
 
@@ -146,11 +154,11 @@
       let id = try #require(model.add("plugin"))
       model.choosePlugin(id, Self.lowpass)
       await model.pluginsReady()
-      let unit = try #require(model.units[id])
+      let unit = try #require(Self.unit(model, id))
       let cutoff = try #require(unit.parameters.values.first { $0.address == 0 })
       cutoff.value = 1000
 
-      model.mapMacro(id, 1, to: cutoff)
+      model.mapMacro(id, 1, to: cutoff.keyPath)
       let control = PluginControl(macro: 1, key: cutoff.keyPath, name: cutoff.displayName)
       #expect(model.patch.modules[0].plugin?.controls == [control])
       let knob = try #require(model.patch.modules[0].params["macro1"])
@@ -158,7 +166,7 @@
         abs(knob - HostedAudioUnit.fraction(of: cutoff)) < 1e-9, "no jump: the knob is where the param is")
       #expect(knob > 0 && knob < 1)
       #expect(unit.mapping(0) == 0)
-      #expect(model.macroParameter(id, 1)?.parameter === cutoff)
+      #expect(model.macroParameter(id, 1)?.parameter?.key == cutoff.keyPath)
       #expect(model.undoTitle == "Undo Map Macro 1")
 
       model.undo()
@@ -168,10 +176,10 @@
       #expect(unit.mapping(0) == 0)
 
       // Kept, and found again by key in a new instance.
-      let again = RackModel(memory: memory)
+      let again = RackSession(plugins: AudioUnitHosting(), memory: memory)
       await again.pluginsReady()
       #expect(again.patch.modules[0].plugin?.controls == [control])
-      #expect(again.units[id]?.mapping(0) == 0)
+      #expect(Self.unit(again, id)?.mapping(0) == 0)
 
       model.mapMacro(id, 1, to: nil)
       #expect(unit.mapping(0) == nil)
@@ -185,12 +193,12 @@
       let id = try #require(model.add("plugin"))
       model.choosePlugin(id, Self.lowpass)
       await model.pluginsReady()
-      let unit = try #require(model.units[id])
+      let unit = try #require(Self.unit(model, id))
       let parameters = unit.parameters.values.sorted { $0.address < $1.address }
       let (cutoff, resonance) = (parameters[0], parameters[1])
-      model.mapMacro(id, 1, to: cutoff)
+      model.mapMacro(id, 1, to: cutoff.keyPath)
 
-      model.learnMacro(id, 2, open: false)
+      model.learnMacro(id, 2)
       #expect(model.learning?.macro == 2)
       cutoff.value = 500
       resonance.value = 6
@@ -205,7 +213,7 @@
       let id = try #require(model.add("plugin"))
       model.choosePlugin(id, Self.lowpass)
       await model.pluginsReady()
-      let cutoff = try #require(model.units[id]?.parameters.values.first { $0.address == 0 })
+      let cutoff = try #require(Self.unit(model, id)?.parameters.values.first { $0.address == 0 })
       #expect(
         HostedAudioUnit.display(cutoff, at: 0).hasPrefix("10"), "\(HostedAudioUnit.display(cutoff, at: 0))")
       #expect(HostedAudioUnit.display(cutoff, at: 1).hasPrefix("23760"))

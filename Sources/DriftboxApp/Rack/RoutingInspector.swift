@@ -1,5 +1,6 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxRack
+  import DriftboxRackSession
   import SwiftUI
 
   /// A Combinator's routing, to edit: which control moves which knob, and between what — the
@@ -9,7 +10,7 @@
   /// watched moving. Source, target, min and max, and no more: anything else is a cable and an
   /// Offset, and the Combinator's value is that it is the simple one.
   struct RoutingInspector: View {
-    let model: RackModel
+    let model: RackSession
     let combi: PatchModule
 
     var body: some View {
@@ -67,7 +68,7 @@
   /// One routing: its source, its target module and knob, its two ends — blank meaning the
   /// target's own limit — and what it is putting on the target now.
   struct RouteRow: View {
-    let model: RackModel
+    let model: RackSession
     let combi: PatchModule
     /// Where it is in the patch's routings, which is what the model edits it by.
     let index: Int
@@ -77,13 +78,13 @@
 
     var body: some View {
       let target = model.patch.modules.first { $0.id == route.to.module }
-      let param = target.flatMap { RackModel.routable($0.type).first { $0.id == route.to.port } }
+      let param = target.flatMap { RackSession.routable($0.type).first { $0.id == route.to.port } }
       VStack(alignment: .leading, spacing: 8) {
         HStack(spacing: 6) {
           Text("\(number)").font(Theme.mono(9, .semibold)).foregroundStyle(Theme.three)
             .frame(width: 14, alignment: .leading)
           Picker("Source", selection: source) {
-            ForEach(RackModel.routable(combi.type), id: \.id) { Text($0.name).tag($0.id) }
+            ForEach(RackSession.routable(combi.type), id: \.id) { Text($0.name).tag($0.id) }
           }
           .labelsHidden()
           .fixedSize()
@@ -108,7 +109,7 @@
           Color.clear.frame(width: 14, height: 1)
           Picker("Target knob", selection: knob) {
             if let target {
-              ForEach(RackModel.routable(target.type), id: \.id) { Text($0.name).tag($0.id) }
+              ForEach(RackSession.routable(target.type), id: \.id) { Text($0.name).tag($0.id) }
             }
             if param == nil { Text("\(route.to.port) (unknown)").tag(route.to.port) }
           }
@@ -139,7 +140,7 @@
 
     /// Modules with a knob to drive.
     private var targets: [PatchModule] {
-      model.patch.modules.filter { !RackModel.routable($0.type).isEmpty }
+      model.patch.modules.filter { !RackSession.routable($0.type).isEmpty }
     }
 
     private var source: Binding<String> {

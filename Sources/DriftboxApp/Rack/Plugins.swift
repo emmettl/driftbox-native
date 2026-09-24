@@ -4,6 +4,7 @@
   import CoreAudioKit
   import DriftboxHost
   import DriftboxRack
+  import DriftboxRackSession
   import SwiftUI
 
   /// The Audio Units on this Mac, as the plug-in modules' menus list them: by maker, then name. The
@@ -108,31 +109,90 @@
     func windowWillClose(_ notification: Notification) { closed() }
   }
 
-  extension RackModel {
-    /// A `plugin` module's unit's own interface, brought to the front, or opened.
-    func showInterface(_ moduleId: String) {
-      if let open = interfaces[moduleId] {
-        open.show()
-        return
+  /// The Mac's plug-ins for the rack: Audio Units, made from what a patch remembers of them.
+  @MainActor
+  final class AudioUnitHosting: RackPluginHosting {
+    func make(_ reference: PluginReference, sampleRate: Double) async throws -> any RackPluginUnit {
+      guard reference.format == "audio-unit", let component = HostedAudioUnit.component(reference.id) else {
+        throw RackPluginFailure.missing
       }
-      guard let unit = units[moduleId],
-        let reference = patch.modules.first(where: { $0.id == moduleId })?.plugin
-      else { return }
-      Task { [weak self] in
-        let interface = await PluginInterface.open(unit, title: "\(reference.name) — \(moduleId)") {
-          [weak self] in
-          guard let self else { return }
-          interfaces[moduleId] = nil
-          // Whatever was done in it is kept now, not only once a param happens to be observed.
-          unitChanged(moduleId)
-        }
-        // The unit may have gone, or been given an interface already, while this one was made.
-        guard let self, units[moduleId] === unit, interfaces[moduleId] == nil else {
-          interface.close()
-          return
-        }
-        interfaces[moduleId] = interface
+      do {
+        return AudioUnitPlugin(
+          try await HostedAudioUnit.instantiate(component, sampleRate: sampleRate, state: reference.state))
+      } catch HostedAudioUnit.Failure.missing {
+        throw RackPluginFailure.missing
+      } catch HostedAudioUnit.Failure.format {
+        throw RackPluginFailure.format
       }
+    }
+  }
+
+  /// One Audio Unit in the rack, as the session asks for it: rendered by the host, its params by
+  /// key for the macros, what it says as it changes, and its interface in a window of its own.
+  @MainActor
+  final class AudioUnitPlugin: RackPluginUnit {
+    let hosted: HostedAudioUnit
+    private var token: AUParameterObserverToken?
+    private var interface: PluginInterface?
+    private var opening = false
+
+    init(_ hosted: HostedAudioUnit) { self.hosted = hosted }
+
+    var external: RackExternal { hosted.external }
+    var latency: Double { hosted.latency }
+    var savedState: String? { hosted.savedState }
+
+    var parameters: [String: RackPluginParameter] {
+      hosted.parameters.mapValues { parameter in
+        RackPluginParameter(
+          key: parameter.keyPath, name: parameter.displayName, address: parameter.address,
+          fraction: HostedAudioUnit.fraction(of: parameter))
+      }
+    }
+
+    func map(_ slot: Int, to key: String?) { hosted.map(slot, to: key.flatMap { hosted.parameters[$0] }) }
+
+    /// Heard about through the unit's parameter tree, which may call from any thread.
+    var onChange: ((UInt64?) -> Void)? {
+      didSet {
+        if let token { hosted.unit.parameterTree?.removeParameterObserver(token) }
+        token =
+          onChange.map { changed in
+            hosted.unit.parameterTree?.token(byAddingParameterObserver: Self.observer { changed($0) })
+          } ?? nil
+      }
+    }
+
+    /// An observer for a unit to call on whatever thread it likes, which a closure written here, on
+    /// the main actor, would trap on: it hands the param moved to the main actor instead.
+    nonisolated private static func observer(_ changed: @escaping @MainActor @Sendable (UInt64) -> Void)
+      -> AUParameterObserver
+    {
+      { address, _ in Task { @MainActor in changed(address) } }
+    }
+
+    /// The unit's own interface, brought to the front, or opened. Closing it says the unit has
+    /// changed, so whatever was done in it is kept, not only a param the tree happened to report.
+    func showInterface(title: String) {
+      if let interface { return interface.show() }
+      guard !opening else { return }
+      opening = true
+      Task { [weak self, hosted] in
+        let opened = await PluginInterface.open(hosted, title: title) { [weak self] in
+          self?.interface = nil
+          self?.onChange?(nil)
+        }
+        // Let go of while its window was being made: nothing left to show it for.
+        guard let self else { return opened.close() }
+        opening = false
+        interface = opened
+      }
+    }
+
+    func close() {
+      onChange = nil
+      interface?.close()
+      interface = nil
     }
   }
 
@@ -185,7 +245,7 @@
     }
 
     /// Choosing a unit, opening it, and mapping its macros.
-    private func buttons(reference: PluginReference?, status: RackModel.PluginStatus?, instrument: Bool)
+    private func buttons(reference: PluginReference?, status: RackSession.PluginStatus?, instrument: Bool)
       -> some View
     {
       let kind = instrument ? "instrument" : "effect"
@@ -210,7 +270,7 @@
         .help("Choose an Audio Unit \(kind) on this Mac")
         // Only a unit that is running has controls to show, or to map.
         if Self.lit(status) {
-          Button("Open") { face.model.showInterface(face.module.id) }
+          Button("Open") { face.rack.showInterface(face.module.id) }
             .buttonStyle(OptionStyle(on: false, tint: Theme.nine))
             .help("Open the plug-in's own controls in a window")
           Menu {
@@ -232,8 +292,12 @@
     /// Macro `macro`'s knob, named for what it turns and saying the value in that param's words.
     private func macro(_ macro: Int, ready: Bool) -> some View {
       let mapped = face.model.macroParameter(face.module.id, macro)
+      let unit = face.model.units[face.module.id] as? AudioUnitPlugin
       let learning = face.model.learning.map { $0.module == face.module.id && $0.macro == macro } ?? false
-      let display: (@Sendable (Double) -> String)? = mapped?.parameter.map { parameter in
+      let display: (@Sendable (Double) -> String)? = mapped.flatMap {
+        unit?.hosted.parameters[$0.control.key]
+      }.map {
+        parameter in
         let held = HeldParameter(parameter: parameter)
         return { HostedAudioUnit.display(held.parameter, at: $0) }
       }
@@ -258,22 +322,22 @@
     @ViewBuilder
     private func macroMenu(_ macro: Int) -> some View {
       let id = face.module.id
-      if let tree = face.model.units[id]?.unit.parameterTree {
+      if let tree = (face.model.units[id] as? AudioUnitPlugin)?.hosted.unit.parameterTree {
         Menu("Map To") {
-          ParameterMenu(nodes: tree.children) { face.model.mapMacro(id, macro, to: $0) }
+          ParameterMenu(nodes: tree.children) { face.model.mapMacro(id, macro, to: $0.keyPath) }
         }
       }
-      Button("Learn from the Plug-in") { face.model.learnMacro(id, macro) }
+      Button("Learn from the Plug-in") { face.rack.learnMacro(id, macro) }
       if face.model.macroParameter(id, macro) != nil {
         Button("Unmap") { face.model.mapMacro(id, macro, to: nil) }
       }
     }
 
-    static func lit(_ status: RackModel.PluginStatus?) -> Bool {
+    static func lit(_ status: RackSession.PluginStatus?) -> Bool {
       if case .ready = status { true } else { false }
     }
 
-    static func state(_ status: RackModel.PluginStatus?, chosen: Bool) -> String {
+    static func state(_ status: RackSession.PluginStatus?, chosen: Bool) -> String {
       switch status {
       case nil: chosen ? "" : "empty"
       case .loading: "loading"
@@ -285,7 +349,7 @@
 
     /// Under the name: who made it and how late it is, or why it is silent.
     static func detail(
-      _ reference: PluginReference?, _ status: RackModel.PluginStatus?, instrument: Bool = false
+      _ reference: PluginReference?, _ status: RackSession.PluginStatus?, instrument: Bool = false
     )
       -> String
     {

@@ -1,5 +1,6 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxRack
+  import DriftboxRackSession
   import SwiftUI
 
   // The faces the reference builds by hand, one for one: each says something the definition

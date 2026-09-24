@@ -120,7 +120,7 @@ finished a buffer since.
 **Where it stands.** `DriftboxHostWindows` is built on the ports and tested against them, and so
 is `DriftboxHostAndroid`'s audio, played through a phone.
 The Mac's adapters — `AudioRoute`, `DriftboxAudioUnit`, `MIDIInput`, `MIDIOutput` — are older than
-the ports, still in `DriftboxHost`, and not yet behind them; `Player` and `RackModel` use them
+the ports, still in `DriftboxHost`, and not yet behind them; `Player` and `MacRack` use them
 directly. Moving them into a target of their own that conforms is the next step, and needs a Mac to
 build. After it, `driftbox-play` is one program on both platforms rather than two branches.
 

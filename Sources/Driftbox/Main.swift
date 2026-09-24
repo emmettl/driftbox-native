@@ -7,7 +7,7 @@
   struct Driftbox: App {
     @State private var player: Player
     @State private var stage: Stage
-    @State private var rack: RackModel
+    @State private var rack: MacRack
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
@@ -22,7 +22,7 @@
       let player = Player()
       _player = State(initialValue: player)
       _stage = State(initialValue: Stage(player: player))
-      _rack = State(initialValue: RackModel(memory: .standard))
+      _rack = State(initialValue: MacRack(memory: .standard))
     }
 
     var body: some Scene {
@@ -48,7 +48,7 @@
       // The rack is an instrument beside the groovebox, in a window of its own, playing through
       // the same device.
       Window("Rack", id: "rack") {
-        RackWindow(model: rack) { player.attach(rack) }
+        RackWindow(rack: rack) { player.attach(rack) }
       }
       .defaultSize(width: 900, height: 860)
 

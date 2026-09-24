@@ -1,4 +1,5 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
+  import DriftboxRackSession
   import SwiftUI
 
   /// The menu bar. Everything the toolbar does is here too, and the menu is the contract: it is
