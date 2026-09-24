@@ -79,6 +79,8 @@
       "combi": (nil, 5), "groovebox": (nil, 16), "vco": (1, 2), "ladder": (1, nil), "looper": (nil, 3),
       "midi": (1, 2), "meter": (nil, 3), "multisampler": (nil, 6), "note-echo": (nil, 5), "out": (1, nil),
       "sampler": (nil, 4), "scale-player": (nil, 4), "tracker": (nil, 7), "tuner": (1, 3),
+      // And the one the reference has no front for at all.
+      "plugin": (1, 2),
     ]
 
     /// How many control cells fit across a module of this span.

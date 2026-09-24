@@ -200,7 +200,9 @@
       // And the app can read them: every entry opens, and every module has its words.
       #expect(PatchEntry.all.count == documents.count)
       for entry in PatchEntry.all { #expect(entry.load() != nil, "\(entry.id)") }
-      #expect(ModuleFace.all.count == Self.panels?.modules.count)
+      // Bar the cards for modules the reference has none of.
+      #expect(ModuleFace.all.count - ModuleFace.native.count == Self.panels?.modules.count)
+      #expect(Set(ModuleFace.native.map(\.type)) == RackModules.nativeOnly)
     }
 
     /// Every module's picture draws: the paths parse into something with an extent, including

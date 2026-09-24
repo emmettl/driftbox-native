@@ -52,6 +52,18 @@
     private(set) var ccBindings: [RackCC.Binding] = []
     /// The param waiting for a controller to be turned, if one is.
     private(set) var ccLearning: PortReference?
+    /// Where each `plugin` module's unit has got to, for its face. None for a module with no
+    /// unit chosen.
+    private(set) var plugins: [String: PluginStatus] = [:]
+
+    enum PluginStatus: Equatable {
+      case loading
+      /// Playing, and how late its output is, in seconds.
+      case ready(latency: Double)
+      /// Not on this Mac: kept in the patch as it was, and silent.
+      case missing
+      case failed(String)
+    }
 
     // MARK: History
 
@@ -90,6 +102,17 @@
     @ObservationIgnored private var rendering: [String: Task<Void, Never>] = [:]
     /// The host slots each module has audio in, so a module that goes takes its audio with it.
     @ObservationIgnored private var held: [String: Set<String>] = [:]
+    /// Each `plugin` module's unit, once made, and which unit it is: a module given a different
+    /// one gets a new instance, and one given the same keeps its own through any edit.
+    @ObservationIgnored private(set) var units: [String: HostedAudioUnit] = [:]
+    @ObservationIgnored private var unitIds: [String: String] = [:]
+    @ObservationIgnored private var making: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var watching: [String: AUParameterObserverToken] = [:]
+    /// Units changed since their state was last taken into the patch.
+    @ObservationIgnored private var changedUnits: Set<String> = []
+    @ObservationIgnored private var pendingSave: Task<Void, Never>?
+    /// Each unit's own interface, while it is open.
+    @ObservationIgnored var interfaces: [String: PluginInterface] = [:]
 
     /// A recording, for a face: its name, how long, whether stereo, and its shape.
     struct Recording: Equatable {
@@ -198,8 +221,9 @@
         songLoop = nil
         if live { host.loopSong(startBar: 0, bars: 0) }
       }
-      // Another patch's samples are not this one's, even under the same ids.
+      // Another patch's samples are not this one's, even under the same ids, nor its units.
       host.clearSamples()
+      for id in Array(unitIds.keys) { dropUnit(id) }
       samples = [:]
       recordings = [:]
       tracks = [:]
@@ -242,6 +266,7 @@
     /// Compile what is there and hand it to the host; and work out which cables to draw as what.
     private func rebuild() {
       settleSamples()
+      settlePlugins()
       // Its Combinator gone, the routing closes rather than waiting to reopen on a new one of
       // the same name.
       if let combi = editingRoutes, !patch.modules.contains(where: { $0.id == combi }) { editingRoutes = nil }
@@ -282,6 +307,7 @@
     }
 
     private func save() {
+      takeUnitStates()
       unit?.saved.withLock { $0 = (PatchCodec.encode(patch), name) }
       guard let memory else { return }
       memory.set(PatchCodec.encode(patch), forKey: Self.savedKey)
@@ -626,6 +652,125 @@
       self.patch = patch
       selection = selection.filter { id in patch.modules.contains { $0.id == id } }
       rebuild()
+    }
+
+    // MARK: Plug-ins
+
+    /// Give a `plugin` module a unit: a structural edit, undone like any other.
+    func choosePlugin(_ moduleId: String, _ reference: PluginReference) {
+      structural("Choose \(reference.name)") { patch in
+        guard let at = patch.modules.firstIndex(where: { $0.id == moduleId }) else { return }
+        patch.modules[at].plugin = reference
+      }
+    }
+
+    /// Units for the `plugin` modules that name one, made as they appear; and let go of as their
+    /// modules go or are given another. A unit's own settings are its to undo, so undoing in the
+    /// rack changes which unit a module has, never how it is set.
+    private func settlePlugins() {
+      var wanted: [String: PluginReference] = [:]
+      for module in patch.modules where module.type == "plugin" {
+        if let plugin = module.plugin { wanted[module.id] = plugin }
+      }
+      for id in Array(unitIds.keys) where wanted[id]?.id != unitIds[id] { dropUnit(id) }
+      for id in plugins.keys where wanted[id] == nil { plugins[id] = nil }
+      for (id, reference) in wanted where unitIds[id] == nil { makeUnit(id, reference) }
+    }
+
+    private func makeUnit(_ id: String, _ reference: PluginReference) {
+      unitIds[id] = reference.id
+      guard reference.format == "audio-unit", let component = HostedAudioUnit.component(reference.id) else {
+        plugins[id] = .missing
+        return
+      }
+      plugins[id] = .loading
+      let rate = host.sampleRate
+      making[id] = Task { [weak self] in
+        let made: Result<HostedAudioUnit, Error>
+        do {
+          made = .success(
+            try await HostedAudioUnit.instantiate(component, sampleRate: rate, state: reference.state))
+        } catch {
+          made = .failure(error)
+        }
+        guard let self, !Task.isCancelled, unitIds[id] == reference.id else { return }
+        making[id] = nil
+        switch made {
+        case .success(let unit):
+          units[id] = unit
+          host.setExternal(id, unit.external)
+          plugins[id] = .ready(latency: unit.latency)
+          watch(id, unit)
+        case .failure(HostedAudioUnit.Failure.missing):
+          plugins[id] = .missing
+        case .failure(let error):
+          plugins[id] = .failed(
+            (error as? HostedAudioUnit.Failure) == .format
+              ? "It will not play in stereo at \(Int(rate)) Hz" : error.localizedDescription)
+        }
+      }
+    }
+
+    /// A unit let go of: silent in the host at once, its interface closed, its state taken first.
+    private func dropUnit(_ id: String) {
+      making.removeValue(forKey: id)?.cancel()
+      interfaces.removeValue(forKey: id)?.close()
+      if let unit = units[id], let token = watching[id] {
+        unit.unit.parameterTree?.removeParameterObserver(token)
+      }
+      host.setExternal(id, nil)
+      units[id] = nil
+      unitIds[id] = nil
+      watching[id] = nil
+      changedUnits.remove(id)
+      plugins[id] = nil
+    }
+
+    /// Hear about a unit being changed — from its interface, or anything else that sets its
+    /// params — so its state reaches the patch soon after.
+    private func watch(_ id: String, _ unit: HostedAudioUnit) {
+      watching[id] = unit.unit.parameterTree?.token(
+        byAddingParameterObserver: Self.observer { [weak self] in self?.unitChanged(id) })
+    }
+
+    /// An observer for a unit to call on whatever thread it likes, which a closure written here, on
+    /// the main actor, would trap on: it hands `changed` to the main actor instead.
+    nonisolated private static func observer(_ changed: @escaping @MainActor @Sendable () -> Void)
+      -> AUParameterObserver
+    {
+      { _, _ in Task { @MainActor in changed() } }
+    }
+
+    /// A unit's state is out of date in the patch: saved once things have been still for a moment.
+    func unitChanged(_ id: String) {
+      changedUnits.insert(id)
+      if let unit = units[id], plugins[id] != .ready(latency: unit.latency) {
+        plugins[id] = .ready(latency: unit.latency)
+      }
+      pendingSave?.cancel()
+      pendingSave = Task { [weak self] in
+        try? await Task.sleep(for: .milliseconds(400))
+        guard !Task.isCancelled else { return }
+        self?.save()
+      }
+    }
+
+    /// The changed units' states into the patch, where the next save finds them. Not an edit: a
+    /// unit's settings are its own, and the patch only keeps them.
+    private func takeUnitStates() {
+      guard !changedUnits.isEmpty else { return }
+      for id in changedUnits {
+        guard let unit = units[id], let at = patch.modules.firstIndex(where: { $0.id == id }),
+          patch.modules[at].plugin != nil
+        else { continue }
+        patch.modules[at].plugin?.state = unit.savedState
+      }
+      changedUnits = []
+    }
+
+    /// Once every unit being made has arrived.
+    func pluginsReady() async {
+      while let task = making.values.first { await task.value }
     }
 
     // MARK: Samples

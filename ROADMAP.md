@@ -374,8 +374,13 @@ external displays, performance capture to video.
    `HostedAudioUnit` readies an Audio Unit effect in stereo at the rack's rate and renders it on
    the rack's thread through its own render block, with the rack's tempo, beat and transport for
    a unit that keeps time. A patch keeps the unit's component and its document state, in base64,
-   whether or not the machine opening it has the unit. Next, the app: choosing a unit, its face,
-   and its own interface in a window.
+   whether or not the machine opening it has the unit.
+   Then the app: the module is on the picker's Effects shelf, and its face chooses from every Audio
+   Unit effect on the Mac, by maker; says who made the unit and how late it is; and opens the unit's
+   own interface in a window, or the system's generic one where it draws none. Choosing a unit is a
+   step of undo; the unit's own settings are its own, so undoing in the rack never changes them,
+   and they reach the patch shortly after they change. A unit the Mac lacks is said to be missing,
+   silent and kept exactly. Next, instruments: a unit played by the rack's notes.
 
 ### What the later milestones ask of the first
 

@@ -37,6 +37,7 @@
         case "multisampler": MultisamplerFace(face: face)
         case "audio-track": AudioTrackFace(face: face)
         case "groovebox": GrooveboxFace(face: face)
+        case "plugin": PluginFace(face: face)
         default: GenericFace(face: face, span: span)
         }
       }
