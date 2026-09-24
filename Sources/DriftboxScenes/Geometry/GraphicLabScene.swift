@@ -3,6 +3,11 @@ import DriftboxGPU
 import DriftboxText
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// Graphic Lab: three kinds of flat music graphic sharing one printing press.
 ///
 /// This deliberately does not construct a place. The canvas only carries one screen-sized

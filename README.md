@@ -375,9 +375,10 @@ catalogue with the scene the song names drawn from it over the whole screen, and
 the performance filter's pad, as the window is on Windows; two fingers tapped step on to the next
 scene. A scene is drawn at no more than two pixels to a point, a Mac's Retina display's, and
 scaled up to the screen: on a Fairphone 6, which has three, every scene but Frost then keeps the
-display's 120 frames a second, and Frost 98. That was before Graphic Lab moved across, which
-sets its type there with Android's own text stack. Given a test's name, the app runs that instead and
-says what happened.
+display's 120 frames a second, and Frost 98. Graphic Lab, which sets its type there with Android's
+own text stack, takes 5.6ms a frame drawn, and more over its first frames at a size, while the
+glyphs it sets go into its atlas. Given a test's name, the app runs that instead and says what
+happened.
 
 ```bash
 scripts/android-app.sh                  # build and install; open it for Pulse, playing acid
