@@ -31,6 +31,8 @@ public final class RackInterface {
   private var lastTap: (target: RackTarget, at: ContinuousClock.Instant)?
   /// The menu the last press asked for, which the window shows as its own.
   private var menuRequest: (menu: Menu, at: SIMD2<Float>)?
+  /// The module a press asked to choose a file for, which the window asks with a panel of its own.
+  private var fileRequest: String?
   var menuActions: [String: () -> Void] = [:]
   var menuDisabled: Set<String> = []
   /// On the back: what a press there is doing, and where the pointer is, in the rack's design space.
@@ -128,15 +130,19 @@ public final class RackInterface {
         let stage = stage
         guard let cell = cell(module, index, in: stage) else { return }
         let travel = Float(rise) / stage.scale
-        if abs(travel) >= Self.cellStep { cellMoved = true }
+        if abs(travel) >= cell.step { cellMoved = true }
         guard cellMoved else { return }
         let next = max(
           cell.range.lowerBound,
           min(
-            cell.range.upperBound, Int(turn.from) + Int(RackDisplay.jsRound(Double(travel / Self.cellStep)))))
+            cell.range.upperBound, Int(turn.from) + Int(RackDisplay.jsRound(Double(travel / cell.step)))))
         if next != cell.value {
-          let data = rack.patch.modules.first { $0.id == module }?.data[cell.slot] ?? []
-          rack.setData(module, cell.slot, to: cell.written(next, in: data), name: cell.name)
+          if let (id, offset, scale) = cell.param {
+            rack.turn(module, id, to: offset + scale * Double(next))
+          } else {
+            let data = rack.patch.modules.first { $0.id == module }?.data[cell.slot] ?? []
+            rack.setData(module, cell.slot, to: cell.written(next, in: data), name: cell.name)
+          }
         }
         turn.value = Double(next)
       default:
@@ -227,6 +233,10 @@ public final class RackInterface {
       pages[module] = page
     case .hold:
       break  // Held from the press itself, not its lift.
+    case .choose:
+      fileRequest = module
+    case .sampleBars(let bars):
+      rack.setSampleBars(module, bars)
     case .learn(let param):
       if pressModifiers.contains(.shift) {
         rack.clearCcBinding(module, param)
@@ -256,6 +266,42 @@ public final class RackInterface {
     default:
       break
     }
+  }
+
+  /// The module a press asked to choose a file for, once: the window asks with its own panel and
+  /// hands what is chosen to `load`.
+  public func takeFileRequest() -> String? {
+    defer { fileRequest = nil }
+    return fileRequest
+  }
+
+  /// Whether the module takes several files at once, as a Multisampler takes a set.
+  public func takesSeveral(_ module: String) -> Bool {
+    rack.patch.modules.first { $0.id == module }?.type == "multisampler"
+  }
+
+  /// Files into a module that holds recordings, as its kind takes them: a sample, a track, or a set
+  /// mapped into an instrument. Read off the main thread; the face says so while they are. False
+  /// for a module that holds none.
+  @discardableResult
+  public func load(_ urls: [URL], into module: String) -> Bool {
+    guard let url = urls.first, let type = rack.patch.modules.first(where: { $0.id == module })?.type
+    else { return false }
+    let rack = rack
+    switch type {
+    case "sampler": Task { await rack.load(url, into: module) }
+    case "audio-track": Task { await rack.loadTrack(url, into: module) }
+    case "multisampler": Task { await rack.loadInstrument(urls, into: module) }
+    default: return false
+    }
+    return true
+  }
+
+  /// Files dropped on the window at `point`: into the module there, if it holds recordings. False
+  /// when nothing there takes them, for the window to do something else with them.
+  public func drop(_ urls: [URL], at point: SIMD2<Float>) -> Bool {
+    guard !rack.flipped, let face = stage.face(at: point) else { return false }
+    return load(urls, into: face.module.id)
   }
 
   /// A menu a press asked for, once: the window shows it as its own, and `choose` does what is
@@ -498,6 +544,12 @@ public final class RackInterface {
     canvas.font = face.wordsFont ?? (face.wordsTint == nil ? Theme.mono(9) : Theme.mono(10, weight: 600))
     canvas.fill = face.wordsTint?.faded(dim) ?? Theme.dim.faded(0.8 * dim)
     canvas.fillText(face.words, title.maxX, baseline)
+    if let light = face.light {
+      // A light before the words: lit when the module has what it needs.
+      let x = title.maxX - canvas.measure(face.words) - 8
+      canvas.fill = light ? Theme.nine : Theme.dim.faded(0.4)
+      canvas.fillEllipse(x - 2.5, baseline - 5.5, 5, 5)
+    }
     canvas.fill = Theme.edge
     canvas.fillRect(title.x, title.maxY + 4, title.width, 1)
     let tint = Self.tint(ModuleFace.byType[def.type]?.group)

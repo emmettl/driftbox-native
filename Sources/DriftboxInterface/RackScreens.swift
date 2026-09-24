@@ -24,6 +24,8 @@ extension RackInterface {
       case "chord-player": drawChordScreen(screen, face: face, on: canvas)
       case "arp": drawArpScreen(screen, face: face, on: canvas)
       case "combi": drawRoutes(screen, face: face, on: canvas)
+      case "sampler": drawSampleScreen(screen, face: face, on: canvas)
+      case "audio-track": drawTrackScreen(screen, face: face, on: canvas)
       default: break
       }
     }
@@ -297,6 +299,13 @@ extension RackInterface {
       return drawArpStep(button, number: number, octave: octave, on: canvas)
     case .learn(let armed, let bound): return drawLearn(button, armed: armed, bound: bound, on: canvas)
     case .pad(let live): return drawPad(button, live: live, hovered: hovered, on: canvas)
+    case .slice(let accent): return drawSlice(button, accent: accent, on: canvas)
+    case .prompt(let detail): return drawPrompt(button, detail: detail, hovered: hovered, on: canvas)
+    case .chip:
+      return Draw.chip(
+        button.frame, label: button.label, isOn: false, hovered: hovered, down: false, tint: button.tint,
+        size: 10,
+        on: canvas)
     }
     let r = button.frame
     if button.isOn {

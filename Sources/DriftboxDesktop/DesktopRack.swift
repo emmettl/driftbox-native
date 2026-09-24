@@ -1,6 +1,8 @@
+import DriftboxDocument
 import DriftboxInterface
 import DriftboxRackSession
 import DriftboxShell
+import Foundation
 
 /// The rack, in the window in the groovebox's place: what it hears while it shows, and how it is
 /// named. The groovebox plays on underneath, as it would with its window out of sight on the Mac.
@@ -33,7 +35,15 @@ extension Desktop {
       if let request = rackInterface.takeMenuRequest() {
         pop(request.menu, at: request.at, for: rackInterface)
       }
+      if let module = rackInterface.takeFileRequest(),
+        let url = window.chooseFile(ofTypes: [Self.audio])
+      {
+        rackInterface.load([url], into: module)
+      }
       return true
+    case .dropped(let urls, let at):
+      // Onto a module that holds recordings; anything else is the window's, as a song is.
+      return rackInterface.drop(urls, at: at)
     case .scroll(let scroll):
       rackInterface.scroll(scroll)
       return true
@@ -42,6 +52,18 @@ extension Desktop {
     default:
       return false
     }
+  }
+
+  /// What a face loads: WAV, which the rack reads on every platform.
+  static let audio = FileType(name: "WAV Audio", extensions: ["wav", "wave"])
+
+  /// Files dropped where nothing else took them: the first song among them opened, as Open would.
+  func openDropped(_ urls: [URL]) {
+    guard let song = urls.first(where: { SongFile.isSong(fileName: $0.lastPathComponent) }),
+      mayLoseChanges()
+    else { return }
+    session.open(file: song)
+    setShowsRack(false)
   }
 
   private func pop(_ menu: Menu, at point: SIMD2<Float>, for rack: RackInterface) {

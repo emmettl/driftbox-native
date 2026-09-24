@@ -25,6 +25,8 @@ public enum RackFaces {
     "chord-player": Set(chordKnobs + ["alter"]),
     "arp": Set(arpKnobs.map(\.id)),
     "combi": Set((1...4).flatMap { ["rotary\($0)", "button\($0)"] }),
+    "sampler": ["slices", "slice", "start", "loop", "reverse"],
+    "audio-track": ["start", "level"],
   ]
 
   static let shapes = ["Saw", "Pulse", "Tri"]
@@ -74,6 +76,24 @@ public enum RackFaces {
       column += 1
       rowHeight = max(rowHeight, height)
     }
+
+    /// Leave the next cell empty, for something of the face's own.
+    mutating func skip() {
+      if column == columns {
+        y += rowHeight
+        column = 0
+        rowHeight = 0
+      }
+      column += 1
+      rowHeight = max(rowHeight, Float(RackLayout.cellHeight))
+    }
+
+    /// Where the next cell would be.
+    var next: Rect {
+      column == columns
+        ? Rect(x, y + rowHeight, cellWidth, Float(RackLayout.cellHeight))
+        : Rect(x + Float(column) * cellWidth, y, cellWidth, Float(RackLayout.cellHeight))
+    }
   }
 
   struct Built {
@@ -84,6 +104,7 @@ public enum RackFaces {
     var mark: String?
     var name: String?
     var markTint: Colour?
+    var light: Bool?
     var screen: Rect?
     var buttons: [RackStage.Button] = []
     var dataCells: [RackStage.Cell] = []
@@ -202,6 +223,10 @@ public enum RackFaces {
       return arp(module, def, x: x, width: width, top: top, rack: rack)
     case "combi":
       return combinator(module, def, x: x, width: width, top: top, bottom: bottom, rack: rack)
+    case "sampler":
+      return sampler(module, def, x: x, width: width, top: top, rack: rack)
+    case "audio-track":
+      return audioTrack(module, def, x: x, width: width, top: top, rack: rack)
     default:
       return nil
     }

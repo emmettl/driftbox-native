@@ -328,7 +328,8 @@ struct RackInterfaceTests {
     for (type, shows) in RackFaces.shows {
       let (_, face) = try Self.alone(type)
       let controls = face.controls.map(\.param.id)
-      #expect(Set(controls + face.buttons.compactMap(\.press?.param)) == shows, "\(type)")
+      let pressed = face.buttons.compactMap(\.press?.param) + face.cells.compactMap(\.param?.id)
+      #expect(Set(controls + pressed) == shows, "\(type)")
       #expect(controls.count == Set(controls).count, "\(type): each once")
       // Buttons may sit on the screen, as a scale's keys do; nothing else may, nor on each other.
       let parts = face.controls.map(\.cell) + face.buttons.map(\.frame) + face.cells.map(\.frame)
@@ -563,6 +564,106 @@ struct RackInterfaceTests {
     #expect(rack.stage.faces[0].buttons.contains { $0.label == "turn one…" })
     Self.press(rack, Self.window(stage, Self.centre(chip.frame)))
     #expect(rack.rack.ccLearning == nil)
+  }
+
+  /// A mono sine in a temporary WAV file of 16-bit samples.
+  static func wav(seconds: Double = 1, rate: Double = 48000, name: String = "Sine.wav") throws -> URL {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let url = folder.appendingPathComponent(name)
+    var body = Data()
+    for i in 0..<Int(seconds * rate) {
+      let value = Int16(12000 * sin(2 * Double.pi * 220 * Double(i) / rate))
+      withUnsafeBytes(of: value.littleEndian) { body.append(contentsOf: $0) }
+    }
+    var file = Data()
+    func u32(_ value: UInt32) { withUnsafeBytes(of: value.littleEndian) { file.append(contentsOf: $0) } }
+    func u16(_ value: UInt16) { withUnsafeBytes(of: value.littleEndian) { file.append(contentsOf: $0) } }
+    file.append(contentsOf: Array("RIFF".utf8))
+    u32(UInt32(36 + body.count))
+    file.append(contentsOf: Array("WAVEfmt ".utf8))
+    u32(16)
+    u16(1)
+    u16(1)
+    u32(UInt32(rate))
+    u32(UInt32(rate) * 2)
+    u16(2)
+    u16(16)
+    file.append(contentsOf: Array("data".utf8))
+    u32(UInt32(body.count))
+    file.append(body)
+    try file.write(to: url)
+    return url
+  }
+
+  /// Until `done` says so, the main actor let go of between looks: a load finishes off it.
+  static func until(_ done: () -> Bool) async throws {
+    for _ in 0..<500 where !done() { try await Task.sleep(for: .milliseconds(10)) }
+  }
+
+  /// An empty Slice Lab asks for a file from its screen and its button; one dropped on it loads,
+  /// and then its slices are played from, stepped round, and the sample taken to be so many bars.
+  @Test func theSliceLabLoadsAndSlices() async throws {
+    let (rack, face) = try Self.alone("sampler")
+    let stage = rack.stage
+    #expect(face.name == "Slice Lab" && face.words == "empty" && face.light == false)
+    let prompt = try #require(face.buttons.first { if case .prompt = $0.style { true } else { false } })
+    #expect(prompt.frame == face.screen)
+    Self.press(rack, Self.window(stage, Self.centre(prompt.frame)))
+    #expect(rack.takeFileRequest() == "m" && rack.takeFileRequest() == nil)
+    #expect(!rack.takesSeveral("m"))
+
+    let url = try Self.wav()
+    #expect(rack.drop([url], at: Self.window(stage, Self.centre(face.frame))))
+    try await Self.until { rack.rack.samples["m"] != nil }
+    let loaded = rack.stage.faces[0]
+    #expect(loaded.words == "sample ready" && loaded.light == true)
+    rack.rack.set("m", "slices", to: 8)
+    let sliced = rack.stage.faces[0]
+    let slices = sliced.buttons.filter { if case .slice = $0.style { true } else { false } }
+    #expect(slices.count == 8)
+    Self.press(rack, Self.window(rack.stage, Self.centre(slices[2].frame)))
+    let slice = try #require(RackModules.registry["sampler"]?.params.first { $0.id == "slice" })
+    #expect(rack.rack.value(rack.rack.patch.modules[0], slice) == 2)
+    rack.rack.set("m", "slice", to: 0)
+    let down = try #require(rack.stage.faces[0].buttons.first { $0.label == "‹" })
+    Self.press(rack, Self.window(rack.stage, Self.centre(down.frame)))
+    #expect(rack.rack.value(rack.rack.patch.modules[0], slice) == 7, "stepped round, not stopped")
+
+    let eight = try #require(rack.stage.faces[0].buttons.first { $0.press == .sampleBars(8) })
+    Self.press(rack, Self.window(rack.stage, Self.centre(eight.frame)))
+    #expect(rack.rack.samples["m"]?.bars == 8)
+  }
+
+  /// An audio track takes a recording dropped on it, and its start is dragged as a bar and a step.
+  @Test func anAudioTrackIsPlaced() async throws {
+    let (rack, face) = try Self.alone("audio-track")
+    let stage = rack.stage
+    #expect(rack.drop([try Self.wav()], at: Self.window(stage, Self.centre(face.frame))))
+    try await Self.until { rack.rack.tracks["m"] != nil }
+    #expect(rack.stage.faces[0].buttons.allSatisfy { if case .prompt = $0.style { false } else { true } })
+
+    let start = try #require(RackModules.registry["audio-track"]?.params.first { $0.id == "start" })
+    let bar = try #require(face.cells.first { $0.caption == "BAR" })
+    let at = Self.window(stage, Self.centre(bar.frame))
+    Self.press(rack, at, to: at - SIMD2(0, bar.step * 2 * stage.scale))
+    #expect(rack.rack.value(rack.rack.patch.modules[0], start) == 32, "bar 3, step 1")
+    let step = try #require(rack.stage.faces[0].cells.first { $0.caption == "STEP" })
+    let from = Self.window(rack.stage, Self.centre(step.frame))
+    Self.press(rack, from, to: from - SIMD2(0, step.step * 4 * stage.scale))
+    #expect(rack.rack.value(rack.rack.patch.modules[0], start) == 36, "bar 3, step 5")
+    rack.rack.undo()
+    #expect(rack.rack.value(rack.rack.patch.modules[0], start) == 32, "one drag, one undo")
+  }
+
+  /// A file dropped on a module that holds no recordings is not the rack's.
+  @Test func aDropOnAnythingElseIsNotTheRacks() throws {
+    let face = Self.rack()
+    let osc = try #require(face.stage.faces.first { $0.module.id == "osc" })
+    #expect(
+      !face.drop(
+        [URL(fileURLWithPath: "C:/nowhere.wav")], at: Self.window(face.stage, Self.centre(osc.frame))))
+    #expect(!face.drop([URL(fileURLWithPath: "C:/nowhere.wav")], at: SIMD2(5, 5)))
   }
 
   struct Unexpected: Error {}

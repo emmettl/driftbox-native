@@ -1,3 +1,5 @@
+import Foundation
+
 /// What a window hears, in terms that are the same on every platform, for an interface drawn on
 /// the GPU layer to answer. Positions are in points from the top left — pixels divided by the
 /// window's scale — so that a control is the same size to a finger on any display.
@@ -9,6 +11,8 @@ public enum ShellEvent: Sendable, Equatable {
   case resized(width: Int, height: Int, scale: Float)
   /// A menu item, or its shortcut, by the id it was given.
   case command(String)
+  /// Files dropped on the window, at a point in it.
+  case dropped([URL], at: SIMD2<Float>)
 }
 
 /// A key, pressed or let go. A key that types something is known by what it types, with the

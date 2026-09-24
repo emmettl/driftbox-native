@@ -183,6 +183,23 @@ struct DesktopTests {
     }
   }
 
+  /// A song dropped on the window opens, as Open would open it; anything else dropped is let be.
+  @Test func aDroppedSongOpens() throws {
+    for device in try Self.devices() {
+      try withTemporaryDirectory { directory in
+        let (desktop, window, _) = try Self.desktop(on: device)
+        let url = directory.appendingPathComponent("Groove.driftbox")
+        try Data(SongCodec.encode(Self.song()).utf8).write(to: url)
+        window.onEvent?(.dropped([directory.appendingPathComponent("Loop.wav")], at: SIMD2(40, 40)))
+        try desktop.drawFrame()
+        #expect(window.title == "Driftbox")
+        window.onEvent?(.dropped([directory.appendingPathComponent("Loop.wav"), url], at: SIMD2(40, 40)))
+        try desktop.drawFrame()
+        #expect(window.title == "Groove - Driftbox")
+      }
+    }
+  }
+
   /// Closing, opening or starting afresh over changes asks first: saved where the song came from,
   /// thrown away, or not done at all.
   @Test func unsavedWorkIsAskedAbout() throws {

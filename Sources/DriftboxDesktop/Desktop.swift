@@ -172,6 +172,8 @@ public final class Desktop {
       if !interface.pointer(pointer) { pad(pointer) }
     case .scroll(let scroll):
       _ = interface.scroll(scroll)
+    case .dropped(let urls, _):
+      openDropped(urls)
     case .key(let key):
       // A name being typed has every key; otherwise the keyboard is an instrument.
       if !interface.key(key) { _ = keys.play(key, on: session) }
