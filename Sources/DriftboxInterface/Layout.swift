@@ -69,6 +69,12 @@ public enum Action: Equatable, Sendable {
   /// On a phone, put the controls away and make the whole screen the scene and the pad, until the
   /// one chip left in the corner brings them back.
   case perform
+  /// On a phone, choose a 303 step to set on the keyboard, or with nil put the keyboard away.
+  case bassStep(voice: String, index: Int?)
+  /// Pause a 303 step, keeping its note, or sound it again.
+  case bassGate(pattern: String, voice: String, index: Int)
+  /// The keyboard's octave: 0 for C1 to C2, 1 for C2 to C3.
+  case octave(Int)
 }
 
 /// A 303 line's rows, as the Mac draws them: two octaves of notes from the top, then a row each
@@ -467,9 +473,11 @@ public struct Layout {
     for line in bassLines {
       if line.header.contains(point) { return .select(voice: line.voice) }
       if onSteps, line.cells.contains(point) {
-        // On a phone a step's note is chosen on a keyboard; until there is one, its line's knobs.
-        return compact
-          ? .select(voice: line.voice) : bassAction(at: point, in: line, pattern: pattern, metrics: metrics)
+        // On a phone a step is chosen, and its note then set on the keyboard.
+        guard compact else { return bassAction(at: point, in: line, pattern: pattern, metrics: metrics) }
+        return column(at: point.x, lane: line.cells, metrics: metrics).map {
+          .bassStep(voice: line.voice, index: $0)
+        }
       }
     }
     return nil
