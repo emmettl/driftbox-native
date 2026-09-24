@@ -24,6 +24,8 @@
     public private(set) var isResizing = false
     public var onEvent: ((ShellEvent) -> Void)?
     public var isEnabled: ((String) -> Bool)?
+    public var isChecked: ((String) -> Bool)?
+    public var shouldClose: (() -> Bool)?
 
     public var title: String {
       didSet { title.withCString(encodedAs: UTF16.self) { _ = SetWindowTextW(handle, $0) } }
@@ -153,6 +155,22 @@
       Win32Files.save(owner: handle, type: type, name: name)
     }
 
+    /// Windows' own question, in the words its own programs use: Yes, No or Cancel, with the window's
+    /// title as its caption.
+    public func askToSave(_ name: String) -> SaveAnswer {
+      let question = "Do you want to save changes to \(name)?"
+      let answer = question.withCString(encodedAs: UTF16.self) { text in
+        title.withCString(encodedAs: UTF16.self) { caption in
+          MessageBoxW(handle, text, caption, UINT(MB_YESNOCANCEL) | UINT(MB_ICONWARNING))
+        }
+      }
+      switch answer {
+      case IDYES: return .save
+      case IDNO: return .discard
+      default: return .cancel
+      }
+    }
+
     /// A frame, unless one is already being drawn: the modal loop's timer can fire while a frame
     /// is presenting, and a frame drawn inside another would draw into a target still in use.
     private func draw(_ frame: () throws -> Void) throws {
@@ -269,9 +287,16 @@
         return 0
       case UINT(WM_INITMENUPOPUP):
         if let menus, let popup = HMENU(bitPattern: UInt(wParam)) {
-          menus.refresh(popup) { self.isEnabled?($0) ?? true }
+          menus.refresh(
+            popup, isEnabled: { self.isEnabled?($0) ?? true }, isChecked: { self.isChecked?($0) ?? false })
         }
         return 0
+
+      case UINT(WM_CLOSE):
+        // Closed by whoever is using it: asked first, and left open if the answer is no. Answered
+        // here, the message goes no further; left to Windows, it destroys the window.
+        if let shouldClose, !shouldClose() { return 0 }
+        return nil
 
       case Mailbox.message:
         for work in mailbox.take() { work() }

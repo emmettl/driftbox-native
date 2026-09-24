@@ -33,13 +33,16 @@
       return commands.indices.contains(index) ? commands[index] : nil
     }
 
-    /// Every item in `popup` greyed or not as `isEnabled` says, as it opens.
-    func refresh(_ popup: HMENU, isEnabled: (String) -> Bool) {
+    /// Every item in `popup` greyed or not as `isEnabled` says, and ticked or not as `isChecked`
+    /// does, as it opens.
+    func refresh(_ popup: HMENU, isEnabled: (String) -> Bool, isChecked: (String) -> Bool) {
       for position in 0..<max(0, GetMenuItemCount(popup)) {
         let id = Int(GetMenuItemID(popup, position))
         guard let command = command(id) else { continue }
         let state = isEnabled(command.id) ? MF_ENABLED : MF_GRAYED
         EnableMenuItem(popup, UINT(id), UINT(MF_BYCOMMAND) | UINT(state))
+        let tick = isChecked(command.id) ? MF_CHECKED : MF_UNCHECKED
+        CheckMenuItem(popup, UINT(id), UINT(MF_BYCOMMAND) | UINT(tick))
       }
     }
 

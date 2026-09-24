@@ -49,6 +49,8 @@ Metal. Next after this is the rack.
 | `Sources/CDirectWrite` | The part of DirectWrite that is called, declared in C, since its own headers are C++. Declarations only. |
 | `Sources/DriftboxCanvas` | A 2D canvas on the GPU layer: Canvas2D's shapes, state, type and blends, the same on every platform. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
+| `Sources/DriftboxDesktop` | Driftbox on a desktop with a `ShellWindow`: menus, the scene, the pad, on `Session`. |
+| `Sources/DriftboxWindows` | The Windows app: Windows' parts, chosen and handed to `DriftboxDesktop`. |
 | `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
 | `Sources/Driftbox` | The executable, which is nothing but `@main`. |
 
@@ -335,6 +337,7 @@ SDK. Build in a shell that has run `vcvars64.bat`, with `SDKROOT` pointing at th
 swift build -c release --build-tests --build-system native -Xswiftc -enable-testing
 swift test -c release --skip-build --build-system native
 swift build -c release --product driftbox-play
+swift build -c release --product DriftboxWindows
 ```
 
 In release, because a debug build does not link there yet: the specialisations `@_noAllocation`
@@ -350,6 +353,21 @@ MIDI is WinMM, which sends at once and says nothing when devices change. So cloc
 a scheduler of its own that holds each message to its stamp on a high-resolution timer, to within
 a millisecond, and devices are read again every two seconds and known by name. A clock for another
 program on the same machine goes through a loopback port made in Windows MIDI Services.
+
+**The app** is `DriftboxWindows`: a window with the song's scene filling it, the whole of it the
+performance filter's pad, and menus for the rest.
+- **File:** New, Open…, the catalogue, Save and Save As… as `.driftbox`.
+- **Edit:** Undo and Redo, named for the edit.
+- **Transport:** play and stop, sections, the loop, the metronome and the count-in.
+- **View:** the song's scene, or any other.
+- **Audio and MIDI:** the output device, the MIDI inputs heard, and the MIDI clock followed or sent,
+  and where. Settings are menu items the menu ticks as it opens.
+
+Closing, opening or starting afresh over unsaved work asks first, in Windows' own words. Its
+executable only chooses Windows' parts — WASAPI, WinMM, a Win32 window, Direct3D, DirectWrite — and
+hands them to `DriftboxDesktop`, the app every platform with a `ShellWindow` runs, on `Session`.
+`DesktopTests` hold that app to its menus, commands, title, care over unsaved work and frames, with
+a stand-in window, on WARP.
 
 ### Android
 

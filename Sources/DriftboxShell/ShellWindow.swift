@@ -16,6 +16,12 @@ public protocol ShellWindow: AnyObject {
   var onEvent: ((ShellEvent) -> Void)? { get set }
   /// Whether a command can be chosen now, asked as its menu opens. Nil, or no answer, is yes.
   var isEnabled: ((String) -> Bool)? { get set }
+  /// Whether a command shows as on — a setting, or the one chosen of several — asked as its menu
+  /// opens. Nil, or no answer, is off.
+  var isChecked: ((String) -> Bool)? { get set }
+  /// Whether the window may close when the person using it closes it — its close box, Alt+F4 —
+  /// asked first. Nil is yes. `close` is not asked: it is the app deciding.
+  var shouldClose: (() -> Bool)? { get set }
 
   /// Until the window closes: take what has arrived, then `frame`, and again. `frame` is also
   /// called while the window is being moved or resized, when the platform would otherwise hold the
@@ -35,6 +41,16 @@ public protocol ShellWindow: AnyObject {
   func chooseFile(ofTypes types: [FileType]) -> URL?
   /// Where to save a file of `type`, starting from `name`. Nil when cancelled.
   func chooseSaveLocation(for type: FileType, name: String) -> URL?
+  /// The platform's own question before work is lost: save the changes to `name`, throw them
+  /// away, or think again.
+  func askToSave(_ name: String) -> SaveAnswer
+}
+
+/// What someone said when asked whether to save their changes.
+public enum SaveAnswer: Sendable, Equatable {
+  case save
+  case discard
+  case cancel
 }
 
 /// A kind of file, as a panel offers it: a name, and the endings files of it have, the first being

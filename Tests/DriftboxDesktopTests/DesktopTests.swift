@@ -1,0 +1,303 @@
+import DriftboxDocument
+import DriftboxGPU
+import DriftboxHost
+import DriftboxSeq
+import DriftboxSession
+import DriftboxShell
+import DriftboxText
+import Foundation
+import Testing
+
+@testable import DriftboxDesktop
+
+#if os(Windows)
+  import DriftboxGPUD3D11
+#elseif canImport(Metal)
+  import DriftboxGPUMetal
+  import Metal
+#elseif os(Linux)
+  import DriftboxGPUGLES
+#endif
+
+/// A window that is only what the app asks of one: it keeps its title and menus, answers the save
+/// question and the panels as a test tells it to, and runs nothing.
+@MainActor
+final class StandInWindow: ShellWindow {
+  var width = 320
+  var height = 180
+  var scale: Float = 1
+  var title = ""
+  var menuBar: MenuBar?
+  var onEvent: ((ShellEvent) -> Void)?
+  var isEnabled: ((String) -> Bool)?
+  var isChecked: ((String) -> Bool)?
+  var shouldClose: (() -> Bool)?
+  var closed = false
+  var saveAnswer = SaveAnswer.cancel
+  var asked: [String] = []
+  var chosenFile: URL?
+  var saveLocation: URL?
+
+  func run(frame: () throws -> Void) throws {}
+  func close() { closed = true }
+  nonisolated func post(_ work: @escaping @Sendable () -> Void) {}
+  func chooseFile(ofTypes types: [FileType]) -> URL? { chosenFile }
+  func chooseSaveLocation(for type: FileType, name: String) -> URL? { saveLocation }
+  func askToSave(_ name: String) -> SaveAnswer {
+    asked.append(name)
+    return saveAnswer
+  }
+
+  /// A command as the window sends one: only while enabled.
+  func choose(_ id: String) {
+    guard isEnabled?(id) ?? true else { return }
+    onEvent?(.command(id))
+  }
+
+  /// Every command in the menus, by id.
+  var commandIDs: [String] { menuBar?.commands.map(\.id) ?? [] }
+  func title(of id: String) -> String? { menuBar?.commands.first { $0.id == id }?.title }
+}
+
+/// A surface that is only a target the size it was last told.
+final class StandInSurface: GPUSurface {
+  let device: any GPUDevice
+  var width: Int
+  var height: Int
+  var presented = 0
+  init(device: any GPUDevice, width: Int, height: Int) {
+    self.device = device
+    self.width = width
+    self.height = height
+  }
+  func resize(width: Int, height: Int) throws {
+    self.width = width
+    self.height = height
+  }
+  func target() throws -> any GPUTarget { try device.makeTarget(width: width, height: height) }
+  func present() throws { presented += 1 }
+}
+
+/// The desktop app, the same on every platform with a window: its menus made from the session,
+/// its commands, its title, its care over unsaved work, and its frames. On every GPU this platform
+/// has, since a frame is part of what it does.
+@MainActor
+struct DesktopTests {
+  static func devices() throws -> [any GPUDevice] {
+    #if os(Windows)
+      return [try D3D11Device(driver: .software)]
+    #elseif canImport(Metal)
+      return MTLCreateSystemDefaultDevice() == nil ? [] : [try MetalDevice()]
+    #elseif os(Linux)
+      return [try GLESDevice()]
+    #else
+      return []
+    #endif
+  }
+
+  /// A desktop on a session of its own, with no sound, no cables and no memory.
+  static func desktop(on device: any GPUDevice) throws -> (Desktop, StandInWindow, StandInSurface) {
+    let window = StandInWindow()
+    let surface = StandInSurface(device: device, width: 320, height: 180)
+    let session = Session(host: EngineHost(sampleRate: 48000))
+    let desktop = try Desktop(
+      session: session, window: window, device: device, surface: surface, typesetter: NoTypesetter())
+    return (desktop, window, surface)
+  }
+
+  static func song() -> Song {
+    var pattern = DriftboxSeq.Pattern(id: "p", name: "Pattern 1", length: 16)
+    pattern.tracks["909.bd"] = [StepValue](repeating: .on, count: 16)
+    var song = Song(bpm: 120, patterns: [pattern])
+    song.chain = [ChainStep(pattern: pattern.id), ChainStep(pattern: pattern.id)]
+    song.visual = "frost"
+    return song
+  }
+
+  /// With nothing open, the window is the application: its name, and nothing to save or play.
+  @Test func withNoSongTheWindowIsTheApplication() throws {
+    for device in try Self.devices() {
+      let (desktop, window, _) = try Self.desktop(on: device)
+      defer { withExtendedLifetime(desktop) {} }
+      #expect(window.title == "Driftbox")
+      #expect(window.isEnabled?(DesktopMenus.save) == false)
+      #expect(window.isEnabled?(DesktopMenus.toggle) == false)
+      #expect(window.isEnabled?(DesktopMenus.undo) == false)
+      #expect(window.isEnabled?(DesktopMenus.open) == true)
+      #expect(
+        window.commandIDs.contains(DesktopMenus.songPrefix + "acid"), "every catalogue song is on offer")
+    }
+  }
+
+  /// A catalogue song chosen from the menu opens, names the window, and brings its scene.
+  @Test func aCatalogueSongOpensWithItsScene() throws {
+    for device in try Self.devices() {
+      let (desktop, window, surface) = try Self.desktop(on: device)
+      window.choose(DesktopMenus.songPrefix + "hothouse")
+      try desktop.drawFrame()
+      #expect(window.title == "Hothouse - Driftbox")
+      #expect(desktop.sceneID == "hothouse")
+      #expect(window.isChecked?(DesktopMenus.songPrefix + "hothouse") == true)
+      #expect(surface.presented == 1)
+    }
+  }
+
+  /// An edit marks the title and names the Edit menu's undo; undoing it takes both back.
+  @Test func editsAreMarkedAndUndoneByName() throws {
+    for device in try Self.devices() {
+      try withTemporaryDirectory { directory in
+        let (desktop, window, _) = try Self.desktop(on: device)
+        let url = directory.appendingPathComponent("Groove.driftbox")
+        try Data(SongCodec.encode(Self.song()).utf8).write(to: url)
+        window.chosenFile = url
+        window.choose(DesktopMenus.open)
+        try desktop.drawFrame()
+        #expect(window.title == "Groove - Driftbox")
+
+        desktop.session.edit("Set Tempo") { $0.bpm = 128 }
+        try desktop.drawFrame()
+        #expect(window.title == "*Groove - Driftbox")
+        #expect(window.title(of: DesktopMenus.undo) == "Undo Set Tempo")
+        #expect(window.isEnabled?(DesktopMenus.undo) == true)
+
+        window.choose(DesktopMenus.undo)
+        try desktop.drawFrame()
+        #expect(window.title == "Groove - Driftbox")
+        #expect(window.title(of: DesktopMenus.redo) == "Redo Set Tempo")
+      }
+    }
+  }
+
+  /// Closing, opening or starting afresh over changes asks first: saved where the song came from,
+  /// thrown away, or not done at all.
+  @Test func unsavedWorkIsAskedAbout() throws {
+    for device in try Self.devices() {
+      try withTemporaryDirectory { directory in
+        let (desktop, window, _) = try Self.desktop(on: device)
+        let url = directory.appendingPathComponent("Groove.driftbox")
+        try Data(SongCodec.encode(Self.song()).utf8).write(to: url)
+        window.chosenFile = url
+        window.choose(DesktopMenus.open)
+
+        #expect(window.shouldClose?() == true, "nothing changed, nothing asked")
+        #expect(window.asked.isEmpty)
+
+        desktop.session.edit("Set Tempo") { $0.bpm = 128 }
+        window.saveAnswer = .cancel
+        #expect(window.shouldClose?() == false, "thought again")
+        window.choose(DesktopMenus.new)
+        #expect(desktop.session.current?.name == "Groove", "and New did nothing")
+        #expect(window.asked == ["Groove", "Groove"])
+
+        window.saveAnswer = .save
+        #expect(window.shouldClose?() == true, "saved, then closed")
+        let written = SongCodec.decode(String(decoding: try Data(contentsOf: url), as: UTF8.self))
+        #expect(written?.bpm == 128)
+
+        desktop.session.edit("Set Tempo") { $0.bpm = 90 }
+        window.saveAnswer = .discard
+        window.choose(DesktopMenus.exit)
+        #expect(window.closed, "thrown away, then closed")
+      }
+    }
+  }
+
+  /// A new song has nowhere to be saved, so saving it asks where; and not saving anywhere is not
+  /// having saved.
+  @Test func aNewSongIsSavedWhereItIsAskedTo() throws {
+    for device in try Self.devices() {
+      try withTemporaryDirectory { directory in
+        let (desktop, window, _) = try Self.desktop(on: device)
+        window.choose(DesktopMenus.new)
+        desktop.session.edit("Set Tempo") { $0.bpm = 100 }
+        window.saveLocation = nil
+        window.saveAnswer = .save
+        #expect(window.shouldClose?() == false, "no place chosen, so not saved and not closed")
+
+        let url = directory.appendingPathComponent("Fresh.driftbox")
+        window.saveLocation = url
+        window.choose(DesktopMenus.save)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+        try desktop.drawFrame()
+        #expect(window.title == "Fresh - Driftbox")
+      }
+    }
+  }
+
+  /// The settings are menu items, ticked as the session has them, and choosing one changes it.
+  @Test func settingsAreTickedAndToggled() throws {
+    for device in try Self.devices() {
+      let (desktop, window, _) = try Self.desktop(on: device)
+      #expect(window.isChecked?(DesktopMenus.metronome) == false)
+      window.choose(DesktopMenus.metronome)
+      #expect(desktop.session.metronome)
+      #expect(window.isChecked?(DesktopMenus.metronome) == true)
+
+      #expect(window.isChecked?(DesktopMenus.systemOutput) == true)
+      window.choose(DesktopMenus.outputPrefix + "{speakers}")
+      #expect(desktop.session.outputDevice == "{speakers}")
+      #expect(window.isChecked?(DesktopMenus.outputPrefix + "{speakers}") == true)
+      #expect(window.isChecked?(DesktopMenus.systemOutput) == false)
+
+      window.choose(DesktopMenus.sendClock)
+      #expect(desktop.session.sendsClock)
+      window.choose(DesktopMenus.followClock)
+      #expect(desktop.session.followsClock)
+      #expect(window.isChecked?(DesktopMenus.sendClock) == false, "following and sending are never both")
+
+      #expect(window.isEnabled?(DesktopMenus.noInputs) == false)
+      #expect(window.isChecked?(DesktopMenus.noInputs) == false)
+    }
+  }
+
+  /// The View menu chooses a scene over the song's, steps through them, and gives the song's back.
+  @Test func aSceneIsChosenOrTheSongs() throws {
+    for device in try Self.devices() {
+      let (desktop, window, _) = try Self.desktop(on: device)
+      window.choose(DesktopMenus.songPrefix + "hothouse")
+      try desktop.drawFrame()
+      window.choose(DesktopMenus.scenePrefix + "orrery")
+      try desktop.drawFrame()
+      #expect(desktop.sceneID == "orrery")
+      #expect(window.isChecked?(DesktopMenus.scenePrefix + "orrery") == true)
+      #expect(window.isChecked?(DesktopMenus.songsScene) == false)
+      window.choose(DesktopMenus.nextScene)
+      try desktop.drawFrame()
+      #expect(desktop.sceneID != "orrery")
+      window.choose(DesktopMenus.songsScene)
+      try desktop.drawFrame()
+      #expect(desktop.sceneID == "hothouse")
+    }
+  }
+
+  /// The window is the pad: pressed, the filter moves and the scene sees the finger; let go, both
+  /// let go.
+  @Test func theWindowIsThePad() throws {
+    for device in try Self.devices() {
+      let (desktop, window, _) = try Self.desktop(on: device)
+      window.onEvent?(.pointer(PointerEvent(phase: .began, id: 0, kind: .mouse, location: SIMD2(80, 45))))
+      #expect(desktop.session.padTouch == SIMD2(0.25, 0.75))
+      window.onEvent?(.pointer(PointerEvent(phase: .ended, id: 0, kind: .mouse, location: SIMD2(80, 45))))
+      #expect(desktop.session.padTouch == nil)
+    }
+  }
+
+  /// A resize reaches the surface at the next frame.
+  @Test func aResizeReachesTheSurface() throws {
+    for device in try Self.devices() {
+      let (desktop, window, surface) = try Self.desktop(on: device)
+      window.onEvent?(.resized(width: 400, height: 300, scale: 1))
+      try desktop.drawFrame()
+      #expect(surface.width == 400 && surface.height == 300)
+    }
+  }
+}
+
+/// Somewhere of its own for a test that writes files, taken away again afterwards.
+func withTemporaryDirectory<T>(_ body: (URL) throws -> T) rethrows -> T {
+  let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+    .appendingPathComponent("driftbox-desktop-\(UUID().uuidString)")
+  try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: directory) }
+  return try body(directory)
+}

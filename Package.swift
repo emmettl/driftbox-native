@@ -28,6 +28,7 @@ let package = Package(
     .library(name: "DriftboxCanvas", targets: ["DriftboxCanvas"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
     .library(name: "DriftboxSession", targets: ["DriftboxSession"]),
+    .library(name: "DriftboxDesktop", targets: ["DriftboxDesktop"]),
   ],
   targets: [
     // Constrained: arithmetic only.
@@ -120,6 +121,26 @@ let package = Package(
       dependencies: ["DriftboxDocument", "DriftboxEngine", "DriftboxHost", "DriftboxScenes", "DriftboxSeq"],
       resources: [.copy("Resources/Songs"), .copy("Resources/catalogue.json")]),
 
+    // Driftbox on a desktop: a window with menus, the song's scene, the pad. The same on every
+    // platform with a `ShellWindow`; each platform's app only chooses its parts.
+    .target(
+      name: "DriftboxDesktop",
+      dependencies: [
+        "DriftboxDocument", "DriftboxGPU", "DriftboxHost", "DriftboxScenes", "DriftboxSession",
+        "DriftboxShell",
+        "DriftboxText",
+      ]),
+    // Driftbox for Windows: Windows' parts, chosen, and handed to `Desktop`.
+    .executableTarget(
+      name: "DriftboxWindows",
+      dependencies: [
+        "DriftboxDesktop", "DriftboxHost", "DriftboxSession",
+        .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
+      ]),
+
     // A song document in, a WAV file out: something to listen to.
     .executableTarget(name: "driftbox-render", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
     // The Mac app, all of it but the entry point. A library rather than part of the executable
@@ -183,6 +204,12 @@ let package = Package(
       dependencies: [
         "DriftboxSession", "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq",
         "ConformanceSupport",
+      ]),
+    .testTarget(
+      name: "DriftboxDesktopTests",
+      dependencies: [
+        "DriftboxDesktop", "DriftboxSession", "DriftboxShell", "DriftboxGPU", "DriftboxHost", "DriftboxSeq",
+        "DriftboxText", "DriftboxDocument", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxGPUGLES",
       ]),
     .testTarget(
       name: "DriftboxTextTests",
