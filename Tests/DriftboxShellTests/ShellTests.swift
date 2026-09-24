@@ -280,6 +280,27 @@ struct ShellTests {
       #expect(GetMenuState(inner, first + 2, UINT(MF_BYCOMMAND)) & UINT(MF_CHECKED) == 0)
     }
 
+    /// A shortcut with no Ctrl or Alt is a shortcut until the app takes text; then its key is
+    /// typed, and arrives as a key.
+    @Test func typedTextIsNotTakenForAShortcut() throws {
+      let (window, heard) = try window()
+      defer { window.close() }
+      window.menuBar = MenuBar([
+        Menu("Transport", [.command("Play", id: "play", shortcut: Shortcut(.space, []))])
+      ])
+      func press() {
+        heard.events.removeAll()
+        PostMessageW(window.handle, UINT(WM_KEYDOWN), WPARAM(VK_SPACE), 0)
+        window.pump()
+      }
+      press()
+      #expect(heard.events.contains(.command("play")))
+      window.takesText = true
+      press()
+      #expect(heard.events.contains(.key(KeyEvent(key: .space))))
+      #expect(!heard.events.contains(.command("play")))
+    }
+
     struct Broken: Error {}
 
     @Test func aFramesErrorEndsTheLoop() throws {

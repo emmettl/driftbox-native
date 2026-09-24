@@ -115,9 +115,12 @@ public struct PointerEvent: Sendable, Equatable {
 public struct ScrollEvent: Sendable, Equatable {
   public var location: SIMD2<Float>
   public var delta: SIMD2<Float>
+  /// What was held: Shift turns a wheel that only goes up and down sideways.
+  public var modifiers: Modifiers
 
-  public init(location: SIMD2<Float>, delta: SIMD2<Float>) {
+  public init(location: SIMD2<Float>, delta: SIMD2<Float>, modifiers: Modifiers = []) {
     self.location = location
     self.delta = delta
+    self.modifiers = modifiers
   }
 }

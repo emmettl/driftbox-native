@@ -37,8 +37,14 @@ public final class Interface {
 
   /// How far the grid is scrolled up inside its panel.
   public private(set) var scroll: Float = 0
+  /// How far its steps are scrolled left, when they are wider than it.
+  public private(set) var scrollX: Float = 0
   /// Whether the song's effects are down the right, where the selected voice's knobs would be.
   public var showsEffects = false
+  /// A pattern being renamed, and its name as it has been typed so far.
+  public internal(set) var renaming: (pattern: String, text: String)?
+  /// Whether keys are the renaming's rather than the instrument's or the menus'.
+  public var takesText: Bool { renaming != nil }
   /// The context menu last made: what each of its commands does, and which are greyed or ticked.
   var menuActions: [String: () -> Void] = [:]
   var menuDisabled: Set<String> = []
@@ -48,14 +54,23 @@ public final class Interface {
     self.session = session
   }
 
-  public var layout: Layout { Layout(session: session, size: size, scroll: scroll, effects: showsEffects) }
+  public var layout: Layout {
+    Layout(
+      session: session, size: size, scroll: scroll, scrollX: scrollX, effects: showsEffects,
+      renaming: renaming)
+  }
 
   /// Scroll the grid, if `event` is over it. False for anywhere else.
   @discardableResult
   public func scroll(_ event: ScrollEvent) -> Bool {
     guard isShowing, let grid = layout.grid, grid.contains(event.location) else { return false }
-    scroll =
-      Layout(session: session, size: size, scroll: scroll + event.delta.y, effects: showsEffects).scroll
+    // Sideways as a wheel tilts, or as it turns with Shift held, as Windows' own programs take it.
+    let sideways = event.modifiers.contains(.shift) ? event.delta.y + event.delta.x : event.delta.x
+    let down = event.modifiers.contains(.shift) ? 0 : event.delta.y
+    let moved = Layout(
+      session: session, size: size, scroll: scroll + down, scrollX: scrollX + sideways, effects: showsEffects)
+    scroll = moved.scroll
+    scrollX = moved.scrollX
     return true
   }
 
@@ -68,6 +83,8 @@ public final class Interface {
     guard isShowing else { return false }
     switch event.phase {
     case .began:
+      // A press anywhere keeps the name being typed, as leaving a field does.
+      if renaming != nil { finishRenaming() }
       let layout = layout
       guard layout.panels.contains(where: { $0.contains(event.location) }) else { return false }
       let action = layout.action(at: event.location)
@@ -223,6 +240,7 @@ public final class Interface {
     let layout = layout
     // Kept to what there is, should the window have grown or the pattern shrunk.
     scroll = layout.scroll
+    scrollX = layout.scrollX
     held = pressed.flatMap { press in
       hover.flatMap { layout.action(at: $0) == press.action ? press.action : nil }
     }
@@ -343,6 +361,8 @@ public final class Interface {
 
     // The ruler: every fourth tick brighter, so a bar reads in beats, and the playhead's tall and lit.
     if let ruler = layout.ruler {
+      clipToColumns(layout, on: canvas)
+      defer { canvas.restore() }
       for step in 0..<metrics.steps {
         let x = ruler.x + Float(step) * metrics.stride
         let live = step == layout.playhead
@@ -378,6 +398,7 @@ public final class Interface {
       canvas.restore()
 
       let loop = pattern.trackLength(voice.id)
+      clipToColumns(layout, on: canvas)
       for index in 0..<pattern.length {
         face(
           layout.step(index, in: lane.frame), value: pattern.step(voice.id, at: index),
@@ -385,6 +406,7 @@ public final class Interface {
           flam: pattern.flam(voice.id, at: index), tail: index >= loop,
           action: .step(pattern: pattern.id, voice: voice.id, index: index), on: canvas)
       }
+      canvas.restore()
     }
 
     // The pattern-controlled filter's lane, on the drums' columns, in teal.
@@ -398,12 +420,14 @@ public final class Interface {
       canvas.fill = Theme.nine
       canvas.align = .left
       canvas.fillText("PCF", lane.x + 17, middle + 4)
+      clipToColumns(layout, on: canvas)
       for index in 0..<pattern.length {
         face(
           layout.step(index, in: lane), value: pattern.pcf(at: index), fill: Theme.stepFill(.tr909),
           playing: index == layout.playhead, onBeat: index % 4 == 0, flam: false, tail: false,
           action: .filterStep(pattern: pattern.id, index: index), on: canvas)
       }
+      canvas.restore()
     }
     for line in layout.bassLines {
       drawBassLine(line, layout, pattern: pattern, metrics: metrics, on: canvas)
@@ -417,6 +441,23 @@ public final class Interface {
       let top = rows.y + 8 + (track - thumb) * layout.scroll / layout.maxScroll
       canvas.fill = Theme.white(0.18)
       canvas.fillRoundedRect(grid.maxX - 7, top, 3, thumb, radius: 1.5)
+    }
+    // And sideways, when it is wider.
+    if layout.maxScrollX > 0, let columns = layout.columns {
+      let track = columns.width
+      let thumb = max(24, track * track / (track + layout.maxScrollX))
+      let left = columns.x + (track - thumb) * layout.scrollX / layout.maxScrollX
+      canvas.fill = Theme.white(0.18)
+      canvas.fillRoundedRect(left, grid.maxY - 7, thumb, 3, radius: 1.5)
+    }
+  }
+
+  /// Only the steps' part of the grid drawn into from here, until the matching `restore`: the steps
+  /// scroll under the lanes' names rather than over them.
+  private func clipToColumns(_ layout: Layout, on canvas: Canvas) {
+    canvas.save()
+    if let columns = layout.columns {
+      canvas.clip(columns.x - 4, columns.y, columns.width + 8, columns.height)
     }
   }
 
@@ -442,7 +483,7 @@ public final class Interface {
     canvas.font = Theme.mono(12, weight: 600)
     canvas.fill = selected || isHovered(header) ? Theme.ink : Theme.ink.faded(0.8)
     canvas.fillText(line.name, header.x, header.y + 24)
-    let right = line.cells.x - 14
+    let right = (layout.columns?.x ?? line.cells.x) - 14
     let cells = line.cells
     canvas.align = .right
     canvas.font = Theme.mono(8)
@@ -455,6 +496,8 @@ public final class Interface {
     canvas.fillText("ACCENT", right, cells.y + BassMetrics.flagsTop + 10)
     canvas.fillText("SLIDE", right, cells.y + BassMetrics.flagsTop + BassMetrics.flagStride + 10)
 
+    clipToColumns(layout, on: canvas)
+    defer { canvas.restore() }
     // The keyboard behind the cells: the black keys' rows darker.
     canvas.fill = Colour(0x000000, alpha: 0.28)
     for (row, note) in BassMetrics.notes.enumerated() where BassMetrics.blackKeys.contains(note % 12) {
@@ -558,6 +601,13 @@ public final class Interface {
       canvas.stroke = tint.faded(playing ? 0.95 : current || hovered ? 0.6 : 0.3)
       canvas.lineWidth = 1
       canvas.strokeRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: radius)
+      // A dot for each machine playing its own pattern here, in that machine's colour.
+      if frame.width > 20 {
+        for (index, slot) in section.clips.reversed().enumerated() {
+          canvas.fill = Theme.colour(slot)
+          canvas.fillEllipse(frame.maxX - 8 - Float(index) * 6, frame.y + 4, 4, 4)
+        }
+      }
     }
     if let loop = session.loop, let sections = layout.sectionsFrame, layout.totalBars > 0 {
       let from = layout.x(ofBar: loop.start)
@@ -578,6 +628,10 @@ public final class Interface {
     canvas.fillText("PATTERN", bar.x + 4, bar.y + bar.height / 2 + 3)
     let playing = session.isPlaying ? session.position?.pattern?.id : nil
     for chip in layout.patternChips {
+      if case .showPattern(let id) = chip.action, id == renaming?.pattern {
+        field(chip, on: canvas)
+        continue
+      }
       self.chip(chip, on: canvas)
       // The pattern playing, whichever is shown, has a light.
       if case .showPattern(let id) = chip.action, id == playing {
@@ -585,6 +639,24 @@ public final class Interface {
         canvas.fillEllipse(chip.frame.maxX - 8, chip.frame.y + 4, 4, 4)
       }
     }
+  }
+
+  /// A chip being typed into: sunk rather than raised, edged in teal, its text from the left with a
+  /// caret after it.
+  private func field(_ chip: Layout.Chip, on canvas: Canvas) {
+    let frame = chip.frame
+    canvas.fill = Colour(0x000000, alpha: 0.35)
+    canvas.fillRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: 7)
+    canvas.stroke = Theme.nine
+    canvas.lineWidth = 1
+    canvas.strokeRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: 7)
+    canvas.font = Theme.mono(11)
+    canvas.fill = Theme.ink
+    canvas.align = .left
+    let baseline = frame.y + frame.height / 2 + 4
+    canvas.fillText(chip.label, frame.x + 9, baseline)
+    canvas.fill = Theme.nine
+    canvas.fillRect(frame.x + 9 + canvas.measure(chip.label) + 1, frame.y + 6, 1.5, frame.height - 12)
   }
 
   /// The selected voice's panel: its machine and name, what can be done with it, its knobs, and

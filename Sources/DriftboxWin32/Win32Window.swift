@@ -26,6 +26,7 @@
     public var isEnabled: ((String) -> Bool)?
     public var isChecked: ((String) -> Bool)?
     public var shouldClose: (() -> Bool)?
+    public var takesText = false
 
     public var title: String {
       didSet { title.withCString(encodedAs: UTF16.self) { _ = SetWindowTextW(handle, $0) } }
@@ -103,7 +104,8 @@
     public func pump() -> Bool {
       var message = MSG()
       while PeekMessageW(&message, nil, 0, 0, UINT(PM_REMOVE)) {
-        if let accelerators = menus?.accelerators, TranslateAcceleratorW(handle, accelerators, &message) != 0
+        if let accelerators = menus?.accelerators, !isText(message),
+          TranslateAcceleratorW(handle, accelerators, &message) != 0
         {
           continue
         }
@@ -111,6 +113,13 @@
         DispatchMessageW(&message)
       }
       return isOpen
+    }
+
+    /// A key typed into text, while the app takes it: one held with neither Ctrl nor Alt, which is
+    /// the text's rather than a shortcut's.
+    private func isText(_ message: MSG) -> Bool {
+      guard takesText, message.message == UINT(WM_KEYDOWN) else { return false }
+      return GetKeyState(VK_CONTROL) >= 0 && GetKeyState(VK_MENU) >= 0
     }
 
     public func close() {
@@ -293,7 +302,11 @@
         let notches = Float(Int16(truncatingIfNeeded: wParam >> 16)) / 120 * Win32Input.pointsPerNotch
         // A wheel rolled toward you, or tilted right, moves the content the way a finger would.
         let delta = message == UINT(WM_MOUSEWHEEL) ? SIMD2(0, -notches) : SIMD2(-notches, 0)
-        onEvent?(.scroll(ScrollEvent(location: point(SIMD2(Float(screen.x), Float(screen.y))), delta: delta)))
+        onEvent?(
+          .scroll(
+            ScrollEvent(
+              location: point(SIMD2(Float(screen.x), Float(screen.y))), delta: delta,
+              modifiers: Win32Input.modifiers())))
         return 0
 
       case UINT(WM_COMMAND):

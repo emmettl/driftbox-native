@@ -19,6 +19,9 @@ public protocol ShellWindow: AnyObject {
   /// Whether a command shows as on — a setting, or the one chosen of several — asked as its menu
   /// opens. Nil, or no answer, is off.
   var isChecked: ((String) -> Bool)? { get set }
+  /// Whether the app is taking typed text, as a field being typed in does: while it is, a key held
+  /// with nothing or Shift is the text's, and not a shortcut's, whatever a menu says it is.
+  var takesText: Bool { get set }
   /// Whether the window may close when the person using it closes it — its close box, Alt+F4 —
   /// asked first. Nil is yes. `close` is not asked: it is the app deciding.
   var shouldClose: (() -> Bool)? { get set }

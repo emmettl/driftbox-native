@@ -15,6 +15,8 @@ extension Layout {
     /// colour within a song.
     public var colour: Int
     public var frame: Rect
+    /// The machines playing a pattern of their own in this section.
+    public var clips: [ClipSlot] = []
   }
 
   static let sectionGap: Float = 3
@@ -37,7 +39,8 @@ extension Layout {
       }
       return Section(
         index: index, name: song.pattern(id: entry.pattern)?.name ?? "?", start: start, bars: bars,
-        colour: colour, frame: Rect(x, frame.y, width, frame.height))
+        colour: colour, frame: Rect(x, frame.y, width, frame.height),
+        clips: ClipSlot.allCases.filter { entry.clips[$0] != nil })
     }
     return (sections, total)
   }
@@ -57,7 +60,10 @@ extension Layout {
   /// The pattern bar's chips: follow the transport, then each pattern that fits, then one to add a
   /// pattern at the end. A pattern's chip is as wide as its name in the bar's monospace.
   @MainActor
-  static func patternChips(session: Session, song: Song, shown: DriftboxSeq.Pattern, in bar: Rect) -> [Chip] {
+  static func patternChips(
+    session: Session, song: Song, shown: DriftboxSeq.Pattern, in bar: Rect,
+    renaming: (pattern: String, text: String)? = nil
+  ) -> [Chip] {
     let add = Chip(
       frame: Rect(bar.maxX - 26, bar.y, 26, bar.height), label: "+", action: .addPattern, isOn: false)
     var chips = [
@@ -67,11 +73,14 @@ extension Layout {
     ]
     var x = bar.x + 64 + 66 + 14
     for pattern in song.patterns {
-      let width = 18 + Float(pattern.name.count) * 6.1
+      // The one being renamed as wide as what has been typed, and room for more.
+      let typed = renaming?.pattern == pattern.id ? renaming?.text : nil
+      let name = typed ?? pattern.name
+      let width = 18 + Float(name.count + (typed == nil ? 0 : 1)) * 6.1
       guard x + width <= add.frame.x - 8 else { break }
       chips.append(
         Chip(
-          frame: Rect(x, bar.y, width, bar.height), label: pattern.name, action: .showPattern(pattern.id),
+          frame: Rect(x, bar.y, width, bar.height), label: name, action: .showPattern(pattern.id),
           isOn: pattern.id == shown.id))
       x += width + 5
     }

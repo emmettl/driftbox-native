@@ -32,6 +32,7 @@ final class StandInWindow: ShellWindow {
   var isEnabled: ((String) -> Bool)?
   var isChecked: ((String) -> Bool)?
   var shouldClose: (() -> Bool)?
+  var takesText = false
   var closed = false
   var saveAnswer = SaveAnswer.cancel
   var asked: [String] = []
@@ -352,6 +353,28 @@ struct DesktopTests {
       let (desktop, window, _) = try Self.desktop(on: device)
       window.onEvent?(.key(KeyEvent(key: .character("x"))))
       #expect(desktop.keys.octave == 1)
+    }
+  }
+
+  /// While a name is being typed the keys are the name's, not the instrument's, and the window is
+  /// told it is taking text, so that its shortcuts leave them be.
+  @Test func aNameBeingTypedHasTheKeys() throws {
+    for device in try Self.devices() {
+      try withTemporaryDirectory { directory in
+        let (desktop, window, _) = try Self.desktop(on: device)
+        let url = directory.appendingPathComponent("Groove.driftbox")
+        try Data(SongCodec.encode(Self.song()).utf8).write(to: url)
+        window.chosenFile = url
+        window.choose(DesktopMenus.open)
+        desktop.interface.rename(pattern: "p")
+        try desktop.drawFrame()
+        #expect(window.takesText)
+        window.onEvent?(.key(KeyEvent(key: .character("x"))))
+        #expect(desktop.keys.octave == 0, "not the instrument's")
+        window.onEvent?(.key(KeyEvent(key: .return)))
+        #expect(!window.takesText)
+        #expect(desktop.session.song?.pattern(id: "p")?.name == "Pattern 1x")
+      }
     }
   }
 
