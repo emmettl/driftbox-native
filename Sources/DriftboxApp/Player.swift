@@ -5,10 +5,12 @@
   import DriftboxHost
   import DriftboxScenes
   import DriftboxSeq
+  import DriftboxSession
   import Foundation
   import Observation
 
-  /// The catalogue that ships with the app: the same documents the conformance fixtures hold.
+  /// The catalogue that ships with the app: the same documents the conformance fixtures hold, which
+  /// live with `DriftboxSession` now, as every platform's app ships them.
   struct CatalogueEntry: Identifiable, Hashable {
     let id: String
     let name: String
@@ -18,26 +20,13 @@
 
   enum Catalogue {
     static func entries() -> [CatalogueEntry] {
-      struct File: Decodable {
-        struct Entry: Decodable {
-          let id: String
-          let name: String
-          let blurb: String
-          let visual: String
-        }
-        let songs: [Entry]
+      DriftboxSession.Catalogue.entries().map {
+        CatalogueEntry(id: $0.id, name: $0.name, blurb: $0.blurb, visual: $0.visual)
       }
-      guard let url = Bundle.module.url(forResource: "catalogue", withExtension: "json"),
-        let data = try? Data(contentsOf: url), let file = try? JSONDecoder().decode(File.self, from: data)
-      else { return [] }
-      return file.songs.map { CatalogueEntry(id: $0.id, name: $0.name, blurb: $0.blurb, visual: $0.visual) }
     }
 
     static func song(_ id: String) -> Song? {
-      guard let url = Bundle.module.url(forResource: id, withExtension: "song.json", subdirectory: "Songs"),
-        let data = try? Data(contentsOf: url)
-      else { return nil }
-      return SongCodec.decode(String(decoding: data, as: UTF8.self))
+      DriftboxSession.Catalogue.song(id)
     }
   }
 

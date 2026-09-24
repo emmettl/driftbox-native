@@ -27,6 +27,7 @@ let package = Package(
     .library(name: "DriftboxTextWindows", targets: ["DriftboxTextWindows"]),
     .library(name: "DriftboxCanvas", targets: ["DriftboxCanvas"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
+    .library(name: "DriftboxSession", targets: ["DriftboxSession"]),
   ],
   targets: [
     // Constrained: arithmetic only.
@@ -111,6 +112,14 @@ let package = Package(
       name: "DriftboxScenes",
       dependencies: ["DriftboxDSP", "DriftboxEngine", "DriftboxGPU", "DriftboxText", "DriftboxCanvas"]),
 
+    // What an app holds, on every platform: the song, the transport, editing and undo, the MIDI
+    // clock both ways, what is remembered — everything but the views, on the ports. With the
+    // catalogue of songs every platform's app ships.
+    .target(
+      name: "DriftboxSession",
+      dependencies: ["DriftboxDocument", "DriftboxEngine", "DriftboxHost", "DriftboxScenes", "DriftboxSeq"],
+      resources: [.copy("Resources/Songs"), .copy("Resources/catalogue.json")]),
+
     // A song document in, a WAV file out: something to listen to.
     .executableTarget(name: "driftbox-render", dependencies: ["DriftboxEngine", "DriftboxDocument"]),
     // The Mac app, all of it but the entry point. A library rather than part of the executable
@@ -120,9 +129,10 @@ let package = Package(
       name: "DriftboxApp",
       dependencies: [
         "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq", "DriftboxScenes", "DriftboxRack",
+        "DriftboxSession",
       ],
       resources: [
-        .copy("Resources/Songs"), .copy("Resources/catalogue.json"), .copy("Resources/AppIcon.icns"),
+        .copy("Resources/AppIcon.icns"),
         .copy("Resources/Patches"), .copy("Resources/patches.json"), .copy("Resources/modules.json"),
       ]),
     // `@main` and nothing else, so that everything it starts can be reached from a test.
@@ -167,6 +177,12 @@ let package = Package(
       name: "DriftboxShellTests",
       dependencies: [
         "DriftboxShell", .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
+      ]),
+    .testTarget(
+      name: "DriftboxSessionTests",
+      dependencies: [
+        "DriftboxSession", "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq",
+        "ConformanceSupport",
       ]),
     .testTarget(
       name: "DriftboxTextTests",

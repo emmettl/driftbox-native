@@ -34,6 +34,7 @@ Metal. Next after this is the rack.
 | `Sources/CAAudio`, `Sources/CAMidi` | AAudio's and native MIDI's headers, which the Swift SDK's Android module leaves out. Declarations only. |
 | `android/` | The Android app's Java, manifest and resources: so far a harness, and the MIDI devices Java can open. |
 | `Sources/DriftboxAndroid` | The Android app's native library: what its Java calls, and the tests it runs on a phone. |
+| `Sources/DriftboxSession` | What an app holds, on every platform: the song, the transport, editing and undo, the MIDI clock both ways, what is remembered, and the catalogue. |
 | `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |
 | `Sources/DriftboxGPU` | What the scenes ask of a GPU, as a protocol every backend answers the same way. |
 | `Sources/DriftboxGPUD3D11` | That protocol on Direct3D 11: the GPU on Windows. |
@@ -117,6 +118,22 @@ The Mac's adapters — `AudioRoute`, `DriftboxAudioUnit`, `MIDIInput`, `MIDIOutp
 the ports, still in `DriftboxHost`, and not yet behind them; `Player` and `RackModel` use them
 directly. Moving them into a target of their own that conforms is the next step, and needs a Mac to
 build. After it, `driftbox-play` is one program on both platforms rather than two branches.
+
+**What an app holds** is `DriftboxSession`'s `Session`: the Mac app's `Player` without the Mac in it.
+It holds the song and the transport, the loop, the metronome and the count-in, editing and undo, a
+MIDI clock followed and one sent, and what is remembered between launches. It also ships the
+catalogue of songs.
+- **The platform arrives through the ports:** `AudioRouting`, `MIDIInputPort` and `MIDIOutputPort`,
+  given by the app. A session made without them is the whole of it and none of the hardware, which
+  is how its tests make one.
+- **Nothing in it keeps time.** The app calls `tick` from its own loop, which on Windows is the
+  window's.
+- **Undo is its own.** Foundation's `UndoManager` is not there on Windows, and every edit is a song
+  before and a song after, so `UndoHistory` is a stack of those with their names.
+- **Settings persist under the Mac app's own keys,** so that its preferences come with it.
+
+The Windows app is to be built on it. The Mac app still has its `Player`, which reads the catalogue
+and the clock cursor from the session, until it moves onto `Session` too, on a Mac.
 
 ### The GPU
 
