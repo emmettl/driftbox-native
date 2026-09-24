@@ -46,6 +46,9 @@ struct RackDefinitionTests {
       #expect(def.voiceCollector == module["voiceCollector"]?.bool, "\(type) collector")
     }
     #expect(missing.isEmpty, "not ported and not on the list: \(missing)")
-    #expect(RackModules.all.count == modules.count - Self.notYet.count)
+    // And the modules the reference has none of are only those that say so.
+    let theirs = Set(modules.compactMap { $0.object?["type"]?.string })
+    #expect(RackModules.nativeOnly.isDisjoint(with: theirs), "the reference has these now")
+    #expect(RackModules.all.count - RackModules.nativeOnly.count == modules.count - Self.notYet.count)
   }
 }

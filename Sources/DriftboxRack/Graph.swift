@@ -64,6 +64,8 @@ public struct RackGraph: ~Copyable {
 
   let nodes: UnsafeMutablePointer<NodeRuntime>
   let nodeCount: Int
+  /// Each runtime's id — a module's, or `id#n` for its later voices — in the same order.
+  let nodeIds: [String]
   /// The metered modules' mirrors, the runtime each copies, and the module ids, in that order.
   let mirrors: UnsafeMutablePointer<MeterMirror>
   let mirrorNodes: UnsafeMutablePointer<Int>
@@ -268,6 +270,7 @@ public struct RackGraph: ~Copyable {
     }
     nodes = table(runtimes)
     nodeCount = runtimes.count
+    nodeIds = runtimeIds
 
     // A mirror for each metered module, on its first voice: what its faceplate reads from.
     var mirrors: [MeterMirror] = []
@@ -414,6 +417,15 @@ public struct RackGraph: ~Copyable {
     dataRevision += 1
     entry.table[index] = DataBuffer(
       samples: UnsafePointer(copy), count: samples.count, revision: dataRevision)
+  }
+
+  /// Where a `plugin` module's processor is held, for a host to put one in: directly before the
+  /// graph is handed over, and from the render thread after.
+  public func externalEntry(module: String) -> UnsafeMutablePointer<ExternalSlot>? {
+    for index in 0..<nodeCount where nodeIds[index] == module {
+      if case .external(let processor) = nodes[index].processor { return processor.slot }
+    }
+    return nil
   }
 
   /// Where one module's data slot is held, for a host to swap a new buffer into from the render
