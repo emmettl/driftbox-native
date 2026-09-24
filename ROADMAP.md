@@ -422,10 +422,12 @@ external displays, performance capture to video.
    `scripts/bundle-app.sh` makes the `.appex` around it inside the app, signed ad hoc and sandboxed as
    an Audio Unit extension must be, and registers it; `auval` passes it. Behind the unit a
    `RackSession`, made at the rate the app asks for and made again at another, keeping its patch.
-   Having no face yet, its presets are the factory patches, chosen from the app's own menu; its
-   state is the patch. The app's MIDI plays it through its MIDI modules, carried off the render
-   thread through a ring, and it runs with the app's transport at the app's tempo. Next: its face,
-   the rack's own, in the app's window; and the groovebox's engine beside it.
+   Its presets are the factory patches, chosen from the app's own menu; its state is the patch.
+   The app's MIDI plays it through its MIDI modules, carried off the render thread through a ring,
+   and it runs with the app's transport at the app's tempo. Its face is the rack's own: the Mac
+   app's rack window on the same session, in the app's window, served by one view controller that
+   is also the unit's factory, as an Audio Unit extension with a face has it. Next: the groovebox's
+   engine beside it.
 
 ### What the later milestones ask of the first
 

@@ -1,31 +1,37 @@
 #if canImport(AVFoundation)
   import AVFoundation
+  import DriftboxApp
   import DriftboxDocument
   import DriftboxHost
   import DriftboxHostMac
   import DriftboxRackSession
   import Foundation
+  import Observation
 
   /// The rack inside another app: the `RackSession` every platform shares, behind the rack's Audio
   /// Unit, and what the app loading it says, carried into the session.
   ///
   /// - The rack is made at the rate the app asks for when it readies the unit, and made again if it
   ///   asks for another, keeping the patch; until then there is nothing to play.
-  /// - The app's presets are the factory patches, since the extension has no face of its own yet;
-  ///   its saved state is the patch, as a document, and restoring one opens it.
+  /// - Its face is the Mac app's rack window, on the same session, shown in the app's window.
+  /// - The app's presets are the factory patches, from the app's own menu; its saved state is the
+  ///   patch, as a document, and restoring one opens it.
   /// - The app's MIDI plays the rack through its MIDI modules, as a controller plugged into the
   ///   Mac would; and the rack follows the app's tempo and runs when its transport does.
   ///
   /// Everything the unit hears arrives on the app's threads, and is carried to the main actor, where
   /// the session lives: the hooks are made below, off the main actor, since a closure made on it
   /// traps when another thread calls it.
-  @MainActor
+  @MainActor @Observable
   public final class RackPlugin {
-    private weak var unit: RackAudioUnit?
+    @ObservationIgnored private weak var unit: RackAudioUnit?
     public private(set) var session: RackSession?
+    /// The rack's own face on that session, for the app's window: the one the Mac app's rack
+    /// window shows.
+    public private(set) var face: MacRack?
     /// A state restored before there was a rack to open it in.
-    private var pending: (document: String, name: String?)?
-    private var timer: Timer?
+    @ObservationIgnored private var pending: (document: String, name: String?)?
+    @ObservationIgnored private var timer: Timer?
 
     init(unit: RackAudioUnit) {
       self.unit = unit
@@ -45,7 +51,7 @@
     }
 
     /// `work` on the main actor, now: in place when already there, and waited for when not.
-    nonisolated static func onMain<T: Sendable>(_ work: @escaping @MainActor () -> T) -> T {
+    nonisolated public static func onMain<T: Sendable>(_ work: @escaping @MainActor () -> T) -> T {
       if Thread.isMainThread { return MainActor.assumeIsolated(work) }
       return DispatchQueue.main.sync { MainActor.assumeIsolated(work) }
     }
@@ -62,6 +68,7 @@
       fresh.onSave = { [weak unit] document, name in unit?.saved.withLock { $0 = (document, name) } }
       unit.saved.withLock { $0 = (PatchCodec.encode(fresh.patch), fresh.name) }
       session = fresh
+      face = MacRack(session: fresh)
       unit.host = fresh.host
       fresh.listen()
       if timer == nil {
@@ -107,7 +114,8 @@
   }
 
   /// A unit crossing to the main actor, which `AUAudioUnit`, not being `Sendable`, may not on its own.
-  struct Held: @unchecked Sendable {
-    let unit: RackAudioUnit
+  public struct Held: @unchecked Sendable {
+    public let unit: RackAudioUnit
+    public init(unit: RackAudioUnit) { self.unit = unit }
   }
 #endif

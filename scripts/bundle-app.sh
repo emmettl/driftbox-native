@@ -76,13 +76,14 @@ cat > "$ext/Contents/Info.plist" <<PLIST
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSExtension</key><dict>
-    <key>NSExtensionPointIdentifier</key><string>com.apple.AudioUnit</string>
-    <!-- RackFactory, by the Objective-C name it gives itself. -->
-    <key>NSExtensionPrincipalClass</key><string>DriftboxRackFactory</string>
+    <!-- An Audio Unit with a face: the rack's own, in the app's window. -->
+    <key>NSExtensionPointIdentifier</key><string>com.apple.AudioUnit-UI</string>
+    <!-- RackViewController, the face and the factory both, by the Objective-C name it gives itself. -->
+    <key>NSExtensionPrincipalClass</key><string>DriftboxRackViewController</string>
     <key>NSExtensionAttributes</key><dict>
       <key>AudioComponents</key><array><dict>
         <key>description</key><string>Driftbox Rack</string>
-        <key>factoryFunction</key><string>DriftboxRackFactory</string>
+        <key>factoryFunction</key><string>DriftboxRackViewController</string>
         <!-- RackAudioUnit.componentDescription: an instrument, 'drck' by 'Drfb'. -->
         <key>manufacturer</key><string>Drfb</string>
         <key>name</key><string>Driftbox: Rack</string>
