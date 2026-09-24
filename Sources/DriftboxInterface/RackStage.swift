@@ -73,6 +73,25 @@ public struct RackStage {
     /// The words' colour, where they are lit.
     public var wordsTint: Colour?
     public var controls: [Control]
+    /// A model mark after the name, in its own colour.
+    public var mark: String?
+    public var markTint: Colour?
+    /// Where a face that meters draws what it reads: a tuner's display, a meter's, a looper's.
+    public var screen: Rect?
+    /// Buttons that set a param to a value, as a looper's transport does.
+    public var buttons: [Button] = []
+  }
+
+  /// A button on a face that sets one param to one value.
+  public struct Button {
+    public var frame: Rect
+    public var label: String
+    public var param: String
+    public var value: Int
+    public var isOn: Bool
+    public var tint: Colour
+    /// The label's colour while it is off, where it is not the usual.
+    public var text: Colour?
   }
 
   public var size: SIMD2<Float>
@@ -149,10 +168,12 @@ public struct RackStage {
       return Face(
         module: module, def: nil, span: placement.span, frame: frame, title: title, words: "", controls: [])
     }
-    if let built = RackFaces.face(module, def, x: frame.x + 12, top: top, rack: rack) {
+    if let built = RackFaces.face(module, def, frame: frame, top: top, rack: rack) {
       return Face(
         module: module, def: def, span: placement.span, frame: frame, title: title, words: built.words,
-        wordsTint: built.wordsTint, controls: built.cells.controls)
+        wordsTint: built.wordsTint, controls: built.cells.controls, mark: built.mark,
+        markTint: built.markTint,
+        screen: built.screen, buttons: built.buttons)
     }
     var cells = RackFaces.Cells(
       def: def, x: frame.x + 12, top: top, columns: RackLayout.columns(for: placement.span))
@@ -191,6 +212,9 @@ public struct RackStage {
     let at = design(point)
     guard let face = faces.first(where: { $0.frame.contains(at) }) else { return nil }
     let id = face.module.id
+    if let button = face.buttons.first(where: { $0.frame.contains(at) }) {
+      return .option(module: id, param: button.param, value: button.value)
+    }
     for control in face.controls where control.cell.contains(at) {
       let param = control.param.id
       switch control.kind {

@@ -322,14 +322,24 @@ struct RackInterfaceTests {
     return (face, try #require(face.stage.faces.first))
   }
 
-  /// Each hand-built face lays out what it says it shows, and all of it fits its panel.
+  /// Each hand-built face lays out what it says it shows, as a control or its buttons, and all of it
+  /// fits its panel without landing on anything else.
   @Test func handBuiltFacesShowWhatTheySay() throws {
     for (type, shows) in RackFaces.shows {
       let (_, face) = try Self.alone(type)
-      #expect(Set(face.controls.map(\.param.id)) == shows, "\(type)")
-      #expect(face.controls.count == shows.count, "\(type): each once")
-      for control in face.controls {
-        #expect(face.frame.contains(SIMD2(control.cell.maxX - 1, control.cell.maxY - 1)), "\(type)")
+      let controls = face.controls.map(\.param.id)
+      #expect(Set(controls + face.buttons.map(\.param)) == shows, "\(type)")
+      #expect(controls.count == Set(controls).count, "\(type): each once")
+      var parts = face.controls.map(\.cell) + face.buttons.map(\.frame)
+      if let screen = face.screen { parts.append(screen) }
+      for (index, part) in parts.enumerated() {
+        #expect(face.frame.contains(SIMD2(part.x, part.y)), "\(type)")
+        #expect(face.frame.contains(SIMD2(part.maxX - 1, part.maxY - 1)), "\(type)")
+        for other in parts[(index + 1)...] {
+          let apart =
+            part.maxX <= other.x || other.maxX <= part.x || part.maxY <= other.y || other.maxY <= part.y
+          #expect(apart, "\(type): \(part) and \(other) overlap")
+        }
       }
     }
     let (_, generic) = try Self.alone("noise")
@@ -369,6 +379,34 @@ struct RackInterfaceTests {
     #expect(face.words == "keys" && face.wordsTint == nil)
     let channel = try #require(face.controls.first { $0.param.id == "channel" })
     #expect(channel.labels?.first == "Omni" && channel.labels?.count == 17)
+  }
+
+  /// The looper's transport sets its mode, one press one undo, and CLEAR turns its param over each
+  /// press; the tuner and the meter have their screens.
+  @Test func theLooperIsPlayedFromItsTransport() throws {
+    let (rack, face) = try Self.alone("looper")
+    let stage = rack.stage
+    #expect(face.buttons.map(\.label) == ["STOP", "REC", "PLAY", "DUB", "CLEAR"])
+    #expect(face.words == "stereo · session" && face.mark == "LS—30")
+    #expect(face.buttons[0].isOn)
+    Self.press(rack, Self.window(stage, Self.centre(face.buttons[1].frame)))
+    let mode = try #require(RackModules.registry["looper"]?.params.first { $0.id == "mode" })
+    #expect(rack.rack.value(rack.rack.patch.modules[0], mode) == 1)
+    #expect(rack.stage.faces[0].buttons[1].isOn)
+
+    let clear = try #require(RackModules.registry["looper"]?.params.first { $0.id == "clear" })
+    let from = rack.rack.value(rack.rack.patch.modules[0], clear)
+    Self.press(rack, Self.window(stage, Self.centre(face.buttons[4].frame)))
+    let once = rack.rack.value(rack.rack.patch.modules[0], clear)
+    #expect(once != from)
+    Self.press(rack, Self.window(rack.stage, Self.centre(rack.stage.faces[0].buttons[4].frame)))
+    #expect(rack.rack.value(rack.rack.patch.modules[0], clear) == from, "turned back over")
+
+    for type in ["tuner", "meter"] {
+      let (_, face) = try Self.alone(type)
+      let screen = try #require(face.screen, "\(type)")
+      #expect(screen.width > 100 && screen.height > 50, "\(type)")
+    }
   }
 
   struct Unexpected: Error {}

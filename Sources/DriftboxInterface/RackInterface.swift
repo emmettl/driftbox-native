@@ -392,6 +392,12 @@ public final class RackInterface {
     canvas.font = Theme.mono(11, weight: 600)
     canvas.fill = Theme.ink.faded(dim)
     canvas.fillText(def.name.uppercased(), title.x, baseline)
+    if let mark = face.mark {
+      let name = canvas.measure(def.name.uppercased())
+      canvas.font = Theme.mono(8)
+      canvas.fill = (face.markTint ?? Theme.three).faded(dim)
+      canvas.fillText(mark, title.x + name + 8, baseline)
+    }
     canvas.align = .right
     canvas.font = face.wordsTint == nil ? Theme.mono(9) : Theme.mono(10, weight: 600)
     canvas.fill = face.wordsTint?.faded(dim) ?? Theme.dim.faded(0.8 * dim)
@@ -402,6 +408,7 @@ public final class RackInterface {
     for control in face.controls {
       drawControl(control, module: face.module, tint: tint, hovered: hovered, on: canvas)
     }
+    drawScreen(face, hovered: hovered, on: canvas)
     canvas.restore()
     if face.module.bypassed {
       let tag = Rect(frame.maxX - 76, frame.y - 7, 64, 14)

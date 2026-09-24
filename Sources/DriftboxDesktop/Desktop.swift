@@ -89,6 +89,8 @@ public final class Desktop {
 
   func drawFrame() throws {
     session.tick()
+    // The rack's meters and its last note, caught up whether it shows or not, as the Mac's are.
+    rack?.tick()
     refresh()
     if let size = resized {
       resized = nil

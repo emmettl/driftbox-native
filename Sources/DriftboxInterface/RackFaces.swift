@@ -14,9 +14,13 @@ public enum RackFaces {
     "ladder": ["cutoff", "resonance"],
     "out": ["level", "pan", "mute", "solo"],
     "midi": Set(RackModules.registry["midi"]?.params.filter { !$0.hidden }.map(\.id) ?? []),
+    "tuner": ["reference", "mute"],
+    "meter": ["mode", "gain", "release"],
+    "looper": ["mode", "clear", "feedback", "dry", "loop"],
   ]
 
   static let shapes = ["Saw", "Pulse", "Tri"]
+  static let loopModes = ["STOP", "REC", "PLAY", "DUB"]
 
   /// A face's controls in cells of the usual size, left to right from its top and `columns` across;
   /// a larger knob makes its row taller.
@@ -66,12 +70,23 @@ public enum RackFaces {
     var words: String
     var wordsTint: Colour?
     var cells: Cells
+    var mark: String?
+    var markTint: Colour?
+    var screen: Rect?
+    var buttons: [RackStage.Button] = []
   }
 
-  /// The face `def`'s module has of its own, from `x` and `top` on its panel; nil for the generic.
+  /// The face `def`'s module has of its own, on its panel `frame` from `top` down; nil for the generic.
   @MainActor
-  static func face(_ module: PatchModule, _ def: ModuleDef, x: Float, top: Float, rack: RackSession) -> Built?
+  static func face(_ module: PatchModule, _ def: ModuleDef, frame: Rect, top: Float, rack: RackSession)
+    -> Built?
   {
+    // Inside the panel's padding, as the Mac's faces sit in theirs.
+    let x = frame.x + 12
+    let width = frame.width - 24
+    let bottom = frame.maxY - 10
+    let cellWidth = Float(RackLayout.cellWidth)
+    let cellHeight = Float(RackLayout.cellHeight)
     func value(_ id: String) -> Double {
       def.params.first { $0.id == id }.map { rack.value(module, $0) } ?? 0
     }
@@ -110,6 +125,54 @@ public enum RackFaces {
       return Built(
         words: rack.lastNote.map(RackKeyboard.name) ?? (rack.midiSources.isEmpty ? "keys" : "listening"),
         wordsTint: rack.lastNote == nil ? nil : Theme.nine, cells: cells)
+    case "tuner":
+      // The chromatic tuner: its display over its two controls.
+      cells = Cells(def: def, x: x, top: bottom - cellHeight, columns: 2)
+      cells.add("reference", tint: Theme.nine)
+      cells.add("mute")
+      return Built(
+        words: "55–2000 Hz", cells: cells, mark: "CT—40", markTint: Theme.nine,
+        screen: Rect(x, top, width, max(0, bottom - cellHeight - 6 - top)))
+    case "meter":
+      // A meter in a cable: its needle, lights or scope, and the three controls beside it.
+      let controls = cellWidth * 3
+      cells = Cells(def: def, x: x + width - controls, top: top + (bottom - top - cellHeight) / 2, columns: 3)
+      cells.add("mode")
+      cells.add("gain", tint: Theme.nine)
+      cells.add("release", tint: Theme.three)
+      let reading = rack.readings[module.id]
+      return Built(
+        words: RackDisplay.meterLabel(reading?.level ?? 0), cells: cells, mark: "VU—3",
+        screen: Rect(x, top, max(0, width - controls - 10), bottom - top))
+    case "looper":
+      // The loop station: what is in the loop, its transport, and its mix.
+      let controls = cellWidth * 3
+      let transport: Float = 168
+      cells = Cells(def: def, x: x + width - controls, top: top + (bottom - top - cellHeight) / 2, columns: 3)
+      cells.add("feedback", tint: Theme.three)
+      cells.add("dry")
+      cells.add("loop", tint: Theme.nine)
+      let left = x + width - controls - 9 - transport
+      let mode = Int(value("mode").rounded())
+      let rowHeight = (bottom - top - 8) / 3
+      let buttonWidth = (transport - 4) / 2
+      var buttons = loopModes.indices.map { index in
+        RackStage.Button(
+          frame: Rect(
+            left + Float(index % 2) * (buttonWidth + 4), top + Float(index / 2) * (rowHeight + 4),
+            buttonWidth,
+            rowHeight),
+          label: loopModes[index], param: "mode", value: index, isOn: mode == index,
+          tint: index == 1 || index == 3 ? Theme.eight : Theme.nine)
+      }
+      // Clear is pressed, not held: each press turns the param over, and the looper hears the turn.
+      buttons.append(
+        RackStage.Button(
+          frame: Rect(left, top + (rowHeight + 4) * 2, transport, rowHeight), label: "CLEAR", param: "clear",
+          value: value("clear") >= 0.5 ? 0 : 1, isOn: false, tint: Theme.eight, text: Theme.eight.faded(0.7)))
+      return Built(
+        words: "stereo · session", cells: cells, mark: "LS—30",
+        screen: Rect(x, top, max(0, left - 9 - x), bottom - top), buttons: buttons)
     default:
       return nil
     }
