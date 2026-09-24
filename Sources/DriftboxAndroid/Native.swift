@@ -2,8 +2,10 @@
   import CAMidi
   import CGLES
   import DriftboxHostAndroid
+  import DriftboxSession
   import DriftboxText
   import DriftboxTextAndroid
+  import FoundationEssentials
 
   // What `app.driftbox.Native` in `android/` declares, one function each, and everything this app
   // shares between them. The names are JNI's: `Java_`, the class, the method.
@@ -52,30 +54,33 @@
 
   /// The song playing and being drawn, if one is.
   @MainActor var stage: Stage?
-  /// The window it is drawn in, held from Java's surface until the render thread has let go of it.
+  /// The window it is drawn in, held from Java's surface until the stage has let go of it.
   @MainActor var window: OpaquePointer?
 
   @_cdecl("Java_app_driftbox_Native_start")
   public func nativeStart(
-    _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ json: jstring?, _ scene: jstring?,
-    _ density: jfloat
+    _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ song: jstring?, _ scene: jstring?,
+    _ density: jfloat, _ resources: jstring?
   ) -> jboolean {
-    let text = env.string(json)
+    let id = env.string(song)
     let named = scene == nil ? nil : env.string(scene)
+    // Where Java unpacked the catalogue, which Swift reads as files: this app is built without
+    // SwiftPM, so there is no resource bundle to find it in.
+    Catalogue.resources = URL(filePath: env.string(resources), directoryHint: .isDirectory)
     // Android 12 and the app's Java are what the typesetter needs; without them, scenes set no type.
     // Made here, since `env` is Java's and does not cross into the main actor.
     let android = AndroidTypesetter(env: env)
     return MainActor.assumeIsolated {
       stage?.stop()
       let typesetter: any Typesetter = android ?? NoTypesetter()
-      stage = Stage(json: text, scene: named, density: density, typesetter: typesetter)
+      stage = Stage(song: id, scene: named, density: density, typesetter: typesetter)
       return stage == nil ? jboolean(JNI_FALSE) : jboolean(JNI_TRUE)
     }
   }
 
-  @_cdecl("Java_app_driftbox_Native_nextScene")
-  public func nativeNextScene(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?) {
-    MainActor.assumeIsolated { stage?.nextScene() }
+  @_cdecl("Java_app_driftbox_Native_frame")
+  public func nativeFrame(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?) {
+    MainActor.assumeIsolated { stage?.frame() }
   }
 
   @_cdecl("Java_app_driftbox_Native_stop")
@@ -128,9 +133,9 @@
 
   @_cdecl("Java_app_driftbox_Native_touch")
   public func nativeTouch(
-    _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ x: jfloat, _ y: jfloat, _ down: jboolean
+    _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ id: jint, _ phase: jint, _ x: jfloat, _ y: jfloat
   ) {
-    MainActor.assumeIsolated { stage?.touch(x: x, y: y, down: down != 0) }
+    MainActor.assumeIsolated { stage?.touch(id: Int(id), phase: Int(phase), x: x, y: y) }
   }
 
   @_cdecl("Java_app_driftbox_Native_tick")

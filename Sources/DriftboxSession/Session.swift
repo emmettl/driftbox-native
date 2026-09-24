@@ -175,10 +175,10 @@ public final class Session {
   /// Where what is remembered between launches is kept: the song that was open and the settings.
   /// Nothing at all for a session made without, so a test that opens files by the dozen does not
   /// rewrite what the app will open next.
-  public let memory: UserDefaults?
+  public let memory: (any SessionMemory)?
   /// Where a change of setting is written: nowhere while the settings are being read, so that
   /// reading them does not write every one back.
-  private var remembering: UserDefaults? { readingSettings ? nil : memory }
+  private var remembering: (any SessionMemory)? { readingSettings ? nil : memory }
   @ObservationIgnored private var readingSettings = false
 
   /// A session on the platform's parts. `hop` is how word from a MIDI port's own thread reaches the
@@ -186,7 +186,7 @@ public final class Session {
   /// such word, and the default, which runs it where it is, is only right for word already there.
   public init(
     host: EngineHost, audio: (any AudioRouting)? = nil, midiIn: (any MIDIInputPort)? = nil,
-    midiOut: (any MIDIOutputPort)? = nil, memory: UserDefaults? = nil,
+    midiOut: (any MIDIOutputPort)? = nil, memory: (any SessionMemory)? = nil,
     hop: @escaping @Sendable (@escaping @Sendable () -> Void) -> Void = { $0() }
   ) {
     self.host = host
@@ -419,7 +419,7 @@ public final class Session {
 
   /// Where the document last open was. A bookmark where there are bookmarks — so one renamed or
   /// moved in the Finder since is still found — and its path where there are not, as on Windows.
-  private func rememberedFile(in memory: UserDefaults) -> URL? {
+  private func rememberedFile(in memory: any SessionMemory) -> URL? {
     #if canImport(Darwin)
       guard let bookmark = memory.data(forKey: SessionDefaults.lastFile) else { return nil }
       var stale = false
@@ -927,3 +927,20 @@ extension MIDIDestination {
     self = stored.isEmpty ? .virtual : .port(stored)
   }
 }
+
+/// What a session remembers between launches is kept in: `UserDefaults`, on the Mac and Windows —
+/// the calls here are its own, so it needs nothing more than to say so. Not on Android, where it
+/// is the old Foundation and the thirty megabytes of internationalisation that come with it, and
+/// where the app will keep what it remembers the way Android apps do.
+public protocol SessionMemory: AnyObject {
+  func object(forKey key: String) -> Any?
+  func string(forKey key: String) -> String?
+  func bool(forKey key: String) -> Bool
+  func data(forKey key: String) -> Data?
+  func set(_ value: Any?, forKey key: String)
+  func removeObject(forKey key: String)
+}
+
+#if !os(Android)
+  extension UserDefaults: SessionMemory {}
+#endif

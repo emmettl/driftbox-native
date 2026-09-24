@@ -5,6 +5,7 @@
   import DriftboxHost
   import DriftboxScenes
   import DriftboxText
+  import DriftboxTouch
 
   /// Every scene on the GPU layer, on the phone's own GPU: each one draws, is not black, and moves
   /// when the music does, as `GPUSceneTests` holds them on the other backends.
@@ -19,7 +20,7 @@
       } catch {
         return "FAIL no OpenGL ES device: \(error)"
       }
-      let drawn = Renderer.drawn(width: width, height: height, density: density)
+      let drawn = Touchscreen.drawn(width: width, height: height, scale: density)
       var lines = [
         "on \(device.renderer), timed drawn at \(drawn.width) by \(drawn.height) and at every pixel, "
           + "\(width) by \(height)"

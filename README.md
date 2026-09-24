@@ -51,6 +51,7 @@ Metal. Next after this is the rack.
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxInterface` | The controls, drawn on the canvas in points over the scene: the transport bar and the step grid, laid out and hit from one layout, on `Session`. |
 | `Sources/DriftboxDesktop` | Driftbox on a desktop with a `ShellWindow`: menus, the scene, the controls over it, the pad, on `Session`. |
+| `Sources/DriftboxTouch` | Driftbox on a touch screen: the scene, the controls over it, the pad, and what each finger is, on `Session`. Android's app uses it, and iOS's can. |
 | `Sources/DriftboxWindows` | The Windows app: Windows' parts, chosen and handed to `DriftboxDesktop`. |
 | `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
 | `Sources/Driftbox` | The executable, which is nothing but `@main`. |
@@ -443,10 +444,22 @@ scripts/android-app.sh scenes           # or every scene drawn, checked and time
 scripts/android-app.sh text             # or the typesetter, held to what every platform's is
 ```
 
-Two threads: Java's main thread owns the engine's commands and the audio route, and a render
-thread owns OpenGL, which is current on one thread, and reads the engine's events. A window is
-handed to it as Java makes one, and taken back before Java's `surfaceDestroyed` returns, as Android
-wants. Out of view, or with the screen off, the song plays on and nothing is drawn: a media
+The app is `Session` and the controls on a touch screen: `DriftboxTouch`'s `Touchscreen`, which is
+`Desktop`'s counterpart for a screen with no window to ask things of, and which iOS can use as it
+is. It draws the scene at no more than two pixels to a point, lays the controls over it at every
+pixel, and decides what each finger is: the controls' if it lands on them, the pad's if it is the
+first anywhere else, and a second finger tapped steps on to the next scene. Everything but the
+audio is on Java's main thread, as a desktop's is on its window's: Java's `Choreographer` asks for
+each frame and hands over each finger between them, and a window is let go of before Java's
+`surfaceDestroyed` returns, as Android wants.
+
+The session finds its songs as files, where the app unpacks them from its package, rather than
+through `Bundle`: on Android that, `String(format:)` and `UserDefaults` are the old Foundation, and
+it brings 48MB of internationalisation with it. The build tells the compiler not to link the old
+Foundation at all, so anything that reaches for it fails to link rather than growing the package;
+it is 16MB.
+
+Out of view, or with the screen off, the song plays on and nothing is drawn: a media
 playback service, with a notification to stop it from, keeps the process on the big cores, which
 Android otherwise takes away from an app out of view. There the render thread costs half as much
 again as in view, with no drawing to keep the cores awake, so the stream's buffer goes to sixteen

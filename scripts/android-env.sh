@@ -79,6 +79,13 @@ echo "using $("$swiftc" --version 2>&1 | head -1), $(basename "$(dirname "$bundl
 core="DriftboxDSP DriftboxSeq DriftboxEngine DriftboxRack DriftboxDocument DriftboxHost DriftboxHostAndroid"
 # Sources/CAAudio, CAMidi and CGLES are where the NDK module maps are found.
 common="-target $target -resource-dir $resources/swift-aarch64 -sdk $sdk -I Sources/CAAudio -I Sources/CAMidi -I Sources/CGLES"
+# `import Foundation` is the old Foundation on Android, over FoundationEssentials, and a module that
+# imports it links it and its internationalisation: 48MB, most of it ICU's data. Nothing here uses
+# either — what Driftbox takes from Foundation is FoundationEssentials' — but a library linked is a
+# library searched, and the linker once found a function FoundationEssentials needs in the old
+# Foundation first and brought all of it in. So neither is linked, and a use of one fails to link.
+common="$common -Xfrontend -disable-autolink-library -Xfrontend Foundation"
+common="$common -Xfrontend -disable-autolink-library -Xfrontend FoundationInternationalization"
 
 # Each module named, compiled whole into $out/<module>.o with its interface beside it: its sources,
 # and any a caller names in `extra_<module>`.

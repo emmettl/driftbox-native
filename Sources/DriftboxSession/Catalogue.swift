@@ -20,6 +20,19 @@ public struct CatalogueEntry: Identifiable, Hashable, Sendable {
 /// The catalogue that ships with the app, on every platform: the same documents the conformance
 /// fixtures hold, in this target's resources.
 public enum Catalogue {
+  /// Where the catalogue and its songs are: this target's resources where SwiftPM builds it, and
+  /// wherever a platform put them where it does not. Android's app is built without SwiftPM, and
+  /// unpacks them from its package and says where before anything asks for a song. Read as files,
+  /// rather than through `Bundle`, which on Android is the whole of the old Foundation and the
+  /// thirty megabytes of internationalisation that come with it.
+  nonisolated(unsafe) public static var resources: URL? = {
+    #if SWIFT_PACKAGE
+      Bundle.module.resourceURL
+    #else
+      nil
+    #endif
+  }()
+
   public static func entries() -> [CatalogueEntry] {
     struct File: Decodable {
       struct Entry: Decodable {
@@ -30,7 +43,7 @@ public enum Catalogue {
       }
       let songs: [Entry]
     }
-    guard let url = Bundle.module.url(forResource: "catalogue", withExtension: "json"),
+    guard let url = resources?.appending(path: "catalogue.json"),
       let data = try? Data(contentsOf: url), let file = try? JSONDecoder().decode(File.self, from: data)
     else { return [] }
     return file.songs.map { CatalogueEntry(id: $0.id, name: $0.name, blurb: $0.blurb, visual: $0.visual) }
@@ -38,7 +51,10 @@ public enum Catalogue {
 
   /// Where the song `id` is, for a platform whose app wants the file itself.
   public static func url(of id: String) -> URL? {
-    Bundle.module.url(forResource: id, withExtension: "song.json", subdirectory: "Songs")
+    guard let url = resources?.appending(path: "Songs/\(id).song.json"),
+      FileManager.default.fileExists(atPath: url.path)
+    else { return nil }
+    return url
   }
 
   public static func song(_ id: String) -> Song? {

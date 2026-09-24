@@ -49,7 +49,7 @@
       let route = WASAPIRoute(hop: hop)
       let session = Session(
         host: EngineHost(sampleRate: route.sampleRate), audio: route, midiIn: WinMMInput(),
-        midiOut: WinMMOutput(), memory: .standard, hop: hop)
+        midiOut: WinMMOutput(), memory: UserDefaults.standard, hop: hop)
       if let path = arguments.first {
         // A song handed over, as Explorer hands one to the program it opens with.
         session.open(file: URL(fileURLWithPath: path))

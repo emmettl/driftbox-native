@@ -27,17 +27,22 @@ export PATH="$java_bin:$PATH"
 jar="$platform/android.jar"
 app="$out/app"
 rm -rf "$app"
-mkdir -p "$app/classes" "$app/dex" "$app/stage/lib/arm64-v8a" "$app/stage/assets/songs"
+mkdir -p "$app/classes" "$app/dex" "$app/stage/lib/arm64-v8a" "$app/stage/assets"
 
 # The native library: everything the player has, the GPU layer on OpenGL ES, the scenes on it,
-# type through Android's own and the canvas it is printed on, and the app's own module on top. The
-# app checks the GPU contract with the contract tests' own programs.
+# type through Android's own and the canvas it is printed on, the session and the controls over
+# the scene, the touch screen that puts them together, and the app's own module on top. The app
+# checks the GPU contract with the contract tests' own programs.
 extra_DriftboxAndroid=Tests/DriftboxGPUTests/Generated/ShaderPrograms.swift
+modules="DriftboxGPU DriftboxGPUGLES DriftboxText DriftboxTextAndroid DriftboxCanvas DriftboxScenes DriftboxShell \
+  DriftboxSession DriftboxInterface DriftboxTouch DriftboxAndroid"
 # shellcheck disable=SC2086
-compile $core DriftboxGPU DriftboxGPUGLES DriftboxText DriftboxTextAndroid DriftboxCanvas DriftboxScenes DriftboxAndroid
-link "$app/stage/lib/arm64-v8a/libdriftbox.so" "$out/DriftboxGPU.o" "$out/DriftboxGPUGLES.o" \
-  "$out/DriftboxText.o" "$out/DriftboxTextAndroid.o" "$out/DriftboxCanvas.o" "$out/DriftboxScenes.o" \
-  "$out/DriftboxAndroid.o" -lGLESv3 -landroid -emit-library -Xlinker -soname=libdriftbox.so
+compile $core $modules
+objects=""
+for module in $modules; do objects="$objects $out/$module.o"; done
+# shellcheck disable=SC2086
+link "$app/stage/lib/arm64-v8a/libdriftbox.so" $objects -lswiftObservation -lGLESv3 -landroid -emit-library \
+  -Xlinker -soname=libdriftbox.so
 cp "$libcxx" "$app/stage/lib/arm64-v8a/"
 # Symbols are half of what the libraries weigh, and the NDK's libc++ comes with all of its own.
 for library in "$app"/stage/lib/arm64-v8a/*.so; do "$llvm/bin/llvm-strip.exe" --strip-unneeded "$library"; done
@@ -53,9 +58,10 @@ cp "$app/dex/classes.dex" "$app/stage/"
 # how Android maps a library straight out of the package; then aligned, then signed with a key of
 # this machine's own.
 "$tools/aapt2.exe" compile --dir android/res -o "$app/resources.zip"
-# The catalogue's songs, which the app plays by name: added below with the dex, since aapt2 on
-# Windows would name them with backslashes, which Android cannot find.
-cp conformance/fixtures/documents/*.song.json "$app/stage/assets/songs/"
+# The session's resources, the catalogue and its songs, which the app unpacks and plays by name:
+# added below with the dex, since aapt2 on Windows would name them with backslashes, which Android
+# cannot find.
+cp -r Sources/DriftboxSession/Resources "$app/stage/assets/"
 "$tools/aapt2.exe" link -o "$app/unaligned.apk" -I "$jar" --manifest android/AndroidManifest.xml \
   --min-sdk-version 29 --target-sdk-version "${platform##*android-}" --version-code 1 --version-name 0.1 \
   "$app/resources.zip"
