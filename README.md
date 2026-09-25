@@ -397,6 +397,18 @@ makes `dist/Driftbox`, which runs on a machine with no Swift on it, and a zip of
 the catalogue's resource bundle, and the Swift and Visual C++ runtime DLLs it loads, found by
 reading their import tables — 18 of them, about 70MB, 26MB zipped.
 
+With Inno Setup 6 installed (`winget install JRSoftware.InnoSetup`),
+
+```bash
+node scripts/windows-installer.mjs
+```
+
+packages it and makes `dist/Driftbox-0.1-setup-x64.exe` from `windows/Driftbox.iss`, about 20MB:
+an installer for the person running it, with no administrator needed unless they choose
+everyone, which puts Driftbox in the Start menu, makes `.driftbox` songs open in it if they want
+that, writing the keys `--register` writes, and takes all of it away again on uninstalling.
+`DRIFTBOX_VERSION` sets its version. It is not signed yet, so Windows warns before it runs.
+
 ### Android
 
 The engine plays through a phone, and times itself there. It is built with the swift.org toolchain
