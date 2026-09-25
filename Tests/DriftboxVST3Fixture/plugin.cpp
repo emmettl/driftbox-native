@@ -4,7 +4,7 @@
 // - Driftbox Test Gain, an effect whose processor and controller are separate classes, as most
 //   plug-ins' are: one param, its gain, which it keeps as its state, and 32 samples of latency.
 // - Driftbox Test Synth, an instrument that is one component: a sine for each note held, at its
-//   velocity, and a level.
+//   velocity, and a level, which it takes pitch bend on.
 //
 // Windows only, as the host is for now.
 #ifdef _WIN32
@@ -16,6 +16,7 @@
 #include "base/source/fstreamer.h"
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstevents.h"
+#include "pluginterfaces/vst/ivstmidicontrollers.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
@@ -121,9 +122,22 @@ public:
   }
 };
 
-class Synth : public SingleComponentEffect {
+class Synth : public SingleComponentEffect, public IMidiMapping {
 public:
   static FUnknown *create(void *) { return static_cast<IAudioProcessor *>(new Synth); }
+
+  /// Pitch bend turns its level, as it would turn something of an instrument's own.
+  tresult PLUGIN_API getMidiControllerAssignment(int32 bus, int16, CtrlNumber number, ParamID &id) override {
+    if (bus != 0 || number != ControllerNumbers::kPitchBend) return kResultFalse;
+    id = levelID;
+    return kResultTrue;
+  }
+
+  tresult PLUGIN_API queryInterface(const TUID _iid, void **obj) override {
+    DEF_INTERFACE(IMidiMapping)
+    return SingleComponentEffect::queryInterface(_iid, obj);
+  }
+  REFCOUNT_METHODS(SingleComponentEffect)
 
   tresult PLUGIN_API initialize(FUnknown *context) override {
     tresult result = SingleComponentEffect::initialize(context);
