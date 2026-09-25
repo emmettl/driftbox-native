@@ -112,8 +112,11 @@
       #expect(Self.loudness(rack) == 0)
       rack.endTurn()
       // Said to have changed, the unit's state is saved once things are still for a moment.
+      // Waited for, not timed: with the whole suite running, a moment can be a long one.
       rack.unitChanged("fx")
-      try await Task.sleep(for: .milliseconds(600))
+      for _ in 0..<100 where rack.patch.modules[1].plugin?.state == nil {
+        try await Task.sleep(for: .milliseconds(50))
+      }
       let saved = try #require(rack.patch.modules[1].plugin)
       #expect(saved.state != nil)
       let again = Self.effectRack(saved)
@@ -132,6 +135,20 @@
         await rack.pluginsReady()
         #expect(rack.plugins["fx"] == .missing)
       }
+    }
+
+    /// What there is to choose: the effect for a `plugin` module, the instrument for a
+    /// `plugin-instrument` one.
+    @Test func theInstalledAreOffered() async {
+      let rack = RackSession(plugins: VST3Hosting(folders: [Self.folder]))
+      rack.findPlugins()
+      await rack.pluginsFound()
+      guard case .found(let choices) = rack.pluginChoices else {
+        Issue.record("not found")
+        return
+      }
+      #expect(choices.map(\.reference.name) == ["Driftbox Test Gain", "Driftbox Test Synth"])
+      #expect(choices.map(\.moduleType) == ["plugin", "plugin-instrument"])
     }
 
     /// An instrument module plays the test synth from the rack's keys, at the level a pitch bend at

@@ -13,6 +13,8 @@ extension Desktop {
     guard shows != showsRack, rack != nil else { return }
     if shows {
       session.padRelease()
+      // The plug-ins installed, found while the rack is looked at, for its Add menu.
+      rack?.findPlugins()
     } else {
       rackInterface?.releaseKeys()
     }

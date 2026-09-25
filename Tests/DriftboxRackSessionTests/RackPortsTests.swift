@@ -136,6 +136,32 @@ struct RackPortsTests {
     #expect(rack.undoTitle == "Undo Unmap Macro 1")
   }
 
+  /// The platform's plug-ins are asked for once, and none are offered where there is no platform to
+  /// make them; one added comes with its module, an instrument wired to the keys, and its unit is
+  /// made; undone, it goes in one step.
+  @Test func aPlugInIsAddedWithItsModule() async throws {
+    let rack = RackSession(plugins: Plugins())
+    #expect(rack.hostsPlugins && rack.pluginChoices == .notAsked)
+    rack.findPlugins()
+    #expect(rack.pluginChoices == .finding)
+    await rack.pluginsFound()
+    #expect(rack.pluginChoices == .found([]), "a platform that lists none")
+    let alone = RackSession()
+    alone.findPlugins()
+    #expect(!alone.hostsPlugins && alone.pluginChoices == .found([]))
+
+    rack.open(Patch(modules: [], cables: []), name: "Empty")
+    let synth = PluginReference(format: "test", id: "good", name: "Synth", vendor: "Tests")
+    let id = try #require(rack.add("plugin-instrument", plugin: synth))
+    #expect(rack.patch.modules.first { $0.id == id }?.plugin == synth)
+    #expect(rack.patch.cables.contains { $0.to == PortReference(id, "gate") }, "played by the keys")
+    #expect(rack.undoTitle == "Undo Add Synth")
+    await rack.pluginsReady()
+    #expect(rack.plugins[id] == .ready(latency: 0.01))
+    rack.undo()
+    #expect(rack.patch.modules.isEmpty && rack.plugins[id] == nil)
+  }
+
   /// Every save is told, as a document and a name: what a platform keeps elsewhere too.
   @Test func aSaveIsTold() {
     let rack = RackSession()

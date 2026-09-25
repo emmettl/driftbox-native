@@ -190,8 +190,6 @@ public final class Desktop {
       // A name being typed has every key; otherwise the keyboard is an instrument.
       if !interface.key(key) { _ = keys.play(key, on: session) }
       window.takesText = interface.takesText
-    default:
-      break
     }
   }
 

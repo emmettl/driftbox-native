@@ -614,9 +614,11 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    one and loaded to be asked where not; a `plugin` or `plugin-instrument` module that names one
    plays it, stereo, from the rack's notes — the mod wheel, sustain and pitch bend reaching the
    params the plug-in takes them on — with its macros turning its params and its state kept in the
-   patch. All of it compiles on Windows alone for now. Next: the plug-ins installed in the Add
-   menu, their faces, and their own editors in windows of their own; and a module that crashes
-   while it is scanned takes the app with it, so scanning out of process, later.
+   patch. The rack's Add menu lists them, found while the rack is first shown: effects and
+   instruments apart, each by who made it, one chosen added with its module in one step of undo.
+   All of it compiles on Windows alone for now. Next: their faces, and their own editors in
+   windows of their own; and a module that crashes while it is scanned takes the app with it, so
+   scanning out of process, later.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift
