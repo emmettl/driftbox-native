@@ -1,0 +1,6 @@
+// Only Driftbox's C bridge is Swift's: the SDK's C++ headers beside it are for the bridge itself,
+// and for a plug-in built against it.
+module CVST3 {
+  header "CVST3.h"
+  export *
+}

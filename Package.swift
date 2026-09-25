@@ -331,5 +331,44 @@ let package = Package(
         "DriftboxRackSession", "DriftboxSession", "ConformanceSupport",
       ]
     ),
-  ]
+  ],
+  cxxLanguageStandard: .cxx17
 )
+
+// VST 3 plug-ins, on Steinberg's SDK (MIT), vendored at 3.8.1 build 84 as much as is used: `VST3SDK`
+// the SDK, a host's part of it; `CVST3` Driftbox's bridge to it in C, for Swift; and
+// `DriftboxVST3Fixture`, a plug-in built from it for the tests to load as a real one is loaded, a
+// library of its own. Driftbox hosts plug-ins on Windows alone for now, so all of it compiles there
+// alone: the SDK's sources sit in an `sdk` folder the build leaves out, and each is compiled through
+// a wrapper in `windows` that includes it only there. Apart from the rest, which the manifest's type
+// checker cannot take in one go.
+package.products.append(
+  .library(name: "DriftboxVST3Fixture", type: .dynamic, targets: ["DriftboxVST3Fixture"]))
+package.targets += [
+  .target(
+    name: "VST3SDK",
+    exclude: ["LICENSE-VST3SDK.txt", "sdk"],
+    // Where the SDK's own sources look for the headers they expect beside them.
+    cxxSettings: [
+      "base/source", "pluginterfaces/base", "public.sdk/source/common", "public.sdk/source/vst",
+      "public.sdk/source/vst/hosting", "public.sdk/source/vst/utility",
+    ].map { .headerSearchPath("include/\($0)") } + [.define("RELEASE", to: "1")],
+    // On Windows its base classes use a few of user32's and ole32's calls, and the C runtime's old
+    // names for its wide-string comparisons.
+    linkerSettings: ["user32", "ole32", "oldnames"].map { .linkedLibrary($0, .when(platforms: [.windows])) }),
+  .target(name: "CVST3", dependencies: ["VST3SDK"], cxxSettings: [.define("RELEASE", to: "1")]),
+  .target(
+    name: "DriftboxVST3Fixture", dependencies: ["VST3SDK"], path: "Tests/DriftboxVST3Fixture",
+    exclude: ["LICENSE-VST3SDK.txt", "sdk"],
+    // It compiles the SDK's edit controller itself, for the effect whose controller is its own class;
+    // the single-component synth would otherwise compile a second copy into itself.
+    cxxSettings: [
+      .headerSearchPath("sdk"), .define("RELEASE", to: "1"), .define("PROJECT_INCLUDES_VSTEDITCONTROLLER"),
+    ],
+    // A library product is linked by the Swift driver, which registers it with the Swift runtime even
+    // with no Swift in it: the test plug-in loads beside the tests, where the runtime is.
+    linkerSettings: [.linkedLibrary("swiftCore", .when(platforms: [.windows]))]),
+  .testTarget(
+    name: "DriftboxVST3Tests", dependencies: [.target(name: "CVST3", condition: .when(platforms: [.windows]))]
+  ),
+]

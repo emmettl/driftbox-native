@@ -50,6 +50,8 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxTextWindows` | That on DirectWrite: type on Windows. |
 | `Sources/DriftboxTextAndroid` | That on Android's own text stack, through the app's Java: type on Android. |
 | `Sources/CDirectWrite` | The part of DirectWrite that is called, declared in C, since its own headers are C++. Declarations only. |
+| `Sources/VST3SDK` | Steinberg's VST 3 SDK, as much of it as a host uses, vendored at 3.8.1 under its own MIT licence. Compiled on Windows alone for now. |
+| `Sources/CVST3` | Driftbox's bridge to VST 3 plug-ins, in C for Swift: a plug-in found, made, played, its params set and its state kept. Windows only for now; `Tests/DriftboxVST3Fixture` is a plug-in of the project's own to hold it to. |
 | `Sources/DriftboxCanvas` | A 2D canvas on the GPU layer: Canvas2D's shapes, state, type and blends, the same on every platform. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxInterface` | The controls, drawn on the canvas in points over the scene: the transport bar and the step grid, laid out and hit from one layout, on `Session`. |
@@ -846,3 +848,7 @@ they ship and cannot be deployed back to an older one.
 
 [MIT](LICENSE), as the web app is. Use it, embed it, sell what you build with it: the engine is
 meant to be picked up, and that is the licence that gets least in the way of doing so.
+
+Steinberg's VST 3 SDK, in `Sources/VST3SDK` and `Tests/DriftboxVST3Fixture`, is theirs, under
+[its own MIT licence](Sources/VST3SDK/LICENSE-VST3SDK.txt). VST is a trademark of Steinberg Media
+Technologies GmbH.

@@ -1,0 +1,5 @@
+// Nothing here is Swift's: the SDK's headers beside this are C++, for the targets built on it.
+module VST3SDK {
+  header "VST3SDK.h"
+  export *
+}
