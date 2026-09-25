@@ -586,7 +586,9 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift
    installed: the program, its resource bundle, and the runtime DLLs it loads, found from their
-   import tables. Left: signing, winget, and an installer to register the type. Songs are already
+   import tables. `scripts/windows-installer.mjs` makes an installer of it with Inno Setup: for the
+   person installing unless they choose everyone, a Start menu entry, `.driftbox` made Driftbox's
+   if they want, and all of it taken away on uninstalling. Left: signing, and winget. Songs are already
    `.driftbox` — the web app's documents byte for byte, under a name
    Windows can associate without claiming every `.json`. `SongFile` in `DriftboxDocument` holds
    the rule for every platform: saved as `.driftbox`; `.song.json` and the web's `.json` still
