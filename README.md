@@ -466,6 +466,7 @@ happened.
 ```bash
 scripts/android-app.sh                  # build and install; open it for Pulse, playing acid
 scripts/android-app.sh build            # build only, with no phone: what CI does
+scripts/android-app.sh bundle           # and an App Bundle beside it, for Google Play
 adb shell am start -n app.driftbox/.Main --es song smallhours --es scene hothouse
 scripts/android-app.sh midi-loopback    # test the MIDI ports against the app's own loopback
 scripts/android-app.sh gpu              # or the GPU contract on the phone's GPU
@@ -782,7 +783,9 @@ script puts a copy in both.
 
 A release is Developer ID-signed and notarised on this Mac by `scripts/release.py`, which leaves a
 stapled app, zipped, with its checksum and a manifest, in `dist/` for review, and tags, uploads and
-publishes nothing. [docs/RELEASING.md](docs/RELEASING.md) has the one-time setup and the steps.
+publishes nothing. `scripts/android-release.py` does the same for Android: an APK and an App Bundle
+signed with the upload key. [docs/RELEASING.md](docs/RELEASING.md) has the one-time setup and the
+steps for both.
 
 ### Visuals
 

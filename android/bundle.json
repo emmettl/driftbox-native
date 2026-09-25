@@ -1,0 +1,12 @@
+{
+  "optimizations": {
+    "uncompressNativeLibraries": { "enabled": true },
+    "splitsConfig": {
+      "splitDimension": [
+        { "value": "ABI" },
+        { "value": "SCREEN_DENSITY", "negate": true },
+        { "value": "LANGUAGE", "negate": true }
+      ]
+    }
+  }
+}
