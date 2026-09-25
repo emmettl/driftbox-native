@@ -62,8 +62,19 @@ public final class RackInterface {
   }
 
   public var stage: RackStage {
-    RackStage(rack: rack, size: size, scroll: scroll, pages: pages, touch: touch, zoom: zoom, pan: pan)
+    RackStage(
+      rack: rack, size: size, scroll: scroll, pages: pages, touch: touch, zoom: zoom, pan: pan,
+      keys: showsKeys)
   }
+
+  /// Whether the keys show, where a finger has said; otherwise whether the patch has a MIDI module
+  /// for them to play.
+  public var keysShown: Bool?
+  public var showsKeys: Bool {
+    touch && (keysShown ?? rack.patch.modules.contains { $0.type == "midi" })
+  }
+  /// The note each finger on the keys is playing, by the finger; nil for one slid off them.
+  private var keyFingers: [Int: Int?] = [:]
 
   // MARK: - Fingers
 
@@ -104,6 +115,10 @@ public final class RackInterface {
   /// A finger, as a touchscreen has it: two zoom, one on nothing but panels pans, and one on
   /// anything else is a press, as a mouse's is.
   private func finger(_ event: PointerEvent) {
+    if keyFingers[event.id] != nil || (event.phase == .began && onKeys(event.location)) {
+      playKeys(event)
+      return
+    }
     switch event.phase {
     case .began:
       fingers[event.id] = event.location
@@ -536,6 +551,10 @@ public final class RackInterface {
     case .run: rack.toggleRunning()
     case .flip: rack.flip()
     case .add: menuRequest = (addMenu(), point)
+    case .keys:
+      if showsKeys { releaseKeyFingers() }
+      keysShown = !showsKeys
+    case .octave(let by): octave = max(-2, min(3, octave + by))
     case .patches:
       if let chip = stage.chips.first(where: { $0.target == .patches }) {
         menuRequest = (patchMenu(), SIMD2(chip.frame.x, chip.frame.maxY))
@@ -616,6 +635,38 @@ public final class RackInterface {
   public func pointerLeft() { hover = nil }
 
   // MARK: - The keys
+
+  /// Whether `point` is on the keys themselves, rather than their row.
+  private func onKeys(_ point: SIMD2<Float>) -> Bool {
+    guard let keys = stage.keyboard, keys.frame.contains(point) else { return false }
+    return point.y >= keys.frame.y + RackKeys.rowHeight
+  }
+
+  /// A finger on the keys: a note from where it lands, the next as it slides onto another key, and
+  /// none as it slides off; let go of as it lifts.
+  private func playKeys(_ event: PointerEvent) {
+    let found = stage.keyboard?.key(at: event.location)
+    let note = found.map { RackKeyboard.root + $0.key.note + octave * 12 }
+    switch event.phase {
+    case .began, .moved:
+      let playing = keyFingers[event.id] ?? nil
+      guard note != playing else { return }
+      if let playing { rack.noteUp(playing) }
+      if let note, let found { rack.noteDown(note, velocity: found.velocity) }
+      keyFingers[event.id] = .some(note)
+    case .ended, .cancelled:
+      if let playing = keyFingers.removeValue(forKey: event.id), let playing { rack.noteUp(playing) }
+    }
+  }
+
+  /// Every finger on the keys lifted, as when the keys are put away.
+  private func releaseKeyFingers() {
+    for case let note? in keyFingers.values { rack.noteUp(note) }
+    keyFingers = [:]
+  }
+
+  /// The notes the keys have down, for the keys to light.
+  var keysDown: Set<Int> { Set(keyFingers.values.compactMap { $0 }) }
 
   /// The keys, as the Mac's rack window plays them: two octaves from `z` and `q`, with `,` and `.`
   /// for the octave. False for any other key, and for anything held with more than Shift.
@@ -782,6 +833,49 @@ public final class RackInterface {
     canvas.restore()
     drawHeader(stage, on: canvas)
     if let routing = stage.routing { drawRouting(routing, hovered: hover, on: canvas) }
+    if let chip = stage.keysChip {
+      Draw.chip(
+        chip.frame, label: chip.label, isOn: false, hovered: false, down: pressed?.target == .keys, on: canvas
+      )
+    }
+    if let keys = stage.keyboard { drawKeys(keys, on: canvas) }
+  }
+
+  /// The keys: a panel across the foot, its row of chips and the octave, and the keys, lit where a
+  /// finger or the rack's own notes have them down.
+  private func drawKeys(_ keys: RackKeys, on canvas: Canvas) {
+    Draw.panel(keys.frame, on: canvas)
+    Draw.chip(
+      keys.down, label: "‹", isOn: false, hovered: false, down: pressed?.target == .octave(by: -1), on: canvas
+    )
+    Draw.chip(
+      keys.up, label: "›", isOn: false, hovered: false, down: pressed?.target == .octave(by: 1), on: canvas)
+    Draw.chip(
+      keys.hide, label: "HIDE", isOn: false, hovered: false, down: pressed?.target == .keys, on: canvas)
+    canvas.align = .center
+    canvas.font = Theme.mono(13, weight: 600)
+    canvas.fill = Theme.ink
+    let base = RackKeyboard.root + octave * 12
+    canvas.fillText(
+      "C\(base / 12 - 1)", keys.octave.x + keys.octave.width / 2, keys.octave.y + keys.octave.height / 2 + 5)
+    let lit = keysDown.union(rack.sounding)
+    for key in keys.keys where !key.black { drawKey(key, lit: lit.contains(base + key.note), on: canvas) }
+    for key in keys.keys where key.black { drawKey(key, lit: lit.contains(base + key.note), on: canvas) }
+  }
+
+  private func drawKey(_ key: RackKeys.Key, lit: Bool, on canvas: Canvas) {
+    let frame = key.frame
+    canvas.fill = lit ? Theme.nine : key.black ? Theme.ground : Theme.ink.faded(0.9)
+    canvas.fillRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: key.black ? 4 : 6)
+    canvas.stroke = Theme.white(0.12)
+    canvas.lineWidth = 1
+    canvas.strokeRoundedRect(frame.x, frame.y, frame.width, frame.height, radius: key.black ? 4 : 6)
+    guard !key.black, key.note % 12 == 0 else { return }
+    canvas.align = .center
+    canvas.font = Theme.mono(10, weight: 500)
+    canvas.fill = Theme.ground.faded(0.7)
+    canvas.fillText(
+      "C\((RackKeyboard.root + key.note + octave * 12) / 12 - 1)", frame.x + frame.width / 2, frame.maxY - 10)
   }
 
   private func drawHeader(_ stage: RackStage, on canvas: Canvas) {

@@ -30,6 +30,10 @@ public enum RackTarget: Equatable, Sendable {
   case routing(RoutingPart)
   /// On a touchscreen, the patch's name: the patches to open, and the way back to the groovebox.
   case patches
+  /// On a touchscreen, the keys shown or put away.
+  case keys
+  /// The keys' octave, down or up.
+  case octave(by: Int)
 }
 
 /// What a press on a Combinator's routing is on: its close and add buttons, and each routing's
@@ -272,6 +276,10 @@ public struct RackStage {
   public var maxPan: Float = 0
   /// The scale at which the rack's width fits the window, which a zoom multiplies.
   public var fitScale: Float = 1
+  /// On a touchscreen, the keys at the foot of the screen, while they show; and while they do not,
+  /// the chip in the rack's corner that shows them.
+  public var keyboard: RackKeys?
+  public var keysChip: Chip?
 
   /// Under this many points across, a touchscreen's header is a phone's: the patch's name a chip
   /// beside the transport, and no room for what the keys play.
@@ -290,7 +298,7 @@ public struct RackStage {
   /// fingers, `zoom` past fitting the width and panned `pan` points from its left.
   public init(
     rack: RackSession, size: SIMD2<Float>, scroll: Float = 0, pages: [String: Int] = [:], touch: Bool = false,
-    zoom: Float = 1, pan: Float = 0
+    zoom: Float = 1, pan: Float = 0, keys showsKeys: Bool = false
   ) {
     self.size = size
     self.touch = touch
@@ -342,7 +350,15 @@ public struct RackStage {
     let combi = rack.editingRoutes.flatMap { id in rack.patch.modules.first { $0.id == id } }
     let room = combi == nil ? size.x : max(0, size.x - Routing.width)
     let width = Float(RackLayout.width)
-    area = Rect(0, header.maxY + margin, room, max(0, size.y - header.maxY - margin))
+    // The keys, on a touchscreen, take the foot of the screen, and the rack the rest.
+    keyboard = touch && showsKeys ? RackKeys(size: size, margin: margin) : nil
+    let foot = keyboard.map { $0.frame.y - margin } ?? size.y
+    area = Rect(0, header.maxY + margin, room, max(0, foot - header.maxY - margin))
+    if touch, !showsKeys {
+      keysChip = Chip(
+        frame: Rect(area.maxX - margin - 64, area.maxY - margin - 32, 64, 32), label: "KEYS", target: .keys,
+        isOn: false)
+    }
     let beside = Rect(room, area.y, max(0, size.x - room - margin), max(0, size.y - area.y - margin))
     routing = combi.map { Routing(combi: $0, rack: rack, frame: beside) }
     let layout = RackLayout.layout(rack.patch.modules)
@@ -437,6 +453,13 @@ public struct RackStage {
     if let part = routing?.part(at: point) { return .routing(part) }
     if let chip = chips.first(where: { $0.frame.contains(point) }) { return chip.target }
     if tempo.contains(point) { return .tempo }
+    if let keysChip, keysChip.frame.contains(point) { return .keys }
+    if let keyboard, keyboard.frame.contains(point) {
+      if keyboard.down.contains(point) { return .octave(by: -1) }
+      if keyboard.up.contains(point) { return .octave(by: 1) }
+      if keyboard.hide.contains(point) { return .keys }
+      return nil
+    }
     guard area.contains(point) else { return nil }
     let at = design(point)
     guard let face = faces.first(where: { $0.frame.contains(at) }) else { return nil }

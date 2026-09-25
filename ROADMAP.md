@@ -775,9 +775,13 @@ sideways slides the rack and leaves the knob; up or down, it turns it. A control
 finger's reach, 22 points, whatever the zoom, except from a module's title, which is where a finger
 grabs the module. On the back a jack drags a cable as a mouse does, and a bay slides the rack; a
 module is moved from its menu, which a long press opens, as it does on the front. The header is a
-phone's: the name, PLAY, the tempo, the flip and ADD. Left: what the keys play, on a keyboard of
-their own; a sample loaded through Android's picker; the Combinator's routing, which is 300 points
-beside the rack; and a tablet, seen.
+phone's: the name, PLAY, the tempo, the flip and ADD. What the typing keys play on a desktop, a
+touchscreen plays on keys across the foot of the screen, the rack above them: an octave of 46-point
+keys on a phone, and as many as fit on a tablet; a finger a note, so a hand plays a chord, slid from
+key to key, and a key struck lower down struck harder; the octave moved from their row, and the
+keys put away, or shown from a chip in the rack's corner. They show of themselves for a patch with
+a MIDI module to play. Left: a sample loaded through Android's picker; the Combinator's routing,
+which is 300 points beside the rack; and a tablet, seen.
 
 ### What Milestone 5 asks of Milestone 4
 
