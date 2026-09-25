@@ -56,7 +56,8 @@ public struct BassKeyboard {
     // Over the scene above the grid, in the room the layout leaves it there.
     let above = (layout.grid?.y ?? layout.size.y) - Layout.margin - Self.height
     frame = Rect(
-      layout.bar.x + (layout.bar.width - width) / 2, max(strip.maxY + Layout.margin, above), width, Self.height)
+      layout.bar.x + (layout.bar.width - width) / 2, max(strip.maxY + Layout.margin, above), width,
+      Self.height)
 
     let inner = Rect(frame.x + 10, frame.y + 10, width - 20, Self.height - 20)
     let id = pattern.id
