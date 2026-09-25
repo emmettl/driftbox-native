@@ -426,8 +426,14 @@ external displays, performance capture to video.
    The app's MIDI plays it through its MIDI modules, carried off the render thread through a ring,
    and it runs with the app's transport at the app's tempo. Its face is the rack's own: the Mac
    app's rack window on the same session, in the app's window, served by one view controller that
-   is also the unit's factory, as an Audio Unit extension with a face has it. Next: the groovebox's
-   engine beside it.
+   is also the unit's factory, as an Audio Unit extension with a face has it. Beside it in the same
+   extension, `Driftbox: Groovebox`: a `Session` behind the unit, the catalogue's songs its presets,
+   the song its state, kept as it is edited. The app's MIDI plays it as a keyboard on the Mac does,
+   through the port a session hears MIDI by; it runs at the app's tempo, followed and not written
+   into the song, as a MIDI clock is; and its face is the window's editor with the visuals behind it,
+   under a bar standing in for the toolbar and song list an app's window cannot lend it. Both
+   instruments are one `InstrumentAudioUnit` underneath, playing a `RenderSource`, and both follow
+   the app's transport as changes, so their own Play still plays while the app stands still.
 
 ### What the later milestones ask of the first
 

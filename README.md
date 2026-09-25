@@ -28,9 +28,9 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxRack` | The modular rack: the patch compiler, the graph, the modules. **Constrained.** |
 | `Sources/DriftboxDocument` | The song codec, migrations, shareable URLs, the catalogue. |
 | `Sources/DriftboxHost` | The engine and rack hosts, the rings to and from the render thread, the ports every platform's audio and MIDI sits behind, and the mixer every platform's output renders through. |
-| `Sources/DriftboxExtensions` | The rack inside another app: a `RackSession` behind the rack's Audio Unit, made at the app's rate, with its presets, its state, its MIDI and its clock carried in, and its face, the rack window on the same session. |
-| `Sources/DriftboxRackExtension` | The AUv3 app extension's executable, whose entry point is `NSExtensionMain`, and its view controller: the unit's factory and the rack's face. `scripts/bundle-app.sh` makes the `.appex` around it inside the app. |
-| `Sources/DriftboxHostMac` | Core Audio and Core MIDI behind those ports, and Audio Units: the engine and the rack as units, and units hosted in the rack. The host on the Mac. |
+| `Sources/DriftboxExtensions` | The rack and the groovebox inside another app: a `RackSession` and a `Session` behind their Audio Units, made at the app's rate, with their presets, their state, their MIDI and the app's clock carried in, and their faces — the rack window, and the groovebox's editor — on the same sessions. |
+| `Sources/DriftboxAudioUnits` | The AUv3 app extension's executable, whose entry point is `NSExtensionMain`, and its view controller: the factory for the rack's and the groovebox's units, and their faces. `scripts/bundle-app.sh` makes the `.appex` around it inside the app. |
+| `Sources/DriftboxHostMac` | Core Audio and Core MIDI behind those ports, and Audio Units: the engine as a unit for `driftbox-play`, the rack and the groovebox as the extension's instruments, and units hosted in the rack. The host on the Mac. |
 | `Sources/DriftboxHostWindows` | WASAPI and WinMM behind those ports: the host on Windows. |
 | `Sources/CWASAPI` | The Windows audio headers Swift's WinSDK module leaves out. Declarations only. |
 | `Sources/DriftboxHostAndroid` | AAudio and native MIDI behind the same ports: the host on Android. |

@@ -194,15 +194,17 @@ let package = Package(
       ],
       // The rack's patches and module cards are `DriftboxRackSession`'s, as every platform ships them.
       resources: [.copy("Resources/AppIcon.icns")]),
-    // The rack as an AUv3 app extension, for other apps to load. Its entry point is Foundation's
-    // `NSExtensionMain`, not a `main` of its own; `scripts/bundle-app.sh` puts it in the app.
+    // The rack and the groovebox as an AUv3 app extension, for other apps to load. Its entry
+    // point is Foundation's `NSExtensionMain`, not a `main` of its own; `scripts/bundle-app.sh`
+    // puts it in the app.
     .target(
       name: "DriftboxExtensions",
       dependencies: [
-        "DriftboxApp", "DriftboxHostMac", "DriftboxHost", "DriftboxRackSession", "DriftboxDocument",
+        "DriftboxApp", "DriftboxHostMac", "DriftboxHost", "DriftboxRackSession", "DriftboxSession",
+        "DriftboxDocument", "DriftboxSeq",
       ]),
     .executableTarget(
-      name: "DriftboxRackExtension", dependencies: ["DriftboxExtensions", "DriftboxHostMac"],
+      name: "DriftboxAudioUnits", dependencies: ["DriftboxExtensions", "DriftboxHostMac"],
       linkerSettings: [
         .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"], .when(platforms: [.macOS]))
       ]),

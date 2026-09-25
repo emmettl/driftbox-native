@@ -1,11 +1,11 @@
 #!/bin/sh
 # Wraps the release Driftbox executable in a minimal application bundle, so the system treats it
-# as an app: a Dock icon, activation, a bundle identifier. With the rack inside it as an AUv3
-# extension, for other apps to load. Signed ad hoc, for this machine; local use only.
+# as an app: a Dock icon, activation, a bundle identifier. With the rack and the groovebox inside it
+# as an AUv3 extension, for other apps to load. Signed ad hoc, for this machine; local use only.
 set -eu
 cd "$(dirname "$0")/.."
 swift build -c release --scratch-path .build-release --product Driftbox
-swift build -c release --scratch-path .build-release --product DriftboxRackExtension
+swift build -c release --scratch-path .build-release --product DriftboxAudioUnits
 app=.build-release/Driftbox.app
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
@@ -55,12 +55,12 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 
-# The rack as an AUv3 app extension: an Audio Unit that Logic, GarageBand or any other app can load,
-# out of process. SwiftPM builds its executable, whose entry point is NSExtensionMain; the bundle
-# around it is made here, as Xcode would make it.
-ext="$app/Contents/PlugIns/DriftboxRack.appex"
+# The rack and the groovebox as an AUv3 app extension: two instruments that Logic, GarageBand or
+# any other app can load, out of process. SwiftPM builds its executable, whose entry point is
+# NSExtensionMain; the bundle around it is made here, as Xcode would make it.
+ext="$app/Contents/PlugIns/DriftboxAudioUnits.appex"
 mkdir -p "$ext/Contents/MacOS" "$ext/Contents/Resources"
-cp .build-release/release/DriftboxRackExtension "$ext/Contents/MacOS/DriftboxRackExtension"
+cp .build-release/release/DriftboxAudioUnits "$ext/Contents/MacOS/DriftboxAudioUnits"
 for bundle in .build-release/release/DriftboxKit_*.bundle; do
   cp -R "$bundle" "$ext/Contents/Resources/"
 done
@@ -68,28 +68,40 @@ cat > "$ext/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>CFBundleExecutable</key><string>DriftboxRackExtension</string>
-  <key>CFBundleIdentifier</key><string>app.driftbox.native.rack</string>
-  <key>CFBundleName</key><string>Driftbox Rack</string>
+  <key>CFBundleExecutable</key><string>DriftboxAudioUnits</string>
+  <key>CFBundleIdentifier</key><string>app.driftbox.native.audiounits</string>
+  <key>CFBundleName</key><string>Driftbox Audio Units</string>
   <key>CFBundlePackageType</key><string>XPC!</string>
   <key>CFBundleShortVersionString</key><string>0.1</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSExtension</key><dict>
-    <!-- An Audio Unit with a face: the rack's own, in the app's window. -->
+    <!-- Audio Units with faces: each instrument's own, in the app's window. -->
     <key>NSExtensionPointIdentifier</key><string>com.apple.AudioUnit-UI</string>
-    <!-- RackViewController, the face and the factory both, by the Objective-C name it gives itself. -->
-    <key>NSExtensionPrincipalClass</key><string>DriftboxRackViewController</string>
+    <!-- AudioUnitViewController, the face and the factory both, by the Objective-C name it gives
+         itself; it makes whichever instrument the subtype asks for. -->
+    <key>NSExtensionPrincipalClass</key><string>DriftboxAudioUnitViewController</string>
     <key>NSExtensionAttributes</key><dict>
       <key>AudioComponents</key><array><dict>
         <key>description</key><string>Driftbox Rack</string>
-        <key>factoryFunction</key><string>DriftboxRackViewController</string>
+        <key>factoryFunction</key><string>DriftboxAudioUnitViewController</string>
         <!-- RackAudioUnit.componentDescription: an instrument, 'drck' by 'Drfb'. -->
         <key>manufacturer</key><string>Drfb</string>
         <key>name</key><string>Driftbox: Rack</string>
         <key>sandboxSafe</key><true/>
         <key>subtype</key><string>drck</string>
         <key>tags</key><array><string>Synthesizer</string></array>
+        <key>type</key><string>aumu</string>
+        <key>version</key><integer>1</integer>
+      </dict><dict>
+        <key>description</key><string>Driftbox Groovebox</string>
+        <key>factoryFunction</key><string>DriftboxAudioUnitViewController</string>
+        <!-- GrooveboxAudioUnit.componentDescription: an instrument, 'drgb' by 'Drfb'. -->
+        <key>manufacturer</key><string>Drfb</string>
+        <key>name</key><string>Driftbox: Groovebox</string>
+        <key>sandboxSafe</key><true/>
+        <key>subtype</key><string>drgb</string>
+        <key>tags</key><array><string>Drums</string><string>Synthesizer</string></array>
         <key>type</key><string>aumu</string>
         <key>version</key><integer>1</integer>
       </dict></array>

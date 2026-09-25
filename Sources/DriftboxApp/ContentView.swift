@@ -31,24 +31,12 @@
           Backdrop(
             stage: stage, running: player.showsVisuals || stage.performing, performing: stage.performing)
           if let song = player.song {
-            VStack(spacing: 12) {
-              SongStrip(player: player, song: song)
-              HStack(alignment: .top, spacing: 12) {
-                VStack(spacing: 0) {
-                  PatternBar(player: player, song: song)
-                  Rectangle().fill(Theme.edge).frame(height: 1)
-                  Sequencer(player: player, song: song)
-                }
-                .panel()
-                Inspector(player: player, song: song)
-                  .frame(width: 292)
-              }
-            }
-            .padding(14)
-            // Put away, not taken out: coming back to the editor finds it where it was.
-            .opacity(stage.performing ? 0 : 1)
-            .scaleEffect(stage.performing ? 0.97 : 1)
-            .allowsHitTesting(!stage.performing)
+            SongEditor(player: player, song: song)
+              .padding(14)
+              // Put away, not taken out: coming back to the editor finds it where it was.
+              .opacity(stage.performing ? 0 : 1)
+              .scaleEffect(stage.performing ? 0.97 : 1)
+              .allowsHitTesting(!stage.performing)
             if stage.performing {
               VibesStage(player: player, stage: stage)
                 .transition(.opacity)
@@ -120,6 +108,29 @@
       )
       .animation(.spring(response: 0.35, dampingFraction: 0.8), value: stage.exporting == nil)
       .animation(.spring(response: 0.35, dampingFraction: 0.8), value: player.isRecording)
+    }
+  }
+
+  /// The song, to edit: its strip, the pattern bar over the grid, and the inspector. The window's,
+  /// and the groovebox's face inside another app.
+  struct SongEditor: View {
+    let player: Session
+    let song: Song
+
+    var body: some View {
+      VStack(spacing: 12) {
+        SongStrip(player: player, song: song)
+        HStack(alignment: .top, spacing: 12) {
+          VStack(spacing: 0) {
+            PatternBar(player: player, song: song)
+            Rectangle().fill(Theme.edge).frame(height: 1)
+            Sequencer(player: player, song: song)
+          }
+          .panel()
+          Inspector(player: player, song: song)
+            .frame(width: 292)
+        }
+      }
     }
   }
 
@@ -363,6 +374,8 @@
   /// are performance decisions and so belong beside the tempo rather than in Settings.
   struct TransportDisplay: View {
     let player: Session
+    /// The two clock switches, which a groovebox inside another app has no cables for.
+    var clocks = true
     // The clock is remembered between launches, so this writes the preference and the window
     // mirrors it onto the player; the menu's own switch writes the same one.
     @AppStorage(Defaults.sendsClock) private var sendsClock = false
@@ -388,7 +401,7 @@
               Text(String(format: "%.1f", followed)).font(Theme.mono(14, .semibold).monospacedDigit())
                 .foregroundStyle(Theme.three)
             }
-            .help("Following an external MIDI clock")
+            .help("Following a tempo kept elsewhere: a MIDI clock, or the app Driftbox is playing in")
           } else {
             DragNumber(
               label: "BPM", value: song.bpm, range: 20...300, perPoint: 0.5,
@@ -399,22 +412,28 @@
             label: "Swing", value: song.swing * 100, range: 0...100, perPoint: 0.5,
             format: { "\(Int($0.rounded()))" }
           ) { value in player.edit("Set Swing") { $0.swing = value.rounded() / 100 } }
-          Rectangle().fill(Theme.edge).frame(width: 1, height: 22)
-          HStack(spacing: 4) {
-            Button("sync") { player.followsClock.toggle() }
-              .buttonStyle(.chip(on: player.followsClock, tint: Theme.three, size: 10))
-              .help("Follow an external MIDI clock: tempo, start, stop and position")
-            // Where the clock goes is a setting, made once; whether it is going is a
-            // performance decision, made often, and that is the only part that is here.
-            Button("clock") { sendsClock.toggle() }
-              .buttonStyle(.chip(on: sendsClock, tint: Theme.nine, size: 10))
-              .help("Send MIDI clock out. Where it goes is in Settings.")
+          if clocks {
+            Rectangle().fill(Theme.edge).frame(width: 1, height: 22)
+            clockSwitches
           }
         }
       }
       .padding(.horizontal, 14)
       .frame(height: 38)
       .fixedSize()
+    }
+
+    private var clockSwitches: some View {
+      HStack(spacing: 4) {
+        Button("sync") { player.followsClock.toggle() }
+          .buttonStyle(.chip(on: player.followsClock, tint: Theme.three, size: 10))
+          .help("Follow an external MIDI clock: tempo, start, stop and position")
+        // Where the clock goes is a setting, made once; whether it is going is a
+        // performance decision, made often, and that is the only part that is here.
+        Button("clock") { sendsClock.toggle() }
+          .buttonStyle(.chip(on: sendsClock, tint: Theme.nine, size: 10))
+          .help("Send MIDI clock out. Where it goes is in Settings.")
+      }
     }
   }
 

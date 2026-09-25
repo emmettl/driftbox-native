@@ -327,15 +327,13 @@ public final class Session {
     }
   }
 
-  /// Run the song at `bpm` without writing it in: the compiled song is remade at that tempo and
-  /// taken up at the same step.
-  private func follow(bpm: Double) {
+  /// Run the song at `bpm` without writing it in, as a clock followed does, or an app the groovebox
+  /// plays inside: the compiled song is remade at that tempo and taken up at the same step.
+  public func follow(bpm: Double) {
     guard let song, abs((followedBPM ?? songBPM) - bpm) >= 0.05 else { return }
     let step = currentStep
     followedBPM = bpm
-    var retimed = song
-    retimed.bpm = bpm
-    load(retimed)
+    load(song)
     seek(toStep: step)
     if isPlaying { startEngine() }
   }
@@ -925,9 +923,13 @@ public final class Session {
     recording?.events.append((host.engineFrame.load(ordering: .relaxed), .command(command)))
   }
 
+  /// Every song the engine is given comes through here, so one run at a tempo kept elsewhere — a
+  /// clock followed, an app the groovebox plays inside — stays at it through an edit or another song.
   private func load(_ song: Song) {
-    host.load(song)
-    recording?.events.append((host.engineFrame.load(ordering: .relaxed), .song(song)))
+    var running = song
+    if let bpm = followedBPM { running.bpm = bpm }
+    host.load(running)
+    recording?.events.append((host.engineFrame.load(ordering: .relaxed), .song(running)))
   }
 
   /// The performance being recorded, while one is.
