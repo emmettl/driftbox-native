@@ -62,6 +62,7 @@ let package = Package(
     .systemLibrary(name: "CAAudio"),
     .systemLibrary(name: "CAMidi"),
     .systemLibrary(name: "CLooper"),
+    .systemLibrary(name: "CMedia"),
     .target(
       name: "DriftboxHostAndroid",
       dependencies: [
@@ -78,6 +79,7 @@ let package = Package(
         "DriftboxGPU", "DriftboxGPUGLES", "DriftboxScenes", "DriftboxText", "DriftboxTextAndroid",
         .target(name: "CAMidi", condition: .when(platforms: [.android])),
         .target(name: "CGLES", condition: .when(platforms: [.android])),
+        .target(name: "CMedia", condition: .when(platforms: [.android])),
       ]),
     // What the scenes ask of a GPU, and the backends that answer it. The shaders are GLSL in
     // `shaders/`, made into every backend's language by `scripts/shaders.mjs` and checked in.

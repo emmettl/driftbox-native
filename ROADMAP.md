@@ -781,16 +781,19 @@ keys on a phone, and as many as fit on a tablet; a finger a note, so a hand play
 key to key, and a key struck lower down struck harder; the octave moved from their row, and the
 keys put away, or shown from a chip in the rack's corner. They show of themselves for a patch with
 a MIDI module to play. A module that holds recordings — a Slice Lab's sample, a Key Atlas's set, an
-Audio Track's take — asks for them with Android's own picker, one or several, offering WAV files,
-which is what the rack reads there; Java copies what is chosen into the app's files, and Swift
-loads it. That found the main actor's own work never running on Android: its queue is
+Audio Track's take — asks for them with Android's own picker, one or several, offering any audio;
+Java copies what is chosen into the app's files, and Swift loads it: WAV with the rack's own
+reader, as everywhere, and anything else — MP3, AAC, FLAC, Ogg — with the NDK's media extractor
+and codecs, as the Mac reads through Core Audio. The phone's rack check holds them to it: a WAV
+read through the codecs is the WAV reader's sample for sample, and two tones the phone's own
+encoder makes AAC of come back at their pitch. That found the main actor's own work never running on Android: its queue is
 libdispatch's main queue, which nothing on Java's main thread drained, so a `Task` on it — a sample
 loading — waited for ever. Its file descriptor is given to the main thread's looper now, which
 drains it between Java's own messages. The Combinator's routing, 300 points beside the rack on a
 desktop, is a sheet across the foot of a phone, over where the keys were, the rack above it; its
 pickers and buttons are 32 points tall, and a route's MIN and MAX are dragged up and down across
-the target's range, as a knob is, rather than typed. A tablet keeps it beside the rack. Left:
-compressed recordings, through Android's own media codecs; and a tablet, seen.
+the target's range, as a knob is, rather than typed. A tablet keeps it beside the rack. Left: a
+tablet, seen; and an empty sampler's "Drop audio here", which a phone cannot.
 
 ### What Milestone 5 asks of Milestone 4
 

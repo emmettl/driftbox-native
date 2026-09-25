@@ -160,6 +160,8 @@ public final class RackSession {
   @ObservationIgnored private let audio: (any AudioRouting)?
   @ObservationIgnored private let pluginHost: (any RackPluginHosting)?
   @ObservationIgnored private let decoder: any SampleDecoding
+  /// What a module's recordings can be chosen as here, as the decoder says.
+  public var readable: String { decoder.readable }
   /// A keyboard for each MIDI channel notes arrive on — the typing keys are channel 1 — so two
   /// controllers on two channels do not steal each other's voices.
   @ObservationIgnored private var keyboards: [Int: RackKeyboard] = [:]

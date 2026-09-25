@@ -32,6 +32,13 @@ public protocol SampleDecoding: Sendable {
   /// device runs at, so a file loaded there plays sharp on a 48kHz device; here the rack's rate
   /// is known and fixed.)
   func decode(_ url: URL, sampleRate: Double) throws -> [[Float]]
+
+  /// What it reads, as a prompt to choose a file says: "a WAV file", unless it reads more.
+  var readable: String { get }
+}
+
+extension SampleDecoding {
+  public var readable: String { "a WAV file" }
 }
 
 /// The arithmetic of loading a sample: the reference's `sample.ts`, held to its tests.

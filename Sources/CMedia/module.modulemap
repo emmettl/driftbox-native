@@ -1,0 +1,5 @@
+module CMedia [system] {
+  header "CMedia.h"
+  link "mediandk"
+  export *
+}

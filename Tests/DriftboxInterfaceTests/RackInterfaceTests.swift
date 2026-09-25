@@ -610,6 +610,8 @@ struct RackInterfaceTests {
     #expect(face.name == "Slice Lab" && face.words == "empty" && face.light == false)
     let prompt = try #require(face.buttons.first { if case .prompt = $0.style { true } else { false } })
     #expect(prompt.frame == face.screen)
+    // What the rack's decoder reads, which here is the WAV reader every platform has.
+    #expect(prompt.style == .prompt(detail: "or choose a WAV file"))
     Self.press(rack, Self.window(stage, Self.centre(prompt.frame)))
     #expect(rack.takeFileRequest() == "m" && rack.takeFileRequest() == nil)
     #expect(!rack.takesSeveral("m"))
