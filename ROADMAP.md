@@ -206,7 +206,9 @@ gone native at all.
    the scene can be chosen at last, from View ▸ Scene or by cycling through them, where before
    the app only ever showed the one the song named.
 
-   Left: the 303's step entry from the keyboard; automation recording; and more
+   Left: the 303's step entry from the keyboard; automation recording, which `Session` now does —
+   `turn` and `endTurn`, and `recordsAutomation` armed, as the Windows app's AUTO arms it — for the
+   Mac's knobs to use; and more
    than one song open at once, which is deliberately not done. It is not a scene change: the
    player owns the audio engine, the MIDI ports and the clock, and two of them would be two
    engines fighting over one output and two sources both called Driftbox Clock. The honest
@@ -534,7 +536,11 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    right, turned by dragging, on arcs the canvas draws. The song is a strip of its sections to
    play from, with the loop bracketed over it, and the grid is headed by its patterns, to follow
    or choose or add to. FX puts the song's effects in the voice panel's place, in their groups.
-   The tempo and the swing are numbers dragged in the transport, as a data wheel sets them. The
+   The tempo and the swing are numbers dragged in the transport, as a data wheel sets them. A knob
+   is heard as it turns, one step of undo however far it went, and AUTO in the transport (or
+   Transport ▸ Record Automation) arms recording: a knob turned while the song plays is written
+   into the song's automation at the step it is on, as the reference's `● auto` does, and plays
+   back so. The
    secondary button gives a lane, a 303 line, a section or a pattern its menu, as Windows shows
    one: turning, transposing, clearing, copying, loop lengths, repeats, moving and removing.
    A section's menu gives each machine a pattern of its own there, dotted on the strip; a pattern

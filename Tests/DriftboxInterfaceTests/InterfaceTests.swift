@@ -68,7 +68,7 @@ struct InterfaceTests {
     interface.size = SIMD2(800, 600)
     let layout = interface.layout
     #expect(layout.grid == nil)
-    #expect(layout.chips.map(\.label) == ["PLAY", "TOP", "FX", "CLICK", "LOOP"])
+    #expect(layout.chips.map(\.label) == ["PLAY", "TOP", "AUTO", "FX", "CLICK", "LOOP"])
     #expect(layout.panels == [layout.bar])
     #expect(layout.bar.maxX == 788, "the window's width, less its margins")
   }
@@ -172,6 +172,13 @@ struct InterfaceTests {
     Self.click(interface, Self.centre(try #require(chip("LOOP")).frame))
     #expect(interface.session.loop == Session.LoopRange(start: 0, bars: 1))
     #expect(chip("LOOP")?.isOn == true)
+    Self.click(interface, Self.centre(try #require(chip("AUTO")).frame))
+    #expect(interface.session.recordsAutomation)
+    #expect(chip("AUTO")?.isOn == true)
+    interface.session.edit {
+      $0 = $0.settingAutomationPoint(AutomationTarget.swing, bar: 0, index: 0, value: 0.2)
+    }
+    #expect(chip("AUTO 1") != nil, "with how many lanes the song has")
   }
 
   /// The song with one 303 line, or two, silent.
@@ -342,6 +349,7 @@ struct InterfaceTests {
     let turned = min(1, from + 0.1)
     #expect(abs((interface.turning?.value ?? -1) - turned) < 1e-6, "a tenth of the way, for seventeen points")
     #expect(!session.canUndo, "not yet")
+    #expect(abs((session.song?.kit.params["909.bd"]?.tune ?? -1) - turned) < 1e-6, "heard as it turns")
     #expect(interface.pointer(PointerEvent(phase: .ended, location: at - SIMD2(0, 17))))
     #expect(interface.turning == nil)
     #expect(abs((session.song?.kit.params["909.bd"]?.tune ?? -1) - turned) < 1e-6)
