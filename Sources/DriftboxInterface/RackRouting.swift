@@ -12,6 +12,9 @@ extension RackStage {
   public struct Routing {
     public static let width: Float = 300
     static let rowHeight: Float = 114
+    /// For fingers: every part a finger's height, and the row taller for them.
+    static let touchRowHeight: Float = 146
+    static let touchHeight: Float = 32
 
     /// One routing: where it is among the patch's routings, which is what edits it, and among
     /// this Combinator's; and where its parts are.
@@ -34,37 +37,63 @@ extension RackStage {
     public var rows: [Row]
     /// Routings there was no room for.
     public var hidden: Int
+    /// For fingers: parts a finger's height, and the ends dragged rather than typed.
+    public var touch: Bool
+    /// Across the foot of the screen rather than down the right of it: a phone's.
+    public var sheet: Bool
 
     @MainActor
-    init(combi: PatchModule, rack: RackSession, frame: Rect) {
+    init(combi: PatchModule, rack: RackSession, frame: Rect, touch: Bool = false, sheet: Bool = false) {
       self.combi = combi
       self.frame = frame
+      self.touch = touch
+      self.sheet = sheet
       let x = frame.x + 14
       let width = max(0, frame.width - 28)
-      close = Rect(frame.maxX - 14 - 18, frame.y + 10, 18, 18)
-      let routes = rack.patch.modulation.indices.filter { rack.patch.modulation[$0].from.module == combi.id }
+      let tall = touch ? Self.touchHeight : 20
+      let button: Float = touch ? Self.touchHeight : 18
+      let rowHeight = touch ? Self.touchRowHeight : Self.rowHeight
+      close = Rect(frame.maxX - 14 - button, frame.y + (touch ? 6 : 10), button, button)
+      let routes = Self.routes(of: combi, in: rack)
       // Nothing routed, and a word on what a routing is in its place.
-      var y = frame.y + 40 + (routes.isEmpty ? 56 : 0)
+      var y = frame.y + (touch ? 48 : 40) + (routes.isEmpty ? 56 : 0)
       rows = []
       hidden = 0
       for (number, index) in routes.enumerated() {
-        guard y + Self.rowHeight + 70 <= frame.maxY else {
+        guard y + rowHeight + 70 <= frame.maxY else {
           hidden = routes.count - number
           break
         }
-        let row = Rect(x, y, width, Self.rowHeight)
+        let row = Rect(x, y, width, rowHeight)
         let inner = row.x + 30
-        let source = Rect(inner, row.y + 10, 92, 20)
-        let remove = Rect(row.maxX - 10 - 18, row.y + 11, 18, 18)
+        let source = Rect(inner, row.y + 10, touch ? 110 : 92, tall)
+        let remove = Rect(row.maxX - 10 - button, row.y + (touch ? 10 : 11), button, button)
+        let knobY = row.y + (touch ? 54 : 40)
+        let endY = row.y + (touch ? 104 : 82)
+        let end: Float = touch ? 96 : 76
         rows.append(
           Row(
             index: index, number: number + 1, frame: row, source: source,
-            module: Rect(source.maxX + 22, row.y + 10, max(40, remove.x - 8 - source.maxX - 22), 20),
-            knob: Rect(inner, row.y + 40, min(180, row.maxX - 10 - inner), 20),
-            min: Rect(inner, row.y + 82, 76, 20), max: Rect(inner + 86, row.y + 82, 76, 20), remove: remove))
-        y += Self.rowHeight + 10
+            module: Rect(source.maxX + 22, row.y + 10, max(40, remove.x - 8 - source.maxX - 22), tall),
+            knob: Rect(inner, knobY, min(touch ? 220 : 180, row.maxX - 10 - inner), tall),
+            min: Rect(inner, endY, end, tall), max: Rect(inner + end + 10, endY, end, tall), remove: remove))
+        y += rowHeight + 10
       }
-      add = Rect(x, y, 112, 20)
+      add = Rect(x, y, touch ? 150 : 112, touch ? 36 : 20)
+    }
+
+    /// The patch's routings from `combi`, by where they are among them all.
+    @MainActor
+    static func routes(of combi: PatchModule, in rack: RackSession) -> [Int] {
+      rack.patch.modulation.indices.filter { rack.patch.modulation[$0].from.module == combi.id }
+    }
+
+    /// How tall a phone's sheet for `combi` wants to be, to show every routing, its add button and
+    /// its word on them.
+    @MainActor
+    static func sheetHeight(for combi: PatchModule, in rack: RackSession) -> Float {
+      let count = routes(of: combi, in: rack).count
+      return 48 + (count == 0 ? 56 : 0) + Float(count) * (touchRowHeight + 10) + 90
     }
 
     func part(at point: SIMD2<Float>) -> RoutingPart? {
@@ -214,13 +243,17 @@ extension RackInterface {
 
   // MARK: Drawing
 
-  /// The routing, over the right of the window, in its points.
+  /// The routing, over the right of the window, or a phone's sheet across its foot, in its points.
   func drawRouting(_ routing: RackStage.Routing, hovered: SIMD2<Float>?, on canvas: Canvas) {
     let frame = routing.frame
-    canvas.fill = Theme.ground
-    canvas.fillRect(frame.x, frame.y, frame.width, frame.height)
-    canvas.fill = Theme.edge
-    canvas.fillRect(frame.x, frame.y, 1, frame.height)
+    if routing.sheet {
+      Draw.panel(frame, on: canvas)
+    } else {
+      canvas.fill = Theme.ground
+      canvas.fillRect(frame.x, frame.y, frame.width, frame.height)
+      canvas.fill = Theme.edge
+      canvas.fillRect(frame.x, frame.y, 1, frame.height)
+    }
     let x = frame.x + 14
     canvas.align = .left
     canvas.font = Theme.mono(11, weight: 600)
@@ -256,7 +289,7 @@ extension RackInterface {
     Draw.chip(
       Rect(x, y, routing.add.width, routing.add.height), label: "Add Routing", isOn: enabled,
       hovered: enabled && (hovered.map(routing.add.contains) ?? false), down: false, tint: Theme.nine,
-      size: 9,
+      size: routing.touch ? 11 : 9,
       on: canvas)
     canvas.align = .left
     canvas.font = Theme.mono(8.5)
@@ -265,7 +298,7 @@ extension RackInterface {
       enabled
         ? "4 rotaries and 4 buttons · a later routing wins a shared target"
         : "Nothing else in the rack has a knob to drive: add a module first",
-      x: x, y: y + 36, width: frame.width - 28, on: canvas)
+      x: x, y: routing.add.maxY + 16, width: frame.width - 28, on: canvas)
   }
 
   private func drawRoute(

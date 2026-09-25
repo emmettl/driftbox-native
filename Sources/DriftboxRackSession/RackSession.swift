@@ -636,6 +636,24 @@ public final class RackSession {
     }
   }
 
+  /// One end of a routing dragged, as a knob turns: the first move of a drag is what undo goes back
+  /// to, and the rest join it, until `endTurn`. An end that is not a number is the target's limit.
+  public func turnRoute(_ index: Int, _ change: (inout ModRoute) -> Void) {
+    guard patch.modulation.indices.contains(index) else { return }
+    var next = patch
+    change(&next.modulation[index])
+    if let min = next.modulation[index].min, !min.isFinite { next.modulation[index].min = nil }
+    if let max = next.modulation[index].max, !max.isFinite { next.modulation[index].max = nil }
+    guard next.modulation != patch.modulation else { return }
+    let key = "route:\(index)"
+    if turning != key {
+      record("Edit Routing")
+      turning = key
+    }
+    settle(applyModulation(next, registry: RackModules.registry))
+    save()
+  }
+
   public func removeRoute(_ index: Int) {
     routing("Remove Routing") { routes in
       guard routes.indices.contains(index) else { return }
