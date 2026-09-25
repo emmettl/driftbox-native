@@ -167,8 +167,10 @@ link() {
     -lCoreFoundation -l_FoundationCollections -l_FoundationCShims -l_FoundationICU \
     -o "$product"
   # A shared library links with symbols it cannot find, and the phone only refuses it when it
-  # loads: so a use of the old Foundation is looked for here instead.
-  old="$("$llvm/bin/llvm-nm$exe" -D -u "$product" | grep -E '\$s10Foundation|\$s31FoundationInternationalization' || true)"
+  # loads: so a use of the old Foundation is looked for here instead. Anywhere in the name, which
+  # is where its extensions of the standard library's types put it: `$sSy10FoundationE…` is
+  # StringProtocol's localizedCaseInsensitiveCompare.
+  old="$("$llvm/bin/llvm-nm$exe" -D -u "$product" | grep -E '\$s.*(10Foundation|31FoundationInternationalization)' || true)"
   if [ -n "$old" ]; then
     echo "$old" >&2
     echo "$(basename "$product") uses the old Foundation, which is not linked" >&2
