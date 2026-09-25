@@ -3,8 +3,8 @@
 // VST 3 SDK (MIT), which lives beside this under include/ and sdk/.
 //
 // A plug-in made here is driven from two threads, as a host's are: everything but `dbvst3_process`
-// from one — the main one — and `dbvst3_process` from the audio thread alone, which never waits on
-// the other. Params set from the main thread reach the audio thread through a queue.
+// and `dbvst3_render` from one — the main one — and those from the audio thread alone, which never
+// waits on the other. Params pass between the two through queues.
 #ifndef CVST3_H
 #define CVST3_H
 
@@ -60,6 +60,33 @@ void dbvst3_process(
   int32_t outputChannels, int32_t frames, double tempo, double beat, bool running, const uint64_t *events,
   int32_t eventCount);
 
+/// One block of it as a rack module plays it, on the audio thread, with the rack's own render
+/// function's arguments: two inlets and two outlets; the transport; the module's MIDI, as for
+/// `dbvst3_process`, with the mod wheel, sustain and pitch bend on the params the plug-in takes them
+/// on, and all notes off ending every note sounding; and the four macros, 0...1, each onto the param
+/// `dbvst3_map` points it at. With `events` — an instrument module's — the inlets are its notes'
+/// voltages, and nothing goes in. A block longer than it was set up for is silence.
+void dbvst3_render(
+  DBVST3Plugin *plugin, float *const *inlets, float *const *outlets, int32_t frames, double tempo, double beat,
+  bool running, const uint64_t *events, int32_t eventCount, const float *macros, int32_t macroCount);
+
+/// Point macro `slot` (0 to 3) at the param `id`, or at nothing (-1), from the next block, which
+/// sends it where the macro is at once.
+void dbvst3_map(DBVST3Plugin *plugin, int32_t slot, int64_t id);
+/// The param macro `slot` turns, or -1.
+int64_t dbvst3_mapping(const DBVST3Plugin *plugin, int32_t slot);
+
+/// Told that a plug-in changed itself: the param it set, from its own interface, or -1 for
+/// anything else. Called on whichever thread the plug-in calls from — its interface's, as a rule.
+typedef void (*DBVST3Listener)(void *context, int64_t id);
+/// Tell `listener`, with `context`, from now on; or no one, with null.
+void dbvst3_listen(DBVST3Plugin *plugin, DBVST3Listener listener, void *context);
+
+/// On the main thread: what the audio thread gave the processor — a macro's value, or one the
+/// processor set itself — told to its controller, so that it shows it; how many values. Reading a
+/// param or the state does this first.
+int32_t dbvst3_idle(DBVST3Plugin *plugin);
+
 /// One of its params.
 typedef struct DBVST3Parameter {
   uint32_t id;
@@ -76,7 +103,7 @@ int32_t dbvst3_parameter_count(const DBVST3Plugin *plugin);
 /// Its `index`th param; false past the end.
 bool dbvst3_parameter(const DBVST3Plugin *plugin, int32_t index, DBVST3Parameter *parameter);
 /// A param's value, 0...1.
-double dbvst3_get_parameter(const DBVST3Plugin *plugin, uint32_t id);
+double dbvst3_get_parameter(DBVST3Plugin *plugin, uint32_t id);
 /// Set a param, 0...1: on its controller now, and in the processor at the start of the next block.
 void dbvst3_set_parameter(DBVST3Plugin *plugin, uint32_t id, double value);
 /// What a param at `value` says it is, as its controller writes it.

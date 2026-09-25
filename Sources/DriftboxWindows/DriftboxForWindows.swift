@@ -2,6 +2,7 @@
   import DriftboxDesktop
   import DriftboxGPUD3D11
   import DriftboxHost
+  import DriftboxHostVST3
   import DriftboxHostWindows
   import DriftboxRackSession
   import DriftboxSession
@@ -64,8 +65,10 @@
       let desktop = try Desktop(
         session: session, window: window, device: device, surface: surface,
         typesetter: try DirectWriteTypesetter(),
-        // The rack, through the same output: heard beside the groovebox, and shown in its place.
-        rack: RackSession(sampleRate: route.sampleRate, audio: route, memory: UserDefaults.standard))
+        // The rack, through the same output: heard beside the groovebox, and shown in its place;
+        // its plug-ins VST 3.
+        rack: RackSession(
+          sampleRate: route.sampleRate, audio: route, plugins: VST3Hosting(), memory: UserDefaults.standard))
       try desktop.run()
     }
 

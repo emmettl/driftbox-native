@@ -15,6 +15,7 @@
 #include "pluginterfaces/vst/ivsteditcontroller.h"
 #include "pluginterfaces/vst/ivstevents.h"
 #include "pluginterfaces/vst/ivstmessage.h"
+#include "pluginterfaces/vst/ivstmidicontrollers.h"
 #include "pluginterfaces/vst/ivstprocesscontext.h"
 #include "pluginterfaces/vst/vstspeaker.h"
 #include "public.sdk/source/common/memorystream.h"
@@ -28,6 +29,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <bitset>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -107,19 +109,33 @@ private:
   std::atomic<uint32_t> tail {0};
 };
 
+/// Who is told when a plug-in changes itself.
+struct Listener {
+  std::atomic<DBVST3Listener> function {nullptr};
+  std::atomic<void *> context {nullptr};
+
+  void tell(int64_t id) const {
+    if (auto told = function.load(std::memory_order_acquire)) told(context.load(std::memory_order_acquire), id);
+  }
+};
+
 /// What a plug-in's own interface tells the host it is doing: its edits go to the processor as a
-/// host's would.
+/// host's would, and the listener hears of each, and of anything else it changes.
 class ComponentHandler : public IComponentHandler {
 public:
-  explicit ComponentHandler(ParameterQueue &queue) : queue(queue) {}
+  ComponentHandler(ParameterQueue &queue, Listener &listener) : queue(queue), listener(listener) {}
 
   tresult PLUGIN_API beginEdit(ParamID) override { return kResultOk; }
   tresult PLUGIN_API performEdit(ParamID id, ParamValue value) override {
     queue.push(id, value);
+    listener.tell(id);
     return kResultOk;
   }
   tresult PLUGIN_API endEdit(ParamID) override { return kResultOk; }
-  tresult PLUGIN_API restartComponent(int32) override { return kResultOk; }
+  tresult PLUGIN_API restartComponent(int32) override {
+    listener.tell(-1);
+    return kResultOk;
+  }
 
   tresult PLUGIN_API queryInterface(const TUID iid, void **object) override {
     if (FUnknownPrivate::iidEqual(iid, IComponentHandler::iid) || FUnknownPrivate::iidEqual(iid, FUnknown::iid)) {
@@ -135,6 +151,7 @@ public:
 
 private:
   ParameterQueue &queue;
+  Listener &listener;
 };
 
 bool isAudioModule(const VST3::Hosting::ClassInfo &info) { return info.category() == kVstAudioEffectClass; }
@@ -152,10 +169,28 @@ struct DBVST3Plugin {
   std::unique_ptr<ConnectionProxy> controllerConnection;
 
   ParameterQueue queue;
-  ComponentHandler handler {queue};
+  Listener listener;
+  ComponentHandler handler {queue, listener};
+  /// Values the audio thread gave the processor — a macro's, or the processor's own — for the
+  /// controller, which the main thread tells.
+  ParameterQueue toController;
+
+  /// Each macro's mapping, written on the main thread and read whole on the audio thread: the
+  /// param's ID in the low 32 bits, then whether it is mapped, then a count of mappings made, so a
+  /// new one is sent at once whatever the macro was.
+  std::atomic<uint64_t> macros[4] {};
+  uint64_t sentMapping[4] {};
+  float sentValue[4] {-1, -1, -1, -1};
+
+  /// The params the plug-in takes the mod wheel, sustain and pitch bend on, where it does.
+  ParamID midiParams[3] {};
+  bool midiMapped[3] {};
+  /// The notes sounding on each channel, for all notes off.
+  std::bitset<128> held[16];
 
   HostProcessData data;
   ParameterChanges changes {256};
+  ParameterChanges outputChanges {64};
   EventList events {512};
   ProcessContext context {};
   double sampleRate = 48000;
@@ -207,11 +242,154 @@ struct DBVST3Plugin {
       outputChannels = SpeakerArr::getChannelCount(arrangement);
     }
     data.inputParameterChanges = &changes;
+    data.outputParameterChanges = &outputChanges;
     data.inputEvents = takesNotes ? &events : nullptr;
     data.processContext = &context;
     context.sampleRate = sampleRate;
     processor->setProcessing(true);
     return true;
+  }
+
+  /// A param's value, 0...1, at `offset` into the block.
+  void change(ParamID id, ParamValue value, int32 offset) {
+    int32 index = 0;
+    if (IParamValueQueue *queue = changes.addParameterData(id, index)) {
+      int32 point = 0;
+      queue->addPoint(offset, value, point);
+    }
+  }
+
+  /// The params the plug-in takes MIDI controllers on, asked of its controller once it is made.
+  void findMIDIParams() {
+    FUnknownPtr<IMidiMapping> mapping(controller);
+    if (!mapping || !takesNotes) return;
+    const CtrlNumber numbers[3] = {
+      ControllerNumbers::kCtrlModWheel, ControllerNumbers::kCtrlSustainOnOff, ControllerNumbers::kPitchBend};
+    for (int index = 0; index < 3; ++index) {
+      midiMapped[index] = mapping->getMidiControllerAssignment(0, 0, numbers[index], midiParams[index]) == kResultOk;
+    }
+  }
+
+  /// The rack's MIDI as the plug-in's: notes as its notes; the mod wheel, sustain and bend on the
+  /// params it takes them on; all notes off as a note off for each note sounding.
+  void readEvents(const uint64_t *packed, int32_t count, int32_t frames) {
+    events.clear();
+    if (!takesNotes || !packed) return;
+    for (int32_t index = 0; index < count; ++index) {
+      uint64_t message = packed[index];
+      int32 offset = std::clamp(static_cast<int32>(message >> 32), 0, std::max(0, frames - 1));
+      uint8_t status = static_cast<uint8_t>(message >> 16);
+      uint8_t data1 = static_cast<uint8_t>(message >> 8) & 0x7F;
+      uint8_t data2 = static_cast<uint8_t>(message) & 0x7F;
+      uint8_t kind = status & 0xF0;
+      int16 channel = static_cast<int16>(status & 0x0F);
+      Event event {};
+      event.busIndex = 0;
+      event.sampleOffset = offset;
+      if (kind == 0x90 && data2 > 0) {
+        event.type = Event::kNoteOnEvent;
+        event.noteOn = {channel, static_cast<int16>(data1), 0, data2 / 127.f, 0, -1};
+        held[channel].set(data1);
+        events.addEvent(event);
+      } else if (kind == 0x80 || kind == 0x90) {
+        event.type = Event::kNoteOffEvent;
+        event.noteOff = {channel, static_cast<int16>(data1), data2 / 127.f, -1, 0};
+        held[channel].reset(data1);
+        events.addEvent(event);
+      } else if (kind == 0xB0 && data1 == ControllerNumbers::kCtrlAllNotesOff) {
+        event.type = Event::kNoteOffEvent;
+        for (int16 pitch = 0; pitch < 128; ++pitch) {
+          if (!held[channel].test(pitch)) continue;
+          event.noteOff = {channel, pitch, 0, -1, 0};
+          events.addEvent(event);
+        }
+        held[channel].reset();
+      } else if (kind == 0xB0 && data1 == ControllerNumbers::kCtrlModWheel && midiMapped[0]) {
+        change(midiParams[0], data2 / 127.0, offset);
+      } else if (kind == 0xB0 && data1 == ControllerNumbers::kCtrlSustainOnOff && midiMapped[1]) {
+        change(midiParams[1], data2 >= 64 ? 1 : 0, offset);
+      } else if (kind == 0xE0 && midiMapped[2]) {
+        change(midiParams[2], (data1 | data2 << 7) / 16383.0, offset);
+      }
+    }
+  }
+
+  /// One block through it, on the audio thread.
+  void process(
+    const float *const *inputs, int32_t inputChannels, float *const *outputs, int32_t outputChannels,
+    int32_t frames, double tempo, double beat, bool running, const uint64_t *packed, int32_t eventCount,
+    const float *macroValues, int32_t macroCount) {
+    frames = std::min(frames, maxFrames);
+    data.numSamples = frames;
+
+    // What the main thread set since the last block, at its start; then the macros that moved, or
+    // were mapped anew, each onto its param; then the block's MIDI.
+    changes.clearQueue();
+    queue.drain([this](ParamID id, ParamValue value) { change(id, value, 0); });
+    for (int32_t macro = 0; macro < std::min(macroCount, 4); ++macro) {
+      uint64_t mapping = macros[macro].load(std::memory_order_acquire);
+      float value = std::clamp(macroValues[macro], 0.f, 1.f);
+      bool mapped = mapping & (uint64_t(1) << 32);
+      if (!mapped || (mapping == sentMapping[macro] && value == sentValue[macro])) continue;
+      ParamID id = static_cast<ParamID>(mapping);
+      change(id, value, 0);
+      toController.push(id, value);
+      sentMapping[macro] = mapping;
+      sentValue[macro] = value;
+    }
+    readEvents(packed, eventCount, frames);
+
+    context.state = ProcessContext::kTempoValid | ProcessContext::kProjectTimeMusicValid;
+    if (running) context.state |= ProcessContext::kPlaying;
+    context.tempo = tempo;
+    context.projectTimeMusic = beat;
+
+    // The rack's channels into the main input, and out of the main output; silence where they
+    // differ in number.
+    if (data.numInputs > 0 && data.inputs[0].numChannels > 0) {
+      for (int32 channel = 0; channel < data.inputs[0].numChannels; ++channel) {
+        Sample32 *to = data.inputs[0].channelBuffers32[channel];
+        if (inputs && channel < inputChannels && inputs[channel]) {
+          std::memcpy(to, inputs[channel], sizeof(float) * frames);
+        } else {
+          std::memset(to, 0, sizeof(float) * frames);
+        }
+      }
+    }
+    outputChanges.clearQueue();
+    processor->process(data);
+    for (int32_t channel = 0; channel < outputChannels; ++channel) {
+      if (!outputs || !outputs[channel]) continue;
+      if (data.numOutputs > 0 && channel < data.outputs[0].numChannels) {
+        std::memcpy(outputs[channel], data.outputs[0].channelBuffers32[channel], sizeof(float) * frames);
+      } else if (data.numOutputs > 0 && data.outputs[0].numChannels == 1) {
+        // A mono plug-in in a stereo rack: the one channel on both sides.
+        std::memcpy(outputs[channel], data.outputs[0].channelBuffers32[0], sizeof(float) * frames);
+      } else {
+        std::memset(outputs[channel], 0, sizeof(float) * frames);
+      }
+    }
+    // What the processor changed of its own params, as the block ends, for its controller.
+    for (int32 index = 0; index < outputChanges.getParameterCount(); ++index) {
+      IParamValueQueue *changed = outputChanges.getParameterData(index);
+      int32 offset = 0;
+      ParamValue value = 0;
+      if (changed && changed->getPointCount() > 0 &&
+          changed->getPoint(changed->getPointCount() - 1, offset, value) == kResultOk) {
+        toController.push(changed->getParameterId(), value);
+      }
+    }
+  }
+
+  /// What the audio thread gave the processor, told to the controller on the main thread: how many
+  /// values.
+  int32_t settle() {
+    int32_t count = 0;
+    toController.drain([this, &count](ParamID id, ParamValue value) {
+      if (controller) controller->setParamNormalized(id, value);
+      ++count;
+    });
+    return count;
   }
 
   void stop() {
@@ -324,11 +502,13 @@ DBVST3Plugin *dbvst3_open(
     plugin->stop();
     return nullptr;
   }
+  plugin->findMIDIParams();
   return plugin.release();
 }
 
 void dbvst3_close(DBVST3Plugin *plugin) {
   if (!plugin) return;
+  plugin->listener.function.store(nullptr, std::memory_order_release);
   plugin->stop();
   delete plugin;
 }
@@ -344,77 +524,43 @@ void dbvst3_process(
   DBVST3Plugin *plugin, const float *const *inputs, int32_t inputChannels, float *const *outputs,
   int32_t outputChannels, int32_t frames, double tempo, double beat, bool running, const uint64_t *events,
   int32_t eventCount) {
-  HostProcessData &data = plugin->data;
-  frames = std::min(frames, plugin->maxFrames);
-  data.numSamples = frames;
-
-  // What the main thread set since the last block, at its start.
-  plugin->changes.clearQueue();
-  plugin->queue.drain([plugin](ParamID id, ParamValue value) {
-    int32 index = 0;
-    if (IParamValueQueue *queue = plugin->changes.addParameterData(id, index)) {
-      int32 point = 0;
-      queue->addPoint(0, value, point);
-    }
-  });
-
-  // Notes on and off, where they fall in the block.
-  plugin->events.clear();
-  if (plugin->takesNotes && events) {
-    for (int32_t index = 0; index < eventCount; ++index) {
-      uint64_t packed = events[index];
-      int32 offset = static_cast<int32>(packed >> 32);
-      uint8_t status = static_cast<uint8_t>(packed >> 16);
-      uint8_t pitch = static_cast<uint8_t>(packed >> 8) & 0x7F;
-      uint8_t velocity = static_cast<uint8_t>(packed) & 0x7F;
-      uint8_t kind = status & 0xF0;
-      Event event {};
-      event.busIndex = 0;
-      event.sampleOffset = std::clamp(offset, 0, std::max(0, frames - 1));
-      if (kind == 0x90 && velocity > 0) {
-        event.type = Event::kNoteOnEvent;
-        event.noteOn = {static_cast<int16>(status & 0x0F), static_cast<int16>(pitch), 0, velocity / 127.f, 0, -1};
-      } else if (kind == 0x80 || kind == 0x90) {
-        event.type = Event::kNoteOffEvent;
-        event.noteOff = {static_cast<int16>(status & 0x0F), static_cast<int16>(pitch), velocity / 127.f, -1, 0};
-      } else {
-        continue;
-      }
-      plugin->events.addEvent(event);
-    }
-  }
-
-  ProcessContext &context = plugin->context;
-  context.state = ProcessContext::kTempoValid | ProcessContext::kProjectTimeMusicValid;
-  if (running) context.state |= ProcessContext::kPlaying;
-  context.tempo = tempo;
-  context.projectTimeMusic = beat;
-
-  // The rack's channels into the main input, and out of the main output; silence where they
-  // differ in number.
-  if (data.numInputs > 0 && data.inputs[0].numChannels > 0) {
-    for (int32 channel = 0; channel < data.inputs[0].numChannels; ++channel) {
-      Sample32 *to = data.inputs[0].channelBuffers32[channel];
-      if (inputs && channel < inputChannels && inputs[channel]) {
-        std::memcpy(to, inputs[channel], sizeof(float) * frames);
-      } else {
-        std::memset(to, 0, sizeof(float) * frames);
-      }
-    }
-  }
-  plugin->processor->process(data);
-  for (int32_t channel = 0; channel < outputChannels; ++channel) {
-    if (!outputs || !outputs[channel]) continue;
-    if (data.numOutputs > 0 && channel < data.outputs[0].numChannels) {
-      std::memcpy(outputs[channel], data.outputs[0].channelBuffers32[channel], sizeof(float) * frames);
-    } else if (data.numOutputs > 0 && data.outputs[0].numChannels == 1) {
-      // A mono plug-in in a stereo rack: the one channel on both sides.
-      std::memcpy(outputs[channel], data.outputs[0].channelBuffers32[0], sizeof(float) * frames);
-    } else {
-      std::memset(outputs[channel], 0, sizeof(float) * frames);
-    }
-  }
+  plugin->process(
+    inputs, inputChannels, outputs, outputChannels, frames, tempo, beat, running, events, eventCount, nullptr, 0);
 }
+
+void dbvst3_render(
+  DBVST3Plugin *plugin, float *const *inlets, float *const *outlets, int32_t frames, double tempo, double beat,
+  bool running, const uint64_t *events, int32_t eventCount, const float *macros, int32_t macroCount) {
+  if (frames > plugin->maxFrames) {
+    for (int channel = 0; channel < 2; ++channel) std::memset(outlets[channel], 0, sizeof(float) * frames);
+    return;
+  }
+  // An instrument module's inlets are its notes' voltages, not audio.
+  plugin->process(
+    events ? nullptr : inlets, events ? 0 : 2, outlets, 2, frames, tempo, beat, running, events, eventCount, macros,
+    macroCount);
+}
+
+void dbvst3_map(DBVST3Plugin *plugin, int32_t slot, int64_t id) {
+  if (slot < 0 || slot >= 4) return;
+  uint64_t made = (plugin->macros[slot].load(std::memory_order_relaxed) >> 33) + 1;
+  uint64_t mapping = made << 33 | (id >= 0 ? uint64_t(1) << 32 | uint32_t(id) : 0);
+  plugin->macros[slot].store(mapping, std::memory_order_release);
+}
+
+int64_t dbvst3_mapping(const DBVST3Plugin *plugin, int32_t slot) {
+  if (slot < 0 || slot >= 4) return -1;
+  uint64_t mapping = plugin->macros[slot].load(std::memory_order_acquire);
+  return mapping & uint64_t(1) << 32 ? int64_t(uint32_t(mapping)) : -1;
+}
+
+void dbvst3_listen(DBVST3Plugin *plugin, DBVST3Listener listener, void *context) {
+  plugin->listener.function.store(nullptr, std::memory_order_release);
+  plugin->listener.context.store(context, std::memory_order_release);
+  plugin->listener.function.store(listener, std::memory_order_release);
+}
+
+int32_t dbvst3_idle(DBVST3Plugin *plugin) { return plugin->settle(); }
 
 int32_t dbvst3_parameter_count(const DBVST3Plugin *plugin) {
   return plugin->controller ? plugin->controller->getParameterCount() : 0;
@@ -434,7 +580,8 @@ bool dbvst3_parameter(const DBVST3Plugin *plugin, int32_t index, DBVST3Parameter
   return true;
 }
 
-double dbvst3_get_parameter(const DBVST3Plugin *plugin, uint32_t id) {
+double dbvst3_get_parameter(DBVST3Plugin *plugin, uint32_t id) {
+  plugin->settle();
   return plugin->controller ? plugin->controller->getParamNormalized(id) : 0;
 }
 
@@ -455,6 +602,7 @@ bool dbvst3_parameter_text(const DBVST3Plugin *plugin, uint32_t id, double value
 
 // The state as one run of bytes: the processor's, its length first, then the controller's.
 int64_t dbvst3_state(DBVST3Plugin *plugin, uint8_t *buffer, int64_t capacity) {
+  plugin->settle();
   MemoryStream component;
   if (plugin->component->getState(&component) != kResultOk) return -1;
   MemoryStream controller;

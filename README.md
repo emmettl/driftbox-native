@@ -52,6 +52,7 @@ Metal. Next after this is the rack.
 | `Sources/CDirectWrite` | The part of DirectWrite that is called, declared in C, since its own headers are C++. Declarations only. |
 | `Sources/VST3SDK` | Steinberg's VST 3 SDK, as much of it as a host uses, vendored at 3.8.1 under its own MIT licence. Compiled on Windows alone for now. |
 | `Sources/CVST3` | Driftbox's bridge to VST 3 plug-ins, in C for Swift: a plug-in found, made, played, its params set and its state kept. Windows only for now; `Tests/DriftboxVST3Fixture` is a plug-in of the project's own to hold it to. |
+| `Sources/DriftboxHostVST3` | The rack's plug-ins on that bridge: the VST 3 plug-ins installed, found, and each a `plugin` module's unit, played, its macros and its state. Windows only for now. |
 | `Sources/DriftboxCanvas` | A 2D canvas on the GPU layer: Canvas2D's shapes, state, type and blends, the same on every platform. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxInterface` | The controls, drawn on the canvas in points over the scene: the transport bar and the step grid, laid out and hit from one layout, on `Session`. |

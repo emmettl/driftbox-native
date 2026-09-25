@@ -61,6 +61,40 @@
       return [outLeft, outRight]
     }
 
+    /// One block of `plugin` as a rack module plays it: two inlets of `input`, `events` for an
+    /// instrument module's MIDI and nil for an effect's, and the four macros.
+    static func render(
+      _ plugin: OpaquePointer, _ input: Float = 1, frames: Int = 256, events: [UInt64]? = nil,
+      macros: [Float] = [0, 0, 0, 0]
+    ) -> [Float] {
+      let inlets = (0..<2).map { _ in UnsafeMutablePointer<Float>.allocate(capacity: frames) }
+      let outlets = (0..<2).map { _ in UnsafeMutablePointer<Float>.allocate(capacity: frames) }
+      defer { for buffer in inlets + outlets { buffer.deallocate() } }
+      for inlet in inlets { inlet.initialize(repeating: input, count: frames) }
+      for outlet in outlets { outlet.initialize(repeating: 9, count: frames) }
+      let ins: [UnsafeMutablePointer<Float>?] = inlets
+      let outs: [UnsafeMutablePointer<Float>?] = outlets
+      ins.withUnsafeBufferPointer { ins in
+        outs.withUnsafeBufferPointer { outs in
+          macros.withUnsafeBufferPointer { macros in
+            if let events {
+              events.withUnsafeBufferPointer { list in
+                dbvst3_render(
+                  plugin, ins.baseAddress, outs.baseAddress, Int32(frames), 120, 0, true, list.baseAddress,
+                  Int32(list.count), macros.baseAddress, Int32(macros.count))
+              }
+            } else {
+              dbvst3_render(
+                plugin, ins.baseAddress, outs.baseAddress, Int32(frames), 120, 0, true, nil, 0,
+                macros.baseAddress,
+                Int32(macros.count))
+            }
+          }
+        }
+      }
+      return Array(UnsafeBufferPointer(start: outlets[0], count: frames))
+    }
+
     /// What a C function wrote into `characters`, up to its end.
     static func string(_ characters: [CChar]) -> String {
       String(decoding: characters.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
@@ -155,6 +189,42 @@
       #expect(on[..<65].allSatisfy { $0 == 0 }, "nothing before its frame")
       #expect(on[65...].contains { abs($0) > 0.1 })
       let off = Self.process(plugin, 0, events: [Self.midi(0, 0x80, 69, 0)])[0]
+      #expect(off.allSatisfy { $0 == 0 })
+    }
+
+    /// As a rack module plays it: a macro turns the param it is mapped onto, and its controller is
+    /// told; unmapped, the param stays where the macro left it, and is set from the main thread again.
+    @Test func aMacroTurnsItsParam() throws {
+      let plugin = try Self.open(Self.gainID)
+      defer { dbvst3_close(plugin) }
+      #expect(
+        Self.render(plugin, 0.8, macros: [0.25, 0, 0, 0]).allSatisfy { abs($0 - 0.4) < 1e-6 }, "unmapped")
+      #expect(dbvst3_mapping(plugin, 0) == -1)
+
+      dbvst3_map(plugin, 0, 0)
+      #expect(dbvst3_mapping(plugin, 0) == 0)
+      #expect(abs(Self.render(plugin, 1, macros: [0.25, 0, 0, 0])[0] - 0.25) < 1e-6, "sent at once")
+      #expect(dbvst3_get_parameter(plugin, 0) == 0.25, "and its controller told")
+      #expect(abs(Self.render(plugin, 1, macros: [0.75, 0, 0, 0])[0] - 0.75) < 1e-6)
+
+      dbvst3_map(plugin, 0, -1)
+      #expect(abs(Self.render(plugin, 1, macros: [0.1, 0, 0, 0])[0] - 0.75) < 1e-6)
+      dbvst3_set_parameter(plugin, 0, 0.5)
+      #expect(abs(Self.render(plugin, 1, macros: [0.1, 0, 0, 0])[0] - 0.5) < 1e-6)
+      #expect(
+        Self.render(plugin, frames: 1024).allSatisfy { $0 == 0 }, "longer than it was made for: silence")
+    }
+
+    /// An instrument module's inlets are voltages, not audio; its pitch bend, all fourteen bits of
+    /// it, reaches the param the plug-in takes it on; and all notes off ends the note sounding.
+    @Test func anInstrumentModuleIsPlayed() throws {
+      let plugin = try Self.open(Self.synthID)
+      defer { dbvst3_close(plugin) }
+      let on = Self.render(plugin, 5, events: [Self.midi(0, 0x90, 69, 127)])
+      #expect(abs((on.map(abs).max() ?? 0) - 0.8) < 0.01, "at its level, with nothing of the inlets")
+      let bent = Self.render(plugin, 5, events: [Self.midi(0, 0xE0, 0, 64)])
+      #expect(abs((bent.map(abs).max() ?? 0) - 8192.0 / 16383) < 0.01)
+      let off = Self.render(plugin, 5, events: [Self.midi(0, 0xB0, 123, 0)])
       #expect(off.allSatisfy { $0 == 0 })
     }
 

@@ -172,6 +172,7 @@ let package = Package(
         "DriftboxDesktop", "DriftboxHost", "DriftboxRackSession", "DriftboxSession",
         .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxHostVST3", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
       ],
@@ -336,14 +337,16 @@ let package = Package(
 )
 
 // VST 3 plug-ins, on Steinberg's SDK (MIT), vendored at 3.8.1 build 84 as much as is used: `VST3SDK`
-// the SDK, a host's part of it; `CVST3` Driftbox's bridge to it in C, for Swift; and
-// `DriftboxVST3Fixture`, a plug-in built from it for the tests to load as a real one is loaded, a
-// library of its own. Driftbox hosts plug-ins on Windows alone for now, so all of it compiles there
-// alone: the SDK's sources sit in an `sdk` folder the build leaves out, and each is compiled through
-// a wrapper in `windows` that includes it only there. Apart from the rest, which the manifest's type
-// checker cannot take in one go.
-package.products.append(
-  .library(name: "DriftboxVST3Fixture", type: .dynamic, targets: ["DriftboxVST3Fixture"]))
+// the SDK, a host's part of it; `CVST3` Driftbox's bridge to it in C, for Swift; `DriftboxHostVST3`
+// the rack's plug-ins on it; and `DriftboxVST3Fixture`, a plug-in built from it for the tests to
+// load as a real one is loaded, a library of its own. Driftbox hosts plug-ins on Windows alone for
+// now, so all of it compiles there alone: the SDK's sources sit in an `sdk` folder the build leaves
+// out, and each is compiled through a wrapper in `windows` that includes it only there. Apart from
+// the rest, which the manifest's type checker cannot take in one go.
+package.products += [
+  .library(name: "DriftboxHostVST3", targets: ["DriftboxHostVST3"]),
+  .library(name: "DriftboxVST3Fixture", type: .dynamic, targets: ["DriftboxVST3Fixture"]),
+]
 package.targets += [
   .target(
     name: "VST3SDK",
@@ -368,7 +371,16 @@ package.targets += [
     // A library product is linked by the Swift driver, which registers it with the Swift runtime even
     // with no Swift in it: the test plug-in loads beside the tests, where the runtime is.
     linkerSettings: [.linkedLibrary("swiftCore", .when(platforms: [.windows]))]),
+  .target(
+    name: "DriftboxHostVST3",
+    dependencies: [
+      "DriftboxHost", "DriftboxRack", "DriftboxRackSession",
+      .target(name: "CVST3", condition: .when(platforms: [.windows])),
+    ]),
   .testTarget(
-    name: "DriftboxVST3Tests", dependencies: [.target(name: "CVST3", condition: .when(platforms: [.windows]))]
-  ),
+    name: "DriftboxVST3Tests",
+    dependencies: [
+      "DriftboxHost", "DriftboxHostVST3", "DriftboxRack", "DriftboxRackSession",
+      .target(name: "CVST3", condition: .when(platforms: [.windows])),
+    ]),
 ]
