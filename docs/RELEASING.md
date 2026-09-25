@@ -94,3 +94,58 @@ is still to be decided. Whatever it is, nothing here does it on its own.
 
 `python3 scripts/test-release.py` checks all of this without signing or uploading anything, and CI
 runs it.
+
+## Android
+
+`scripts/android-release.py` makes the Android release the same way. It leaves an APK and an App
+Bundle in `dist/`, each signed with the upload key, with a checksum each and one manifest, and
+uploads nothing. It builds on any host the Android build does (Windows, a Mac or Linux), with the
+toolchain, the Swift SDK for Android and the NDK that `scripts/android-env.sh` describes. The bundle
+also needs Google's `bundletool`, found as `bundletool/bundletool-all-*.jar` beside the Android SDK's
+folder, or at `DRIFTBOX_BUNDLETOOL`.
+
+**The upload key** is yours, and never in the repository. Make one once, and keep the keystore and
+its password somewhere safe: every update is signed with it, and losing it means asking Google to
+reset it.
+
+```sh
+keytool -genkeypair -keystore ~/driftbox-upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+**A release**, from a clean checkout, with the version and build set in `scripts/version.env` (the
+build is Android's version code, which Google Play needs to go up with every upload):
+
+```sh
+export DRIFTBOX_ANDROID_KEYSTORE=~/driftbox-upload.jks
+export DRIFTBOX_ANDROID_KEY_ALIAS=upload
+python3 scripts/android-release.py check
+python3 scripts/android-release.py prepare
+```
+
+The password is asked for, or read from `DRIFTBOX_ANDROID_KEYSTORE_PASS`. It reaches `apksigner`
+and `jarsigner` through their environment, never their command lines. `prepare`:
+
+- lints, checks the constrained targets, and runs the suite, unless `--skip-tests`;
+- builds with `scripts/android-app.sh bundle`: the APK aligned for 16 KB pages, and the same pieces
+  laid out as a bundle's base module and made into an App Bundle by `bundletool`, native libraries
+  kept uncompressed and split by ABI;
+- checks that the APK carries the release's version and build, and the minimum Android version;
+- signs the APK with v2 and v3 signatures (no v4 `.idsig`, which is for `adb` streaming) and
+  verifies it;
+- signs the bundle with `jarsigner`, as Google Play asks, verifies it, and has `bundletool` validate
+  it;
+- writes `dist/Driftbox-<version>-android.apk` and `.aab`, a `.sha256` for each, and a `.json`
+  manifest: version, build, commit, application id, minimum SDK, checksums, and whether it was
+  tested.
+
+`jarsigner` warns that an upload key signs itself and carries no timestamp, and that is what every
+upload key is. Google Play signs what it serves again with the key it keeps.
+
+Before uploading, install what was made on a device, or on an arm64 emulator, and try it:
+
+- the APK, as someone installing it directly would: `adb install dist/Driftbox-…-android.apk`;
+- the bundle, as Google Play would serve it: `bundletool build-apks --bundle=… --connected-device`,
+  signed with the same key, then `bundletool install-apks`.
+
+`python3 scripts/test-android-release.py` checks the script without signing anything real, and CI
+runs it.

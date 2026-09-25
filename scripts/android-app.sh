@@ -4,6 +4,7 @@
 #
 #     scripts/android-app.sh                    # build and install; it opens on Pulse, playing acid
 #     scripts/android-app.sh build              # build only, for a machine with no phone: CI
+#     scripts/android-app.sh bundle             # build, and an App Bundle for Google Play beside it
 #     scripts/android-app.sh midi-loopback      # and run the MIDI ports against Driftbox Loopback
 #     scripts/android-app.sh gpu                # or the GPU contract on the phone's GPU
 #     scripts/android-app.sh scenes             # or every scene drawn, checked and timed
@@ -15,6 +16,9 @@
 # one `java_home` names on a Mac), and the Android SDK's build-tools and a platform, found where
 # `android-env.sh` finds the SDK.
 . "$(dirname "$0")/android-env.sh"
+# The version and build the Mac's release carries too: the build is Android's version code, which
+# only ever goes up.
+. scripts/version.env
 
 tools="$(newest "$android_sdk"/build-tools/*)"
 platform="$(newest "$android_sdk"/platforms/android-*)"
@@ -81,8 +85,8 @@ cp "$app/dex/classes.dex" "$app/stage/"
 cp -r Sources/DriftboxSession/Resources "$app/stage/assets/"
 cp -r Sources/DriftboxRackSession/Resources/. "$app/stage/assets/Resources/"
 "$tools/aapt2$exe" link -o "$app/unaligned.apk" -I "$jar" --manifest android/AndroidManifest.xml \
-  --min-sdk-version 29 --target-sdk-version "${platform##*android-}" --version-code 1 --version-name 0.1 \
-  "$app/resources.zip"
+  --min-sdk-version 29 --target-sdk-version "${platform##*android-}" \
+  --version-code "$DRIFTBOX_BUILD" --version-name "$DRIFTBOX_VERSION" "$app/resources.zip"
 (cd "$app/stage" && jar -uf0M ../unaligned.apk classes.dex lib assets)
 "$tools/zipalign$exe" -f -P 16 4 "$app/unaligned.apk" "$app/aligned.apk"
 keystore="$out/debug.keystore"
@@ -90,7 +94,29 @@ keystore="$out/debug.keystore"
   -alias driftbox -keyalg RSA -validity 10000 -dname "CN=Driftbox debug" >/dev/null 2>&1
 "$tools/apksigner$bat" sign --ks "$keystore" --ks-pass pass:android --out "$app/driftbox.apk" "$app/aligned.apk"
 echo "  driftbox.apk: ok ($(($(wc -c <"$app/driftbox.apk") / 1024)) KB)"
-if [ "${1:-}" = build ]; then
+if [ "${1:-}" = bundle ]; then
+  # The same, as an App Bundle, which is what Google Play takes: the resources linked again in the
+  # protocol buffer form a bundle holds, and every piece laid out as a bundle's base module, then
+  # made into one by Google's bundletool (DRIFTBOX_BUNDLETOOL, or the newest jar under the Android
+  # folder beside the SDK). Unsigned: a release signs it with its upload key.
+  bundletool="${DRIFTBOX_BUNDLETOOL:-$(newest "$(dirname "$android_sdk")"/bundletool/bundletool-all-*.jar)}"
+  [ -f "$bundletool" ] || { echo "not found: bundletool (DRIFTBOX_BUNDLETOOL)" >&2; exit 1; }
+  "$tools/aapt2$exe" link --proto-format -o "$app/proto.zip" -I "$jar" --manifest android/AndroidManifest.xml \
+    --min-sdk-version 29 --target-sdk-version "${platform##*android-}" \
+    --version-code "$DRIFTBOX_BUILD" --version-name "$DRIFTBOX_VERSION" "$app/resources.zip"
+  base="$app/base"
+  rm -rf "$base" "$app/base.zip"
+  mkdir -p "$base/manifest" "$base/dex"
+  (cd "$base" && jar -xf ../proto.zip)
+  mv "$base/AndroidManifest.xml" "$base/manifest/"
+  cp "$app/dex/classes.dex" "$base/dex/"
+  cp -r "$app/stage/lib" "$app/stage/assets" "$base/"
+  jar --create --no-manifest --file "$app/base.zip" -C "$base" .
+  java -jar "$bundletool" build-bundle --modules="$app/base.zip" --output="$app/driftbox.aab" \
+    --config=android/bundle.json --overwrite
+  echo "  driftbox.aab: ok ($(($(wc -c <"$app/driftbox.aab") / 1024)) KB)"
+fi
+if [ "${1:-}" = build ] || [ "${1:-}" = bundle ]; then
   echo "built $app/driftbox.apk"
   exit 0
 fi

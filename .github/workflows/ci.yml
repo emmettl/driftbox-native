@@ -62,9 +62,9 @@ jobs:
           path: conformance/generated
       - name: Format
         run: swift format lint --strict -r Sources Tests Package.swift
-      # The release script's checks, which sign, upload and publish nothing.
-      - name: Release script
-        run: python3 scripts/test-release.py
+      # The release scripts' checks, which sign, upload and publish nothing.
+      - name: Release scripts
+        run: python3 scripts/test-release.py && python3 scripts/test-android-release.py
       - name: Test
         run: swift test
         # Strict actor isolation, as an app runs with: a closure made on the main actor and called
