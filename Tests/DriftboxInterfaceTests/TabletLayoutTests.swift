@@ -83,7 +83,8 @@ struct TabletLayoutTests {
     onItsSide.perform(.select(voice: "909.bd"))
     layout = onItsSide.layout
     panel = try #require(layout.inspector)
-    #expect(panel.frame.width == Layout.inspectorWidth && panel.frame.maxX == layout.bar.maxX, "down the right")
+    #expect(
+      panel.frame.width == Layout.inspectorWidth && panel.frame.maxX == layout.bar.maxX, "down the right")
     #expect(try #require(layout.grid).maxX <= panel.frame.x)
     #expect(layout.metrics?.shown == 16, "and every step still beside it")
   }

@@ -114,7 +114,7 @@ extension Song {
   public func settingAutomationPoint(
     _ target: String, bar: Int, index: Int, value: Double, interpolation: AutomationInterpolation = .linear
   ) -> Song {
-    guard !target.allSatisfy(\.isWhitespace), value.isFinite else { return self }
+    guard !target.allSatisfy({ $0.isWhitespace }), value.isFinite else { return self }
     let pointBar = max(0, bar)
     let point = AutomationPoint(
       bar: pointBar, index: max(0, min(barLength(forBar: pointBar) - 1, index)), value: value)
