@@ -827,13 +827,13 @@ public final class RackInterface {
       let byVendor = Dictionary(grouping: wanted) {
         $0.reference.vendor.isEmpty ? "Other" : $0.reference.vendor
       }
-      let vendors = byVendor.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+      let vendors = byVendor.keys.sorted(by: alphabetically)
       return .submenu(
         Menu(
           kind.title,
           vendors.map { vendor in
             let sorted = (byVendor[vendor] ?? []).sorted {
-              $0.reference.name.localizedCaseInsensitiveCompare($1.reference.name) == .orderedAscending
+              alphabetically($0.reference.name, $1.reference.name)
             }
             return .submenu(
               Menu(
@@ -1132,4 +1132,11 @@ public final class RackInterface {
     default: Theme.nine
     }
   }
+}
+
+/// Whether `a` comes before `b` in a menu, whatever their case: by hand, since
+/// `localizedCaseInsensitiveCompare` is the old Foundation's on Android, which is not linked there.
+private func alphabetically(_ a: String, _ b: String) -> Bool {
+  let (lower, other) = (a.lowercased(), b.lowercased())
+  return lower == other ? a < b : lower < other
 }
