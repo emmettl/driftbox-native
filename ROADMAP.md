@@ -739,6 +739,11 @@ in `TabletLayoutTests`, and looked at drawn by D3D11 on Windows, since there is 
 try it on. A phone is kept upright, since on its side it is 372 points high, too short for the
 grid and the knobs.
 
+The rack is built into the Android app now, though not yet shown there: its session and its
+controls take nothing from the old Foundation, and every patch in its catalogue opens and sounds
+on the phone. What it needs next is the same design work as the groovebox had: its faces, the
+back of the rack and its cables at a finger's size.
+
 ### What Milestone 5 asks of Milestone 4
 
 - **The GPU layer takes a third backend** without its protocol changing. Nothing goes in it that

@@ -29,6 +29,12 @@ final class Native {
   static native String sceneCheck(int width, int height, float density);
 
   /**
+   * Every patch in the rack's catalogue, unpacked into {@code resources}, opened and run for a
+   * second. On the main thread, which the rack session is on; blocks while it renders.
+   */
+  static native String rackCheck(String resources);
+
+  /**
    * Play the catalogue's song {@code song}, and draw a scene from it, with the controls over it, in
    * whatever window it is given: the scene called {@code scene}, or the one the song names when that
    * is null. {@code resources} is the directory {@link Main} unpacked the catalogue and its songs into.

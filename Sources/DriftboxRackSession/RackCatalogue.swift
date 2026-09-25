@@ -29,7 +29,7 @@ public struct ModuleFace: Decodable, Equatable, Sendable {
   }
 
   public static let all: [ModuleFace] = {
-    guard let url = Bundle.module.url(forResource: "modules", withExtension: "json"),
+    guard let url = RackCatalogue.resources?.appending(path: "modules.json"),
       let data = try? Data(contentsOf: url)
     else { return native }
     return ((try? JSONDecoder().decode([ModuleFace].self, from: data)) ?? []) + native
@@ -86,7 +86,7 @@ public struct PatchEntry: Decodable, Equatable, Identifiable, Sendable {
   public var tip: String?
 
   public static let all: [PatchEntry] = {
-    guard let url = Bundle.module.url(forResource: "patches", withExtension: "json"),
+    guard let url = RackCatalogue.resources?.appending(path: "patches.json"),
       let data = try? Data(contentsOf: url)
     else { return [] }
     return (try? JSONDecoder().decode([PatchEntry].self, from: data)) ?? []
@@ -95,9 +95,25 @@ public struct PatchEntry: Decodable, Equatable, Identifiable, Sendable {
   /// The patch itself, as the reference saved it.
   public func load() -> Patch? {
     guard
-      let url = Bundle.module.url(forResource: id, withExtension: "patch.json", subdirectory: "Patches"),
+      let url = RackCatalogue.resources?.appending(path: "Patches/\(id).patch.json"),
       let text = try? String(contentsOf: url, encoding: .utf8)
     else { return nil }
     return PatchCodec.decode(text)
   }
+}
+
+/// Where the rack's catalogue is: its modules' faces, its patches and their list.
+public enum RackCatalogue {
+  /// This target's resources where SwiftPM builds it, and wherever a platform put them where it
+  /// does not. Android's app is built without SwiftPM, and unpacks them from its package, beside
+  /// the groovebox's songs, and says where before anything asks for a patch. Read as files, rather
+  /// than through `Bundle`, which on Android is the whole of the old Foundation, as
+  /// `Catalogue.resources` is for the songs.
+  nonisolated(unsafe) public static var resources: URL? = {
+    #if SWIFT_PACKAGE
+      Bundle.module.resourceURL
+    #else
+      nil
+    #endif
+  }()
 }

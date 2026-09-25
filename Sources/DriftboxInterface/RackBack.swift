@@ -2,7 +2,14 @@ import DriftboxCanvas
 import DriftboxRack
 import DriftboxRackSession
 import DriftboxShell
-import Foundation
+#if os(Android)
+  // Its dates from FoundationEssentials, and C's maths from Android's own: the old Foundation's
+  // `CGPoint` would be as much in sight as the rack's, which stands in for it there.
+  import Android
+  import FoundationEssentials
+#else
+  import Foundation
+#endif
 
 /// What a press on the back of the rack is doing.
 enum BackGesture {

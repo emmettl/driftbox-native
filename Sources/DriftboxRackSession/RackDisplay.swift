@@ -78,7 +78,16 @@ public enum RackDisplay {
   /// 1.25 is "1.3" here as there.
   public static func fixed(_ value: Double, _ digits: Int) -> String {
     let scale = pow(10, Double(digits))
-    return String(format: "%.\(digits)f", jsRound(value * scale) / scale)
+    let rounded = jsRound(value * scale)
+    guard rounded.isFinite, abs(rounded) < 1e18 else { return "\(rounded / scale)" }
+    // Written out from the whole number of the last digit's units, rather than by `%f`, which is
+    // the old Foundation's on Android.
+    let units = Int(rounded)
+    let magnitude = String(units.magnitude)
+    let padded = String(repeating: "0", count: max(0, digits + 1 - magnitude.count)) + magnitude
+    let whole = padded.dropLast(digits)
+    let sign = units < 0 ? "-" : ""
+    return digits > 0 ? "\(sign)\(whole).\(padded.suffix(digits))" : "\(sign)\(whole)"
   }
 
   /// JavaScript's `Math.round`: halves go up, not away from zero.

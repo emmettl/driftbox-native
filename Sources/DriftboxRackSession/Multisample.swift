@@ -61,49 +61,46 @@ public struct MultisampleZone: Equatable, Sendable {
 public enum Multisample {
   private static let semitones: [String: Int] = ["c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11]
 
-  private static func regex(_ pattern: String) -> NSRegularExpression {
-    // Patterns written here, so a failure is a mistake in this file rather than in any input.
-    try! NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
-  }
-  private static let numbered = regex("(?:^|[^a-z])(?:midi|note)[ _-]?(\\d{1,3})(?=$|\\D)")
-  private static let named = regex("(?:^|[^a-z0-9])([a-g])([#b]?)(-?\\d)(?=$|[^0-9])")
-  private static let velocityNumber = regex("(?:^|[^a-z0-9])(?:vel(?:ocity)?|v)[ _-]?(\\d{1,3})(?=$|\\D)")
-  private static let dynamic = regex("(?:^|[^a-z])(pp|mp|mf|ff|p|f)(?=$|[^a-z])")
+  // The reference's patterns, which it matches ignoring case: matched here against the name in
+  // lower case, which is the same thing for the letters they name.
+  private static let numbered = "(?:^|[^a-z])(?:midi|note)[ _-]?(\\d{1,3})(?=$|\\D)"
+  private static let named = "(?:^|[^a-z0-9])([a-g])([#b]?)(-?\\d)(?=$|[^0-9])"
+  private static let velocityNumber = "(?:^|[^a-z0-9])(?:vel(?:ocity)?|v)[ _-]?(\\d{1,3})(?=$|\\D)"
+  private static let dynamic = "(?:^|[^a-z])(pp|mp|mf|ff|p|f)(?=$|[^a-z])"
   private static let dynamics: [String: Double] = [
     "pp": 0.16, "p": 0.3, "mp": 0.43, "mf": 0.62, "f": 0.78, "ff": 0.94,
   ]
 
-  private static func groups(_ match: NSTextCheckingResult, in name: String) -> [String] {
-    (1..<match.numberOfRanges).map { index in
-      Range(match.range(at: index), in: name).map { String(name[$0]) } ?? ""
+  /// Each match of `pattern` in `name`, lower-cased, as its groups: the standard library's
+  /// regular expressions, since `NSRegularExpression` is the old Foundation's on Android.
+  private static func matches(_ pattern: String, in name: String) -> [[String]] {
+    // Patterns written here, so a failure is a mistake in this file rather than in any input.
+    let regex = try! Regex(pattern)
+    return name.lowercased().matches(of: regex).map { match in
+      (1..<match.output.count).map { match.output[$0].substring.map(String.init) ?? "" }
     }
   }
 
   /// The MIDI note a file name names: `midi 72` or `note60`, or else the last note name in it,
   /// such as `C#4` with C4 60.
   public static func note(_ name: String) -> Int? {
-    let whole = NSRange(name.startIndex..., in: name)
-    if let match = numbered.firstMatch(in: name, range: whole), let value = Int(groups(match, in: name)[0]) {
+    if let match = matches(numbered, in: name).first, let value = Int(match[0]) {
       return max(0, min(127, value))
     }
-    guard let last = named.matches(in: name, range: whole).last else { return nil }
-    let parts = groups(last, in: name)
-    let accidental = parts[1] == "#" ? 1 : parts[1].lowercased() == "b" ? -1 : 0
-    guard let octave = Int(parts[2]), let semitone = semitones[parts[0].lowercased()] else { return nil }
+    guard let parts = matches(named, in: name).last else { return nil }
+    let accidental = parts[1] == "#" ? 1 : parts[1] == "b" ? -1 : 0
+    guard let octave = Int(parts[2]), let semitone = semitones[parts[0]] else { return nil }
     let note = (octave + 1) * 12 + semitone + accidental
     return note >= 0 && note <= 127 ? note : nil
   }
 
   /// The velocity a file name implies: `vel064` or `v127` out of 127, or a dynamic from pp to ff.
   public static func velocity(_ name: String) -> Double? {
-    let whole = NSRange(name.startIndex..., in: name)
-    if let match = velocityNumber.firstMatch(in: name, range: whole),
-      let value = Double(groups(match, in: name)[0])
-    {
+    if let match = matches(velocityNumber, in: name).first, let value = Double(match[0]) {
       return max(0, min(1, value / 127))
     }
-    guard let match = dynamic.firstMatch(in: name, range: whole) else { return nil }
-    return dynamics[groups(match, in: name)[0].lowercased()]
+    guard let match = matches(dynamic, in: name).first else { return nil }
+    return dynamics[match[0]]
   }
 
   /// Zones for a set of recordings: each at the note its name gives, or placed chromatically about

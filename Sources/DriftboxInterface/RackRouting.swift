@@ -195,7 +195,9 @@ extension RackInterface {
   func finishTyping() {
     guard let typed = typing else { return }
     typing = nil
-    let text = typed.text.trimmingCharacters(in: .whitespaces)
+    // Trimmed by hand: `CharacterSet` is the old Foundation's on Android.
+    let text = String(
+      typed.text.drop(while: \.isWhitespace).reversed().drop(while: \.isWhitespace).reversed())
     let value: Double?
     if text.isEmpty {
       value = nil
