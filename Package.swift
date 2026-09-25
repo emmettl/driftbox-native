@@ -201,8 +201,8 @@ let package = Package(
     .target(
       name: "DriftboxExtensions",
       dependencies: [
-        "DriftboxApp", "DriftboxHostMac", "DriftboxHost", "DriftboxRackSession", "DriftboxSession",
-        "DriftboxDocument", "DriftboxSeq",
+        "DriftboxApp", "DriftboxHostMac", "DriftboxHost", "DriftboxRack", "DriftboxRackSession",
+        "DriftboxSession", "DriftboxDocument", "DriftboxSeq",
       ]),
     .executableTarget(
       name: "DriftboxAudioUnits", dependencies: ["DriftboxExtensions", "DriftboxHostMac"],

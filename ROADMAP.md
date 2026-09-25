@@ -419,7 +419,7 @@ external displays, performance capture to video.
    song leading in; once the free-running state a take does not keep has settled, well inside half
    a second, what is heard again is what was heard, to the last place of a float. Nothing is kept
    but commands, so a take costs nothing to record however long it runs.
-4. **AUv3 export.** ← *here.* Begun with the rack: `Driftbox: Rack`, an instrument any Audio Unit
+4. ~~**AUv3 export.**~~ Done. Begun with the rack: `Driftbox: Rack`, an instrument any Audio Unit
    host can load, out of process. SwiftPM builds its executable, entered at `NSExtensionMain`, and
    `scripts/bundle-app.sh` makes the `.appex` around it inside the app, signed ad hoc and sandboxed as
    an Audio Unit extension must be, and registers it; `auval` passes it. Behind the unit a
@@ -446,8 +446,12 @@ external displays, performance capture to video.
    puts the instrument at the app's beat before rendering that block, through a `locate` each
    `RenderSource` can carry, so the groovebox starts on the block the app does with the kick on
    its beat, going round its song past the song's end, and the rack's clock is at the app's beat.
-   A jump is a beat other than the last block's tempo led to, not the app's word for one. Next:
-   the rack's parameters, which cannot be its knobs, since those come and go with the patch.
+   A jump is a beat other than the last block's tempo led to, not the app's word for one. The
+   rack's parameters cannot be its knobs, since those come and go with the patch, so they are eight
+   macros, the same for every patch, each mapped onto a knob by learning it on the face — click the
+   macro, turn the knob — and kept in the unit's state beside the patch. The app's moves turn the
+   knob across its range, or to a selector's nearest choice, without a step of undo; the knob's
+   place is shown back to the app, in the face's words for it.
 
 ### What the later milestones ask of the first
 

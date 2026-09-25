@@ -397,6 +397,19 @@ public final class RackSession {
     save()
   }
 
+  /// A knob moved from outside — an app's automation, where the rack plays inside one as an Audio
+  /// Unit — heard at once and kept, but no step of undo: nobody here turned it, and a DAW playing
+  /// automation back would otherwise fill the history. The routings run over it as over a turn.
+  public func automate(_ moduleId: String, _ param: String, to value: Double) {
+    guard let at = patch.modules.firstIndex(where: { $0.id == moduleId }) else { return }
+    var next = patch
+    next.modules[at].params[param] = value
+    next = applyModulation(next, registry: RackModules.registry)
+    guard next != patch else { return }
+    settle(next)
+    save()
+  }
+
   /// Take a settled patch, and send the sound every param that differs from the one before.
   private func settle(_ next: Patch) {
     if live {
