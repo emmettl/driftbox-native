@@ -315,7 +315,9 @@ let package = Package(
       ]),
     .testTarget(
       name: "DriftboxExtensionsTests",
-      dependencies: ["DriftboxExtensions", "DriftboxHostMac", "DriftboxRackSession", "DriftboxDocument"]),
+      dependencies: [
+        "DriftboxExtensions", "DriftboxHostMac", "DriftboxHost", "DriftboxRackSession", "DriftboxDocument",
+      ]),
     .testTarget(
       name: "DriftboxHostMacTests",
       dependencies: [

@@ -24,6 +24,9 @@ public final class EngineHost: @unchecked Sendable {
   let engine: UnsafeMutablePointer<SongEngine>
   let commands: UnsafeMutablePointer<CommandRing>
   let released: UnsafeMutablePointer<ReleaseRing>
+  /// Where an app's transport last said to be, until the block it was said on is rendered. The
+  /// render thread's alone.
+  let located: UnsafeMutablePointer<(beat: Double, moving: Bool, pending: Bool)>
   /// Songs handed to the engine and not yet handed back.
   private var owned: [UnsafeMutablePointer<CompiledSong>] = []
   private let lock = Mutex<Void>(())
@@ -68,6 +71,8 @@ public final class EngineHost: @unchecked Sendable {
     commands.initialize(to: CommandRing())
     released = .allocate(capacity: 1)
     released.initialize(to: ReleaseRing())
+    located = .allocate(capacity: 1)
+    located.initialize(to: (0, false, false))
   }
 
   deinit {
@@ -78,6 +83,7 @@ public final class EngineHost: @unchecked Sendable {
     commands.deallocate()
     released.deinitialize(count: 1)
     released.deallocate()
+    located.deallocate()
     for song in owned {
       song.deinitialize(count: 1)
       song.deallocate()
@@ -111,12 +117,14 @@ public final class EngineHost: @unchecked Sendable {
   // MARK: - From the interface
 
   /// Compile `song` and ask the engine to play it. Songs it has finished with are freed here too.
-  public func load(_ song: Song) {
+  /// Play `song` from its start; or, `keepingPlace`, from where the song playing had got to, as an
+  /// edit of it is.
+  public func load(_ song: Song, keepingPlace: Bool = false) {
     collect()
     let compiled = UnsafeMutablePointer<CompiledSong>.allocate(capacity: 1)
     compiled.initialize(to: CompiledSong(song, preparer: preparer))
     lock.withLock { _ in owned.append(compiled) }
-    commands.pointee.send(.load(compiled))
+    commands.pointee.send(keepingPlace ? .replace(compiled) : .load(compiled))
   }
 
   public func send(_ command: Command) {
@@ -162,6 +170,30 @@ public final class EngineHost: @unchecked Sendable {
     #endif
   }
 
+  /// Where an app the engine plays inside has its transport, from the render thread at the start of
+  /// a block: `beat` quarter notes from the app's top, and whether it is moving. The song goes to
+  /// the same beat — round again, pass after pass, past its end, as it plays on past it — and
+  /// plays or stops there, on this block rather than one the interface's thread gets round to.
+  ///
+  /// Kept until the block is rendered, and done once whatever the interface sent before it has
+  /// been taken: a song it loaded is the one put at the beat.
+  @_noAllocation
+  public func locate(beat: Double, moving: Bool) {
+    located.pointee = (beat, moving, true)
+  }
+
+  @_noAllocation
+  private func takeLocate() {
+    guard located.pointee.pending else { return }
+    located.pointee.pending = false
+    let (beat, moving, _) = located.pointee
+    if let song = engine.pointee.song, beat.isFinite, song.pointee.bpm > 0 {
+      let framesPerBeat = 60 / song.pointee.bpm * sampleRate
+      engine.pointee.seek(toSongFrame: Int(max(0, beat) * framesPerBeat) % song.pointee.passFrames)
+    }
+    if moving { engine.pointee.play() } else { engine.pointee.stop() }
+  }
+
   /// Everything the render callback does: take what the interface asked for, then render.
   @_noAllocation
   public func render(frames: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>) {
@@ -195,12 +227,19 @@ public final class EngineHost: @unchecked Sendable {
         let previous = engine.pointee.song
         engine.pointee.load(song)
         if let previous { released.pointee.send(previous) }
+      case .replace(let song):
+        let previous = engine.pointee.song
+        let place = engine.pointee.songFrame()
+        engine.pointee.load(song)
+        if place > 0 { engine.pointee.seek(toSongFrame: place) }
+        if let previous { released.pointee.send(previous) }
       case .pad(let x, let y): engine.pointee.pad.set(x: x, y: y, atFrame: engine.pointee.frame)
       case .padRelease: engine.pointee.pad.release(atFrame: engine.pointee.frame)
       case .strike(let hit): engine.pointee.strike(hit)
       case .note(let line, let note): engine.pointee.play(note, line: line)
       }
     }
+    takeLocate()
     engine.pointee.render(frames: frames, left: left, right: right, sections: sections)
     var loudestLeft: Float = 0
     var loudestRight: Float = 0

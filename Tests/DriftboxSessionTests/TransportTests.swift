@@ -160,4 +160,24 @@ struct TransportTests {
       #expect(hits == 8)
     }
   }
+
+  /// An edit while the song plays carries on from where the engine is, not from where the session
+  /// last read it to be: a seek back there would strike what lies between a second time.
+  @Test func anEditCarriesOnFromWhereTheEngineIs() throws {
+    try withTemporaryDirectory { directory in
+      // A kick on every sixteenth at 120: one every 6000 frames.
+      let (session, host) = try openedSession(steadySong(bpm: 120), in: directory)
+      renderAudio(host, frames: 24000)
+      session.tick()
+      // Half a step on from the session's reading, past the kick at 24000.
+      renderAudio(host, frames: 3000)
+      session.edit { $0.patterns[0].tracks["909.sd"] = [StepValue](repeating: .off, count: 16) }
+      renderAudio(host, frames: 9000)
+      var kicks = 0
+      while let event = host.nextEvent() {
+        if event.kind == .hit, event.frame >= 24000, event.frame < 36000 { kicks += 1 }
+      }
+      #expect(kicks == 2, "the kicks at 24000 and 30000, each once")
+    }
+  }
 }

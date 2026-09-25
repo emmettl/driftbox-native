@@ -100,15 +100,8 @@
     /// as changes, so its own Play still plays while the app stands still.
     @Test func theGrooveboxKeepsTheAppsTime() throws {
       let (unit, plugin) = try Self.unit()
-      let moving = Mutex(false)
-      unit.musicalContextBlock = { tempo, _, _, _, _, _ in
-        tempo?.pointee = 97
-        return true
-      }
-      unit.transportStateBlock = { flags, _, _, _ in
-        flags?.pointee = moving.withLock { $0 } ? .moving : []
-        return true
-      }
+      let clock = AppClock(tempo: 97)
+      clock.attach(to: unit)
       try unit.allocateRenderResources()
       let session = try #require(plugin.session)
       let songBPM = try #require(session.song?.bpm)
@@ -118,17 +111,13 @@
       #expect(session.song?.bpm == songBPM, "followed, not written into the song")
       #expect(!session.isPlaying)
 
-      moving.withLock { $0 = true }
-      _ = RackPluginTests.render(unit, frames: 512)
-      Self.tickSession(plugin)
-      _ = RackPluginTests.render(unit, frames: 512)
+      clock.moving = true
+      _ = RackPluginTests.render(unit, frames: 1024)
       Self.tickSession(plugin)
       #expect(session.isPlaying)
 
-      moving.withLock { $0 = false }
-      _ = RackPluginTests.render(unit, frames: 512)
-      Self.tickSession(plugin)
-      _ = RackPluginTests.render(unit, frames: 512)
+      clock.moving = false
+      _ = RackPluginTests.render(unit, frames: 1024)
       Self.tickSession(plugin)
       #expect(!session.isPlaying)
 
@@ -139,6 +128,61 @@
         Self.tickSession(plugin)
       }
       #expect(session.isPlaying)
+    }
+
+    /// A bar of kicks on every sixteenth at 120, which is 22050 frames a beat at 44.1 kHz.
+    static func kicks() -> Song {
+      var pattern = DriftboxSeq.Pattern(id: "p", name: "Kicks", length: 16)
+      pattern.tracks["909.bd"] = [StepValue](repeating: .on, count: 16)
+      var song = Song(bpm: 120, patterns: [pattern])
+      song.chain = [ChainStep(pattern: "p")]
+      return song
+    }
+
+    /// Where the app's transport is, the groovebox is — stopped at the app's playhead, starting on
+    /// the block the app does with the kick that is on its beat, jumping when the app's cycle goes
+    /// round, and going round its own song past the song's end.
+    @Test func theGrooveboxStartsWhereTheAppIs() throws {
+      let (unit, plugin) = try Self.unit()
+      unit.fullState = ["song": SongCodec.encode(Self.kicks()), "name": "Kicks"]
+      let clock = AppClock(tempo: 120, beat: 2)
+      clock.attach(to: unit)
+      try unit.allocateRenderResources()
+      let session = try #require(plugin.session)
+      let host = session.host
+      _ = RackPluginTests.render(unit, frames: 512)
+      #expect(unit.appLocates)
+      #expect(host.songFrame.load(ordering: .relaxed) == 44100, "the app's second beat, stopped")
+      let stopped = !host.playing.load(ordering: .relaxed)
+      #expect(stopped)
+      host.collect()
+      while host.nextEvent() != nil {}
+
+      // The app starts: the groovebox with it, on the same block, the beat's kick on its first frame.
+      clock.moving = true
+      let start = host.engineFrame.load(ordering: .relaxed)
+      _ = RackPluginTests.render(unit, frames: 512)
+      #expect(host.songFrame.load(ordering: .relaxed) == 44100 + 512)
+      var first: Int?
+      while let event = host.nextEvent() {
+        if event.kind == .hit, first == nil { first = event.frame }
+      }
+      #expect(first == start)
+      Self.tickSession(plugin)
+      #expect(session.isPlaying)
+
+      // The app's cycle goes round to its top.
+      clock.beat = 0
+      _ = RackPluginTests.render(unit, frames: 512)
+      #expect(host.songFrame.load(ordering: .relaxed) == 512)
+
+      // Stopped at the app's fifth beat: a bar of four on, the song's second beat.
+      clock.moving = false
+      clock.beat = 5
+      _ = RackPluginTests.render(unit, frames: 512)
+      #expect(host.songFrame.load(ordering: .relaxed) == 22050)
+      Self.tickSession(plugin)
+      #expect(!session.isPlaying)
     }
 
     /// The face is the groovebox's editor, on the session the unit plays; and it draws.

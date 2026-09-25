@@ -974,9 +974,9 @@ public final class Session {
     if rackLink != nil { saved = edited }
     isEdited = edited != saved
     refreshUndo()
-    let position = songFrame
-    load(edited)
-    send(.seek(songFrame: position))
+    // Where the engine has got to, which only the render thread knows exactly: a place read at
+    // the last tick is behind it, and a seek there would play what is between twice.
+    load(edited, keepingPlace: true)
     if isPlaying { startEngine() }
     rackLink?.edited(edited)
   }
@@ -991,11 +991,12 @@ public final class Session {
 
   /// Every song the engine is given comes through here, so one run at a tempo kept elsewhere — a
   /// clock followed, an app the groovebox plays inside — stays at it through an edit or another song.
-  private func load(_ song: Song) {
+  private func load(_ song: Song, keepingPlace: Bool = false) {
     var running = song
     if let bpm = followedBPM { running.bpm = bpm }
-    host.load(running)
-    recording?.events.append((host.engineFrame.load(ordering: .relaxed), .song(running)))
+    host.load(running, keepingPlace: keepingPlace)
+    recording?.events.append(
+      (host.engineFrame.load(ordering: .relaxed), .song(running, keepingPlace: keepingPlace)))
   }
 
   /// The performance being recorded, while one is.
@@ -1022,9 +1023,9 @@ public final class Session {
 
   /// A song a take loaded, as the take loaded it: into the engine and what the session shows, and
   /// nothing else — an edit left the loop, the history and the rest as they were.
-  public func takeUp(_ song: Song) {
+  public func takeUp(_ song: Song, keepingPlace: Bool = false) {
     self.song = song
-    load(song)
+    load(song, keepingPlace: keepingPlace)
   }
 
   /// The take, ended now; nil if none was being made.

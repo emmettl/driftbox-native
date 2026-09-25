@@ -19,7 +19,7 @@
   ///   a document, kept as it is edited, and restoring one opens it.
   /// - The app's MIDI plays the groovebox as a keyboard plugged into the Mac does — the drums from
   ///   note 21, the 303 from 33 — and it runs at the app's tempo, starting and stopping with its
-  ///   transport.
+  ///   transport at the app's beat, on the block it does, the song going round past its end.
   /// - Its knobs are the unit's parameters, every one of `GrooveboxKnob.all`, for the app to
   ///   automate: a move of the app's is the song's, heard and kept but no step of undo, and a knob
   ///   turned on the face is shown to the app, which can record it.
@@ -159,8 +159,16 @@
     func tick() {
       guard let unit, let session else { return }
       while let bytes = unit.nextMIDI() { midi.hear(bytes) }
-      if let tempo = unit.appTempo, abs(tempo - session.tempo) >= 0.05 { session.follow(bpm: tempo) }
-      if let playing = transport.change(unit.appPlaying), playing != session.isPlaying {
+      if let tempo = unit.appTempo, abs(tempo - session.tempo) >= 0.05 {
+        session.follow(bpm: tempo)
+        // Remade at the new tempo and taken up at the step it was on, which is near the app's beat
+        // but not on it.
+        unit.locateAgain()
+      }
+      // Put where the app is on the render thread, the engine plays or stops there itself, and the
+      // session hears of it as it ticks; an app that does not say where it is has the groovebox
+      // start where it stands.
+      if let playing = transport.change(unit.appPlaying), !unit.appLocates, playing != session.isPlaying {
         if playing { session.play() } else { session.stop() }
       }
       ticks += 1

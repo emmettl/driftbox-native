@@ -2,6 +2,7 @@ import ConformanceSupport
 import DriftboxDocument
 import DriftboxEngine
 import DriftboxHost
+import DriftboxSeq
 import Foundation
 import Testing
 
@@ -50,6 +51,41 @@ struct EngineHostTests {
 
     #expect(left == expected && right == expectedRight)
     #expect(left.contains { $0 != 0 })
+  }
+
+  /// An app's transport, put on the song from the render thread: at the same beat, round again past
+  /// the song's end, playing or stopped as the app is — from the block it is said on.
+  @Test func anAppsTransportLocatesTheSong() {
+    var pattern = DriftboxSeq.Pattern(id: "p", name: "P", length: 16)
+    pattern.tracks["909.bd"] = [StepValue](repeating: .on, count: 16)
+    var song = Song(bpm: 120, patterns: [pattern])
+    song.chain = [ChainStep(pattern: "p")]
+    let host = EngineHost(sampleRate: 48000)
+    host.load(song)
+    var left = [Float](repeating: 0, count: 480)
+    var right = [Float](repeating: 0, count: 480)
+    func render() {
+      left.withUnsafeMutableBufferPointer { l in
+        right.withUnsafeMutableBufferPointer { r in
+          host.render(frames: 480, left: l.baseAddress!, right: r.baseAddress!)
+        }
+      }
+    }
+    render()
+
+    // Half a second a beat at 120: the third beat is a second and a half in.
+    host.locate(beat: 3, moving: true)
+    render()
+    let playing = host.playing.load(ordering: .relaxed)
+    #expect(playing)
+    #expect(host.songFrame.load(ordering: .relaxed) == 3 * 24000 + 480)
+
+    // The song is a bar, four beats, so the app's fifth is the song's second, a pass on.
+    host.locate(beat: 5, moving: false)
+    render()
+    let stopped = !host.playing.load(ordering: .relaxed)
+    #expect(stopped)
+    #expect(host.songFrame.load(ordering: .relaxed) == 24000)
   }
 
   /// Loading a second song hands the first back, and the host frees it.

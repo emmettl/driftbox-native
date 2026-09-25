@@ -14,8 +14,9 @@ public struct Take {
     /// A command as the session sent it. Never `.load`, whose song is a pointer only the engine
     /// that compiled it can read: a song arrives as `.song`.
     case command(Command)
-    /// A song loaded: an edit, or a different song opened.
-    case song(Song)
+    /// A song loaded: a different song opened, from its start; or an edit, `keepingPlace`, from
+    /// where the engine had got to.
+    case song(Song, keepingPlace: Bool)
     /// The scene the visuals switched to, or the song's own for nil: not the engine's, but part of
     /// what was seen.
     case scene(String?)
