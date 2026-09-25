@@ -931,6 +931,17 @@ public final class Session {
     refreshUndo()
   }
 
+  /// The song changed from outside — an app's automation moving a knob, where the groovebox plays
+  /// inside one — heard at once and kept, but no step of undo: nobody here made it, and a DAW
+  /// playing automation back would otherwise fill the history. Nothing when it changes nothing.
+  public func automate(_ change: (inout Song) -> Void) {
+    guard let current = song else { return }
+    var edited = current
+    change(&edited)
+    guard edited != current else { return }
+    apply(edited)
+  }
+
   /// `song` with `value` written into `target`'s lane at the step the transport is on, when
   /// automation is armed and the song is playing past any count-in — there is no bar of it yet for
   /// a knob to belong to during one — and as it was otherwise: the reference's `recordPoint`.

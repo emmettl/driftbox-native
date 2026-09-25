@@ -1,5 +1,6 @@
 #if canImport(AVFoundation)
   import AVFoundation
+  import DriftboxApp
   import DriftboxDocument
   import DriftboxHostMac
   import DriftboxSeq
@@ -147,6 +148,102 @@
       try unit.allocateRenderResources()
       #expect(plugin.session != nil && plugin.stage != nil)
       #expect(try RackPluginTests.colours(GrooveboxPluginView(plugin: plugin)) > 4 * waiting)
+    }
+
+    /// Every knob is a parameter, the same whatever song is open, named and shown as the face does.
+    @Test func theKnobsAreParameters() throws {
+      let (unit, _) = try Self.unit()
+      let tree = try #require(unit.parameterTree)
+      let knobs = GrooveboxKnob.all
+      #expect(tree.allParameters.count == knobs.count)
+      #expect(Set(knobs.map(\.identifier)).count == knobs.count, "an app tells them apart by these")
+      #expect(Set(knobs.map(\.target)).count == knobs.count)
+      let cutoff = try #require(knobs.firstIndex { $0.target == "fx/pcfCutoff" })
+      let parameter = try #require(tree.parameter(withAddress: AUParameterAddress(cutoff)))
+      #expect(parameter.displayName == "Cutoff")
+      #expect(parameter.string(fromValue: nil).hasSuffix("Hz"))
+      #expect(tree.children.map(\.displayName).prefix(4) == ["Song", "Master", "303 A", "303 B"])
+    }
+
+    /// The app's automation moves the song — through the tree, as its controls do, and in the render
+    /// events, as its automation lanes do — heard and kept, but no step of undo.
+    @Test func theAppsAutomationMovesTheSong() throws {
+      let (unit, plugin) = try Self.unit()
+      try unit.allocateRenderResources()
+      let session = try #require(plugin.session)
+      Self.tickSession(plugin)
+      let knobs = GrooveboxKnob.all
+      let cutoff = try #require(knobs.firstIndex { $0.target == "fx/pcfCutoff" })
+      let level = try #require(knobs.firstIndex { $0.target == "voice/909.bd/level" })
+      let tree = try #require(unit.parameterTree)
+
+      tree.parameter(withAddress: AUParameterAddress(cutoff))?.value = 0.8
+      let schedule = try #require(unit.scheduleParameterBlock)
+      schedule(AUEventSampleTimeImmediate, 0, AUParameterAddress(level), 0.25)
+      _ = RackPluginTests.render(unit, frames: 512)
+      Self.tickSession(plugin)
+      let song = try #require(session.song)
+      #expect(abs(song.fx.pcfCutoff - 0.8) < 1e-6)
+      #expect(abs((song.kit.params["909.bd"]?.level ?? 0) - 0.25) < 1e-6)
+      #expect(!session.canUndo, "the app's, not an edit made here")
+
+      // Kept as the state the app saves.
+      let document = try #require(unit.fullState?["song"] as? String)
+      #expect(abs((SongCodec.decode(document)?.fx.pcfCutoff ?? 0) - 0.8) < 1e-6)
+    }
+
+    /// A knob turned on the face, or a song opened, is shown to the app — and not heard back as the
+    /// app's own move, which would undo a turn still going on.
+    @Test func theFacesTurnsAreShownToTheApp() throws {
+      let (unit, plugin) = try Self.unit()
+      try unit.allocateRenderResources()
+      let session = try #require(plugin.session)
+      Self.tickSession(plugin)
+      let knobs = GrooveboxKnob.all
+      let cutoff = try #require(knobs.firstIndex { $0.target == "fx/pcfCutoff" })
+      let parameter = try #require(unit.parameterTree?.parameter(withAddress: AUParameterAddress(cutoff)))
+      let song = try #require(session.song)
+      #expect(abs(Double(parameter.value) - song.fx.pcfCutoff) < 1e-6, "the open song's, not the rest")
+
+      session.edit { $0.fx.pcfCutoff = 0.61 }
+      Self.tickSession(plugin)
+      #expect(abs(parameter.value - 0.61) < 1e-6)
+      session.edit { $0.fx.pcfCutoff = 0.7 }
+      Self.tickSession(plugin)
+      Self.tickSession(plugin)
+      #expect(abs((session.song?.fx.pcfCutoff ?? 0) - 0.7) < 1e-6)
+      #expect(abs(parameter.value - 0.7) < 1e-6)
+      #expect(unit.movedParameters().isEmpty)
+    }
+
+    /// What the app sets before there is a song — as it restores a project, before readying the
+    /// unit — is the song's once there is one, not overwritten by the song opened.
+    @Test func whatTheAppSetsFirstIsTheSongs() throws {
+      let (unit, plugin) = try Self.unit()
+      let cutoff = try #require(GrooveboxKnob.all.firstIndex { $0.target == "fx/pcfCutoff" })
+      let parameter = try #require(unit.parameterTree?.parameter(withAddress: AUParameterAddress(cutoff)))
+      parameter.value = 0.9
+      try unit.allocateRenderResources()
+      #expect(
+        plugin.session?.song?.fx.pcfCutoff == 0.9, "and 0.9, as the app set it, not the float's 0.8999…")
+      #expect(parameter.value == 0.9)
+    }
+
+    /// The app moves its parameters on threads of its own while the owner shows it the song: a move
+    /// not yet taken is newer than the song, and is not shown over.
+    @Test func aMoveNotYetTakenIsNotShownOver() throws {
+      let (unit, _) = try Self.unit()
+      let cutoff = try #require(GrooveboxKnob.all.firstIndex { $0.target == "fx/pcfCutoff" })
+      let parameter = try #require(unit.parameterTree?.parameter(withAddress: AUParameterAddress(cutoff)))
+      parameter.value = 0.9
+      unit.show(0.2, at: cutoff)
+      #expect(parameter.value == 0.9)
+      let moves = unit.movedParameters()
+      #expect(moves.count == 1 && moves.first?.address == cutoff && moves.first?.value == 0.9)
+      // Taken, it can be shown over, as the next edit on the face would.
+      unit.show(0.2, at: cutoff)
+      #expect(parameter.value == 0.2)
+      #expect(unit.movedParameters().isEmpty)
     }
   }
 #endif

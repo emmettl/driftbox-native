@@ -436,6 +436,13 @@ external displays, performance capture to video.
    under a bar standing in for the toolbar and song list an app's window cannot lend it. Both
    instruments are one `InstrumentAudioUnit` underneath, playing a `RenderSource`, and both follow
    the app's transport as changes, so their own Play still plays while the app stands still.
+   The groovebox's knobs are its parameters for the app to automate — `GrooveboxKnob.all`, the
+   song's swing, the master path, both 303s and every drum voice with its sends, the same list for
+   every song so the app's automation keeps its place — named and shown as the face shows them.
+   The app's moves, from its controls or in the render events, become the song's at the next
+   tick, heard and kept but no step of undo; a knob turned on the face is shown to the app, without
+   being heard back as the app's. Next: the app's song position, so both start where the app is;
+   and the rack's parameters, which cannot be its knobs, since those come and go with the patch.
 
 ### What the later milestones ask of the first
 
