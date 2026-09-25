@@ -78,6 +78,19 @@ public final class Interface {
   public var takesText: Bool { renaming != nil }
   /// The context menu last made: what each of its commands does, and which are greyed or ticked.
   var menuActions: [String: () -> Void] = [:]
+  /// A menu a tap asked for — the song's — for the platform to show as its own.
+  var menuRequest: (menu: Menu, at: SIMD2<Float>)?
+
+  /// What the song's menu asks of its file, which only the platform can do: choose one to open, or
+  /// where to save it, with its own pickers.
+  public enum FileAction: Sendable, Equatable {
+    case open, save, saveAs
+  }
+  /// Where the song's menu sends what it asks of a file; with none, it offers none.
+  public var files: ((FileAction) -> Void)?
+  /// Ask whether to go on and lose the song's unsaved edits, and do `then` if so; with none, the
+  /// interface goes on without asking.
+  public var confirm: ((_ question: String, _ then: @escaping () -> Void) -> Void)?
   var menuDisabled: Set<String> = []
   var menuChecked: Set<String> = []
 
@@ -371,6 +384,10 @@ public final class Interface {
       followsPage = false
     case .perform:
       performing = true
+    case .songs:
+      if let chip = layout.songChip {
+        menuRequest = (songMenu(), SIMD2(chip.frame.x, chip.frame.maxY))
+      }
     case .bassStep(let voice, let index):
       select(bass: voice, index)
     case .bassGate(let pattern, let voice, let index):
@@ -534,6 +551,18 @@ public final class Interface {
 
   /// A button as the web draws one: a dark rounded chip with a hairline edge that brightens under
   /// the pointer, lit in teal when it is on.
+  /// The song's chip: its name, cut to fit with an ellipsis.
+  private func drawSongChip(_ chip: Layout.Chip, on canvas: Canvas) {
+    canvas.font = Theme.mono(11)
+    let room = chip.frame.width - 20
+    var name = chip.label
+    if canvas.measure(name) > room {
+      while !name.isEmpty, canvas.measure(name + "…") > room { name.removeLast() }
+      name += "…"
+    }
+    self.chip(Layout.Chip(frame: chip.frame, label: name, action: chip.action, isOn: false), on: canvas)
+  }
+
   private func chip(_ chip: Layout.Chip, tint: Colour = Theme.nine, on canvas: Canvas) {
     Draw.chip(
       chip.frame, label: chip.label, isOn: chip.isOn, hovered: isHovered(chip.frame),
@@ -862,9 +891,15 @@ public final class Interface {
     canvas.font = Theme.mono(9, weight: 500)
     canvas.fill = Theme.dim
     if layout.touch {
-      // For fingers the head holds the tempo and the swing, the song's length beside its name.
+      // For fingers the head holds the song, as a chip that opens its menu, its length after it,
+      // and the tempo and the swing.
       let middle = strip.y + Layout.phoneStripHead / 2 + 3
-      canvas.fillText("SONG  \(layout.totalBars) bars", strip.x + 14, middle)
+      if let songChip = layout.songChip {
+        drawSongChip(songChip, on: canvas)
+      }
+      canvas.align = .left
+      canvas.font = Theme.mono(9, weight: 500)
+      canvas.fill = Theme.dim
       if let song = session.song {
         for number in layout.numbers {
           drawNumber(number, song: song, on: canvas)

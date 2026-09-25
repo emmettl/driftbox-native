@@ -110,10 +110,17 @@ public final class Main extends Activity {
         @Override
         public void doFrame(long nanos) {
           String menu = Native.frame();
-          if (menu != null && anchor != null) Menus.show(anchor, menu, getResources().getDisplayMetrics().density);
+          if (menu != null && !Files.handle(Main.this, menu) && anchor != null) {
+            Menus.show(anchor, menu, getResources().getDisplayMetrics().density);
+          }
           Choreographer.getInstance().postFrameCallback(this);
         }
       };
+
+  @Override
+  protected void onActivityResult(int request, int code, Intent data) {
+    if (!Files.result(this, request, code, data)) super.onActivityResult(request, code, data);
+  }
 
   @Override
   protected void onDestroy() {

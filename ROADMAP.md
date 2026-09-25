@@ -712,8 +712,12 @@ each question, and the rest is Android's alone:
    library 1.4MB. Out of view it plays on through a media playback service, which keeps the big
    cores Android would otherwise take away, with a buffer of sixteen bursts while nothing is
    drawn, and pauses when audio focus is lost. It builds on any of the three hosts, Windows, a Mac
-   or Linux, and CI builds it on Linux; on a Mac, an arm64 emulator runs every check the app has. The build leaves out Foundation's
-   internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
+   or Linux, and CI builds it on Linux; on a Mac, an arm64 emulator runs every check the app has.
+   Songs open and save through the storage access framework now: on a touchscreen the song's name
+   heads the strip, and a tap on it is the song's menu — Open…, Save, Save As… and the catalogue's
+   songs — with Android's own pickers; a document is read and written whole by Java, and known to
+   the session by its URI, so Save goes back to where it came from, and Android asks before
+   unsaved edits are lost. The build leaves out Foundation's internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
    `DriftboxDocument` takes Foundation only to write a WAV. The Play Store, or F-Droid, when
    Driftbox is public.
 

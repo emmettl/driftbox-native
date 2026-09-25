@@ -562,6 +562,41 @@ public final class Session {
     }
   }
 
+  // MARK: - Documents the platform reads and writes
+
+  /// A song document a platform read and handed over as text, from `location`, which it alone can
+  /// read and write: on Android, a document the storage access framework chose, named by a URI no
+  /// path can stand for. Called after its file name, less a song's ending, and opened playing, as a
+  /// file is. The location is the song's id, which is how a later save knows where it goes. False,
+  /// and nothing opened, for text that is not a song.
+  @discardableResult
+  public func open(document text: String, fileName: String, at location: String) -> Bool {
+    let name = SongFile.name(fromFileName: fileName)
+    guard let loaded = SongCodec.decode(text) else {
+      error = "\(name) is not a song"
+      return false
+    }
+    let entry = CatalogueEntry(id: location, name: name, blurb: "", visual: loaded.visual ?? "")
+    take(loaded, as: entry, from: nil, remembered: false)
+    startEngine()
+    return true
+  }
+
+  /// The platform wrote `song` to `location`, as `fileName`: saved, as far as the session knows,
+  /// and called after it. Still edited if it has been edited since it was handed over to be written.
+  public func wrote(_ song: Song, to location: String, fileName: String) {
+    saved = song
+    isEdited = self.song != song
+    current = CatalogueEntry(
+      id: location, name: SongFile.name(fromFileName: fileName), blurb: current?.blurb ?? "",
+      visual: current?.visual ?? "")
+  }
+
+  /// The platform could not write the song where it was asked to.
+  public func couldNotWrite(_ fileName: String) {
+    error = "\(SongFile.name(fromFileName: fileName)) could not be saved"
+  }
+
   // MARK: - The transport
 
   /// Jump to the start of a bar of the arrangement.

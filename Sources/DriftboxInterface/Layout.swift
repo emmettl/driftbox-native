@@ -79,6 +79,8 @@ public enum Action: Equatable, Sendable {
   /// On a touchscreen, put the controls away and make the whole screen the scene and the pad, until
   /// the one chip left in the corner brings them back.
   case perform
+  /// On a touchscreen, the song's menu: the catalogue's songs, and the song's own file.
+  case songs
   /// On a touchscreen, choose a 303 step to set on the keyboard, or with nil put the keyboard away.
   case bassStep(voice: String, index: Int?)
   /// Pause a 303 step, keeping its note, or sound it again.
@@ -231,6 +233,9 @@ public struct Layout {
 
   /// The song's strip under the transport, and its sections, or nil with no song.
   public var strip: Rect?
+  /// On a touchscreen, the song's name at the head of the strip, which opens the song's menu: a
+  /// window has a menu bar for that, and a touchscreen has nothing else to hold it.
+  public var songChip: Chip?
   public var sections: [Section] = []
   /// Where the sections are drawn, inside the strip.
   public var sectionsFrame: Rect?
@@ -388,6 +393,12 @@ public struct Layout {
         let tempo = Rect(swing.x - 4 - 84, swing.y, 84, swing.height)
         numbers.insert(Knob(target: .tempo, dial: tempo, cell: tempo), at: 0)
       }
+      // The song's name from the left, as far as the tempo; past a followed tempo's readout, which
+      // is drawn where the tempo would be.
+      let right = (session.followedBPM == nil ? numbers.first?.cell.x : swing.x - 72) ?? strip.maxX
+      songChip = Chip(
+        frame: Rect(strip.x + 8, swing.y, max(60, min(240, right - 10 - strip.x - 8)), swing.height),
+        label: session.documentName, action: .songs, isOn: false)
     }
     let sectionsFrame = Rect(strip.x + 14, strip.y + stripHead, max(0, strip.width - 28), 24)
     self.sectionsFrame = sectionsFrame
@@ -525,6 +536,7 @@ public struct Layout {
   /// What pressing at `point` would do, if anything.
   public func action(at point: SIMD2<Float>) -> Action? {
     if let chip = chips.first(where: { $0.frame.contains(point) }) { return chip.action }
+    if let songChip, songChip.frame.contains(point) { return songChip.action }
     if let number = numbers.first(where: { $0.cell.contains(point) }) { return .knob(number.target) }
     if let section = sections.first(where: { $0.frame.contains(point) }) { return .seek(bar: section.start) }
     if let inspector, inspector.frame.contains(point) {

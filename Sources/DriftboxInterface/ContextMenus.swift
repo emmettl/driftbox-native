@@ -46,7 +46,48 @@ extension Interface {
     action()
   }
 
+  /// A menu a tap asked for, once: the platform shows it as its own, and `choose` does what is
+  /// chosen from it.
+  public func takeMenuRequest() -> (menu: Menu, at: SIMD2<Float>)? {
+    defer { menuRequest = nil }
+    return menuRequest
+  }
+
   // MARK: - The menus
+
+  /// The song's: its file, where the platform can open and save one, and the catalogue's songs.
+  func songMenu() -> Menu {
+    menuActions = [:]
+    menuDisabled = []
+    menuChecked = []
+    var items: [MenuItem] = []
+    if let files {
+      menuActions["file.open"] = { [weak self] in self?.unlessEdited { files(.open) } }
+      menuActions["file.save"] = { files(.save) }
+      menuActions["file.saveAs"] = { files(.saveAs) }
+      if session.song == nil {
+        menuDisabled.formUnion(["file.save", "file.saveAs"])
+      }
+      items += [
+        .command("Open…", id: "file.open"), .command("Save", id: "file.save"),
+        .command("Save As…", id: "file.saveAs"), .separator,
+      ]
+    }
+    let songs = session.entries.map { entry -> MenuItem in
+      let id = "song." + entry.id
+      menuActions[id] = { [weak self] in self?.unlessEdited { self?.session.open(entry) } }
+      if session.current?.id == entry.id { menuChecked.insert(id) }
+      return .command(entry.name, id: id)
+    }
+    items.append(.submenu(Menu("Songs", songs)))
+    return Menu(session.song == nil ? "Driftbox" : session.documentName, items)
+  }
+
+  /// `then`, once the platform has said to go on if the song has edits that are not saved.
+  private func unlessEdited(_ then: @escaping () -> Void) {
+    guard session.isEdited, let confirm else { return then() }
+    confirm("\(session.documentName) has changes that are not saved. Lose them?", then)
+  }
 
   private func laneMenu(_ voice: String, name: String, pattern: DriftboxSeq.Pattern) -> Menu {
     let id = pattern.id
