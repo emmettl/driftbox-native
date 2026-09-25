@@ -506,6 +506,11 @@ again as in view, with no drawing to keep the cores awake, so the stream's buffe
 bursts at once, 32ms, and back to one in view. On a Fairphone 6, twenty seconds with the screen
 off underran once, as it went off. A call, or another app's playing, pauses it, as media does.
 
+Songs open and save as `.driftbox` through Android's own pickers, from the song's menu: its name,
+at the head of the strip, tapped. Java reads and writes the document whole and hands Swift its
+text and its URI (`FileLines` in `Sources/DriftboxAndroid` says what passes between them), and the
+session keeps the URI as the song's id, so Save writes back to the document it came from.
+
 It needs a JDK and the SDK's build-tools and a platform beside the NDK. Driftbox Loopback is a
 MIDI device the app publishes that sends back what it is sent, so the ports are tested with
 nothing plugged in, as on Windows. Notes and clock come back whole and in order, stamps exact. A

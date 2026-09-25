@@ -50,6 +50,12 @@ final class Native {
   /** The command with this id chosen from the menu the last frame returned. */
   static native void menuChosen(String id);
 
+  /** A song document the open picker chose, read whole: its URI, its name, and its text. */
+  static native void fileOpened(String uri, String name, String text);
+
+  /** The song written to the document at `uri`, called `name`; or not. */
+  static native void fileSaved(String uri, String name, boolean done);
+
   /** Stop playing and drawing, and wait until both have. */
   static native void stop();
 

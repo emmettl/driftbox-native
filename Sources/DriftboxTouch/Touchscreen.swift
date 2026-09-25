@@ -140,6 +140,8 @@ public final class Touchscreen {
     }
     if interface.pointer(event) {
       if event.phase == .began { resting = (event.id, event.location, clock()) }
+      // A tap that asks for a menu — the song's chip — has it shown as a long press's is.
+      if let request = interface.takeMenuRequest() { onMenu?(request.menu, request.at) }
       return
     }
     switch event.phase {

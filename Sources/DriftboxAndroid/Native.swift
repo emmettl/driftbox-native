@@ -104,6 +104,26 @@
     MainActor.assumeIsolated { stage?.choose(chosen) }
   }
 
+  /// A song document Java's picker chose, and Java read: its text, its file's name, and its URI.
+  @_cdecl("Java_app_driftbox_Native_fileOpened")
+  public func nativeFileOpened(
+    _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ location: jstring?, _ fileName: jstring?,
+    _ text: jstring?
+  ) {
+    let (location, fileName, text) = (env.string(location), env.string(fileName), env.string(text))
+    MainActor.assumeIsolated { stage?.opened(text, fileName: fileName, at: location) }
+  }
+
+  /// The song written by Java, to the document at `location` called `fileName`; or not, `done` false.
+  @_cdecl("Java_app_driftbox_Native_fileSaved")
+  public func nativeFileSaved(
+    _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ location: jstring?, _ fileName: jstring?,
+    _ done: jboolean
+  ) {
+    let (location, fileName) = (env.string(location), env.string(fileName))
+    MainActor.assumeIsolated { stage?.wrote(to: location, fileName: fileName, done != 0) }
+  }
+
   @_cdecl("Java_app_driftbox_Native_stop")
   public func nativeStop(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?) {
     MainActor.assumeIsolated {

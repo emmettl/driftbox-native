@@ -6,6 +6,9 @@
   import DriftboxHost
   import DriftboxHostAndroid
   import DriftboxSession
+  import DriftboxDocument
+  import DriftboxInterface
+  import DriftboxSeq
   import DriftboxShell
   import DriftboxText
   import DriftboxTouch
@@ -51,6 +54,11 @@
       screen.onMenu = { [weak self, interface = screen.interface] menu, at in
         self?.pendingMenu = MenuLines.write(
           menu, at: at, isEnabled: interface.menuIsEnabled, isChecked: interface.menuIsChecked)
+      }
+      screen.interface.files = { [weak self] action in self?.file(action) }
+      screen.interface.confirm = { [weak self] question, then in
+        self?.confirmed = then
+        self?.pendingMenu = FileLines.ask(question)
       }
     }
 
@@ -140,9 +148,55 @@
       return pendingMenu
     }
 
-    /// What was chosen from it.
+    /// What was chosen from it; or, `FileLines.confirmed`, the answer to a question asked.
     func choose(_ id: String) {
+      if id == FileLines.confirmed {
+        confirmed?()
+        confirmed = nil
+        return
+      }
       screen.interface.choose(id)
+    }
+
+    // MARK: - The song's file
+
+    /// What to do once a question asked has been answered yes.
+    private var confirmed: (() -> Void)?
+    /// The song as it was handed to Java to write, which is what is saved once Java says it is.
+    private var writing: Song?
+
+    /// What the song's menu asks of its file, handed to Java, which alone has the pickers and can
+    /// read and write what they choose. A song saved goes back to the document it came from, when it
+    /// came from one, and to one Java's picker makes when it did not.
+    private func file(_ action: Interface.FileAction) {
+      switch action {
+      case .open:
+        pendingMenu = FileLines.open
+      case .save, .saveAs:
+        guard let song = session.song else { return }
+        writing = song
+        let document = SongCodec.encode(song)
+        if action == .save, let location = session.current?.id, location.hasPrefix("content:") {
+          pendingMenu = FileLines.write(document, to: location)
+        } else {
+          pendingMenu = FileLines.create(document, named: session.documentName + "." + SongFile.fileExtension)
+        }
+      }
+    }
+
+    /// A document Java's picker chose, and read.
+    func opened(_ text: String, fileName: String, at location: String) {
+      session.open(document: text, fileName: fileName, at: location)
+    }
+
+    /// Java has written the song, or could not.
+    func wrote(to location: String, fileName: String, _ done: Bool) {
+      defer { writing = nil }
+      guard done, let song = writing else {
+        session.couldNotWrite(fileName)
+        return
+      }
+      session.wrote(song, to: location, fileName: fileName)
     }
   }
 
