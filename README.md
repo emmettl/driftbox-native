@@ -761,6 +761,12 @@ wrap it into a bundle: `swift run Driftbox` also works, but the catalogue lives 
 bundle that `Bundle.module` looks for beside the executable and in `Contents/Resources`, and the
 script puts a copy in both.
 
+### Releases
+
+A release is Developer ID-signed and notarised on this Mac by `scripts/release.py`, which leaves a
+stapled app, zipped, with its checksum and a manifest, in `dist/` for review, and tags, uploads and
+publishes nothing. [docs/RELEASING.md](docs/RELEASING.md) has the one-time setup and the steps.
+
 ### Visuals
 
 `DriftboxScenes` is phase 6: a `Scene` protocol that keeps the web scenes' ids and accent
