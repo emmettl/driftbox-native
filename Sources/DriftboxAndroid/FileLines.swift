@@ -8,6 +8,9 @@
   ///     <the song's document>         `Native.fileSaved`
   ///     file  write  location         write the song below over the document at `location`
   ///     <the song's document>
+  ///     file  samples  module  several  choose recordings for the rack's `module`, one or (1)
+  ///                                   several, and copy them where Swift can read them:
+  ///                                   `Native.samplesChosen`
   ///     ask  question                 ask, and choose `confirmed` for yes: `Native.menuChosen`
   ///
   /// A menu's first line begins with a number, so neither can be taken for the other.
@@ -23,6 +26,10 @@
     }
 
     static func ask(_ question: String) -> String { "ask\t\(clean(question))" }
+
+    static func samples(for module: String, several: Bool) -> String {
+      "file\tsamples\t\(clean(module))\t\(several ? 1 : 0)"
+    }
 
     /// What Java chooses when a question is answered yes.
     static let confirmed = "confirmed"

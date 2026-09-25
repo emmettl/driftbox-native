@@ -53,6 +53,9 @@ final class Native {
   /** A song document the open picker chose, read whole: its URI, its name, and its text. */
   static native void fileOpened(String uri, String name, String text);
 
+  /** Recordings chosen for the rack's `module`, copied into the app's files: their paths, a line each. */
+  static native void samplesChosen(String module, String paths);
+
   /** The song written to the document at `uri`, called `name`; or not. */
   static native void fileSaved(String uri, String name, boolean done);
 

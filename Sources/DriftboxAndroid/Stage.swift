@@ -13,6 +13,7 @@
   import DriftboxShell
   import DriftboxText
   import DriftboxTouch
+  import FoundationEssentials
   import Synchronization
 
   /// A song, played and seen and edited: the session playing it through AAudio, and the touch
@@ -63,6 +64,9 @@
           menu, at: at, isEnabled: screen.menuIsEnabled, isChecked: screen.menuIsChecked)
       }
       screen.interface.files = { [weak self] action in self?.file(action) }
+      screen.onFiles = { [weak self] module, several in
+        self?.pendingMenu = FileLines.samples(for: module, several: several)
+      }
       screen.interface.confirm = { [weak self] question, then in
         self?.confirmed = then
         self?.pendingMenu = FileLines.ask(question)
@@ -190,6 +194,11 @@
           pendingMenu = FileLines.create(document, named: session.documentName + "." + SongFile.fileExtension)
         }
       }
+    }
+
+    /// Recordings Java's picker chose, copied where Swift reads them, for the rack's `module`.
+    func samplesChosen(_ paths: [String], into module: String) {
+      screen.load(paths.map { URL(filePath: $0) }, into: module)
     }
 
     /// A document Java's picker chose, and read.

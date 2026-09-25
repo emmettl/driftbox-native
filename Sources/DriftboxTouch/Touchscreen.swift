@@ -7,6 +7,7 @@ import DriftboxScenes
 import DriftboxSession
 import DriftboxShell
 import DriftboxText
+import Foundation
 
 /// Driftbox on a touch screen: the song's scene filling it, the controls over the scene, and the rest
 /// of it the performance filter's pad. `Desktop`'s counterpart, and the same on every platform with
@@ -58,6 +59,9 @@ public final class Touchscreen {
   /// `showsRack` says. Each offers the way to the other, in the song's menu and the patches'.
   public private(set) var rack: RackInterface?
   public private(set) var showsRack = false
+  /// A module of the rack asking for recordings — a Slice Lab's sample, a Key Atlas's set — for the
+  /// platform to ask for with its own picker, and hand to `load`.
+  public var onFiles: ((_ module: String, _ several: Bool) -> Void)?
 
   public init(
     session: Session, device: any GPUDevice, typesetter: any Typesetter, scale: Float, scene: String? = nil
@@ -167,6 +171,12 @@ public final class Touchscreen {
     showsRack = showing
   }
 
+  /// Recordings the platform's picker chose, as files, into the rack's `module`.
+  @discardableResult
+  public func load(_ files: [URL], into module: String) -> Bool {
+    rack?.load(files, into: module) ?? false
+  }
+
   /// What was chosen from the menu last shown: the rack's, while it shows, or the groovebox's.
   public func choose(_ id: String) {
     if showsRack, let rack { rack.choose(id) } else { interface.choose(id) }
@@ -194,6 +204,7 @@ public final class Touchscreen {
       rack.pointer(event)
       if event.phase == .began { resting = (event.id, event.location, clock()) }
       if let request = rack.takeMenuRequest() { onMenu?(request.menu, request.at) }
+      if let module = rack.takeFileRequest() { onFiles?(module, rack.takesSeveral(module)) }
       return
     }
     if interface.pointer(event) {
