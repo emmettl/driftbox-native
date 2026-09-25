@@ -42,6 +42,11 @@
     /// A host restoring a state it saved: the document to open, and its name if it had one.
     /// Called on whatever thread the host restores from.
     public var restore: (@Sendable (_ document: String, _ name: String?) -> Void)?
+    /// More the owner keeps beside the document, by key, saved and restored with it: the rack's
+    /// macros, and what each is mapped onto.
+    public let extras = Mutex<[String: String]>([:])
+    /// A host restoring a state it saved: the extras it held. Called before `restore`.
+    public var restoreExtras: (@Sendable ([String: String]) -> Void)?
     /// Called with the rate the output will run at as render resources are allocated, on whatever
     /// thread the app allocates them from: for an owner that makes its host at the rate it is asked
     /// for, before the unit checks the two agree.
@@ -117,6 +122,7 @@
     private var outputBuses: AUAudioUnitBusArray!
 
     static let nameKey = "name"
+    static let extraPrefix = "driftbox."
 
     public override init(
       componentDescription: AudioComponentDescription, options: AudioComponentInstantiationOptions = []
@@ -240,10 +246,16 @@
           state[Self.documentKey] = saved.document
           state[Self.nameKey] = saved.name
         }
+        for (key, value) in extras.withLock({ $0 }) { state[Self.extraPrefix + key] = value }
         return state
       }
       set {
         super.fullState = newValue
+        var restored: [String: String] = [:]
+        for (key, value) in newValue ?? [:] where key.hasPrefix(Self.extraPrefix) {
+          if let value = value as? String { restored[String(key.dropFirst(Self.extraPrefix.count))] = value }
+        }
+        if !restored.isEmpty { restoreExtras?(restored) }
         if let document = newValue?[Self.documentKey] as? String {
           restore?(document, newValue?[Self.nameKey] as? String)
         }

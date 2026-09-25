@@ -12,8 +12,13 @@
 
     public var body: some View {
       if let face = plugin.face {
-        // Played by the app it is in, not attached to a device here.
-        RackWindow(rack: face) {}
+        VStack(spacing: 0) {
+          RackMacroStrip(
+            slots: plugin.macroSlots, learning: plugin.learning, learn: { plugin.learn($0) },
+            clear: { plugin.clearMacro($0) })
+          // Played by the app it is in, not attached to a device here.
+          RackWindow(rack: face) {}
+        }
       } else {
         Waiting(what: "rack")
       }

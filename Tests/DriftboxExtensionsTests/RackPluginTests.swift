@@ -1,5 +1,6 @@
 #if canImport(AVFoundation)
   import AVFoundation
+  import DriftboxApp
   import DriftboxDocument
   import DriftboxHostMac
   import DriftboxRack
@@ -198,6 +199,100 @@
       try unit.allocateRenderResources()
       #expect(plugin.face !== face)
       #expect(plugin.face?.session === plugin.session)
+    }
+
+    /// A rack of one oscillator, to map macros onto its knobs.
+    static func oscillator() throws -> (RackAudioUnit, RackPlugin, RackSession) {
+      let (unit, plugin) = try Self.unit()
+      let patch = Patch(
+        modules: [PatchModule(id: "osc", type: "vco"), PatchModule(id: "out", type: "out")],
+        cables: [PatchCable(from: PortReference("osc", "out"), to: PortReference("out", "in"))])
+      unit.fullState = ["patch": PatchCodec.encode(patch), "name": "Osc"]
+      try unit.allocateRenderResources()
+      return (unit, plugin, try #require(plugin.session))
+    }
+
+    static func knob(stepped: Bool) throws -> ParamDef {
+      try #require(RackModules.registry["vco"]?.params.first { $0.stepped == stepped && !$0.hidden })
+    }
+
+    static func tickSession(_ plugin: RackPlugin) {
+      for _ in 0..<Plugins.sessionEvery { plugin.tick() }
+    }
+
+    /// Eight macros, the same for every patch, mapped onto nothing until they are learnt.
+    @Test func theMacrosAreParameters() throws {
+      let (unit, plugin) = try Self.unit()
+      let tree = try #require(unit.parameterTree)
+      #expect(tree.allParameters.map(\.displayName) == (1...8).map { "Macro \($0)" })
+      #expect(tree.allParameters[0].string(fromValue: nil) == "—")
+      #expect(plugin.macros.allSatisfy { $0 == nil })
+    }
+
+    /// A macro is mapped onto the next knob turned on the face, and shows the app where it is, in
+    /// the face's words for it.
+    @Test func aMacroIsLearntFromTheNextKnobTurned() throws {
+      let (unit, plugin, session) = try Self.oscillator()
+      let knob = try Self.knob(stepped: false)
+      plugin.learn(2)
+      #expect(plugin.learning == 2)
+      session.turn("osc", knob.id, to: knob.min + (knob.max - knob.min) * 0.25)
+      session.endTurn()
+      Self.tickSession(plugin)
+      #expect(plugin.macros[2] == RackMacro(module: "osc", param: knob.id))
+      #expect(plugin.learning == nil)
+      let parameter = try #require(unit.parameterTree?.parameter(withAddress: 2))
+      #expect(abs(parameter.value - 0.25) < 1e-6)
+      #expect(
+        parameter.string(fromValue: nil)
+          == RackParamText.display(knob, knob.min + (knob.max - knob.min) * 0.25))
+      #expect(plugin.macroSlots[2]?.title.hasSuffix(knob.name) == true)
+    }
+
+    /// The app's moves turn the knob a macro is mapped onto — across its range, or to the nearest
+    /// choice of a selector — heard and kept, but no step of undo.
+    @Test func theAppsMovesTurnTheKnob() throws {
+      let (unit, plugin, session) = try Self.oscillator()
+      let knob = try Self.knob(stepped: false)
+      let selector = try Self.knob(stepped: true)
+      for (index, def) in [knob, selector].enumerated() {
+        plugin.learn(index)
+        session.turn("osc", def.id, to: def.stepped ? def.min + 1 : def.min + (def.max - def.min) / 2)
+        session.endTurn()
+        Self.tickSession(plugin)
+      }
+      #expect(plugin.macros[0]?.param == knob.id && plugin.macros[1]?.param == selector.id)
+      let undoable = session.canUndo
+      let tree = try #require(unit.parameterTree)
+      tree.parameter(withAddress: 0)?.value = 0.75
+      tree.parameter(withAddress: 1)?.value = 0.01
+      Self.tickSession(plugin)
+      let osc = try #require(session.patch.modules.first { $0.id == "osc" })
+      #expect(abs(session.value(osc, knob) - (knob.min + (knob.max - knob.min) * 0.75)) < 1e-4)
+      #expect(session.value(osc, selector) == selector.min, "the nearest choice")
+      #expect(session.canUndo == undoable)
+      #expect(unit.fullState?["patch"] as? String == PatchCodec.encode(session.patch), "kept as the state")
+    }
+
+    /// The macros are kept in the unit's state beside the patch, and a state restored maps them again.
+    @Test func theMacrosAreKeptInTheState() throws {
+      let (unit, plugin, session) = try Self.oscillator()
+      let knob = try Self.knob(stepped: false)
+      plugin.learn(5)
+      session.turn("osc", knob.id, to: knob.max)
+      session.endTurn()
+      Self.tickSession(plugin)
+      let state = try #require(unit.fullState)
+
+      let (other, otherPlugin) = try Self.unit()
+      other.fullState = state
+      try other.allocateRenderResources()
+      Self.tickSession(otherPlugin)
+      #expect(otherPlugin.macros == plugin.macros)
+      #expect(other.parameterTree?.parameter(withAddress: 5)?.value == 1)
+
+      otherPlugin.clearMacro(5)
+      #expect(otherPlugin.macros.allSatisfy { $0 == nil })
     }
   }
 #endif

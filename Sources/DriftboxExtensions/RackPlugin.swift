@@ -4,6 +4,7 @@
   import DriftboxDocument
   import DriftboxHost
   import DriftboxHostMac
+  import DriftboxRack
   import DriftboxRackSession
   import Foundation
   import Observation
@@ -19,13 +20,15 @@
   /// - The app's MIDI plays the rack through its MIDI modules, as a controller plugged into the
   ///   Mac would; and the rack follows the app's tempo, and starts and stops as its transport does,
   ///   at the app's beat, on the block it does.
+  /// - Its parameters are eight macros, each mapped onto one of the rack's knobs by learning it on
+  ///   the face, since the knobs themselves come and go with the patch (`RackMacros.swift`).
   ///
   /// Everything the unit hears arrives on the app's threads, and is carried to the main actor, where
   /// the session lives: the hooks are made below, off the main actor, since a closure made on it
   /// traps when another thread calls it.
   @MainActor @Observable
   public final class RackPlugin {
-    @ObservationIgnored private weak var unit: RackAudioUnit?
+    @ObservationIgnored weak var unit: RackAudioUnit?
     public private(set) var session: RackSession?
     /// The rack's own face on that session, for the app's window: the one the Mac app's rack
     /// window shows.
@@ -36,8 +39,19 @@
     @ObservationIgnored private var transport = TransportEdge()
     @ObservationIgnored private var ticks = 0
 
-    init(unit: RackAudioUnit) {
+    /// What each macro is mapped onto, if anything.
+    public internal(set) var macros = [RackMacro?](repeating: nil, count: RackMacro.count)
+    /// The macro waiting for a knob to be turned, if one is, and the patch as it was when it began.
+    public internal(set) var learning: Int?
+    @ObservationIgnored var learnFrom: Patch?
+    /// The macros' params, for the app's words for their values, on whatever thread it asks.
+    @ObservationIgnored let macroMap: MacroMap
+    /// The patch as the app's macros last showed it.
+    @ObservationIgnored var macrosShown: Patch?
+
+    init(unit: RackAudioUnit, macroMap: MacroMap) {
       self.unit = unit
+      self.macroMap = macroMap
       unit.presetNames = PatchEntry.all.map(\.name)
     }
 
@@ -45,14 +59,17 @@
     nonisolated public static func attach(to unit: RackAudioUnit) {
       // Handed to the main actor to be set up, and only set up there; the render thread reads what
       // the unit keeps for it, not the unit.
+      let macroMap = MacroMap()
+      publishMacros(on: unit, map: macroMap)
       let held = Held(unit: unit)
-      let plugin = Plugins.onMain { RackPlugin(unit: held.unit) }
+      let plugin = Plugins.onMain { RackPlugin(unit: held.unit, macroMap: macroMap) }
       unit.owner = plugin
       unit.prepare = { [weak plugin] rate in Plugins.onMain { plugin?.prepare(rate) } }
       unit.choosePreset = { [weak plugin] number in Plugins.onMain { plugin?.choose(number) } }
       unit.restore = { [weak plugin] document, name in
         Plugins.onMain { plugin?.restore(document, name: name) }
       }
+      unit.restoreExtras = { [weak plugin] extras in Plugins.onMain { plugin?.restoreMacros(extras) } }
     }
 
     /// A rack at `rate`: the one there is if it is already at it, a new one keeping its patch if not.
@@ -68,6 +85,8 @@
       unit.saved.withLock { $0 = (PatchCodec.encode(fresh.patch), fresh.name) }
       session = fresh
       face = MacRack(session: fresh)
+      macrosShown = nil
+      learnFrom = learning == nil ? nil : fresh.patch
       unit.host = fresh.host
       fresh.listen()
       if timer == nil {
@@ -113,7 +132,10 @@
         }
       }
       ticks += 1
-      if ticks % Plugins.sessionEvery == 0 { session.tick() }
+      if ticks % Plugins.sessionEvery == 0 {
+        session.tick()
+        macroTick(unit, session)
+      }
     }
 
     isolated deinit {
