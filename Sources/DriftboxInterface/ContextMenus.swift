@@ -61,6 +61,10 @@ extension Interface {
     menuDisabled = []
     menuChecked = []
     var items: [MenuItem] = []
+    if let showRack {
+      menuActions["rack.show"] = showRack
+      items += [.command("Rack", id: "rack.show"), .separator]
+    }
     if let files {
       menuActions["file.open"] = { [weak self] in self?.unlessEdited { files(.open) } }
       menuActions["file.save"] = { files(.save) }

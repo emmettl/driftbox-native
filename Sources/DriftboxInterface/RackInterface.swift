@@ -61,7 +61,250 @@ public final class RackInterface {
     self.rack = rack
   }
 
-  public var stage: RackStage { RackStage(rack: rack, size: size, scroll: scroll, pages: pages) }
+  public var stage: RackStage {
+    RackStage(rack: rack, size: size, scroll: scroll, pages: pages, touch: touch, zoom: zoom, pan: pan)
+  }
+
+  // MARK: - Fingers
+
+  /// For fingers: the rack zoomed and panned about, rather than scrolled by a wheel. Set by the
+  /// platform that has a touchscreen, as `Interface.touch` is.
+  public var touch = false
+  /// How far past fitting the window's width the rack is zoomed, on a touchscreen.
+  public private(set) var zoom: Float = 1
+  /// How far it is panned from its left edge, in points.
+  public private(set) var pan: Float = 0
+  /// The way back to the groovebox, where there is one to go back to: the patches' menu offers it.
+  public var showGroovebox: (() -> Void)?
+
+  /// Every finger down, and where.
+  private var fingers: [Int: SIMD2<Float>] = [:]
+  /// Two fingers zooming: how far apart they began, the zoom then, and the point of the rack under
+  /// the middle of them, which stays under it.
+  private var pinch: (distance: Float, zoom: Float, anchor: SIMD2<Float>)?
+  /// A finger on nothing but the rack's panels: a tap if it lifts where it went down, a pan if it
+  /// moves, and what it went down on.
+  private var sliding: (pointer: Int, from: SIMD2<Float>, last: SIMD2<Float>, moved: Bool, on: RackTarget?)?
+  /// Fingers that were part of a pinch, heard no more until they lift.
+  private var spent: Set<Int> = []
+  /// A finger on a knob or a number, which turns them up and down: not yet moved far enough to say
+  /// whether it means to turn it or, going sideways, to pan the rack.
+  private var deciding: (pointer: Int, from: SIMD2<Float>)?
+  /// The module last tapped, and when: a second tap soon after fits it to the window, or back.
+  private var lastModuleTap: (module: String?, at: ContinuousClock.Instant)?
+  /// The module the rack is fitted to, after a double tap.
+  public private(set) var fitted: String?
+
+  /// Past this many points a finger has slid, not tapped.
+  static let slop: Float = 10
+  /// A knob's dial across, in the rack's design space, and how many points a finger wants of it.
+  static let knobDiameter: Float = 34
+  static let fingerKnob: Float = 44
+
+  /// A finger, as a touchscreen has it: two zoom, one on nothing but panels pans, and one on
+  /// anything else is a press, as a mouse's is.
+  private func finger(_ event: PointerEvent) {
+    switch event.phase {
+    case .began:
+      fingers[event.id] = event.location
+      if fingers.count == 2 {
+        // The first finger's press given up for a pinch: whatever it had begun is let go.
+        if let other = fingers.keys.first(where: { $0 != event.id }) {
+          if sliding?.pointer == other {
+            sliding = nil
+          } else {
+            press(PointerEvent(phase: .cancelled, id: other, kind: .touch, location: fingers[other]!))
+          }
+          spent.insert(other)
+        }
+        spent.insert(event.id)
+        beginPinch()
+        return
+      }
+      guard fingers.count == 1 else {
+        spent.insert(event.id)
+        return
+      }
+      let stage = stage
+      if stage.area.contains(event.location), stage.routing?.part(at: event.location) == nil,
+        slides(at: event.location, on: stage)
+      {
+        sliding = (event.id, event.location, event.location, false, stage.target(at: event.location))
+        return
+      }
+      if !rack.flipped, stage.area.contains(event.location) {
+        switch stage.target(at: event.location) {
+        case .knob, .cell: deciding = (event.id, event.location)
+        default: break
+        }
+      }
+      press(event)
+    case .moved:
+      guard fingers[event.id] != nil else { return }
+      fingers[event.id] = event.location
+      if pinch != nil {
+        movePinch()
+        return
+      }
+      if spent.contains(event.id) { return }
+      if let decide = deciding, decide.pointer == event.id {
+        let moved = event.location - decide.from
+        // Nothing turned until the finger has said which it means.
+        guard (moved * moved).sum() > Self.slop * Self.slop else { return }
+        deciding = nil
+        if abs(moved.x) > abs(moved.y) {
+          press(PointerEvent(phase: .cancelled, id: event.id, kind: .touch, location: decide.from))
+          sliding = (event.id, decide.from, decide.from, true, nil)
+        } else {
+          press(event)
+          return
+        }
+      }
+      if var slide = sliding, slide.pointer == event.id {
+        let moved = event.location - slide.from
+        if !slide.moved, (moved * moved).sum() > Self.slop * Self.slop { slide.moved = true }
+        if slide.moved {
+          let step = event.location - slide.last
+          scroll =
+            RackStage(
+              rack: rack, size: size, scroll: scroll - step.y, pages: pages, touch: true, zoom: zoom, pan: pan
+            ).scroll
+          pan =
+            RackStage(
+              rack: rack, size: size, scroll: scroll, pages: pages, touch: true, zoom: zoom, pan: pan - step.x
+            ).pan
+          fitted = nil
+        }
+        slide.last = event.location
+        sliding = slide
+        return
+      }
+      press(event)
+    case .ended, .cancelled:
+      fingers[event.id] = nil
+      if spent.remove(event.id) != nil {
+        if fingers.count < 2 { pinch = nil }
+        return
+      }
+      if let slide = sliding, slide.pointer == event.id {
+        sliding = nil
+        if !slide.moved, event.phase == .ended { tap(slide.on, at: event.location) }
+        return
+      }
+      if deciding?.pointer == event.id { deciding = nil }
+      press(event)
+    }
+  }
+
+  /// Whether a finger landing at `point` slides the rack about rather than pressing something: on a
+  /// panel away from its controls, or on nothing; on the back, anywhere but a jack, a pot or a cable.
+  private func slides(at point: SIMD2<Float>, on stage: RackStage) -> Bool {
+    if rack.flipped { return !backTakes(at: point, stage: stage) }
+    switch stage.target(at: point) {
+    case nil, .module: return true
+    default: return false
+    }
+  }
+
+  /// A finger lifted where it went down, on nothing a press takes: selects the module under it, and
+  /// a second tap soon after fits the module to the window, or, fitted already, the rack.
+  private func tap(_ target: RackTarget?, at point: SIMD2<Float>) {
+    var module: String?
+    if rack.flipped {
+      let at = stage.design(point)
+      module = stage.placements.first { $0.frame.contains(Self.point(at)) }?.id
+    } else if case .module(let id) = target {
+      module = id
+    }
+    rack.select(module)
+    let now = ContinuousClock.now
+    if let last = lastModuleTap, last.module == module, now - last.at < .milliseconds(350) {
+      lastModuleTap = nil
+      if let module, fitted != module {
+        fit(module, at: point)
+      } else {
+        fitRack()
+      }
+      return
+    }
+    lastModuleTap = (module, now)
+  }
+
+  /// Zoom `module` to a finger's size, its top at the top of the rack's area: to fill the window's
+  /// width, a half-width module; and a full-width one, which fills it already, until its knobs are
+  /// as big as a finger, the part of it tapped at `point` staying under the finger, and the rest of
+  /// it slid to.
+  public func fit(_ module: String, at point: SIMD2<Float>? = nil) {
+    let before = stage
+    guard let placement = before.placements.first(where: { $0.id == module }) else { return }
+    let overview = RackStage(rack: rack, size: size, pages: pages, touch: true)
+    let across = max(1, overview.area.width - RackStage.inset * 2)
+    let filling = across / (Float(placement.width) * overview.fitScale)
+    let fingered = Self.fingerKnob / (Self.knobDiameter * overview.fitScale)
+    zoom = max(filling, fingered)
+    let zoomed = RackStage(rack: rack, size: size, pages: pages, touch: true, zoom: zoom)
+    zoom = zoomed.zoom
+    var left = Float(placement.x) * zoomed.scale
+    if let point, Float(placement.width) * zoomed.scale > across {
+      // Wider than the window: the part tapped stays where it was tapped.
+      left = RackStage.inset + before.design(point).x * zoomed.scale - point.x
+    }
+    pan = RackStage(rack: rack, size: size, pages: pages, touch: true, zoom: zoom, pan: left).pan
+    scroll =
+      RackStage(
+        rack: rack, size: size, scroll: Float(placement.y) * zoomed.scale, pages: pages, touch: true,
+        zoom: zoom, pan: pan
+      ).scroll
+    fitted = module
+  }
+
+  /// The whole rack's width in the window again.
+  public func fitRack() {
+    let ratio = 1 / zoom
+    zoom = 1
+    pan = 0
+    scroll = RackStage(rack: rack, size: size, scroll: scroll * ratio, pages: pages, touch: true).scroll
+    fitted = nil
+  }
+
+  private func beginPinch() {
+    let points = Array(fingers.values)
+    guard points.count == 2 else { return }
+    let middle = (points[0] + points[1]) / 2
+    let apart = distance(points[0], points[1])
+    pinch = (max(1, apart), zoom, stage.design(middle))
+    sliding = nil
+  }
+
+  private func movePinch() {
+    guard let pinch else { return }
+    let points = Array(fingers.values)
+    guard points.count == 2 else { return }
+    let middle = (points[0] + points[1]) / 2
+    let apart = distance(points[0], points[1])
+    zoom =
+      RackStage(rack: rack, size: size, pages: pages, touch: true, zoom: pinch.zoom * apart / pinch.distance)
+      .zoom
+    // The point of the rack that was under the fingers stays under them.
+    let zoomed = RackStage(rack: rack, size: size, pages: pages, touch: true, zoom: zoom)
+    pan =
+      RackStage(
+        rack: rack, size: size, pages: pages, touch: true, zoom: zoom,
+        pan: RackStage.inset + pinch.anchor.x * zoomed.scale - middle.x
+      ).pan
+    scroll =
+      RackStage(
+        rack: rack, size: size, scroll: pinch.anchor.y * zoomed.scale - (middle.y - zoomed.area.y),
+        pages: pages,
+        touch: true, zoom: zoom, pan: pan
+      ).scroll
+    fitted = nil
+  }
+
+  private func distance(_ a: SIMD2<Float>, _ b: SIMD2<Float>) -> Float {
+    let d = a - b
+    return (d * d).sum().squareRoot()
+  }
 
   /// Points of drag, in the rack's own units, for a number to move one: as the Mac's cells have it.
   public static let cellStep: Float = 4
@@ -71,8 +314,18 @@ public final class RackInterface {
 
   // MARK: - The pointer
 
-  /// Take `event`: the rack is the whole window while it shows.
+  /// Take `event`: the rack is the whole window while it shows. On a touchscreen a finger may zoom
+  /// or pan it instead of pressing; a mouse always presses.
   public func pointer(_ event: PointerEvent) {
+    if touch, event.kind != .mouse {
+      finger(event)
+    } else {
+      press(event)
+    }
+  }
+
+  /// A press, as a mouse makes one.
+  private func press(_ event: PointerEvent) {
     if event.kind == .mouse { hover = event.phase == .cancelled ? nil : event.location }
     switch event.phase {
     case .began:
@@ -283,6 +536,10 @@ public final class RackInterface {
     case .run: rack.toggleRunning()
     case .flip: rack.flip()
     case .add: menuRequest = (addMenu(), point)
+    case .patches:
+      if let chip = stage.chips.first(where: { $0.target == .patches }) {
+        menuRequest = (patchMenu(), SIMD2(chip.frame.x, chip.frame.maxY))
+      }
     case .option(let module, let param, let value): rack.set(module, param, to: Double(value))
     case .step(let module, let param, let by):
       guard let def = def(module, param), let value = value(module, param) else { return }
@@ -424,6 +681,27 @@ public final class RackInterface {
 
   /// The modules there are to add, by what they are for, as the catalogue of cards groups them.
   /// Plug-ins are not offered where there is nothing to make them.
+  /// The patches to open, and the way back to the groovebox where there is one.
+  func patchMenu() -> Menu {
+    menuActions = [:]
+    menuDisabled = []
+    menuChecked = []
+    var items: [MenuItem] = []
+    if let showGroovebox {
+      items += [item("Groovebox", "rack.groovebox", enabled: true) { showGroovebox() }, .separator]
+    }
+    let patches = PatchEntry.all.map { entry -> MenuItem in
+      let id = "patch." + entry.id
+      if rack.name == entry.name { menuChecked.insert(id) }
+      return item(entry.name, id, enabled: true) { [weak self] in
+        self?.rack.open(entry)
+        self?.fitRack()
+      }
+    }
+    items.append(.submenu(Menu("Patches", patches)))
+    return Menu(rack.name, items)
+  }
+
   func addMenu() -> Menu {
     menuActions = [:]
     menuDisabled = []
@@ -544,7 +822,7 @@ public final class RackInterface {
     canvas.align = .left
     canvas.font = Theme.mono(10)
     canvas.fill = Theme.dim
-    canvas.fillText("keys C\(2 + octave)", stage.keys.x, baseline)
+    if stage.keys.width > 0 { canvas.fillText("keys C\(2 + octave)", stage.keys.x, baseline) }
   }
 
   /// A module's front: its panel, lit when selected; its title; and its controls.

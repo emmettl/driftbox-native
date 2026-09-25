@@ -8,6 +8,7 @@
   import DriftboxSession
   import DriftboxDocument
   import DriftboxInterface
+  import DriftboxRackSession
   import DriftboxSeq
   import DriftboxShell
   import DriftboxText
@@ -27,6 +28,9 @@
     private let route: AAudioRoute
     private let lost = Flag()
     let session: Session
+    /// The rack, beside the groovebox through the same output, and shown in its place from the
+    /// song's menu.
+    let rack: RackSession
     private let device: GLESDevice
     private let screen: Touchscreen
     private var surface: (any GPUSurface)?
@@ -42,18 +46,21 @@
       route = AAudioRoute(hop: { [lost] _ in lost.raise() })
       session = Session(host: host, audio: route)
       session.open(entry)
+      rack = RackSession(sampleRate: 48000, audio: route)
       guard session.song != nil, let device = try? GLESDevice(),
         let screen = try? Touchscreen(
           session: session, device: device, typesetter: typesetter, scale: density, scene: scene)
       else {
         session.close()
+        rack.close()
         return nil
       }
+      screen.add(rack)
       self.device = device
       self.screen = screen
-      screen.onMenu = { [weak self, interface = screen.interface] menu, at in
+      screen.onMenu = { [weak self, screen] menu, at in
         self?.pendingMenu = MenuLines.write(
-          menu, at: at, isEnabled: interface.menuIsEnabled, isChecked: interface.menuIsChecked)
+          menu, at: at, isEnabled: screen.menuIsEnabled, isChecked: screen.menuIsChecked)
       }
       screen.interface.files = { [weak self] action in self?.file(action) }
       screen.interface.confirm = { [weak self] question, then in
@@ -66,6 +73,7 @@
     func stop() {
       surface = nil
       session.close()
+      rack.close()
     }
 
     /// Draw, or draw nothing: the app in view, or out of it. The song plays on either way, since the
@@ -155,7 +163,7 @@
         confirmed = nil
         return
       }
-      screen.interface.choose(id)
+      screen.choose(id)
     }
 
     // MARK: - The song's file
