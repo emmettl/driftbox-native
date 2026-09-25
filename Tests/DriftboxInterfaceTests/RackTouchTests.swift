@@ -261,4 +261,29 @@ struct RackTouchTests {
     face.choose("patch." + entry.id)
     #expect(face.rack.name == entry.name)
   }
+
+  /// A face waiting for a file asks a finger to tap its screen, which a phone can, rather than to
+  /// drop a file on it, which it cannot; and the tap asks for one. A desktop's still asks for a drop.
+  @Test func anEmptyFaceAsksForATap() throws {
+    let asks = [
+      "sampler": "Tap to choose a sample", "audio-track": "Tap to choose a recording",
+      "multisampler": "Tap to choose an instrument set",
+    ]
+    for (type, words) in asks {
+      let (desktop, _) = try RackInterfaceTests.alone(type)
+      let rack = desktop.rack
+      let face = RackInterface(rack: rack)
+      face.touch = true
+      face.size = Self.phone
+      let stage = face.stage
+      let prompt = try #require(
+        stage.faces.first?.buttons.first { if case .prompt = $0.style { true } else { false } })
+      #expect(prompt.label == words, "\(type)")
+      Self.tap(face, RackInterfaceTests.window(stage, RackInterfaceTests.centre(prompt.frame)))
+      #expect(face.takeFileRequest() == "m", "\(type)")
+      let dropped = try #require(
+        desktop.stage.faces.first?.buttons.first { if case .prompt = $0.style { true } else { false } })
+      #expect(dropped.label.hasPrefix("Drop"), "\(type)")
+    }
+  }
 }

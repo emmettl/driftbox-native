@@ -792,8 +792,9 @@ loading — waited for ever. Its file descriptor is given to the main thread's l
 drains it between Java's own messages. The Combinator's routing, 300 points beside the rack on a
 desktop, is a sheet across the foot of a phone, over where the keys were, the rack above it; its
 pickers and buttons are 32 points tall, and a route's MIN and MAX are dragged up and down across
-the target's range, as a knob is, rather than typed. A tablet keeps it beside the rack. Left: a
-tablet, seen; and an empty sampler's "Drop audio here", which a phone cannot.
+the target's range, as a knob is, rather than typed. A tablet keeps it beside the rack. A face
+waiting for recordings asks a finger to tap it — "Tap to choose a sample" — where a desktop's asks
+for them to be dropped. Left: a tablet, seen.
 
 ### What Milestone 5 asks of Milestone 4
 
