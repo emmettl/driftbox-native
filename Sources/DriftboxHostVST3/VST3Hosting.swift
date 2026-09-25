@@ -29,6 +29,10 @@
       return found
     }
 
+    public func available() async -> [RackPluginChoice] {
+      await installed().entries.map { RackPluginChoice(reference: $0.reference, instrument: $0.isInstrument) }
+    }
+
     public func make(_ reference: PluginReference, sampleRate: Double) async throws -> any RackPluginUnit {
       guard reference.format == VST3Catalogue.format, let entry = await installed().entry(reference.id) else {
         throw RackPluginFailure.missing

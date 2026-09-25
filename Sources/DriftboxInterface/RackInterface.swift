@@ -793,16 +793,58 @@ public final class RackInterface {
       if types[group] == nil { groups.append(group) }
       types[group, default: []].append(card.type)
     }
-    return Menu(
-      "Add",
-      groups.map { group in
-        .submenu(
-          Menu(
-            group,
-            (types[group] ?? []).map { type in
-              item(RackModules.registry[type]?.name ?? type, "add.\(type)") { self.rack.add(type) }
-            }))
-      })
+    let modules: [MenuItem] = groups.map { group in
+      .submenu(
+        Menu(
+          group,
+          (types[group] ?? []).map { type in
+            item(RackModules.registry[type]?.name ?? type, "add.\(type)") { self.rack.add(type) }
+          }))
+    }
+    guard rack.hostsPlugins else { return Menu("Add", modules) }
+    rack.findPlugins()
+    return Menu("Add", modules + [.separator] + pluginMenus())
+  }
+
+  /// The platform's plug-ins, effects and instruments apart, each by who made them: one chosen is
+  /// added with its module, in one step. While they are being found, or where there are none, the
+  /// menu says so.
+  func pluginMenus() -> [MenuItem] {
+    let kinds = [
+      (title: "Effect Plug-ins", instrument: false), (title: "Instrument Plug-ins", instrument: true),
+    ]
+    guard case .found(let choices) = rack.pluginChoices else {
+      return kinds.map {
+        .submenu(Menu($0.title, [item("Finding Plug-ins…", "plugins.finding", enabled: false) {}]))
+      }
+    }
+    return kinds.map { kind in
+      let wanted = choices.filter { $0.instrument == kind.instrument }
+      guard !wanted.isEmpty else {
+        let none = kind.instrument ? "No Instruments Installed" : "No Effects Installed"
+        return .submenu(Menu(kind.title, [item(none, "plugins.none.\(kind.instrument)", enabled: false) {}]))
+      }
+      let byVendor = Dictionary(grouping: wanted) {
+        $0.reference.vendor.isEmpty ? "Other" : $0.reference.vendor
+      }
+      let vendors = byVendor.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+      return .submenu(
+        Menu(
+          kind.title,
+          vendors.map { vendor in
+            let sorted = (byVendor[vendor] ?? []).sorted {
+              $0.reference.name.localizedCaseInsensitiveCompare($1.reference.name) == .orderedAscending
+            }
+            return .submenu(
+              Menu(
+                vendor,
+                sorted.map { choice in
+                  item(choice.reference.name, "plugin.\(choice.reference.format).\(choice.reference.id)") {
+                    self.rack.add(choice.moduleType, plugin: choice.reference)
+                  }
+                }))
+          }))
+    }
   }
 
   public func menuIsEnabled(_ id: String) -> Bool { !menuDisabled.contains(id) }

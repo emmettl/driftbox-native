@@ -13,6 +13,29 @@ public protocol RackPluginHosting: AnyObject {
   /// A unit of `reference`, set as its state says, at the rack's rate. Throws
   /// `RackPluginFailure.missing` when there is none on this machine.
   func make(_ reference: PluginReference, sampleRate: Double) async throws -> any RackPluginUnit
+  /// The plug-ins this machine has to offer, for a menu to choose from: found when first asked,
+  /// which may take a while.
+  func available() async -> [RackPluginChoice]
+}
+
+extension RackPluginHosting {
+  /// None to choose from: a platform whose own interface lists them, as the Mac's does, or none.
+  public func available() async -> [RackPluginChoice] { [] }
+}
+
+/// A plug-in there is to choose: which, and whether it is an instrument, for a `plugin-instrument`
+/// module, or an effect, for a `plugin` one.
+public struct RackPluginChoice: Equatable, Sendable {
+  public var reference: PluginReference
+  public var instrument: Bool
+
+  public init(reference: PluginReference, instrument: Bool) {
+    self.reference = reference
+    self.instrument = instrument
+  }
+
+  /// The module that hosts it.
+  public var moduleType: String { instrument ? "plugin-instrument" : "plugin" }
 }
 
 /// One plug-in, made.
@@ -112,6 +135,14 @@ public final class RackSession {
   public private(set) var plugins: [String: PluginStatus] = [:]
   /// The macro waiting for a param to be moved in its unit's interface, if one is.
   public private(set) var learning: (module: String, macro: Int)?
+  /// The plug-ins the platform has to offer, once `findPlugins` has asked.
+  public private(set) var pluginChoices: PluginChoices = .notAsked
+
+  public enum PluginChoices: Equatable, Sendable {
+    case notAsked
+    case finding
+    case found([RackPluginChoice])
+  }
 
   public enum PluginStatus: Equatable, Sendable {
     case loading
@@ -159,6 +190,8 @@ public final class RackSession {
   @ObservationIgnored public let host: RackHost
   @ObservationIgnored private let audio: (any AudioRouting)?
   @ObservationIgnored private let pluginHost: (any RackPluginHosting)?
+  /// Whether the platform makes plug-ins at all: where it does not, there are none to offer.
+  public var hostsPlugins: Bool { pluginHost != nil }
   @ObservationIgnored private let decoder: any SampleDecoding
   /// What a module's recordings can be chosen as here, as the decoder says.
   public var readable: String { decoder.readable }
@@ -178,6 +211,7 @@ public final class RackSession {
   @ObservationIgnored public private(set) var units: [String: any RackPluginUnit] = [:]
   @ObservationIgnored private var unitIds: [String: String] = [:]
   @ObservationIgnored private var making: [String: Task<Void, Never>] = [:]
+  @ObservationIgnored private var finding: Task<Void, Never>?
   /// Units changed since their state was last taken into the patch.
   @ObservationIgnored private var changedUnits: Set<String> = []
   @ObservationIgnored private var pendingSave: Task<Void, Never>?
@@ -481,12 +515,12 @@ public final class RackSession {
   }
 
   /// A module at the end of the rack, with an Out of its own when it is a source, as the
-  /// reference adds one.
+  /// reference adds one. A plug-in module can come with its `plugin` chosen, in the same step.
   @discardableResult
-  public func add(_ type: String) -> String? {
+  public func add(_ type: String, plugin: PluginReference? = nil) -> String? {
     guard let def = RackModules.registry[type] else { return nil }
     let id = Self.freshId(patch, type)
-    structural("Add \(def.name)") { patch in
+    structural("Add \(plugin?.name ?? def.name)") { patch in
       // An instrument comes played: from the rack's MIDI module, or a new one just before it.
       if type == "plugin-instrument" {
         let keys =
@@ -500,7 +534,9 @@ public final class RackSession {
           patch.cables.append(PatchCable(from: PortReference(keys, from), to: PortReference(id, to)))
         }
       }
-      patch.modules.append(PatchModule(id: id, type: type))
+      var module = PatchModule(id: id, type: type)
+      if RackModules.pluginTypes.contains(type) { module.plugin = plugin }
+      patch.modules.append(module)
       guard ModuleFace.byType[type]?.group == "Sources", def.outlets.contains(where: { $0.id == "out" })
       else { return }
       let out = Self.freshId(patch, "out")
@@ -934,6 +970,24 @@ public final class RackSession {
   public func pluginsReady() async {
     while let task = making.values.first { await task.value }
   }
+
+  /// Ask the platform what plug-ins it has to offer, once: `pluginChoices` says when it knows.
+  public func findPlugins() {
+    guard pluginChoices == .notAsked else { return }
+    guard let pluginHost else {
+      pluginChoices = .found([])
+      return
+    }
+    pluginChoices = .finding
+    finding = Task { [weak self] in
+      let found = await pluginHost.available()
+      self?.pluginChoices = .found(found)
+      self?.finding = nil
+    }
+  }
+
+  /// Once the plug-ins being found are.
+  public func pluginsFound() async { await finding?.value }
 
   // MARK: Samples
 
