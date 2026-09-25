@@ -117,8 +117,8 @@ echo "using $("$swiftc" --version 2>&1 | head -1), $(basename "$(dirname "$bundl
 
 # Everything below the app and the player, in the order they depend on each other.
 core="DriftboxDSP DriftboxSeq DriftboxEngine DriftboxRack DriftboxDocument DriftboxHost DriftboxHostAndroid"
-# Sources/CAAudio, CAMidi and CGLES are where the NDK module maps are found.
-common="-target $target -resource-dir $resources/swift-aarch64 -sdk $sdk -I Sources/CAAudio -I Sources/CAMidi -I Sources/CGLES -I Sources/CLooper"
+# Sources/CAAudio, CAMidi, CGLES, CLooper and CMedia are where the NDK module maps are found.
+common="-target $target -resource-dir $resources/swift-aarch64 -sdk $sdk -I Sources/CAAudio -I Sources/CAMidi -I Sources/CGLES -I Sources/CLooper -I Sources/CMedia"
 # `import Foundation` is the old Foundation on Android, over FoundationEssentials, and a module that
 # imports it links it and its internationalisation: 48MB, most of it ICU's data. Nothing here uses
 # either — what Driftbox takes from Foundation is FoundationEssentials' — but a library linked is a

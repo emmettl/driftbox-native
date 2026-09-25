@@ -48,6 +48,10 @@
               + cost
             : "FAIL \(entry.id): nothing above 0.001 in \(longest) seconds; \(cost)")
       }
+      // Recordings, which a module asks for from Android's picker, read as the rack reads them here.
+      if let resources = RackCatalogue.resources {
+        lines += DecodingCheck.run(in: resources.appending(path: "decoding-check"))
+      }
       return lines.joined(separator: "\n")
     }
 

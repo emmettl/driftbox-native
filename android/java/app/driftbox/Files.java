@@ -62,10 +62,8 @@ final class Files {
             activity.startActivityForResult(
                 new Intent(Intent.ACTION_OPEN_DOCUMENT)
                     .addCategory(Intent.CATEGORY_OPENABLE)
-                    // WAV, which is what the rack reads on Android: offered alone, so what can be
-                    // chosen is what will load.
+                    // Any audio: what the phone's codecs cannot read, Swift says so of.
                     .setType("audio/*")
-                    .putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"})
                     .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, "1".equals(fields[3])),
                 SAMPLES);
             return true;

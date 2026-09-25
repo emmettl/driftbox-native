@@ -47,7 +47,7 @@
       route = AAudioRoute(hop: { [lost] _ in lost.raise() })
       session = Session(host: host, audio: route)
       session.open(entry)
-      rack = RackSession(sampleRate: 48000, audio: route)
+      rack = RackSession(sampleRate: 48000, audio: route, decoder: MediaDecoder())
       guard session.song != nil, let device = try? GLESDevice(),
         let screen = try? Touchscreen(
           session: session, device: device, typesetter: typesetter, scale: density, scene: scene)

@@ -34,7 +34,7 @@ extension RackFaces {
       buttons.append(
         RackStage.Button(
           frame: screen, label: busy ? "Reading sample…" : "Drop audio here", press: busy ? nil : .choose,
-          isOn: false, tint: Theme.nine, style: .prompt(detail: "or choose a WAV file")))
+          isOn: false, tint: Theme.nine, style: .prompt(detail: "or choose \(rack.readable)")))
     }
     let rowY = screen.maxY + 6
     buttons.append(
