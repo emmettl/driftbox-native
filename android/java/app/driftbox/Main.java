@@ -3,6 +3,7 @@ package app.driftbox;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
@@ -65,6 +66,12 @@ public final class Main extends Activity {
   @Override
   protected void onCreate(Bundle state) {
     super.onCreate(state);
+    // A phone kept upright: on its side it is too short for the grid and the knobs, which a
+    // tablet, turned either way, has room for. Narrower than 600dp is a phone, as the controls
+    // take it.
+    if (getResources().getConfiguration().smallestScreenWidthDp < 600) {
+      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+    }
     midi = new Midi(this);
     String run = getIntent().getStringExtra("run");
     if ("midi-loopback".equals(run) || "gpu".equals(run) || "scenes".equals(run) || "text".equals(run)) {

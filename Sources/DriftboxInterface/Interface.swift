@@ -35,6 +35,9 @@ public final class Interface {
   }
   /// The window's size in points, which the last frame was laid out for.
   public var size: SIMD2<Float> = .zero
+  /// Whether it is on a touchscreen, and laid out for fingers however wide: a tablet's controls, as
+  /// a roomier phone's. Narrower than `Layout.compactWidth` it is a phone's either way.
+  public var touch = false
   /// Where the pointer is over the window, if it is, for what it is over to brighten.
   public private(set) var hover: SIMD2<Float>?
   /// A press the interface has, and what it was pressed on.
@@ -44,12 +47,12 @@ public final class Interface {
   public private(set) var scroll: Float = 0
   /// How far its steps are scrolled left, when they are wider than it.
   public private(set) var scrollX: Float = 0
-  /// On a phone, which eight steps the grid shows, and whether that follows the playhead: it does
-  /// until a page is chosen, and again once the pattern playing is followed.
+  /// Where the steps are paged, which eight the grid shows, and whether that follows the playhead:
+  /// it does until a page is chosen, and again once the pattern playing is followed.
   public private(set) var page = 0
   public private(set) var followsPage = true
-  /// On a phone, whether the controls are put away for performing: the whole screen the scene and
-  /// the pad but for one chip in the corner, which brings them back.
+  /// On a touchscreen, whether the controls are put away for performing: the whole screen the scene
+  /// and the pad but for one chip in the corner, which brings them back.
   public var performing = false {
     didSet {
       if performing {
@@ -61,7 +64,8 @@ public final class Interface {
   /// A finger dragged on the grid rather than tapped: which, from where, where it was last, and
   /// which way it went once it had gone far enough to say.
   private var drag: (pointer: Int, from: SIMD2<Float>, last: SIMD2<Float>, across: Bool?)?
-  /// On a phone, the 303 step the keyboard is setting, if it is showing, and the keyboard's octave.
+  /// On a touchscreen, the 303 step the keyboard is setting, if it is showing, and the keyboard's
+  /// octave.
   public private(set) var bassSelection: (voice: String, index: Int)?
   public private(set) var octave = 0
   /// Whether the song's effects are down the right, where the selected voice's knobs would be.
@@ -87,17 +91,17 @@ public final class Interface {
   func layout(scroll: Float, scrollX: Float? = nil) -> Layout {
     Layout(
       session: session, size: size, scroll: scroll, scrollX: scrollX ?? self.scrollX, effects: showsEffects,
-      renaming: renaming, page: page, keyboard: bassSelection != nil)
+      renaming: renaming, page: page, keyboard: bassSelection != nil, touch: touch)
   }
 
   /// Where the chip that brings the controls back is, while performing.
   public var editChip: Rect { Rect(size.x - Layout.margin - 64, Layout.margin, 64, 32) }
 
-  /// On a phone, the keyboard the selected 303 step's note is set on, while one is selected.
+  /// On a touchscreen, the keyboard the selected 303 step's note is set on, while one is selected.
   public var keyboard: BassKeyboard? { keyboard(in: layout) }
 
   func keyboard(in layout: Layout) -> BassKeyboard? {
-    guard layout.compact, let selection = bassSelection else { return nil }
+    guard layout.touch, let selection = bassSelection else { return nil }
     return BassKeyboard(layout: layout, voice: selection.voice, index: selection.index, octave: octave)
   }
 
@@ -163,6 +167,10 @@ public final class Interface {
       if moving.across == false {
         let up = moving.last.y - event.location.y
         scroll = layout(scroll: scroll + up).scroll
+      } else if moving.across == true, layout.maxScrollX > 0 {
+        // Steps wider than the grid, and not paged, are dragged along under the names instead.
+        let left = moving.last.x - event.location.x
+        scrollX = layout(scroll: scroll, scrollX: scrollX + left).scrollX
       }
       moving.last = event.location
       drag = moving
@@ -402,8 +410,8 @@ public final class Interface {
       return
     }
     var layout = layout
-    // On a phone, the page the playhead is on, while it is followed; and whatever page, one there is.
-    if let metrics = layout.metrics, metrics.compact {
+    // Paged, the page the playhead is on, while it is followed; and whatever page, one there is.
+    if let metrics = layout.metrics, metrics.pages > 1 {
       let wanted =
         followsPage ? layout.playhead.map { $0 / GridMetrics.pageSteps } ?? metrics.page : metrics.page
       if wanted != page {
@@ -455,12 +463,13 @@ public final class Interface {
     canvas.save()
     canvas.clip(layout.readout.x, layout.readout.y, layout.readout.width, layout.readout.height)
     // The tempo and the swing, set by dragging; or, while an outside clock sets the tempo, what it
-    // is, in the 303's amber, which is nobody's to drag.
-    for number in layout.numbers {
+    // is, in the 303's amber, which is nobody's to drag. For fingers they are in the strip instead.
+    let numbers = layout.touch ? [] : layout.numbers
+    for number in numbers {
       drawNumber(number, song: song, on: canvas)
     }
-    var right = layout.numbers.map(\.cell.x).min() ?? layout.readout.maxX
-    if let followed = session.followedBPM {
+    var right = numbers.map(\.cell.x).min() ?? layout.readout.maxX
+    if !layout.touch, let followed = session.followedBPM {
       canvas.align = .right
       canvas.font = Theme.mono(14, weight: 600)
       canvas.fill = Theme.three
@@ -596,7 +605,7 @@ public final class Interface {
       canvas.restore()
     }
     for line in layout.bassLines {
-      if layout.compact {
+      if layout.touch {
         drawStepBassLine(line, layout, pattern: pattern, metrics: metrics, on: canvas)
       } else {
         drawBassLine(line, layout, pattern: pattern, metrics: metrics, on: canvas)
@@ -684,10 +693,12 @@ public final class Interface {
     canvas.align = .left
     canvas.font = Theme.mono(8.5, weight: 600)
     canvas.fill = Theme.three
-    canvas.fillText("TB-303", line.header.x, line.header.y + 11)
+    // Above the steps on a phone, beside them on a tablet.
+    let baseline = line.header.y + line.header.height / 2 + 3
+    canvas.fillText("TB-303", line.header.x, baseline)
     canvas.font = Theme.mono(11, weight: 600)
     canvas.fill = selected ? Theme.ink : Theme.ink.faded(0.8)
-    canvas.fillText(line.name, line.header.x + 52, line.header.y + 11)
+    canvas.fillText(line.name, line.header.x + 52, baseline)
     let names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
     for index in 0..<pattern.length where metrics.shows(index) {
       let cell = Rect(
@@ -829,8 +840,8 @@ public final class Interface {
     canvas.align = .left
     canvas.font = Theme.mono(9, weight: 500)
     canvas.fill = Theme.dim
-    if layout.compact {
-      // On a phone the head holds the tempo and the swing, the song's length beside its name.
+    if layout.touch {
+      // For fingers the head holds the tempo and the swing, the song's length beside its name.
       let middle = strip.y + Layout.phoneStripHead / 2 + 3
       canvas.fillText("SONG  \(layout.totalBars) bars", strip.x + 14, middle)
       if let song = session.song {

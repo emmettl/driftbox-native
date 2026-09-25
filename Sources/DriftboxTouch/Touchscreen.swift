@@ -62,6 +62,7 @@ public final class Touchscreen {
     self.scale = max(1, scale)
     presenter = try Presenter(device: device)
     interface = Interface(session: session)
+    interface.touch = true
     canvas = try Canvas(device: device, typesetter: typesetter)
     chosenScene = scene
     let type = GPUScenes.type(for: scene ?? session.song?.visual)

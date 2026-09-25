@@ -14,7 +14,7 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
   <application android:label="Driftbox" android:hasCode="true" android:extractNativeLibs="false">
-    <!-- One of it, kept through a turn of the phone, which only resizes its window: made again,
+    <!-- One of it, kept through a turn of a tablet, which only resizes its window: made again,
          it would start the song again. -->
     <activity android:name=".Main" android:exported="true" android:launchMode="singleTask"
         android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"

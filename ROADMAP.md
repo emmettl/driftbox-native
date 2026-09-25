@@ -676,7 +676,7 @@ A groovebox of four machines and a rack full of cables were laid out for a deskt
 a pointer. A tablet and a phone need them designed again: what is on screen at once, what a
 finger can hit, what a drag means when there is no hover and no right click, and where the rack's
 cables go at arm's length. That design is the same work on iOS and Android, so it is done once,
-for both, tablets first.
+for both.
 
 The implementations may well be two, built in parallel: SwiftUI on iOS, where the Mac's views
 are most of the way there, and the drawn layer on Android. What carries across is then everything
@@ -700,8 +700,19 @@ by 40, their names above them, chosen by chip, swipe or the playhead; the grid d
 wheeled; a PERFORM chip that leaves the screen to the scene and the pad bar an EDIT chip — and a
 303 step tapped opens `BassKeyboard` above the grid, which makes room for it: an octave and the C
 above, a key setting the note, sounding it, and moving on to the next step, with chips for the
-step before and after, a rest, the octave, accent and slide. Left: long press for the context
-menus, the tempo and swing somewhere on a phone, the inspector as a sheet, and a tablet's layout.
+step before and after, a rest, the octave, accent and slide. A long press opens the context
+menus, as Android's own popups; the tempo and swing are in the song strip's head; and a voice's
+knobs, or the effects, are a sheet across the foot of the screen with the grid above it.
+
+A tablet is a roomier phone. `Interface.touch`, which `Touchscreen` sets, lays the controls out
+for fingers at any width: the steps 40 points high beside their names, all sixteen where they fit
+44 points apart and a page of eight where they do not; the 303's notes set on the keyboard, both
+octaves at once where there is room; the knobs a sheet while it is upright, in rows as long as fit,
+and the desktop's column on its side; and a PERFORM chip in the desktop's transport. A desktop
+window as large keeps the desktop's layout. Held to it at 800 by 1280, 1280 by 800 and 600 by 960
+in `TabletLayoutTests`, and looked at drawn by D3D11 on Windows, since there is no tablet here to
+try it on. A phone is kept upright, since on its side it is 372 points high, too short for the
+grid and the knobs.
 
 ### What Milestone 5 asks of Milestone 4
 
