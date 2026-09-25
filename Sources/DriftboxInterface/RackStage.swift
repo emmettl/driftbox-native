@@ -348,19 +348,33 @@ public struct RackStage {
     // reading as a rack of modules and start reading as a poster of one.
     // A Combinator's routing open beside the rack takes the right of the window, and the rack the rest.
     let combi = rack.editingRoutes.flatMap { id in rack.patch.modules.first { $0.id == id } }
-    let room = combi == nil ? size.x : max(0, size.x - Routing.width)
+    // On a phone the routing is a sheet across the foot, as the groovebox's knobs are, and the rack
+    // keeps the whole width above it; elsewhere it is down the right, and the rack has the rest.
+    let sheet = touch && size.x < Self.compactWidth
+    let room = combi == nil || sheet ? size.x : max(0, size.x - Routing.width)
     let width = Float(RackLayout.width)
-    // The keys, on a touchscreen, take the foot of the screen, and the rack the rest.
-    keyboard = touch && showsKeys ? RackKeys(size: size, margin: margin) : nil
-    let foot = keyboard.map { $0.frame.y - margin } ?? size.y
+    // The keys, on a touchscreen, take the foot of the screen, and the rack the rest; a routing open
+    // has it instead.
+    keyboard = touch && showsKeys && combi == nil ? RackKeys(size: size, margin: margin) : nil
+    var foot = keyboard.map { $0.frame.y - margin } ?? size.y
+    var sheetFrame: Rect?
+    if sheet, let combi {
+      let height = min(size.y * 0.62, Routing.sheetHeight(for: combi, in: rack))
+      let frame = Rect(margin, size.y - margin - height, max(0, size.x - margin * 2), height)
+      sheetFrame = frame
+      foot = frame.y - margin
+    }
     area = Rect(0, header.maxY + margin, room, max(0, foot - header.maxY - margin))
-    if touch, !showsKeys {
+    if touch, !showsKeys, combi == nil {
       keysChip = Chip(
         frame: Rect(area.maxX - margin - 64, area.maxY - margin - 32, 64, 32), label: "KEYS", target: .keys,
         isOn: false)
     }
-    let beside = Rect(room, area.y, max(0, size.x - room - margin), max(0, size.y - area.y - margin))
-    routing = combi.map { Routing(combi: $0, rack: rack, frame: beside) }
+    let beside =
+      sheetFrame ?? Rect(room, area.y, max(0, size.x - room - margin), max(0, size.y - area.y - margin))
+    routing = combi.map {
+      Routing(combi: $0, rack: rack, frame: beside, touch: touch, sheet: sheetFrame != nil)
+    }
     let layout = RackLayout.layout(rack.patch.modules)
     placements = layout.placements
     height = Float(max(layout.height, RackLayout.row))

@@ -375,6 +375,10 @@ public final class RackInterface {
         else { break }
         rack.turn(module, param, to: 1)
         holding = (event.id, module, param)
+      case .routing(.min(let index)), .routing(.max(let index)):
+        // On a touchscreen, where there are no keys to type an end with, it is dragged instead.
+        guard touch, let (from, _) = routeEnd(index, isMax: target == .routing(.max(index))) else { break }
+        turning = (event.id, target!, event.location.y, from, from)
       case .module(let id):
         rack.select(id, adding: event.modifiers.contains(.control))
       case nil:
@@ -402,6 +406,17 @@ public final class RackInterface {
         if turningWhole { turn.value = RackDisplay.jsRound(turn.value) }
         // Heard as it turns, as the Mac's knobs are: the first move is what undo goes back to.
         rack.turn(module, param, to: turn.value)
+      case .routing(.min(let index)), .routing(.max(let index)):
+        let isMax = turn.target == .routing(.max(index))
+        guard let (_, def) = routeEnd(index, isMax: isMax) else { return }
+        let span = def.max - def.min
+        let moved = rise / Double(Self.travel) * span * (fine ? 0.25 : 1)
+        var value = max(def.min, min(def.max, turn.from + moved))
+        if def.stepped { value = value.rounded() }
+        turn.value = value
+        rack.turnRoute(index) { route in
+          if isMax { route.max = value } else { route.min = value }
+        }
       case .cell(let module, let index):
         let stage = stage
         guard let cell = cell(module, index, in: stage) else { return }
@@ -492,9 +507,22 @@ public final class RackInterface {
       // Not dragged: a click, which does what the number does when clicked, if it does anything.
       if !cellMoved, let press = cell(module, index, in: stage)?.click { self.press(press, on: module) }
       cellMoved = false
+    case .routing:
+      rack.endTurn()
     default:
       break
     }
+  }
+
+  /// One end of routing `index`, as it is, or its target's own limit where it has none; and the
+  /// target's param, whose range it is dragged across.
+  private func routeEnd(_ index: Int, isMax: Bool) -> (Double, ParamDef)? {
+    guard rack.patch.modulation.indices.contains(index) else { return nil }
+    let route = rack.patch.modulation[index]
+    guard let type = rack.patch.modules.first(where: { $0.id == route.to.module })?.type,
+      let def = RackSession.routable(type).first(where: { $0.id == route.to.port })
+    else { return nil }
+    return ((isMax ? route.max : route.min) ?? (isMax ? def.max : def.min), def)
   }
 
   /// The number `index` on `module`'s face.

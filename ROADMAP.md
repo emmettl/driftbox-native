@@ -786,8 +786,11 @@ which is what the rack reads there; Java copies what is chosen into the app's fi
 loads it. That found the main actor's own work never running on Android: its queue is
 libdispatch's main queue, which nothing on Java's main thread drained, so a `Task` on it — a sample
 loading — waited for ever. Its file descriptor is given to the main thread's looper now, which
-drains it between Java's own messages. Left: the Combinator's routing, which is 300 points beside
-the rack; compressed recordings, through Android's own media codecs; and a tablet, seen.
+drains it between Java's own messages. The Combinator's routing, 300 points beside the rack on a
+desktop, is a sheet across the foot of a phone, over where the keys were, the rack above it; its
+pickers and buttons are 32 points tall, and a route's MIN and MAX are dragged up and down across
+the target's range, as a knob is, rather than typed. A tablet keeps it beside the rack. Left:
+compressed recordings, through Android's own media codecs; and a tablet, seen.
 
 ### What Milestone 5 asks of Milestone 4
 
