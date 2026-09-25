@@ -9,7 +9,7 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Everything here runs on Linux on purpose. The packages under test have no platform in them —
+# Everything but Windows runs on Linux on purpose, Android's build among it. The packages under test have no platform in them —
 # that is the point of them — and a private repository pays ten times as much for a macOS minute.
 # A macOS job arrives with the first target that needs one.
 jobs:
@@ -117,6 +117,47 @@ jobs:
           done <<< "$files"
           echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
           echo "Windows is $([ $relevant = true ] && echo needed || echo not needed) for this change"
+
+  # The Android app and player, built as the Mac and Windows build them, by `android-app.sh` and
+  # `android-build.sh`, and not run: the phone's checks need a phone, or an arm64 emulator, which
+  # a Linux runner has neither of. What this holds is that the Android build builds, from any host.
+  # The versions go together: swift.org's SDK for Android is built for one toolchain, and against
+  # one NDK's C++ library, which swift.org names (r30 for 6.4).
+  android:
+    name: Android
+    runs-on: ubuntu-24.04
+    env:
+      SWIFT_RELEASE: swift-6.4.0-RELEASE
+      ANDROID_SDK_CHECKSUM: 21fb555122a3d801ad943d48df7ebffdd8824de61c25c180bb792d3edaee0b43
+      NDK_VERSION: 30.0.16248370
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/swift
+            ~/.swiftpm/swift-sdks
+          key: android-${{ env.SWIFT_RELEASE }}
+      - name: Swift, and its SDK for Android
+        run: |
+          if [ ! -x ~/swift/usr/bin/swiftc ]; then
+            mkdir -p ~/swift
+            curl -fsSL "https://download.swift.org/${SWIFT_RELEASE,,}/ubuntu2404/$SWIFT_RELEASE/$SWIFT_RELEASE-ubuntu24.04.tar.gz" |
+              tar xz -C ~/swift --strip-components 1
+          fi
+          echo ~/swift/usr/bin >> "$GITHUB_PATH"
+          if ! ~/swift/usr/bin/swift sdk list | grep -q "${SWIFT_RELEASE}_android"; then
+            ~/swift/usr/bin/swift sdk install --checksum "$ANDROID_SDK_CHECKSUM" \
+              "https://download.swift.org/${SWIFT_RELEASE,,}/android-sdk/$SWIFT_RELEASE/${SWIFT_RELEASE}_android.artifactbundle.tar.gz"
+          fi
+      - name: The NDK the SDK was built against
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" >/dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - name: Build the app
+        run: sh scripts/android-app.sh build
+      - name: Build the player
+        run: sh scripts/android-build.sh build
 
   # The Windows host is the one target Linux cannot build, so it is built and tested here, over
   # everything else as well: the core is meant to be platform-free, and this is where that is kept.
