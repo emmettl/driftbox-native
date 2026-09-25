@@ -254,6 +254,8 @@ public final class Desktop {
     case DesktopMenus.previousSection: session.skip(sections: -1)
     case DesktopMenus.nextSection: session.skip(sections: 1)
     case DesktopMenus.metronome: session.metronome.toggle()
+    case DesktopMenus.recordAutomation: session.recordsAutomation.toggle()
+    case DesktopMenus.clearAutomation: session.clearAutomation()
     case DesktopMenus.countIn: session.countsIn.toggle()
     case DesktopMenus.loop: session.loopSection()
     case DesktopMenus.nextScene: stepScene(by: 1)
@@ -318,6 +320,8 @@ public final class Desktop {
     case DesktopMenus.save, DesktopMenus.saveAs, DesktopMenus.start,
       DesktopMenus.previousSection, DesktopMenus.nextSection, DesktopMenus.loop:
       session.song != nil
+    case DesktopMenus.recordAutomation: session.song != nil
+    case DesktopMenus.clearAutomation: session.song?.automation.isEmpty == false
     case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote: false
     default: true
     }
@@ -326,6 +330,7 @@ public final class Desktop {
   func isChecked(_ id: String) -> Bool {
     switch id {
     case DesktopMenus.metronome: return session.metronome
+    case DesktopMenus.recordAutomation: return session.recordsAutomation
     case DesktopMenus.countIn: return session.countsIn
     case DesktopMenus.loop: return session.loop != nil
     case DesktopMenus.songsScene: return chosenScene == nil

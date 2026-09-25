@@ -1,5 +1,5 @@
-// Parameters over the song timeline. A port of the reading half of
-// `driftbox/packages/engine/src/automation.ts`.
+// Parameters over the song timeline. A port of `driftbox/packages/engine/src/automation.ts`: reading a
+// lane at a step, and writing a point into one, as recording does.
 
 /// Stable target names. Built here so nothing else invents a second spelling.
 public enum AutomationTarget {
@@ -103,5 +103,37 @@ extension Song {
       automationValue(target, bar: bar, index: index, fallback: baseOffset ?? 0.5), 0, 1)
     if baseOffset == nil && lane(target) == nil { return songSwing }
     return clamp(songSwing + (offset - 0.5) * 2, 0, 1)
+  }
+}
+
+extension Song {
+  /// The song with `value` at `bar` and step `index` of `target`'s lane, the lane made on first use
+  /// with `interpolation`, and a point already there replaced: the reference's `setAutomationPoint`,
+  /// which records as a control turns. A blank target or a value that is not a number changes
+  /// nothing.
+  public func settingAutomationPoint(
+    _ target: String, bar: Int, index: Int, value: Double, interpolation: AutomationInterpolation = .linear
+  ) -> Song {
+    guard !target.allSatisfy(\.isWhitespace), value.isFinite else { return self }
+    let pointBar = max(0, bar)
+    let point = AutomationPoint(
+      bar: pointBar, index: max(0, min(barLength(forBar: pointBar) - 1, index)), value: value)
+    let existing = automation.firstIndex { $0.target == target }
+    var points = (existing.map { automation[$0].points } ?? []).filter {
+      $0.bar != point.bar || $0.index != point.index
+    }
+    points.append(point)
+    points.sort { ($0.bar, $0.index) < ($1.bar, $1.index) }
+    let lane = AutomationLane(target: target, interpolation: interpolation, points: points)
+    var song = self
+    if let existing { song.automation[existing] = lane } else { song.automation.append(lane) }
+    return song
+  }
+
+  /// The song without `target`'s lane: the reference's `clearAutomationLane`.
+  public func clearingAutomationLane(_ target: String) -> Song {
+    var song = self
+    song.automation.removeAll { $0.target == target }
+    return song
   }
 }

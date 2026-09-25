@@ -43,6 +43,8 @@ public enum Action: Equatable, Sendable {
   case start
   case loop
   case metronome
+  /// Arm the recording of knobs into the song's automation, or disarm it.
+  case automation
   /// Cycle a drum step through off, on and accented; or on a 909 lane, flam it, as the flam mode
   /// or the option key held says.
   case step(pattern: String, voice: String, index: Int)
@@ -336,20 +338,30 @@ public struct Layout {
       Chip(frame: Rect(bar.x + 76, chipY, 48, chipHeight), label: "TOP", action: .start, isOn: false),
     ]
     if perform {
-      chips.append(Chip(frame: Rect(bar.x + 130, chipY, 76, chipHeight), label: "PERFORM", action: .perform, isOn: false))
+      chips.append(
+        Chip(frame: Rect(bar.x + 130, chipY, 76, chipHeight), label: "PERFORM", action: .perform, isOn: false)
+      )
     }
     let loopChip = Rect(bar.maxX - 10 - 56, chipY, 56, chipHeight)
     let clickChip = Rect(loopChip.x - 6 - 64, chipY, 64, chipHeight)
     let fxChip = Rect(clickChip.x - 6 - 44, chipY, 44, chipHeight)
+    // Armed, a knob turned while the song plays is written into it, as the reference's `● auto` is;
+    // with how many lanes the song has, once it has any.
+    let lanes = session.song?.automation.count ?? 0
+    let autoChip = Rect(fxChip.x - 6 - 64, chipY, 64, chipHeight)
+    chips.append(
+      Chip(
+        frame: autoChip, label: lanes > 0 ? "AUTO \(lanes)" : "AUTO", action: .automation,
+        isOn: session.recordsAutomation))
     chips.append(Chip(frame: fxChip, label: "FX", action: .effects, isOn: effects && session.song != nil))
     chips.append(Chip(frame: clickChip, label: "CLICK", action: .metronome, isOn: session.metronome))
     chips.append(Chip(frame: loopChip, label: "LOOP", action: .loop, isOn: session.loop != nil))
     let left = bar.x + (perform ? 218 : 136)
     // Half each; on a tablet, where the readout is only where the transport is, the name the rest.
-    let middle = max(left, perform ? fxChip.x - 12 - 100 : (left + fxChip.x - 12) / 2)
+    let middle = max(left, perform ? autoChip.x - 12 - 100 : (left + autoChip.x - 12) / 2)
     return (
       chips, Rect(left, bar.y, max(0, middle - left), bar.height),
-      Rect(middle, bar.y, max(0, fxChip.x - 12 - middle), bar.height)
+      Rect(middle, bar.y, max(0, autoChip.x - 12 - middle), bar.height)
     )
   }
 
@@ -406,7 +418,8 @@ public struct Layout {
       compact
       ? GridMetrics(steps: pattern.length, width: width - inset * 2, page: page)
       : touch
-        ? GridMetrics(steps: pattern.length, width: width - inset * 2, page: page, label: GridMetrics.labelWidth)
+        ? GridMetrics(
+          steps: pattern.length, width: width - inset * 2, page: page, label: GridMetrics.labelWidth)
         : GridMetrics(steps: pattern.length, width: width - inset * 2)
     self.metrics = metrics
     let voices = allVoices.enumerated().filter { pattern.tracks[$0.element.id] != nil }
@@ -444,7 +457,8 @@ public struct Layout {
     // phone, a page of them fills the lane under its name, and nothing paged scrolls sideways.
     let first = x + 4 + metrics.label
     let seen = max(0, inner - 8 - metrics.label)
-    maxScrollX = metrics.pages > 1 ? 0 : max(0, metrics.stride * Float(metrics.steps) - GridMetrics.gap - seen)
+    maxScrollX =
+      metrics.pages > 1 ? 0 : max(0, metrics.stride * Float(metrics.steps) - GridMetrics.gap - seen)
     self.scrollX = min(max(0, scrollX), maxScrollX)
     columnsLeft = first - self.scrollX
     columns = Rect(first, rows.y, seen, rows.height)

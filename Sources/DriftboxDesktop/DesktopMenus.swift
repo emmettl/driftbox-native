@@ -24,6 +24,8 @@ public enum DesktopMenus {
   public static let nextSection = "transport.nextSection"
   public static let loop = "transport.loop"
   public static let metronome = "transport.metronome"
+  public static let recordAutomation = "transport.recordAutomation"
+  public static let clearAutomation = "transport.clearAutomation"
   public static let countIn = "transport.countIn"
   public static let nextScene = "view.nextScene"
   public static let previousScene = "view.previousScene"
@@ -95,6 +97,9 @@ public enum DesktopMenus {
             .separator,
             .command("Loop This Section", id: loop, shortcut: Shortcut("l")),
             .command("Metronome", id: metronome, shortcut: Shortcut("m")),
+            .separator,
+            .command("Record Automation", id: recordAutomation),
+            .command("Clear Automation", id: clearAutomation),
             .command("Count In", id: countIn),
           ]),
         Menu(

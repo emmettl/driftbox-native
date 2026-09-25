@@ -29,6 +29,7 @@ public final class Interface {
     didSet {
       if !isShowing {
         pressed = nil
+        if turning != nil { session.endTurn() }
         turning = nil
       }
     }
@@ -57,6 +58,7 @@ public final class Interface {
     didSet {
       if performing {
         pressed = nil
+        if turning != nil { session.endTurn() }
         turning = nil
       }
     }
@@ -185,7 +187,16 @@ public final class Interface {
         let fine = event.modifiers.contains(.option) ? (target.isNumber ? 0.2 : 0.25) : 1
         let moved = turn.from + Double(turn.fromY - event.location.y) * target.perPoint * fine
         let value = min(target.range.upperBound, max(target.range.lowerBound, moved))
-        turn.value = target.isNumber ? value.rounded() : value
+        let next = target.isNumber ? value.rounded() : value
+        if next != turn.value {
+          // Heard as it turns, and recorded as it turns when automation is armed: the song takes
+          // each move, and undo the whole turn once it is let go.
+          session.turn(
+            target.editName, automating: target.automationTarget, value: target.songValue(next),
+            interpolation: target.interpolation
+          ) { target.set(next, in: &$0) }
+        }
+        turn.value = next
         turning = turn
       }
       return pressed?.pointer == event.id
@@ -211,6 +222,7 @@ public final class Interface {
     case .cancelled:
       guard pressed?.pointer == event.id else { return false }
       pressed = nil
+      if turning != nil { session.endTurn() }
       turning = nil
       drag = nil
       return true
@@ -248,13 +260,14 @@ public final class Interface {
     public var value: Double
   }
 
-  /// The knob being turned, which the song only hears about when it is let go: one turn, one undo.
+  /// The knob being turned, which the song hears as it turns and keeps as one step of undo once it is
+  /// let go.
   public private(set) var turning: Turn?
   /// A knob pressed and let go without turning, and when: a second, soon after, puts it back.
   private var lastTap: (target: KnobTarget, at: ContinuousClock.Instant)?
   private func finish(_ turn: Turn) {
+    session.endTurn()
     if turn.value != turn.from {
-      session.edit(turn.target.editName) { turn.target.set(turn.value, in: &$0) }
       lastTap = nil
       return
     }
@@ -262,7 +275,12 @@ public final class Interface {
     if let last = lastTap, last.target == turn.target, now - last.at < .milliseconds(400) {
       lastTap = nil
       if let rest = turn.target.rest, turn.from != rest {
-        session.edit(turn.target.editName) { turn.target.set(rest, in: &$0) }
+        let target = turn.target
+        session.turn(
+          target.editName, automating: target.automationTarget, value: target.songValue(rest),
+          interpolation: target.interpolation
+        ) { target.set(rest, in: &$0) }
+        session.endTurn()
       }
     } else {
       lastTap = (turn.target, now)
@@ -278,6 +296,7 @@ public final class Interface {
     case .start: session.seek(toStep: 0)
     case .loop: session.loopSection()
     case .metronome: session.metronome.toggle()
+    case .automation: session.recordsAutomation.toggle()
     case .select(let voice):
       // Its knobs, in the effects' place if they are there. On a phone, where they are a sheet
       // at the foot of the screen, the 303 keyboard goes: there is no room for both.

@@ -172,6 +172,32 @@ public enum KnobTarget: Hashable, Sendable {
     }
   }
 
+  /// The automation lane the knob is, by the names the engine reads it by.
+  public var automationTarget: String {
+    switch self {
+    case .voice(let id, let knob): AutomationTarget.voice(id, VoiceParams.names[knob])
+    case .bass(let id, let knob): AutomationTarget.bass(id, BassParams.names[knob])
+    case .send(let id, let knob): AutomationTarget.send(id, SendLevels.names[knob])
+    case .swing(let id): AutomationTarget.voiceSwing(id)
+    case .fx(let knob): AutomationTarget.fx(FxParams.names[knob])
+    case .tempo: AutomationTarget.bpm
+    case .songSwing: AutomationTarget.swing
+    }
+  }
+
+  /// How its recorded points run between each other: the tempo holds until the next, as the
+  /// reference records it, and everything else ramps.
+  public var interpolation: AutomationInterpolation { self == .tempo ? .hold : .linear }
+
+  /// What the song holds with the knob at `value`: the swing as a fraction, not the percent it shows.
+  public func songValue(_ value: Double) -> Double {
+    switch self {
+    case .tempo: value.rounded()
+    case .songSwing: value.rounded() / 100
+    default: value
+    }
+  }
+
   /// `song` with the knob at `value`.
   public func set(_ value: Double, in song: inout Song) {
     switch self {

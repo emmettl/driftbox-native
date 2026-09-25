@@ -529,6 +529,7 @@ public final class Session {
     loop = nil
     if remembered { remember(entry, at: url) }
     history.clear()
+    turnStart = nil
     refreshUndo()
     song = loaded
     saved = loaded
@@ -876,6 +877,7 @@ public final class Session {
   /// Change the song and have the engine take it up where it is, without stopping. Undoable under
   /// `name`, which is what the Edit menu offers to undo — "Undo Set Step", not "Undo".
   public func edit(_ name: String = "Edit", _ change: (inout Song) -> Void) {
+    endTurn()
     guard let before = song else { return }
     var edited = before
     change(&edited)
@@ -884,13 +886,66 @@ public final class Session {
   }
 
   public func undo() {
+    endTurn()
     guard let before = history.undo() else { return }
     apply(before)
   }
 
   public func redo() {
+    endTurn()
     guard let after = history.redo() else { return }
     apply(after)
+  }
+
+  // MARK: - Turning a knob, and recording it
+
+  /// A knob being turned: the song as it was before the turn, and what undoing it is called.
+  private var turnStart: (song: Song, name: String)?
+
+  /// Whether a knob turned while the song plays is written into the song's automation, at the
+  /// step it is on: armed, as the reference's `● auto` is. Editor state, so never remembered.
+  public var recordsAutomation = false
+
+  /// A knob moved: the song changed and heard at once, as a knob turning is, but kept for undo only
+  /// when it is let go (`endTurn`), so one turn is one step of undo under `name`. `target` is the
+  /// automation lane the knob is — `AutomationTarget`'s names — and `value` what it is at, in the
+  /// song's own units, for recording. The engine takes each move up where it is, as an edit.
+  public func turn(
+    _ name: String, automating target: String? = nil, value: Double? = nil,
+    interpolation: AutomationInterpolation = .linear, _ change: (inout Song) -> Void
+  ) {
+    guard let current = song else { return }
+    if turnStart == nil { turnStart = (current, name) }
+    var edited = current
+    change(&edited)
+    if let target, let value { edited = recording(value, into: target, of: edited, interpolation) }
+    apply(edited)
+  }
+
+  /// The knob let go of: the turn, however far it went, kept as one step of undo.
+  public func endTurn() {
+    guard let start = turnStart else { return }
+    turnStart = nil
+    guard let song, song != start.song else { return }
+    history.record(start.name, before: start.song, after: song)
+    refreshUndo()
+  }
+
+  /// `song` with `value` written into `target`'s lane at the step the transport is on, when
+  /// automation is armed and the song is playing past any count-in — there is no bar of it yet for
+  /// a knob to belong to during one — and as it was otherwise: the reference's `recordPoint`.
+  func recording(
+    _ value: Double, into target: String, of song: Song, _ interpolation: AutomationInterpolation = .linear
+  ) -> Song {
+    guard recordsAutomation, isPlaying, !countingIn, let position else { return song }
+    return song.settingAutomationPoint(
+      target, bar: position.bar, index: position.step, value: value, interpolation: interpolation)
+  }
+
+  /// Every automation lane gone, as one step of undo.
+  public func clearAutomation() {
+    guard song?.automation.isEmpty == false else { return }
+    edit("Clear Automation") { $0.automation = [] }
   }
 
   private func refreshUndo() {
