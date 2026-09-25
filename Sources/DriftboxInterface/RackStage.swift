@@ -400,16 +400,18 @@ public struct RackStage {
     let modules = Dictionary(rack.patch.modules.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     faces = layout.placements.compactMap { placement in
       guard let module = modules[placement.id] else { return nil }
-      return Self.face(module, placement, rack: rack, page: pages[module.id] ?? 0)
+      return Self.face(module, placement, rack: rack, page: pages[module.id] ?? 0, touch: touch)
     }
   }
 
   /// A module's front: its panel, inset from its place; its title; and its controls, as its own
   /// hand-built face lays them out, or as the generic face does — a cell for every param a hand
-  /// could set, three across on a half-width module and seven on a full one.
+  /// could set, three across on a half-width module and seven on a full one. `touch` words it for
+  /// a finger.
   @MainActor
   static func face(
-    _ module: PatchModule, _ placement: RackLayout.Placement, rack: RackSession, page: Int = 0
+    _ module: PatchModule, _ placement: RackLayout.Placement, rack: RackSession, page: Int = 0,
+    touch: Bool = false
   ) -> Face {
     let frame = Rect(
       Float(placement.x) + 3, Float(placement.y) + 3, Float(placement.width) - 6, Float(placement.height) - 6)
@@ -420,7 +422,7 @@ public struct RackStage {
       return Face(
         module: module, def: nil, span: placement.span, frame: frame, title: title, words: "", controls: [])
     }
-    if let built = RackFaces.face(module, def, frame: frame, top: top, rack: rack, page: page) {
+    if let built = RackFaces.face(module, def, frame: frame, top: top, rack: rack, page: page, touch: touch) {
       return Face(
         module: module, def: def, span: placement.span, frame: frame, title: title, words: built.words,
         wordsTint: built.wordsTint, wordsFont: built.wordsFont, controls: built.cells.controls,
