@@ -80,8 +80,29 @@ public final class Session {
     didSet {
       audio?.chosen = outputDevice
       remembering?.set(outputDevice ?? "", forKey: SessionDefaults.outputDevice)
+      nameOutputDevice()
     }
   }
+  /// The chosen device's name, remembered with it, for saying which device it is while it is not
+  /// plugged in.
+  public private(set) var outputDeviceName: String?
+
+  /// The chosen device's name as it is known now: from the devices there are, while it is one of
+  /// them, and remembered for while it is not.
+  private func nameOutputDevice() {
+    guard let chosen = outputDevice else {
+      guard outputDeviceName != nil else { return }
+      outputDeviceName = nil
+      remembering?.set("", forKey: SessionDefaults.outputDeviceName)
+      return
+    }
+    guard let found = outputs.first(where: { $0.id == chosen }), found.name != outputDeviceName else {
+      return
+    }
+    outputDeviceName = found.name
+    remembering?.set(found.name, forKey: SessionDefaults.outputDeviceName)
+  }
+
   /// Every device there is to play through, kept up to date as they come and go.
   public private(set) var outputs: [AudioDevice] = []
   /// The one the sound is going out of: the chosen one while it is there, the system's while it
@@ -201,6 +222,7 @@ public final class Session {
       audio.onChange = { [weak self, weak audio] in
         guard let self, let audio else { return }
         outputs = audio.devices
+        nameOutputDevice()
         playingThrough = audio.current
         systemOutput = audio.systemDefault
         outputError = audio.error
@@ -249,6 +271,9 @@ public final class Session {
     ignoredMIDISources = Set(
       (memory.string(forKey: SessionDefaults.ignoredMIDI) ?? "").split(separator: "\n").map(String.init))
     outputDevice = memory.string(forKey: SessionDefaults.outputDevice).flatMap { $0.isEmpty ? nil : $0 }
+    outputDeviceName = memory.string(forKey: SessionDefaults.outputDeviceName).flatMap {
+      $0.isEmpty ? nil : $0
+    }
     metronome = memory.bool(forKey: SessionDefaults.metronome)
     countsIn = memory.bool(forKey: SessionDefaults.countIn)
     clockDestination = MIDIDestination(stored: memory.string(forKey: SessionDefaults.clockDestination) ?? "")
@@ -1026,6 +1051,8 @@ enum SessionDefaults {
   static let clockDestination = "clock.destination"
   /// The device to play through, by its id; empty for the system's.
   static let outputDevice = "audio.output"
+  /// Its name, for saying which device it is while it is not plugged in: the Mac's key for it.
+  static let outputDeviceName = "audio.output.name"
   static let lastSong = "song.last.catalogue"
   static let lastFile = "song.last.file"
   /// The pattern chosen to edit in that song, if one was rather than following the transport.

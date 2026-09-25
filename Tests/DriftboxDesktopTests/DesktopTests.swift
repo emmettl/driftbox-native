@@ -183,6 +183,28 @@ struct DesktopTests {
     }
   }
 
+  /// View's Run the Visuals is the session's, ticked as it is; and the Audio menu names a device
+  /// chosen and not plugged in, ticked, rather than ticking nothing.
+  @Test func theVisualsAndTheSoundAreSettings() throws {
+    for device in try Self.devices() {
+      let (desktop, window, _) = try Self.desktop(on: device)
+      #expect(window.commandIDs.contains(DesktopMenus.visuals))
+      #expect(window.isChecked?(DesktopMenus.visuals) == desktop.session.showsVisuals)
+      let was = desktop.session.showsVisuals
+      window.choose(DesktopMenus.visuals)
+      #expect(desktop.session.showsVisuals == !was)
+      try desktop.drawFrame()
+      window.choose(DesktopMenus.visuals)
+
+      desktop.session.outputDevice = "gone"
+      try desktop.drawFrame()
+      #expect(window.commandIDs.contains(DesktopMenus.outputPrefix + "gone"))
+      #expect(window.title(of: DesktopMenus.outputPrefix + "gone")?.hasSuffix("(Not Connected)") == true)
+      #expect(window.isChecked?(DesktopMenus.outputPrefix + "gone") == true)
+      desktop.session.outputDevice = nil
+    }
+  }
+
   /// A song dropped on the window opens, as Open would open it; anything else dropped is let be.
   @Test func aDroppedSongOpens() throws {
     for device in try Self.devices() {

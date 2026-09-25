@@ -89,6 +89,9 @@ public final class Desktop {
 
   // MARK: - A frame
 
+  /// The ground the controls stand on while the visuals are stopped: the interface's own.
+  static let ground = SIMD4<Float>(7 / 255, 4 / 255, 15 / 255, 1)
+
   func drawFrame() throws {
     session.tick()
     // The rack's meters and its last note, caught up whether it shows or not, as the Mac's are.
@@ -101,9 +104,14 @@ public final class Desktop {
     }
     showScene()
     let time = HostTime.seconds(from: began, to: HostTime.now())
-    // The rack covers the window while it shows: the scene waits.
+    // The rack covers the window while it shows: the scene waits. Behind the controls it runs if
+    // the visuals are to run, and while the controls are away always: performing is what it is for.
     if !showsRack {
-      scene.draw(session.sceneInput(time: time, pixelRatio: window.scale), into: frame, on: device)
+      if session.showsVisuals || !interface.isShowing {
+        scene.draw(session.sceneInput(time: time, pixelRatio: window.scale), into: frame, on: device)
+      } else {
+        device.render(into: frame, clear: .colour(Self.ground)) { _ in }
+      }
     }
     let target = try surface.target()
     presenter.present(frame, into: target, on: device)
@@ -252,6 +260,7 @@ public final class Desktop {
     case DesktopMenus.previousScene: stepScene(by: -1)
     case DesktopMenus.songsScene: chosenScene = nil
     case DesktopMenus.controls: interface.isShowing.toggle()
+    case DesktopMenus.visuals: session.showsVisuals.toggle()
     case DesktopMenus.systemOutput: session.outputDevice = nil
     case DesktopMenus.listen: session.listensToMIDI.toggle()
     case DesktopMenus.followClock: session.followsClock.toggle()
@@ -309,7 +318,7 @@ public final class Desktop {
     case DesktopMenus.save, DesktopMenus.saveAs, DesktopMenus.start,
       DesktopMenus.previousSection, DesktopMenus.nextSection, DesktopMenus.loop:
       session.song != nil
-    case DesktopMenus.noInputs, DesktopMenus.noOutputs: false
+    case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote: false
     default: true
     }
   }
@@ -324,6 +333,7 @@ public final class Desktop {
     case DesktopMenus.showRack: return showsRack
     case DesktopMenus.rackBack: return rack?.flipped == true
     case DesktopMenus.systemOutput: return session.outputDevice == nil
+    case DesktopMenus.visuals: return session.showsVisuals
     case DesktopMenus.listen: return session.listensToMIDI
     case DesktopMenus.followClock: return session.followsClock
     case DesktopMenus.sendClock: return session.sendsClock

@@ -129,7 +129,9 @@ public final class Interface {
   // MARK: - The pointer
 
   /// Take `event` if it is the interface's: a press on a panel, and everything that press does until
-  /// it lifts. False for anything else, which is the pad's.
+  /// it lifts. False for anything else, which is the pad's: what a window with a pad asks, and
+  /// one without, as a phone's, has no need to.
+  @discardableResult
   public func pointer(_ event: PointerEvent) -> Bool {
     if event.kind == .mouse { hover = event.phase == .cancelled ? nil : event.location }
     guard isShowing else { return false }
