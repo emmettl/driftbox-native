@@ -4,6 +4,10 @@
 # as an AUv3 extension, for other apps to load. Signed ad hoc, for this machine; local use only.
 set -eu
 cd "$(dirname "$0")/.."
+. scripts/version.env
+# The version an Audio Unit host keeps a component by, and scans it again when it changes: the
+# release's, as Apple packs one, a byte each for minor and patch.
+component_version=$(echo "$DRIFTBOX_VERSION" | awk -F. '{ print $1 * 65536 + $2 * 256 + $3 }')
 swift build -c release --scratch-path .build-release --product Driftbox
 swift build -c release --scratch-path .build-release --product DriftboxAudioUnits
 app=.build-release/Driftbox.app
@@ -27,7 +31,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>app.driftbox.native</string>
   <key>CFBundleName</key><string>Driftbox</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1</string>
+  <key>CFBundleShortVersionString</key><string>$DRIFTBOX_VERSION</string>
+  <key>CFBundleVersion</key><string>$DRIFTBOX_BUILD</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSHighResolutionCapable</key><true/>
@@ -72,8 +77,8 @@ cat > "$ext/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>app.driftbox.native.audiounits</string>
   <key>CFBundleName</key><string>Driftbox Audio Units</string>
   <key>CFBundlePackageType</key><string>XPC!</string>
-  <key>CFBundleShortVersionString</key><string>0.1</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>$DRIFTBOX_VERSION</string>
+  <key>CFBundleVersion</key><string>$DRIFTBOX_BUILD</string>
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSExtension</key><dict>
     <!-- Audio Units with faces: each instrument's own, in the app's window. -->
@@ -92,7 +97,7 @@ cat > "$ext/Contents/Info.plist" <<PLIST
         <key>subtype</key><string>drck</string>
         <key>tags</key><array><string>Synthesizer</string></array>
         <key>type</key><string>aumu</string>
-        <key>version</key><integer>1</integer>
+        <key>version</key><integer>$component_version</integer>
       </dict><dict>
         <key>description</key><string>Driftbox Groovebox</string>
         <key>factoryFunction</key><string>DriftboxAudioUnitViewController</string>
@@ -103,15 +108,16 @@ cat > "$ext/Contents/Info.plist" <<PLIST
         <key>subtype</key><string>drgb</string>
         <key>tags</key><array><string>Drums</string><string>Synthesizer</string></array>
         <key>type</key><string>aumu</string>
-        <key>version</key><integer>1</integer>
+        <key>version</key><integer>$component_version</integer>
       </dict></array>
     </dict>
   </dict>
 </dict></plist>
 PLIST
-# Inside out: the extension, sandboxed, then the app around it.
+# Inside out: the extension, sandboxed, then the app around it. Ad hoc, for this machine; a release
+# is signed again, for everyone's, by scripts/release.py.
 codesign --force --sign - --entitlements scripts/extension.entitlements "$ext"
-codesign --force --sign - "$app"
+codesign --force --sign - --entitlements scripts/app.entitlements "$app"
 
 # A bundle sitting in a build directory is not something the system goes looking for, so the type
 # it has just declared and the extension inside it are announced by hand. Nothing is installed;
