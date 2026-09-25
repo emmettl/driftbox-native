@@ -1,0 +1,5 @@
+module CLooper [system] {
+  header "CLooper.h"
+  link "android"
+  export *
+}

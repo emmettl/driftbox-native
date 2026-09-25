@@ -81,6 +81,9 @@
     // Android 12 and the app's Java are what the typesetter needs; without them, scenes set no type.
     // Made here, since `env` is Java's and does not cross into the main actor.
     let android = AndroidTypesetter(env: env)
+    // The main actor's own work — a sample loading, a patch's recordings — run on this thread, from
+    // Java's looper, as it is nowhere else here.
+    MainQueue.drainOnLooper()
     return MainActor.assumeIsolated {
       stage?.stop()
       let typesetter: any Typesetter = android ?? NoTypesetter()
@@ -122,6 +125,17 @@
   ) {
     let (location, fileName) = (env.string(location), env.string(fileName))
     MainActor.assumeIsolated { stage?.wrote(to: location, fileName: fileName, done != 0) }
+  }
+
+  /// Recordings Java's picker chose for the rack's `module`, copied into the app's own files: their
+  /// paths, a line each.
+  @_cdecl("Java_app_driftbox_Native_samplesChosen")
+  public func nativeSamplesChosen(
+    _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ module: jstring?, _ paths: jstring?
+  ) {
+    let (module, paths) = (env.string(module), env.string(paths))
+    let files = paths.split(separator: "\n").map(String.init)
+    MainActor.assumeIsolated { stage?.samplesChosen(files, into: module) }
   }
 
   @_cdecl("Java_app_driftbox_Native_stop")

@@ -61,11 +61,13 @@ let package = Package(
     // compiles to nothing off Android.
     .systemLibrary(name: "CAAudio"),
     .systemLibrary(name: "CAMidi"),
+    .systemLibrary(name: "CLooper"),
     .target(
       name: "DriftboxHostAndroid",
       dependencies: [
         "DriftboxHost", .target(name: "CAAudio", condition: .when(platforms: [.android])),
         .target(name: "CAMidi", condition: .when(platforms: [.android])),
+        .target(name: "CLooper", condition: .when(platforms: [.android])),
       ]),
     // The Android app's native library: what `android/`'s Java calls, and the tests it runs on a
     // phone. Built into libdriftbox.so by `scripts/android-app.sh`; nothing off Android.
@@ -285,7 +287,8 @@ let package = Package(
     .testTarget(
       name: "DriftboxTouchTests",
       dependencies: [
-        "DriftboxGPU", "DriftboxHost", "DriftboxSession", "DriftboxShell", "DriftboxText", "DriftboxTouch",
+        "DriftboxGPU", "DriftboxHost", "DriftboxInterface", "DriftboxRack", "DriftboxRackSession",
+        "DriftboxSession", "DriftboxShell", "DriftboxText", "DriftboxTouch",
         .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxGPUMetal", condition: .when(platforms: [.macOS, .iOS])),
         .target(name: "DriftboxGPUGLES", condition: .when(platforms: [.linux])),

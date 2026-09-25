@@ -21,9 +21,12 @@ import java.nio.charset.StandardCharsets;
 final class Files {
   static final int OPEN = 7101;
   static final int CREATE = 7102;
+  static final int SAMPLES = 7103;
 
   /** A song waiting for the create picker to say where it goes. */
   private static String waiting;
+  /** The rack's module waiting for the recordings the picker chooses. */
+  private static String sampling;
 
   private Files() {}
 
@@ -54,6 +57,18 @@ final class Files {
                     .putExtra(Intent.EXTRA_TITLE, fields[2]),
                 CREATE);
             return true;
+          case "samples":
+            sampling = fields[2];
+            activity.startActivityForResult(
+                new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                    .addCategory(Intent.CATEGORY_OPENABLE)
+                    // WAV, which is what the rack reads on Android: offered alone, so what can be
+                    // chosen is what will load.
+                    .setType("audio/*")
+                    .putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"})
+                    .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, "1".equals(fields[3])),
+                SAMPLES);
+            return true;
           case "write":
             Uri uri = Uri.parse(fields[2]);
             Native.fileSaved(uri.toString(), name(activity, uri), write(activity, uri, body));
@@ -75,6 +90,10 @@ final class Files {
 
   /** What a picker chose, if it is one of these. */
   static boolean result(Activity activity, int request, int code, Intent data) {
+    if (request == SAMPLES) {
+      samples(activity, code == Activity.RESULT_OK ? data : null);
+      return true;
+    }
     if (request != OPEN && request != CREATE) return false;
     Uri uri = code == Activity.RESULT_OK && data != null ? data.getData() : null;
     if (uri == null) {
@@ -99,6 +118,45 @@ final class Files {
       if (song != null) Native.fileSaved(uri.toString(), name(activity, uri), write(activity, uri, song));
     }
     return true;
+  }
+
+  /**
+   * The recordings chosen, one or several, copied into a folder of the app's own under their own
+   * names, since Swift reads a recording as a file; and handed to Swift for the module waiting.
+   */
+  private static void samples(Activity activity, Intent data) {
+    String module = sampling;
+    sampling = null;
+    if (module == null || data == null) {
+      Log.i("Driftbox", "no recordings chosen" + (module == null ? ", and no module waiting" : ""));
+      return;
+    }
+    java.util.List<Uri> chosen = new java.util.ArrayList<>();
+    if (data.getClipData() != null) {
+      for (int i = 0; i < data.getClipData().getItemCount(); i++) chosen.add(data.getClipData().getItemAt(i).getUri());
+    } else if (data.getData() != null) {
+      chosen.add(data.getData());
+    }
+    java.io.File folder = new java.io.File(activity.getCacheDir(), "samples/" + System.nanoTime());
+    folder.mkdirs();
+    StringBuilder paths = new StringBuilder();
+    for (Uri uri : chosen) {
+      // Its name without a path in it, which is what a set is mapped by.
+      String name = name(activity, uri).replace('/', '_');
+      java.io.File file = new java.io.File(folder, name);
+      try (InputStream in = activity.getContentResolver().openInputStream(uri);
+          OutputStream out = new java.io.FileOutputStream(file)) {
+        byte[] buffer = new byte[65536];
+        for (int n; (n = in.read(buffer)) > 0; ) out.write(buffer, 0, n);
+      } catch (IOException | NullPointerException e) {
+        Log.i("Driftbox", "could not copy " + uri + ": " + e.getMessage());
+        continue;
+      }
+      if (paths.length() > 0) paths.append('\n');
+      paths.append(file.getPath());
+    }
+    Log.i("Driftbox", chosen.size() + " chosen for " + module + ", copied: " + paths.toString().replace('\n', ' '));
+    if (paths.length() > 0) Native.samplesChosen(module, paths.toString());
   }
 
   private static String read(Activity activity, Uri uri) {

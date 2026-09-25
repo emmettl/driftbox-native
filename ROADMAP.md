@@ -780,8 +780,14 @@ touchscreen plays on keys across the foot of the screen, the rack above them: an
 keys on a phone, and as many as fit on a tablet; a finger a note, so a hand plays a chord, slid from
 key to key, and a key struck lower down struck harder; the octave moved from their row, and the
 keys put away, or shown from a chip in the rack's corner. They show of themselves for a patch with
-a MIDI module to play. Left: a sample loaded through Android's picker; the Combinator's routing,
-which is 300 points beside the rack; and a tablet, seen.
+a MIDI module to play. A module that holds recordings — a Slice Lab's sample, a Key Atlas's set, an
+Audio Track's take — asks for them with Android's own picker, one or several, offering WAV files,
+which is what the rack reads there; Java copies what is chosen into the app's files, and Swift
+loads it. That found the main actor's own work never running on Android: its queue is
+libdispatch's main queue, which nothing on Java's main thread drained, so a `Task` on it — a sample
+loading — waited for ever. Its file descriptor is given to the main thread's looper now, which
+drains it between Java's own messages. Left: the Combinator's routing, which is 300 points beside
+the rack; compressed recordings, through Android's own media codecs; and a tablet, seen.
 
 ### What Milestone 5 asks of Milestone 4
 
