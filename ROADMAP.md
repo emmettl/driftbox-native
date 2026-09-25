@@ -441,8 +441,13 @@ external displays, performance capture to video.
    every song so the app's automation keeps its place — named and shown as the face shows them.
    The app's moves, from its controls or in the render events, become the song's at the next
    tick, heard and kept but no step of undo; a knob turned on the face is shown to the app, without
-   being heard back as the app's. Next: the app's song position, so both start where the app is;
-   and the rack's parameters, which cannot be its knobs, since those come and go with the patch.
+   being heard back as the app's. Both keep the app's song position: where the app's transport
+   starts or stops or jumps — its cycle going round, its playhead moved — the unit's render block
+   puts the instrument at the app's beat before rendering that block, through a `locate` each
+   `RenderSource` can carry, so the groovebox starts on the block the app does with the kick on
+   its beat, going round its song past the song's end, and the rack's clock is at the app's beat.
+   A jump is a beat other than the last block's tempo led to, not the app's word for one. Next:
+   the rack's parameters, which cannot be its knobs, since those come and go with the patch.
 
 ### What the later milestones ask of the first
 

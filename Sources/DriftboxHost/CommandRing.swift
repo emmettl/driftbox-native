@@ -18,6 +18,10 @@ public enum Command {
   /// Play this song from its start. The engine hands back the song it was playing through the
   /// `released` ring, for the sender to free.
   case load(UnsafeMutablePointer<CompiledSong>?)
+  /// This song in place of the one playing, an edit of it, from where that one had got to — worked
+  /// out here, on the render thread, where the place is exact, and not from a reading the interface
+  /// took some time ago, which would play a sliver of the song twice. Handed back as a load's is.
+  case replace(UnsafeMutablePointer<CompiledSong>)
   case pad(x: Double, y: Double)
   case padRelease
   /// Strike a voice now, outside the song: the keys. Prepared against time zero; the engine

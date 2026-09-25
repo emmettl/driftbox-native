@@ -1,6 +1,7 @@
-import DriftboxHost
 import DriftboxRack
 import Testing
+
+@testable import DriftboxHost
 
 /// The rack's real-time host against its headless renderer: the same patch, the same sound,
 /// whatever size of block the device asks for.
@@ -157,5 +158,21 @@ struct RackHostTests {
     let before = untouched.render(frames: 128 * 260).left
     #expect(Array(mine[..<(128 * 60)]) == Array(before[..<(128 * 60)]))
     #expect(Array(mine[(128 * 60)...]) != Array(before[(128 * 60)...]))
+  }
+
+  /// An app's transport puts the rack's clock at its beat, running, without the rewind a start of
+  /// the rack's own makes.
+  @Test func anAppsTransportLocatesTheClock() {
+    let host = RackHost(sampleRate: 48000)
+    host.load(Self.patch)
+    _ = render(host, frames: 256, callback: 128)
+    host.locate(beat: 8, moving: true)
+    _ = render(host, frames: 512, callback: 128)
+    let beat = host.current.pointee?.pointee.beatPosition ?? 0
+    #expect(beat > 8 && beat < 8.1, "at the app's beat, and moving on from it")
+
+    host.locate(beat: 2, moving: false)
+    _ = render(host, frames: 512, callback: 128)
+    #expect(host.current.pointee?.pointee.beatPosition == 2, "put there, and standing still")
   }
 }

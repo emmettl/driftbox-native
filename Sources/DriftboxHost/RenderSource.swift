@@ -12,17 +12,30 @@ public struct RenderSource: @unchecked Sendable {
       _ right: UnsafeMutablePointer<Float>
     ) -> Void
 
+  /// Where an app the source plays inside has its transport, from the render thread at the start
+  /// of a block, before that block is rendered: `beat` quarter notes from the app's top, and
+  /// whether it is moving. Called when it starts or stops or jumps, so the source starts on the
+  /// block the app does, and at the beat it is on.
+  public typealias Locate =
+    @convention(c) (_ context: UnsafeMutableRawPointer, _ beat: Double, _ moving: Bool) -> Void
+
   public let context: UnsafeMutableRawPointer
   public let render: Render
+  /// For a source with a transport of its own to put where the app's is; nil for one without.
+  public let locate: Locate?
   /// The rate it renders at, which is the rate it expects to be played at.
   public let sampleRate: Double
   /// What keeps `context` alive for as long as a device might call it. Held by whoever attaches
   /// the source, on the interface's thread; the device's thread never touches it.
   public let owner: AnyObject
 
-  public init(context: UnsafeMutableRawPointer, render: Render, sampleRate: Double, owner: AnyObject) {
+  public init(
+    context: UnsafeMutableRawPointer, render: Render, locate: Locate? = nil, sampleRate: Double,
+    owner: AnyObject
+  ) {
     self.context = context
     self.render = render
+    self.locate = locate
     self.sampleRate = sampleRate
     self.owner = owner
   }
@@ -38,6 +51,11 @@ extension EngineHost {
           $0.render(frames: frames, left: left, right: right)
         }
       },
+      locate: { context, beat, moving in
+        Unmanaged<EngineHost>.fromOpaque(context)._withUnsafeGuaranteedRef {
+          $0.locate(beat: beat, moving: moving)
+        }
+      },
       sampleRate: sampleRate, owner: self)
   }
 }
@@ -50,6 +68,11 @@ extension RackHost {
       render: { context, frames, left, right in
         Unmanaged<RackHost>.fromOpaque(context)._withUnsafeGuaranteedRef {
           $0.render(frames: frames, left: left, right: right)
+        }
+      },
+      locate: { context, beat, moving in
+        Unmanaged<RackHost>.fromOpaque(context)._withUnsafeGuaranteedRef {
+          $0.locate(beat: beat, moving: moving)
         }
       },
       sampleRate: sampleRate, owner: self)

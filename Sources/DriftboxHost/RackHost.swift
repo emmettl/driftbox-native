@@ -185,6 +185,8 @@ public final class RackHost: @unchecked Sendable {
   let songRight: UnsafeMutablePointer<Float>
   /// Whether there is a song, and which machines the rack takes. Only the render thread touches it.
   let hosting: UnsafeMutablePointer<(on: Bool, diverted: UInt8)>
+  /// Where an app's transport last said to be, until the next block. The render thread's alone.
+  let located: UnsafeMutablePointer<(beat: Double, moving: Bool, pending: Bool)>
   /// Whether the song was last told to play, so starting the rack starts it from the top once.
   private var songRunning = false
   /// Which machines the loaded patch takes, sent again when a song arrives.
@@ -227,6 +229,8 @@ public final class RackHost: @unchecked Sendable {
     songRight.initialize(repeating: 0, count: blockFrames)
     hosting = .allocate(capacity: 1)
     hosting.initialize(to: (false, 0))
+    located = .allocate(capacity: 1)
+    located.initialize(to: (0, false, false))
   }
 
   deinit {
@@ -249,6 +253,7 @@ public final class RackHost: @unchecked Sendable {
     songLeft.deallocate()
     songRight.deallocate()
     hosting.deallocate()
+    located.deallocate()
   }
 
   // MARK: - From the interface
@@ -359,8 +364,13 @@ public final class RackHost: @unchecked Sendable {
     commands.pointee.send(.param(slot: slot, value: value, voice: -1, frame: -1))
   }
 
-  public func setTransport(tempo: Double, running: Bool, shuffle: Double = 0) {
+  ///
+  /// `located` says the rack is already running or stopped where it should be, put there on the
+  /// render thread by an app it plays inside (`locate`): the song is where the app is, and starting
+  /// does not send it back to its top.
+  public func setTransport(tempo: Double, running: Bool, shuffle: Double = 0, located: Bool = false) {
     commands.pointee.send(.transport(tempo: tempo, running: running, shuffle: shuffle))
+    if located { songRunning = running }
     // The song goes with the rack: from its top when the rack starts, as the rack's own clock
     // does, and stopped, to ring out, when it stops.
     if running != songRunning {
@@ -446,6 +456,28 @@ public final class RackHost: @unchecked Sendable {
 
   // MARK: - From the render thread
 
+  /// Where an app the rack plays inside has its transport, at the start of a block: the clock at
+  /// the app's beat, running or not as it is, and a song beside the rack at the same beat. Heard
+  /// from the next of the rack's own blocks, which is at most one of them away.
+  ///
+  /// Done once whatever the interface sent before it has been taken: a patch it loaded is the one
+  /// put at the beat.
+  @_noAllocation
+  public func locate(beat: Double, moving: Bool) {
+    located.pointee = (beat, moving, true)
+  }
+
+  @_noAllocation
+  private func takeLocate() {
+    guard located.pointee.pending else { return }
+    located.pointee.pending = false
+    let (beat, moving, _) = located.pointee
+    current.pointee?.pointee.locate(beat: beat, running: moving)
+    if hosting.pointee.on {
+      songOnRenderThread._withUnsafeGuaranteedRef { $0.locate(beat: beat, moving: moving) }
+    }
+  }
+
   /// `frames` frames into `left` and `right`, whatever size the device asks for.
   @_noAllocation
   public func render(frames: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>) {
@@ -472,6 +504,7 @@ public final class RackHost: @unchecked Sendable {
         hosting.pointee = (on, diverted)
       }
     }
+    takeLocate()
     var done = 0
     while done < frames {
       if blockUsed.pointee >= blockFrames {

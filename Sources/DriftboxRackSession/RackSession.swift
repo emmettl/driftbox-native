@@ -1171,6 +1171,15 @@ public final class RackSession {
     if live { host.setTransport(tempo: tempo, running: running, shuffle: swing) }
   }
 
+  /// Run or stop as an app the rack plays inside already has it, on the render thread, where its
+  /// transport is: the session's word brought into line, without the rewind to the top a start of
+  /// its own makes.
+  public func follow(running: Bool) {
+    guard running != self.running else { return }
+    self.running = running
+    if live { host.setTransport(tempo: tempo, running: running, shuffle: swing, located: true) }
+  }
+
   // MARK: Keys
 
   public var voices: Int { max(1, min(8, Int(patch.voices ?? 1))) }

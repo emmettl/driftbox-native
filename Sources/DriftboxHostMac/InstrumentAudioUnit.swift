@@ -20,7 +20,11 @@
     /// What it plays. Setting it sets the output's rate to the source's.
     public var source: RenderSource? {
       didSet {
-        shared.pointee.target = source.map { Shared.Target(context: $0.context, render: $0.render) }
+        shared.pointee.target = source.map {
+          Shared.Target(context: $0.context, render: $0.render, locate: $0.locate)
+        }
+        // A new source has been put nowhere yet.
+        shared.pointee.expectedBeat = .nan
         if let source, source.sampleRate != outputBus.format.sampleRate,
           let format = AVAudioFormat(standardFormatWithSampleRate: source.sampleRate, channels: 2)
         {
@@ -57,8 +61,25 @@
       struct Target {
         let context: UnsafeMutableRawPointer
         let render: RenderSource.Render
+        let locate: RenderSource.Locate?
       }
       var target: Target?
+      /// The rate the output runs at, which the app's beats are counted against.
+      var sampleRate = 48000.0
+      /// The render thread's own: the beat the app's transport should be on at the next block if
+      /// it has neither jumped nor stopped, and whether it was moving, as of the last block.
+      var expectedBeat = Double.nan
+      var wasMoving = false
+      /// Whether the render thread puts the instrument where the app's transport is, which it does
+      /// once the app has said both where that is and whether it moves.
+      let locates = Atomic<Bool>(false)
+      /// Set by the owner when it has moved the instrument itself — a song remade at a new tempo,
+      /// taken up at a step — so the next block puts it back where the app is.
+      let again = Atomic<Bool>(false)
+
+      /// Beats that far apart are the same place: the app's tempo changing inside a block moves it
+      /// a little from where the last block's tempo said, and that is no jump.
+      static let sameBeat = 0.02
       let midi = UnsafeMutablePointer<UInt32>.allocate(capacity: Shared.ring)
       let written = Atomic<Int>(0)
       let read = Atomic<Int>(0)
@@ -123,6 +144,8 @@
         throw NSError(domain: NSOSStatusErrorDomain, code: Int(kAudioUnitErr_FormatNotSupported))
       }
       // The app's clock, as it gives it to the unit: read on the render thread, as it must be.
+      shared.pointee.sampleRate = outputBus.format.sampleRate
+      shared.pointee.expectedBeat = .nan
       shared.pointee.context = musicalContextBlock
       shared.pointee.transport = transportStateBlock
       try super.allocateRenderResources()
@@ -269,6 +292,14 @@
       return bits == 0 ? nil : Double(bitPattern: bits)
     }
 
+    /// Whether the render thread puts the instrument where the app's transport is — starting,
+    /// stopping and jumping with it — rather than the owner following its transport as changes.
+    public var appLocates: Bool { shared.pointee.locates.load(ordering: .relaxed) }
+
+    /// Put the instrument where the app's transport is again at the next block: for an owner that
+    /// has moved it itself, as remaking a song at a new tempo does.
+    public func locateAgain() { shared.pointee.again.store(true, ordering: .relaxed) }
+
     /// Whether the app's transport is moving, as of the last block; nil before it has said.
     public var appPlaying: Bool? {
       switch shared.pointee.moving.load(ordering: .relaxed) {
@@ -306,15 +337,22 @@
           event = UnsafePointer(current.pointee.head.next)
         }
         // The app's tempo and transport, when it gives them.
+        var tempo = 0.0
+        var beat = Double.nan
         if let context = shared.pointee.context {
-          var tempo = 0.0
-          if context(&tempo, nil, nil, nil, nil, nil), tempo > 0 {
-            shared.pointee.tempo.store(tempo.bitPattern, ordering: .relaxed)
+          // Not a number until the app writes one: an app can say it answered and leave the beat
+          // alone, and a beat of nought every block while moving would be a jump every block.
+          var at = Double.nan
+          if context(&tempo, nil, nil, &at, nil, nil) {
+            if tempo > 0 { shared.pointee.tempo.store(tempo.bitPattern, ordering: .relaxed) }
+            beat = at
           }
         }
+        var moving: Bool?
         if let transport = shared.pointee.transport {
           var flags = AUHostTransportStateFlags()
           if transport(&flags, nil, nil, nil) {
+            moving = flags.contains(.moving)
             shared.pointee.moving.store(flags.contains(.moving) ? 1 : 0, ordering: .relaxed)
           }
         }
@@ -330,6 +368,27 @@
           l.update(repeating: 0, count: frames)
           r.update(repeating: 0, count: frames)
           return noErr
+        }
+        // Where the app's transport is, when it has started or stopped or jumped since the last
+        // block — a jump being a beat other than the one the last block's tempo led to, which is
+        // the app's cycle going round, or its playhead moved — put the instrument there before
+        // this block is rendered, so it starts on the block the app does.
+        if let locate = target.locate, let moving, beat.isFinite {
+          let expected = shared.pointee.expectedBeat
+          let again =
+            shared.pointee.again.load(ordering: .relaxed)
+            && shared.pointee.again.exchange(false, ordering: .relaxed)
+          if again || moving != shared.pointee.wasMoving || !expected.isFinite
+            || abs(beat - expected) > Shared.sameBeat
+          {
+            locate(target.context, beat, moving)
+            if !shared.pointee.locates.load(ordering: .relaxed) {
+              shared.pointee.locates.store(true, ordering: .relaxed)
+            }
+          }
+          shared.pointee.wasMoving = moving
+          shared.pointee.expectedBeat =
+            moving && tempo > 0 ? beat + Double(frames) * tempo / (60 * shared.pointee.sampleRate) : beat
         }
         target.render(target.context, frames, l, r)
         return noErr

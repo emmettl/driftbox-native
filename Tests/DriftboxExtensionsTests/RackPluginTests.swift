@@ -10,6 +10,7 @@
   import Testing
 
   @testable import DriftboxExtensions
+  @testable import DriftboxHost
 
   /// The rack's Audio Unit as another app sees it, with its owner behind it: made at the app's rate,
   /// its presets the factory patches and its state the patch, played by the app's MIDI, and keeping
@@ -120,24 +121,26 @@
       #expect(held.contains { abs($0) > 0.05 }, "heard once the key is down")
     }
 
-    /// The rack keeps the app's time: its tempo, and running while the app's transport moves.
+    /// The rack keeps the app's time: its tempo, and running while the app's transport moves, its
+    /// clock at the app's beat.
     @Test func theRackKeepsTheAppsTime() throws {
       let (unit, plugin) = try Self.unit()
-      unit.musicalContextBlock = { tempo, _, _, _, _, _ in
-        tempo?.pointee = 97
-        return true
-      }
-      unit.transportStateBlock = { flags, _, _, _ in
-        flags?.pointee = .moving
-        return true
-      }
+      let clock = AppClock(tempo: 97, beat: 8)
+      clock.attach(to: unit)
       try unit.allocateRenderResources()
       let session = try #require(plugin.session)
       #expect(!session.running)
       _ = Self.render(unit, frames: 512)
       plugin.tick()
       #expect(session.tempo == 97)
+      #expect(!session.running)
+
+      clock.moving = true
+      _ = Self.render(unit, frames: 512)
+      plugin.tick()
       #expect(session.running)
+      let beat = session.host.current.pointee?.pointee.beatPosition ?? 0
+      #expect(beat > 8 && beat < 8.1, "at the app's beat, not rewound to the top")
 
       // A change the rack follows, not a state it is held to: stopped from the face while the app
       // plays, it stays stopped.

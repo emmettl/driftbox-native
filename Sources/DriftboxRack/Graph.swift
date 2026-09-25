@@ -403,6 +403,14 @@ public struct RackGraph: ~Copyable {
     self.running = running
   }
 
+  /// Put the clock at `beat`, running or not, without the rewind a start from a stop has: an app
+  /// the rack plays inside says where its own transport is.
+  @_noAllocation
+  public mutating func locate(beat: Double, running: Bool) {
+    if beat.isFinite { self.beat = max(0, beat) }
+    self.running = running
+  }
+
   public var beatPosition: Double { beat }
 
   // MARK: - Rendering

@@ -245,7 +245,7 @@
           case .command(.pad(let x, let y)): session.pad(x: x, y: y)
           case .command(.padRelease): session.padRelease()
           case .command(let command): host.send(command)
-          case .song(let song): session.takeUp(song)
+          case .song(let song, let keepingPlace): session.takeUp(song, keepingPlace: keepingPlace)
           case .scene(let id): if scene == nil { scenes.append((index + 1, id)) }
           }
           next += 1

@@ -88,12 +88,13 @@ struct TakeTests {
       case .command(.stop): "stop"
       case .command(.play): "play"
       case .command: "other"
+      case .song(_, keepingPlace: true): "edit"
       case .song: "song"
       case .scene: "scene"
       }
     }
-    // The edit is its song, then where it was and playing on.
-    #expect(kinds == ["pad", "pad", "release", "strike", "song", "seek", "play", "seek", "stop"], "\(kinds)")
+    // The edit is its song, kept where the engine had got to, and playing on.
+    #expect(kinds == ["pad", "pad", "release", "strike", "edit", "play", "seek", "stop"], "\(kinds)")
     let frames = take.events.map(\.frame)
     #expect(frames == frames.sorted())
     #expect(frames.allSatisfy { $0 >= take.start && $0 <= take.end })

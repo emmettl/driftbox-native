@@ -17,7 +17,8 @@
   /// - The app's presets are the factory patches, from the app's own menu; its saved state is the
   ///   patch, as a document, and restoring one opens it.
   /// - The app's MIDI plays the rack through its MIDI modules, as a controller plugged into the
-  ///   Mac would; and the rack follows the app's tempo, and starts and stops as its transport does.
+  ///   Mac would; and the rack follows the app's tempo, and starts and stops as its transport does,
+  ///   at the app's beat, on the block it does.
   ///
   /// Everything the unit hears arrives on the app's threads, and is carried to the main actor, where
   /// the session lives: the hooks are made below, off the main actor, since a closure made on it
@@ -102,8 +103,14 @@
       guard let unit, let session else { return }
       while let bytes = unit.nextMIDI() { session.midi(bytes) }
       if let tempo = unit.appTempo, abs(tempo - session.tempo) > 0.005 { session.setTempo(tempo) }
-      if let playing = transport.change(unit.appPlaying), playing != session.running {
-        session.toggleRunning()
+      if let playing = transport.change(unit.appPlaying) {
+        // Put where the app is on the render thread, the rack need only be told it is running; an
+        // app that does not say where it is has the rack start as it would itself.
+        if unit.appLocates {
+          session.follow(running: playing)
+        } else if playing != session.running {
+          session.toggleRunning()
+        }
       }
       ticks += 1
       if ticks % Plugins.sessionEvery == 0 { session.tick() }
