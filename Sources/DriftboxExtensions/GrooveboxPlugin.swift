@@ -20,6 +20,9 @@
   /// - The app's MIDI plays the groovebox as a keyboard plugged into the Mac does — the drums from
   ///   note 21, the 303 from 33 — and it runs at the app's tempo, starting and stopping with its
   ///   transport.
+  /// - Its knobs are the unit's parameters, every one of `GrooveboxKnob.all`, for the app to
+  ///   automate: a move of the app's is the song's, heard and kept but no step of undo, and a knob
+  ///   turned on the face is shown to the app, which can record it.
   ///
   /// The session has no device, no cables and nothing remembered between launches: the app it is in
   /// has all three.
@@ -34,6 +37,8 @@
     @ObservationIgnored private var pending: (document: String, name: String?)?
     /// The song as last handed to the unit to save, so it is written again only when it changes.
     @ObservationIgnored private var kept: Song?
+    /// The song as the app's parameters last showed it.
+    @ObservationIgnored private var shown: Song?
     /// The app's MIDI, as the session hears a port's.
     @ObservationIgnored private let midi = UnitMIDI()
     @ObservationIgnored private var timer: Timer?
@@ -47,6 +52,7 @@
 
     /// Give `unit` a groovebox to play, with everything it hears carried to it.
     nonisolated public static func attach(to unit: GrooveboxAudioUnit) {
+      publishKnobs(on: unit)
       let held = Held(unit: unit)
       let plugin = Plugins.onMain { GrooveboxPlugin(unit: held.unit) }
       unit.owner = plugin
@@ -55,6 +61,38 @@
       unit.restore = { [weak plugin] document, name in
         Plugins.onMain { plugin?.restore(document, name: name) }
       }
+    }
+
+    /// Every knob as a parameter, grouped as the face groups them, each at its rest until there is
+    /// a song to say otherwise.
+    nonisolated static func publishKnobs(on unit: GrooveboxAudioUnit) {
+      let knobs = GrooveboxKnob.all
+      var groups: [AUParameterGroup] = []
+      var start = 0
+      while start < knobs.count {
+        let group = knobs[start].group
+        var end = start
+        var parameters: [AUParameter] = []
+        while end < knobs.count, knobs[end].group == group {
+          let knob = knobs[end]
+          let parameter = AUParameterTree.createParameter(
+            withIdentifier: knob.identifier, name: knob.label, address: AUParameterAddress(end), min: 0,
+            max: 1,
+            unit: .generic, unitName: nil, flags: [.flag_IsReadable, .flag_IsWritable, .flag_CanRamp],
+            valueStrings: nil, dependentParameters: nil)
+          parameter.value = Float(knob.rest)
+          parameters.append(parameter)
+          end += 1
+        }
+        let identifier = String(group.map { $0.isLetter || $0.isNumber ? $0 : "_" })
+        groups.append(
+          AUParameterTree.createGroup(withIdentifier: identifier, name: group, children: parameters))
+        start = end
+      }
+      unit.publish(groups, count: knobs.count) { address, value in
+        address < knobs.count ? knobs[address].display(Double(value)) : ""
+      }
+      for (address, knob) in knobs.enumerated() { unit.show(Float(knob.rest), at: address) }
     }
 
     /// A session at `rate`: the one there is if it is already at it, a new one keeping its song if not.
@@ -72,9 +110,13 @@
         fresh.open(song, named: first.name)
       }
       pending = nil
+      shown = nil
       session = fresh
       stage = Stage(player: fresh)
       unit.host = fresh.host
+      // What the app set before there was a song to set it in is the song's, as a state restored
+      // before then is.
+      knobs(unit, fresh)
       keep()
       if timer == nil {
         timer = Timer.scheduledTimer(withTimeInterval: Plugins.interval, repeats: true) { [weak self] _ in
@@ -124,8 +166,28 @@
       ticks += 1
       if ticks % Plugins.sessionEvery == 0 {
         session.tick()
+        knobs(unit, session)
         keep()
       }
+    }
+
+    /// The app's moves into the song, then the song's knobs out to the app where they have moved
+    /// since it was last shown them: by an edit on the face, a preset, an undo.
+    private func knobs(_ unit: GrooveboxAudioUnit, _ session: Session) {
+      let knobs = GrooveboxKnob.all
+      let moves = unit.movedParameters()
+      if !moves.isEmpty {
+        session.automate { song in
+          // A float's shortest decimal, which is what the app set: 0.9 and not 0.8999999761581421,
+          // which is what the float's own bits would write into the song's document.
+          for move in moves {
+            knobs[move.address].set(Double("\(move.value)") ?? Double(move.value), in: &song)
+          }
+        }
+      }
+      guard let song = session.song, song != shown else { return }
+      shown = song
+      for (address, knob) in knobs.enumerated() { unit.show(Float(knob.value(in: song)), at: address) }
     }
 
     isolated deinit {

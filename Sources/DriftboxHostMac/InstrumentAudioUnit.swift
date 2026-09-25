@@ -67,8 +67,29 @@
       let moving = Atomic<Int>(-1)
       var context: AUHostMusicalContextBlock?
       var transport: AUHostTransportStateBlock?
+      /// Each parameter's value, by address: a float's bits, with `Shared.moved` set when the app
+      /// moved it and the owner has not yet taken it. Written from the app's threads and the render
+      /// thread both, read by the owner; the last value written is the one that counts.
+      var parameters: UnsafeMutablePointer<Atomic<UInt64>>?
+      var parameterCount = 0
 
       static let ring = 1024
+      static let moved: UInt64 = 1 << 32
+
+      /// The app moved parameter `address` to `value`: from its automation in the render events, or
+      /// from its own controls through the tree. A value it already has is not a move — which is
+      /// how the owner shows the app a value without hearing it back as one.
+      func move(_ address: Int, to value: Float) {
+        guard let parameters, address >= 0, address < parameterCount else { return }
+        let bits = UInt64(value.bitPattern)
+        if parameters[address].load(ordering: .relaxed) & 0xFFFF_FFFF == bits { return }
+        parameters[address].store(bits | Shared.moved, ordering: .releasing)
+      }
+
+      func value(_ address: Int) -> Float {
+        guard let parameters, address >= 0, address < parameterCount else { return 0 }
+        return Float(bitPattern: UInt32(truncatingIfNeeded: parameters[address].load(ordering: .relaxed)))
+      }
     }
     private let shared: UnsafeMutablePointer<Shared>
     private var outputBus: AUAudioUnitBus
@@ -111,6 +132,82 @@
       super.deallocateRenderResources()
       shared.pointee.context = nil
       shared.pointee.transport = nil
+    }
+
+    // MARK: - Parameters
+
+    /// Give the app `count` parameters to automate, at addresses 0 up to it, under `groups`; each
+    /// shown as `display` says. Once, as the unit is made, before the app asks what it has: an app
+    /// keeps automation by address, so the parameters are the same whatever is loaded.
+    public func publish(
+      _ groups: [AUParameterGroup], count: Int, display: @escaping @Sendable (Int, Float) -> String
+    ) {
+      let slots = UnsafeMutablePointer<Atomic<UInt64>>.allocate(capacity: count)
+      for address in 0..<count { (slots + address).initialize(to: Atomic(0)) }
+      shared.pointee.parameters = slots
+      shared.pointee.parameterCount = count
+      let tree = AUParameterTree.createTree(withChildren: groups)
+      Self.connect(tree, to: shared, display: display)
+      parameterTree = tree
+    }
+
+    /// The tree's hooks, made here rather than in a method of the unit so they capture the pointer
+    /// and nothing else, as the render block does: the app calls them on any thread it likes.
+    private static func connect(
+      _ tree: AUParameterTree, to shared: UnsafeMutablePointer<Shared>,
+      display: @escaping @Sendable (Int, Float) -> String
+    ) {
+      let held = SharedPointer(shared)
+      tree.implementorValueObserver = { parameter, value in
+        held.pointer.pointee.move(Int(parameter.address), to: value)
+      }
+      tree.implementorValueProvider = { parameter in
+        held.pointer.pointee.value(Int(parameter.address))
+      }
+      tree.implementorStringFromValueCallback = { parameter, value in
+        display(Int(parameter.address), value?.pointee ?? parameter.value)
+      }
+    }
+
+    /// What the app moved since last asked, by address, as their latest values. From one thread
+    /// only, the owner's.
+    public func movedParameters() -> [(address: Int, value: Float)] {
+      guard let parameters = shared.pointee.parameters else { return [] }
+      var moves: [(address: Int, value: Float)] = []
+      for address in 0..<shared.pointee.parameterCount {
+        var bits = parameters[address].load(ordering: .acquiring)
+        while bits & Shared.moved != 0 {
+          let (exchanged, now) = parameters[address].compareExchange(
+            expected: bits, desired: bits & 0xFFFF_FFFF, ordering: .acquiringAndReleasing)
+          if exchanged {
+            moves.append((address, Float(bitPattern: UInt32(truncatingIfNeeded: bits))))
+            break
+          }
+          bits = now
+        }
+      }
+      return moves
+    }
+
+    /// Show the app what parameter `address` is at now, moved by the owner — a knob turned on the
+    /// unit's face, a preset opened — so its controls follow and it can record the move; without
+    /// hearing it back as the app's own.
+    ///
+    /// Never over a move of the app's not yet taken: the app moves its parameters on threads of its
+    /// own while the owner shows it the song, and a move shown over would be lost. That move is the
+    /// newer, and the owner takes it next time.
+    public func show(_ value: Float, at address: Int) {
+      guard let parameters = shared.pointee.parameters, address >= 0, address < shared.pointee.parameterCount
+      else { return }
+      let current = parameters[address].load(ordering: .acquiring)
+      let bits = UInt64(value.bitPattern)
+      guard current & Shared.moved == 0, current != bits,
+        parameters[address].compareExchange(
+          expected: current, desired: bits, ordering: .acquiringAndReleasing
+        )
+        .exchanged
+      else { return }
+      parameterTree?.parameter(withAddress: AUParameterAddress(address))?.setValue(value, originator: nil)
     }
 
     public override var fullState: [String: Any]? {
@@ -190,7 +287,13 @@
         // MIDI into the ring, for the owner; a full ring drops the newest, as the command rings do.
         var event = events
         while let current = event {
-          if current.pointee.head.eventType == .MIDI {
+          let type = current.pointee.head.eventType
+          if type == .parameter || type == .parameterRamp {
+            // Automation, sample by sample in the app, taken as it arrives: the song it moves is
+            // remade as a whole, which a block at a time is already more often than it can be.
+            let parameter = current.pointee.parameter
+            shared.pointee.move(Int(parameter.parameterAddress), to: parameter.value)
+          } else if type == .MIDI {
             let midi = current.pointee.MIDI
             let written = shared.pointee.written.load(ordering: .relaxed)
             if written - shared.pointee.read.load(ordering: .acquiring) < Shared.ring {
@@ -234,9 +337,19 @@
     }
 
     deinit {
+      if let parameters = shared.pointee.parameters {
+        parameters.deinitialize(count: shared.pointee.parameterCount)
+        parameters.deallocate()
+      }
       shared.pointee.midi.deallocate()
       shared.deinitialize(count: 1)
       shared.deallocate()
     }
+  }
+
+  /// The shared state's address, for the tree's hooks to carry across threads.
+  private struct SharedPointer: @unchecked Sendable {
+    let pointer: UnsafeMutablePointer<InstrumentAudioUnit.Shared>
+    init(_ pointer: UnsafeMutablePointer<InstrumentAudioUnit.Shared>) { self.pointer = pointer }
   }
 #endif
