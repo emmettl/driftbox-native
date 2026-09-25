@@ -135,29 +135,51 @@ public enum RackCC {
   }
 
   /// What was learnt. Anything unreadable is no bindings, and one bad entry costs only itself.
-  public static func load(_ memory: UserDefaults?) -> [Binding] {
-    guard let text = memory?.string(forKey: key), let data = text.data(using: .utf8),
-      let entries = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
+  public static func load(_ memory: (any RackMemory)?) -> [Binding] {
+    guard let text = memory?.string(forKey: key),
+      let entries = try? JSONDecoder().decode([Entry].self, from: Data(text.utf8))
     else { return [] }
     return entries.compactMap { entry in
-      guard let entry = entry as? [String: Any],
-        let cc = entry["cc"] as? Int, (0...127).contains(cc),
-        let channel = entry["channel"] as? Int, (0...16).contains(channel),
-        let module = entry["module"] as? String, !module.isEmpty,
-        let param = entry["param"] as? String, !param.isEmpty
+      guard let cc = entry.cc, (0...127).contains(cc),
+        let channel = entry.channel, (0...16).contains(channel),
+        let module = entry.module, !module.isEmpty,
+        let param = entry.param, !param.isEmpty
       else { return nil }
       return Binding(cc: cc, channel: channel, module: module, param: param)
     }
   }
 
-  public static func save(_ bindings: [Binding], to memory: UserDefaults?) {
+  public static func save(_ bindings: [Binding], to memory: (any RackMemory)?) {
     guard let memory else { return }
-    let entries = bindings.map {
-      ["cc": $0.cc, "channel": $0.channel, "module": $0.module, "param": $0.param] as [String: Any]
-    }
-    guard let data = try? JSONSerialization.data(withJSONObject: entries, options: [.sortedKeys]),
-      let text = String(data: data, encoding: .utf8)
+    let entries = bindings.map { Entry(cc: $0.cc, channel: $0.channel, module: $0.module, param: $0.param) }
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    guard let data = try? encoder.encode(entries), let text = String(data: data, encoding: .utf8)
     else { return }
     memory.set(text, forKey: key)
+  }
+
+  /// A binding as it is kept, each part read on its own: an entry that is not an object, or has a
+  /// part of the wrong kind, is an entry of nothing rather than a list that cannot be read.
+  private struct Entry: Codable {
+    var cc: Int?
+    var channel: Int?
+    var module: String?
+    var param: String?
+
+    init(cc: Int, channel: Int, module: String, param: String) {
+      self.cc = cc
+      self.channel = channel
+      self.module = module
+      self.param = param
+    }
+
+    init(from decoder: any Decoder) throws {
+      guard let entry = try? decoder.container(keyedBy: CodingKeys.self) else { return }
+      cc = try? entry.decode(Int.self, forKey: .cc)
+      channel = try? entry.decode(Int.self, forKey: .channel)
+      module = try? entry.decode(String.self, forKey: .module)
+      param = try? entry.decode(String.self, forKey: .param)
+    }
   }
 }

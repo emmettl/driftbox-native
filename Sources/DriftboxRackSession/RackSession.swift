@@ -180,7 +180,7 @@ public final class RackSession {
   @ObservationIgnored private var changedUnits: Set<String> = []
   @ObservationIgnored private var pendingSave: Task<Void, Never>?
   /// Where the patch is kept between launches; nil for a rack made in a test.
-  @ObservationIgnored public let memory: UserDefaults?
+  @ObservationIgnored public let memory: (any RackMemory)?
   /// Called with the patch as a document, and its name, whenever it is saved: for a platform that
   /// keeps it somewhere of its own too, as a plug-in host keeps its plug-ins' state.
   @ObservationIgnored public var onSave: ((_ document: String, _ name: String) -> Void)?
@@ -189,7 +189,7 @@ public final class RackSession {
   /// making no sound until something renders it if there is not.
   public init(
     sampleRate: Double = 48000, audio: (any AudioRouting)? = nil, plugins: (any RackPluginHosting)? = nil,
-    decoder: any SampleDecoding = WAVDecoder(), memory: UserDefaults? = nil
+    decoder: any SampleDecoding = WAVDecoder(), memory: (any RackMemory)? = nil
   ) {
     host = RackHost(sampleRate: sampleRate)
     self.audio = audio

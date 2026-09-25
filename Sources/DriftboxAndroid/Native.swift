@@ -2,6 +2,7 @@
   import CAMidi
   import CGLES
   import DriftboxHostAndroid
+  import DriftboxRackSession
   import DriftboxSession
   import DriftboxText
   import DriftboxTextAndroid
@@ -45,6 +46,15 @@
       SceneCheck.run(width: Int(width), height: Int(height), density: density, typesetter: typesetter))
   }
 
+  /// On Java's main thread, which is the main actor's, as the rack session wants.
+  @_cdecl("Java_app_driftbox_Native_rackCheck")
+  public func nativeRackCheck(
+    _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ resources: jstring?
+  ) -> jstring? {
+    RackCatalogue.resources = URL(filePath: env.string(resources), directoryHint: .isDirectory)
+    return env.java(MainActor.assumeIsolated { RackCheck.run() })
+  }
+
   @_cdecl("Java_app_driftbox_Native_textCheck")
   public func nativeTextCheck(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?) -> jstring? {
     env.java(TextCheck.run(env: env))
@@ -64,9 +74,10 @@
   ) -> jboolean {
     let id = env.string(song)
     let named = scene == nil ? nil : env.string(scene)
-    // Where Java unpacked the catalogue, which Swift reads as files: this app is built without
-    // SwiftPM, so there is no resource bundle to find it in.
+    // Where Java unpacked the catalogue and the rack's, which Swift reads as files: this app is
+    // built without SwiftPM, so there is no resource bundle to find them in.
     Catalogue.resources = URL(filePath: env.string(resources), directoryHint: .isDirectory)
+    RackCatalogue.resources = Catalogue.resources
     // Android 12 and the app's Java are what the typesetter needs; without them, scenes set no type.
     // Made here, since `env` is Java's and does not cross into the main actor.
     let android = AndroidTypesetter(env: env)

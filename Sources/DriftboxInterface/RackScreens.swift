@@ -3,6 +3,11 @@ import DriftboxRack
 import DriftboxRackSession
 import Foundation
 
+// C's maths, which Foundation brings with it on Apple's platforms and not on Android.
+#if canImport(Android)
+  import Android
+#endif
+
 /// The faces that meter, drawn as the Mac draws them from what the render thread last copied out:
 /// the tuner's display, the meter's needle, lights or scope, and the looper's screen and transport.
 /// There is no blur on the canvas, so a glow is the same stroke again, wider and faint, underneath.

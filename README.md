@@ -464,6 +464,7 @@ scripts/android-app.sh midi-loopback    # test the MIDI ports against the app's 
 scripts/android-app.sh gpu              # or the GPU contract on the phone's GPU
 scripts/android-app.sh scenes           # or every scene drawn, checked and timed there
 scripts/android-app.sh text             # or the typesetter, held to what every platform's is
+scripts/android-app.sh rack             # or every patch of the rack's opened and run until it sounds
 ```
 
 The app is `Session` and the controls on a touch screen: `DriftboxTouch`'s `Touchscreen`, which is
@@ -479,8 +480,17 @@ narrower than 600 points, kept upright, and a tablet's, a roomier phone's, wider
 The session finds its songs as files, where the app unpacks them from its package, rather than
 through `Bundle`: on Android that, `String(format:)` and `UserDefaults` are the old Foundation, and
 it brings 48MB of internationalisation with it. The build tells the compiler not to link the old
-Foundation at all, so anything that reaches for it fails to link rather than growing the package;
-it is 16MB.
+Foundation at all, and fails a library that still asks for any of it, which the phone would
+otherwise refuse only as it loaded; the package is 17MB.
+
+The rack is in it too, though the phone does not show it yet. The rack session finds its patches
+beside the songs; keeps what it remembers in a `RackMemory`, which `UserDefaults` is elsewhere; reads
+its learnt controllers with `JSONDecoder` rather than `JSONSerialization`, sample names with the
+standard library's `Regex`, and writes numbers without `%f`; and on Android has its own `CGPoint`
+and `CGRect`, which the old Foundation gives Windows. `scripts/android-app.sh rack` opens every
+patch in the catalogue on the phone and runs it until it sounds: all eleven do, each in its first
+second but Pressure System, a song that comes in in its seventh, as it does on Windows, and a
+second of any costs the phone 9 to 127ms.
 
 Out of view, or with the screen off, the song plays on and nothing is drawn: a media
 playback service, with a notification to stop it from, keeps the process on the big cores, which

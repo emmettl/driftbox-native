@@ -41,7 +41,8 @@ import java.nio.charset.StandardCharsets;
  *
  * Or a harness, started with a test's name, which runs it and says what happened, on screen and in
  * the log under "Driftbox": {@code --es run midi-loopback}, {@code gpu} for the GPU contract on this
- * phone's GPU, or {@code scenes} for every scene drawn, checked and timed.
+ * phone's GPU, {@code scenes} for every scene drawn, checked and timed, {@code text} for the
+ * typesetter, or {@code rack} for every patch of the rack's opened and run.
  */
 public final class Main extends Activity {
   static final String TAG = "Driftbox";
@@ -74,7 +75,8 @@ public final class Main extends Activity {
     }
     midi = new Midi(this);
     String run = getIntent().getStringExtra("run");
-    if ("midi-loopback".equals(run) || "gpu".equals(run) || "scenes".equals(run) || "text".equals(run)) {
+    if ("midi-loopback".equals(run) || "gpu".equals(run) || "scenes".equals(run) || "text".equals(run)
+        || "rack".equals(run)) {
       test(run);
     } else {
       String song = getIntent().getStringExtra("song");
@@ -244,9 +246,10 @@ public final class Main extends Activity {
   }
 
   /**
-   * The session's resources — the catalogue and its songs — copied out of the package into a
-   * directory of the app's own, since Swift reads them as files, and where. Copied every time the
-   * app starts: they are small, and a package updated in place brings new ones.
+   * The session's resources — the catalogue and its songs, and the rack's patches — copied out of
+   * the package into a directory of the app's own, since Swift reads them as files, and where.
+   * Copied every time the app starts: they are small, and a package updated in place brings new
+   * ones.
    */
   private File unpack() throws IOException {
     File resources = new File(getFilesDir(), "Resources");
@@ -274,6 +277,21 @@ public final class Main extends Activity {
     text.setPadding(48, 48, 48, 48);
     text.setText("Driftbox");
     setContentView(text);
+    if ("rack".equals(run)) {
+      // On the main thread, which the rack session is on, once the view is up.
+      text.post(() -> {
+        String report;
+        try {
+          report = Native.rackCheck(unpack().getPath());
+        } catch (IOException e) {
+          report = "FAIL unpacking the resources: " + e;
+        }
+        for (String line : report.split("\n")) Log.i(TAG, line);
+        Log.i(TAG, "done");
+        text.setText(report);
+      });
+      return;
+    }
     new Thread(() -> {
       String report;
       try {

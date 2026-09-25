@@ -7,6 +7,7 @@
 #     scripts/android-app.sh gpu                # or the GPU contract on the phone's GPU
 #     scripts/android-app.sh scenes             # or every scene drawn, checked and timed
 #     scripts/android-app.sh text               # or the typesetter, held to what every platform's is
+#     scripts/android-app.sh rack               # or every patch of the rack's opened and run for a second
 #
 # No Gradle: the SDK's own tools, in the order Gradle would call them. Beyond what
 # `android-env.sh` needs, a JDK (JAVA_HOME, or the newest under Programs/Java), and the Android
@@ -34,12 +35,9 @@ mkdir -p "$app/classes" "$app/dex" "$app/stage/lib/arm64-v8a" "$app/stage/assets
 # the scene, the touch screen that puts them together, and the app's own module on top. The app
 # checks the GPU contract with the contract tests' own programs.
 extra_DriftboxAndroid=Tests/DriftboxGPUTests/Generated/ShaderPrograms.swift
-# The rack's controls are left out, and the rack session with them: it takes CoreGraphics' points,
-# JSONSerialization, Bundle and UserDefaults from Foundation, which on Android are the old
-# Foundation and its 48MB of internationalisation, and the phone does not show the rack yet.
-skip_DriftboxInterface='/Rack[A-Za-z]*\.swift$'
+# The rack session and the rack's controls are in it, though the phone does not show the rack yet.
 modules="DriftboxGPU DriftboxGPUGLES DriftboxText DriftboxTextAndroid DriftboxCanvas DriftboxScenes DriftboxShell \
-  DriftboxSession DriftboxInterface DriftboxTouch DriftboxAndroid"
+  DriftboxSession DriftboxRackSession DriftboxInterface DriftboxTouch DriftboxAndroid"
 # shellcheck disable=SC2086
 compile $core $modules
 objects=""
@@ -62,10 +60,11 @@ cp "$app/dex/classes.dex" "$app/stage/"
 # how Android maps a library straight out of the package; then aligned, then signed with a key of
 # this machine's own.
 "$tools/aapt2.exe" compile --dir android/res -o "$app/resources.zip"
-# The session's resources, the catalogue and its songs, which the app unpacks and plays by name:
-# added below with the dex, since aapt2 on Windows would name them with backslashes, which Android
-# cannot find.
+# The session's resources, the catalogue and its songs, which the app unpacks and plays by name,
+# and beside them the rack's, its modules' faces and its patches: added below with the dex, since
+# aapt2 on Windows would name them with backslashes, which Android cannot find.
 cp -r Sources/DriftboxSession/Resources "$app/stage/assets/"
+cp -r Sources/DriftboxRackSession/Resources/. "$app/stage/assets/Resources/"
 "$tools/aapt2.exe" link -o "$app/unaligned.apk" -I "$jar" --manifest android/AndroidManifest.xml \
   --min-sdk-version 29 --target-sdk-version "${platform##*android-}" --version-code 1 --version-name 0.1 \
   "$app/resources.zip"

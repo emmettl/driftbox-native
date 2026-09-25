@@ -83,7 +83,8 @@ common="-target $target -resource-dir $resources/swift-aarch64 -sdk $sdk -I Sour
 # imports it links it and its internationalisation: 48MB, most of it ICU's data. Nothing here uses
 # either — what Driftbox takes from Foundation is FoundationEssentials' — but a library linked is a
 # library searched, and the linker once found a function FoundationEssentials needs in the old
-# Foundation first and brought all of it in. So neither is linked, and a use of one fails to link.
+# Foundation first and brought all of it in. So neither is linked, and `link` fails a library that
+# still asks for one.
 common="$common -Xfrontend -disable-autolink-library -Xfrontend Foundation"
 common="$common -Xfrontend -disable-autolink-library -Xfrontend FoundationInternationalization"
 
@@ -125,5 +126,13 @@ link() {
     $objects "$@" -lswiftSynchronization -lswiftDispatch -ldispatch -lBlocksRuntime -lswift_RegexParser \
     -lCoreFoundation -l_FoundationCollections -l_FoundationCShims -l_FoundationICU \
     -o "$product"
+  # A shared library links with symbols it cannot find, and the phone only refuses it when it
+  # loads: so a use of the old Foundation is looked for here instead.
+  old="$("$llvm/bin/llvm-nm.exe" -D -u "$product" | grep -E '\$s10Foundation|\$s31FoundationInternationalization' || true)"
+  if [ -n "$old" ]; then
+    echo "$old" >&2
+    echo "$(basename "$product") uses the old Foundation, which is not linked" >&2
+    exit 1
+  fi
   echo "  $(basename "$product"): ok"
 }
