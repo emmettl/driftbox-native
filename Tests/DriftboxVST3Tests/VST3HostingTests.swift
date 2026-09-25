@@ -105,6 +105,8 @@
       rack.mapMacro("fx", 1, to: "0")
       #expect(rack.patch.modules[1].plugin?.controls == [PluginControl(macro: 1, key: "0", name: "Gain")])
       #expect(rack.patch.modules[1].params["macro1"] == 0.5)
+      let said = try #require(rack.units["fx"]?.display("0", at: 0.25))
+      #expect(said.hasPrefix("0.25") && said.hasSuffix(" x"), "in its own words, and its units")
       #expect(abs(Self.loudness(rack) - half) < 0.01, "nothing jumps")
       rack.turn("fx", "macro1", to: 1)
       #expect(abs(Self.loudness(rack) - 2 * half) < 0.02)
