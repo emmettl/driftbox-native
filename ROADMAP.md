@@ -711,7 +711,8 @@ each question, and the rest is Android's alone:
    Swift, and a package of 8MB: Driftbox and the Swift runtime 6.9MB stripped, the NDK's C++
    library 1.4MB. Out of view it plays on through a media playback service, which keeps the big
    cores Android would otherwise take away, with a buffer of sixteen bursts while nothing is
-   drawn, and pauses when audio focus is lost. The build leaves out Foundation's
+   drawn, and pauses when audio focus is lost. It builds on any of the three hosts, Windows, a Mac
+   or Linux, and CI builds it on Linux; on a Mac, an arm64 emulator runs every check the app has. The build leaves out Foundation's
    internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
    `DriftboxDocument` takes Foundation only to write a WAV. The Play Store, or F-Droid, when
    Driftbox is public.

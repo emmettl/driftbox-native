@@ -414,9 +414,12 @@ that, writing the keys `--register` writes, and takes all of it away again on un
 
 ### Android
 
-The engine plays through a phone, and times itself there. It is built with the swift.org toolchain
-for Windows and swift.org's Swift SDK for Android, the same version, with the NDK and adb beside
-them:
+The engine plays through a phone, and times itself there. It is built with a swift.org toolchain
+and swift.org's Swift SDK for Android of the same version, and the NDK that SDK names — Swift 6.4.0
+and NDK r30 — on Windows from Git Bash, on a Mac, or on Linux, which CI builds it on. On a Mac the
+toolchain is swift.org's, in `~/Library/Developer/Toolchains`, not Xcode's own Swift, which the SDK
+is not built for; `swift sdk install` puts the SDK where the scripts look, and Android Studio the
+NDK. `android-env.sh` says where each is looked for on each, and how to point at another:
 
 ```bash
 scripts/android-play.sh                    # acid through the phone's speaker, for twenty seconds
@@ -462,6 +465,7 @@ happened.
 
 ```bash
 scripts/android-app.sh                  # build and install; open it for Pulse, playing acid
+scripts/android-app.sh build            # build only, with no phone: what CI does
 adb shell am start -n app.driftbox/.Main --es song smallhours --es scene hothouse
 scripts/android-app.sh midi-loopback    # test the MIDI ports against the app's own loopback
 scripts/android-app.sh gpu              # or the GPU contract on the phone's GPU
@@ -508,6 +512,14 @@ nothing plugged in, as on Windows. Notes and clock come back whole and in order,
 clock sent ahead goes out when it is due: a beat of it, tick by tick, 0.1 to 2ms after each tick
 was due, and a flush drops what has not gone. Without the scheduler it came back a tenth of a
 second early, the moment it was sent, and a flush dropped nothing.
+
+The NDK has to be the one the SDK names, not only a recent one: the Swift runtime is built against
+that NDK's C++ library, and linked with an older one it links and is then refused by the phone for
+want of a function (6.4.0's wants `std::__hash_memory`, which r30's libc++ has and r29's has not).
+`android-app.sh` looks for every such function in the libc++ it packs, and stops if one is
+missing. An arm64 emulator runs the app's checks as a phone does, from a Mac with no phone to
+hand; drawing in software, the scenes want `DRIFTBOX_ANDROID_WAIT=300` rather than the thirty
+seconds a phone takes.
 
 ## Conformance
 

@@ -3,11 +3,19 @@
 # phone. Sourced by `android-build.sh`, which makes `driftbox-play`, and `android-app.sh`, which
 # makes the app.
 #
-# Written for the swift.org toolchain on Windows, run from Git Bash, with swift.org's own Swift SDK
-# for Android beside it (its artifact bundle, unpacked under Programs/Swift/SDKs), the Android NDK
-# and platform-tools (adb), found where Android Studio puts them. Every location can be
-# overridden: DRIFTBOX_SWIFTC, DRIFTBOX_ANDROID_SWIFT_SDK (the bundle's swift-android folder),
-# ANDROID_NDK_HOME and ADB.
+# Built with a swift.org toolchain and swift.org's Swift SDK for Android of the same version, and
+# the Android NDK, on any of the three: Windows, from Git Bash; macOS; or Linux, which CI builds on.
+# Each is found where its installer puts it on that platform, and every location can be overridden:
+# DRIFTBOX_SWIFTC, DRIFTBOX_ANDROID_SWIFT_SDK (the bundle's swift-android folder), ANDROID_NDK_HOME
+# and ADB. A phone, and adb, are needed only to install and run.
+#
+#     Windows  the toolchain and the SDK under %LOCALAPPDATA%\Programs\Swift, the NDK and adb
+#              under %LOCALAPPDATA%\Android\Sdk, where Android Studio puts them
+#     macOS    the toolchain in ~/Library/Developer/Toolchains (not Xcode's own Swift, which the
+#              SDK is not built for), the SDK where `swift sdk install` puts it, the NDK and adb
+#              under ~/Library/Android/sdk
+#     Linux    swiftc on the PATH, the SDK where `swift sdk install` puts it, the NDK at
+#              ANDROID_NDK_HOME or under ANDROID_HOME
 #
 # swift.org's SDK rather than the Android platform the Windows installer brings: that one's standard
 # library has no SIMD types, which the GPU layer is written in, and its arm64 runtime lacks
@@ -18,19 +26,42 @@ cd "$(dirname "$0")/.."
 # Git Bash would otherwise turn the phone's /data/local/tmp into a Windows path on its way to adb.
 export MSYS_NO_PATHCONV=1
 
-local_app_data="${LOCALAPPDATA:-}"
-if command -v cygpath >/dev/null 2>&1 && [ -n "$local_app_data" ]; then
-  local_app_data="$(cygpath -m "$local_app_data")"
-fi
 newest() { ls -d "$@" 2>/dev/null | sort -V | tail -1; }
 
-swiftc="${DRIFTBOX_SWIFTC:-$(newest "$local_app_data"/Programs/Swift/Toolchains/*/usr/bin/swiftc.exe)}"
-bundle="${DRIFTBOX_ANDROID_SWIFT_SDK:-$(newest "$local_app_data"/Programs/Swift/SDKs/swift-*_android.artifactbundle/swift-android)}"
-ndk="${ANDROID_NDK_HOME:-$(newest "$local_app_data"/Android/Sdk/ndk/*)}"
-adb="${ADB:-$(command -v adb || echo "$local_app_data/Android/Sdk/platform-tools/adb.exe")}"
-for need in "$swiftc" "$bundle" "$ndk" "$adb"; do
+# What the host is, and what its tools are called there: the SDK's build tools are scripts ending
+# .bat on Windows, and every executable ends .exe.
+if command -v cygpath >/dev/null 2>&1; then
+  host=windows exe=.exe bat=.bat
+  local_app_data="$(cygpath -m "${LOCALAPPDATA:-}")"
+  swift_sdks="$local_app_data/Programs/Swift/SDKs"
+  android_sdk="${ANDROID_HOME:-$local_app_data/Android/Sdk}"
+elif [ "$(uname)" = Darwin ]; then
+  host=macos exe= bat=
+  swift_sdks="$HOME/Library/org.swift.swiftpm/swift-sdks"
+  android_sdk="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+else
+  host=linux exe= bat=
+  swift_sdks="$HOME/.swiftpm/swift-sdks"
+  android_sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
+fi
+
+bundle="${DRIFTBOX_ANDROID_SWIFT_SDK:-$(newest "$swift_sdks"/swift-*_android.artifactbundle/swift-android)}"
+# The toolchain the SDK was made for: its version is in the bundle's name.
+release="$(basename "$(dirname "$bundle")" | sed 's/_android.artifactbundle$//')"
+case $host in
+  windows) swiftc="${DRIFTBOX_SWIFTC:-$(newest "$local_app_data"/Programs/Swift/Toolchains/*/usr/bin/swiftc.exe)}" ;;
+  macos) swiftc="${DRIFTBOX_SWIFTC:-$HOME/Library/Developer/Toolchains/$release.xctoolchain/usr/bin/swiftc}" ;;
+  linux) swiftc="${DRIFTBOX_SWIFTC:-$(command -v swiftc || true)}" ;;
+esac
+ndk="${ANDROID_NDK_HOME:-$(newest "$android_sdk"/ndk/*)}"
+adb="${ADB:-$(command -v adb || echo "$android_sdk/platform-tools/adb$exe")}"
+for need in "$swiftc" "$bundle" "$ndk"; do
   [ -e "$need" ] || { echo "not found: $need" >&2; exit 1; }
 done
+# adb, and a phone, only for what is put on one.
+need_adb() {
+  [ -e "$adb" ] || { echo "not found: $adb" >&2; exit 1; }
+}
 llvm="$(newest "$ndk"/toolchains/llvm/prebuilt/*)"
 resources="$bundle/swift-resources/usr/lib"
 sdk="$bundle/ndk-sysroot"
@@ -39,8 +70,12 @@ sdk="$bundle/ndk-sysroot"
 # which Windows makes only for an administrator, so there it is done with junctions instead, the
 # start-up objects copied. And tar on Windows leaves the bundle's links to clang's headers as empty
 # files, which the compiler's own copy of those headers stands in for.
+# Made again when it was made from another NDK than this one, which an NDK updated leaves behind.
+if [ $host != windows ] && [ -L "$sdk/usr/include" ] && [ "$(readlink "$sdk/usr/include")" != "$llvm/sysroot/usr/include" ]; then
+  rm -rf "$sdk"
+fi
 if [ ! -d "$sdk/usr/include" ]; then
-  if command -v cygpath >/dev/null 2>&1; then
+  if [ $host = windows ]; then
     mkdir -p "$sdk/usr/lib"
     cmd //c "mklink /J $(cygpath -w "$sdk/usr/include") $(cygpath -w "$llvm/sysroot/usr/include")" >/dev/null
     for triple in aarch64-linux-android x86_64-linux-android; do
@@ -54,7 +89,7 @@ if [ ! -d "$sdk/usr/include" ]; then
       done
     done
   else
-    ANDROID_NDK_HOME="$ndk" "$bundle/scripts/setup-android-sdk.sh"
+    (cd "$bundle" && ANDROID_NDK_HOME="$ndk" bash scripts/setup-android-sdk.sh >/dev/null)
   fi
   echo "set up $sdk"
 fi
@@ -65,6 +100,11 @@ for clang in "$resources"/swift*-*/clang; do
   fi
 done
 
+# The compiler's runtime, which clang links, from the NDK: a macOS or Linux toolchain's clang would
+# look in its own resource directory, which has none for Android. Windows' finds the NDK's already.
+runtime=""
+[ $host = windows ] || runtime="-Xclang-linker -resource-dir -Xclang-linker $(newest "$llvm"/lib/clang/*)"
+
 # Android 10, the first with native MIDI.
 target=aarch64-unknown-linux-android29
 libcxx="$llvm/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
@@ -72,7 +112,7 @@ libcxx="$llvm/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
 # Short on purpose: swiftc on Windows writes nothing, and says nothing, past MAX_PATH.
 out="${DRIFTBOX_ANDROID_OUT:-${TMPDIR:-/tmp}/dbxa/arm64}"
 mkdir -p "$out"
-if command -v cygpath >/dev/null 2>&1; then out="$(cygpath -m "$out")"; fi
+if [ $host = windows ]; then out="$(cygpath -m "$out")"; fi
 echo "using $("$swiftc" --version 2>&1 | head -1), $(basename "$(dirname "$bundle")"), NDK $(basename "$ndk")"
 
 # Everything below the app and the player, in the order they depend on each other.
@@ -122,13 +162,13 @@ link() {
   rm -f "$product"
   # shellcheck disable=SC2086
   "$swiftc" -target $target -sdk "$sdk" -resource-dir "$resources/swift_static-aarch64" -static-stdlib \
-    -L "$(newest "$llvm"/lib/clang/*/lib/linux/aarch64)" \
+    -L "$(newest "$llvm"/lib/clang/*/lib/linux/aarch64)" $runtime \
     $objects "$@" -lswiftSynchronization -lswiftDispatch -ldispatch -lBlocksRuntime -lswift_RegexParser \
     -lCoreFoundation -l_FoundationCollections -l_FoundationCShims -l_FoundationICU \
     -o "$product"
   # A shared library links with symbols it cannot find, and the phone only refuses it when it
   # loads: so a use of the old Foundation is looked for here instead.
-  old="$("$llvm/bin/llvm-nm.exe" -D -u "$product" | grep -E '\$s10Foundation|\$s31FoundationInternationalization' || true)"
+  old="$("$llvm/bin/llvm-nm$exe" -D -u "$product" | grep -E '\$s10Foundation|\$s31FoundationInternationalization' || true)"
   if [ -n "$old" ]; then
     echo "$old" >&2
     echo "$(basename "$product") uses the old Foundation, which is not linked" >&2
