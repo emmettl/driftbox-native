@@ -765,10 +765,19 @@ in `TabletLayoutTests`, and looked at drawn by D3D11 on Windows, since there is 
 try it on. A phone is kept upright, since on its side it is 372 points high, too short for the
 grid and the knobs.
 
-The rack is built into the Android app now, though not yet shown there: its session and its
-controls take nothing from the old Foundation, and every patch in its catalogue opens and sounds
-on the phone. What it needs next is the same design work as the groovebox had: its faces, the
-back of the rack and its cables at a finger's size.
+The rack is on the Android app now, beside the groovebox through the same output: the song's menu
+has Rack, and the patch's name, heading the rack, has the patches and the way back. It is kept as a
+desktop draws it and moved about instead, which is how a modular rack is used by hand: fitted to
+the screen's width, pinched to zoom about the fingers, slid by a finger on its panels, and a module
+double-tapped to a finger's size — a half-width one filling the width, a full-width one zoomed until
+its knobs are 44 points, the part tapped kept under the finger. A finger on a knob that goes
+sideways slides the rack and leaves the knob; up or down, it turns it. A control is taken from a
+finger's reach, 22 points, whatever the zoom, except from a module's title, which is where a finger
+grabs the module. On the back a jack drags a cable as a mouse does, and a bay slides the rack; a
+module is moved from its menu, which a long press opens, as it does on the front. The header is a
+phone's: the name, PLAY, the tempo, the flip and ADD. Left: what the keys play, on a keyboard of
+their own; a sample loaded through Android's picker; the Combinator's routing, which is 300 points
+beside the rack; and a tablet, seen.
 
 ### What Milestone 5 asks of Milestone 4
 

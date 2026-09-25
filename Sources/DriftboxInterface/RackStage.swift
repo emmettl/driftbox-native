@@ -28,6 +28,8 @@ public enum RackTarget: Equatable, Sendable {
   case cell(module: String, index: Int)
   /// Part of the Combinator's routing, open beside the rack.
   case routing(RoutingPart)
+  /// On a touchscreen, the patch's name: the patches to open, and the way back to the groovebox.
+  case patches
 }
 
 /// What a press on a Combinator's routing is on: its close and add buttons, and each routing's
@@ -261,26 +263,78 @@ public struct RackStage {
   public var height: Float
   public var scroll: Float
   public var maxScroll: Float
+  /// On a touchscreen: the rack drawn for fingers, which zoom it and pan it about.
+  public var touch = false
+  /// How far the rack is zoomed past fitting the window's width, on a touchscreen; 1 on a desktop.
+  public var zoom: Float = 1
+  /// How far the rack is panned from its left edge, in points, when zoomed wider than the window.
+  public var pan: Float = 0
+  public var maxPan: Float = 0
+  /// The scale at which the rack's width fits the window, which a zoom multiplies.
+  public var fitScale: Float = 1
+
+  /// Under this many points across, a touchscreen's header is a phone's: the patch's name a chip
+  /// beside the transport, and no room for what the keys play.
+  public static let compactWidth: Float = 600
+  /// Past fitting the width, how far a touchscreen zooms in: enough for a half-width module to fill
+  /// a phone, and a knob on it to be a finger's size.
+  public static let maxZoom: Float = 3
+  /// How far from a control a finger may land and still take it, in points on the window: a
+  /// finger's reach, whatever the zoom.
+  public static let reach: Float = 22
+  /// A touchscreen's rack is inset this far from the window's sides.
+  public static let inset: Float = 8
 
   @MainActor
-  /// `pages` is the bar each face with more than one shows, by module.
-  public init(rack: RackSession, size: SIMD2<Float>, scroll: Float = 0, pages: [String: Int] = [:]) {
+  /// `pages` is the bar each face with more than one shows, by module. `touch` lays the rack out for
+  /// fingers, `zoom` past fitting the width and panned `pan` points from its left.
+  public init(
+    rack: RackSession, size: SIMD2<Float>, scroll: Float = 0, pages: [String: Int] = [:], touch: Bool = false,
+    zoom: Float = 1, pan: Float = 0
+  ) {
     self.size = size
+    self.touch = touch
     let margin = Self.margin
     header = Rect(margin, margin, max(0, size.x - margin * 2), Self.headerHeight)
     let chipY = header.y + 8
     let chipHeight = header.height - 16
-    let add = Rect(header.maxX - 10 - 56, chipY, 56, chipHeight)
-    let flip = Rect(add.x - 6 - 64, chipY, 64, chipHeight)
-    keys = Rect(flip.x - 12 - 70, header.y, 70, header.height)
-    tempo = Rect(keys.x - 8 - 76, chipY, 76, chipHeight)
-    let run = Rect(tempo.x - 8 - 60, chipY, 60, chipHeight)
-    chips = [
-      Chip(frame: run, label: rack.running ? "STOP" : "PLAY", target: .run, isOn: rack.running),
-      Chip(frame: flip, label: rack.flipped ? "FRONT" : "BACK", target: .flip, isOn: rack.flipped),
-      Chip(frame: add, label: "ADD", target: .add, isOn: false),
-    ]
-    title = Rect(header.x + 14, header.y, max(0, run.x - 12 - header.x - 14), header.height)
+    if touch, size.x < Self.compactWidth {
+      // A phone's: its name a chip at the left, then the transport, the tempo, the flip and ADD,
+      // each as narrow as its label lets it be.
+      let add = Rect(header.maxX - 6 - 44, chipY, 44, chipHeight)
+      let flip = Rect(add.x - 4 - 58, chipY, 58, chipHeight)
+      tempo = Rect(flip.x - 4 - 66, chipY, 66, chipHeight)
+      let run = Rect(tempo.x - 4 - 52, chipY, 52, chipHeight)
+      let name = Rect(header.x + 6, chipY, max(0, run.x - 6 - header.x - 6), chipHeight)
+      keys = Rect(add.maxX, header.y, 0, 0)
+      title = Rect(name.x, header.y, 0, 0)
+      chips = [
+        Chip(frame: name, label: rack.name, target: .patches, isOn: false),
+        Chip(frame: run, label: rack.running ? "STOP" : "PLAY", target: .run, isOn: rack.running),
+        Chip(frame: flip, label: rack.flipped ? "FRONT" : "BACK", target: .flip, isOn: rack.flipped),
+        Chip(frame: add, label: "ADD", target: .add, isOn: false),
+      ]
+    } else {
+      let add = Rect(header.maxX - 10 - 56, chipY, 56, chipHeight)
+      let flip = Rect(add.x - 6 - 64, chipY, 64, chipHeight)
+      keys = Rect(flip.x - 12 - 70, header.y, 70, header.height)
+      tempo = Rect(keys.x - 8 - 76, chipY, 76, chipHeight)
+      let run = Rect(tempo.x - 8 - 60, chipY, 60, chipHeight)
+      chips = [
+        Chip(frame: run, label: rack.running ? "STOP" : "PLAY", target: .run, isOn: rack.running),
+        Chip(frame: flip, label: rack.flipped ? "FRONT" : "BACK", target: .flip, isOn: rack.flipped),
+        Chip(frame: add, label: "ADD", target: .add, isOn: false),
+      ]
+      title = Rect(header.x + 14, header.y, max(0, run.x - 12 - header.x - 14), header.height)
+      if touch {
+        // On a tablet the name is where it is on a desktop, and a press on it is the patches.
+        chips.insert(
+          Chip(
+            frame: Rect(title.x - 8, chipY, min(title.width, 260), chipHeight), label: rack.name,
+            target: .patches, isOn: false), at: 0)
+        title = Rect(title.x, header.y, 0, 0)
+      }
+    }
 
     // About the reference's size, a little larger when there is room: past this the panels stop
     // reading as a rack of modules and start reading as a poster of one.
@@ -288,16 +342,30 @@ public struct RackStage {
     let combi = rack.editingRoutes.flatMap { id in rack.patch.modules.first { $0.id == id } }
     let room = combi == nil ? size.x : max(0, size.x - Routing.width)
     let width = Float(RackLayout.width)
-    scale = max(0.5, min(1.35, (room - 48) / width))
     area = Rect(0, header.maxY + margin, room, max(0, size.y - header.maxY - margin))
     let beside = Rect(room, area.y, max(0, size.x - room - margin), max(0, size.y - area.y - margin))
     routing = combi.map { Routing(combi: $0, rack: rack, frame: beside) }
     let layout = RackLayout.layout(rack.patch.modules)
     placements = layout.placements
     height = Float(max(layout.height, RackLayout.row))
-    maxScroll = max(0, (height + 24) * scale - area.height)
-    self.scroll = min(max(0, scroll), maxScroll)
-    origin = SIMD2((room - width * scale) / 2, area.y - self.scroll)
+    if touch {
+      // Fitted to the width, and zoomed from there by the fingers; wider than the window, panned.
+      let across = max(1, room - Self.inset * 2)
+      fitScale = across / width
+      self.zoom = max(1, min(Self.maxZoom, zoom))
+      scale = fitScale * self.zoom
+      maxPan = max(0, width * scale - across)
+      self.pan = min(max(0, pan), maxPan)
+      maxScroll = max(0, (height + 24) * scale - area.height)
+      self.scroll = min(max(0, scroll), maxScroll)
+      origin = SIMD2(Self.inset - self.pan, area.y - self.scroll)
+    } else {
+      scale = max(0.5, min(1.35, (room - 48) / width))
+      fitScale = scale
+      maxScroll = max(0, (height + 24) * scale - area.height)
+      self.scroll = min(max(0, scroll), maxScroll)
+      origin = SIMD2((room - width * scale) / 2, area.y - self.scroll)
+    }
 
     let modules = Dictionary(rack.patch.modules.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     faces = layout.placements.compactMap { placement in
@@ -379,6 +447,10 @@ public struct RackStage {
     if let index = face.cells.firstIndex(where: { $0.frame.contains(at) }) {
       return .cell(module: id, index: index)
     }
+    // A module's head, its title across the top, is the module's, and reach takes nothing from it:
+    // it is where a finger grabs a module to select it or fit it to the window.
+    let head = Rect(face.frame.x, face.frame.y, face.frame.width, face.title.maxY + 6 - face.frame.y)
+    if touch, !head.contains(at), let near = nearest(to: at, on: face) { return near }
     for control in face.controls where control.cell.contains(at) {
       let param = control.param.id
       switch control.kind {
@@ -394,6 +466,42 @@ public struct RackStage {
       }
     }
     return .module(id)
+  }
+
+  /// On a touchscreen, whatever on `face` a finger landing at `at` means: the nearest of its buttons,
+  /// numbers and controls within a finger's reach, however small the zoom draws them.
+  func nearest(to at: SIMD2<Float>, on face: Face) -> RackTarget? {
+    let reach = Self.reach / scale
+    func distance(_ rect: Rect) -> Float {
+      let dx = max(rect.x - at.x, 0, at.x - rect.maxX)
+      let dy = max(rect.y - at.y, 0, at.y - rect.maxY)
+      return (dx * dx + dy * dy).squareRoot()
+    }
+    var best: (target: RackTarget, distance: Float)?
+    func offer(_ target: RackTarget, _ rect: Rect) {
+      let d = distance(rect)
+      if d <= reach, d < (best?.distance ?? .infinity) { best = (target, d) }
+    }
+    let id = face.module.id
+    for (index, button) in face.buttons.enumerated() {
+      offer(.button(module: id, index: index), button.frame)
+    }
+    for (index, cell) in face.cells.enumerated() { offer(.cell(module: id, index: index), cell.frame) }
+    for control in face.controls {
+      let param = control.param.id
+      switch control.kind {
+      case .knob(let dial):
+        offer(.knob(module: id, param: param), dial)
+      case .options(let buttons):
+        for (index, button) in buttons.enumerated() {
+          offer(.option(module: id, param: param, value: Int(control.param.min) + index), button)
+        }
+      case .stepper(_, let down, let up):
+        offer(.step(module: id, param: param, by: -1), down)
+        offer(.step(module: id, param: param, by: 1), up)
+      }
+    }
+    return best?.target
   }
 
   /// The face at `point`, on the window, if there is one there.

@@ -2,6 +2,7 @@ import DriftboxCanvas
 import DriftboxRack
 import DriftboxRackSession
 import DriftboxShell
+
 #if os(Android)
   // Its dates from FoundationEssentials, and C's maths from Android's own: the old Foundation's
   // `CGPoint` would be as much in sight as the rack's, which stands in for it there.
@@ -87,6 +88,20 @@ extension RackInterface {
   }
 
   // MARK: The hand
+
+  /// Whether a press on the back at `location` would take something a finger means to use: an
+  /// unplug button, a trim pot, a jack, a cable's belly. Anywhere else, a finger pans the rack.
+  func backTakes(at location: SIMD2<Float>, stage: RackStage) -> Bool {
+    let at = stage.design(location)
+    let jacks = RackLayout.jacks(stage.placements)
+    for cable in rack.patch.cables {
+      guard let (from, to) = ends(cable, in: jacks) else { continue }
+      if Self.distance(at, Self.point(Self.unplug(SIMD2(Float(to.x), Float(to.y))))) < 13 { return true }
+      if Self.distance(at, Cable.middle(from, to, angle: angle(cable, from, to))) < 11 { return true }
+    }
+    if potUnder(at, jacks: jacks) != nil { return true }
+    return RackLayout.nearestJack(in: jacks, to: Self.point(at), radius: 16) != nil
+  }
 
   /// What a press on the back starts, by what is under it: an unplug button, a trim pot, a jack, a
   /// cable's belly, a bay.

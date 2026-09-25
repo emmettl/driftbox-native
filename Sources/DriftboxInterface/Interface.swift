@@ -86,6 +86,8 @@ public final class Interface {
   public enum FileAction: Sendable, Equatable {
     case open, save, saveAs
   }
+  /// The way to the rack, where there is one beside the groovebox: the song's menu offers it.
+  public var showRack: (() -> Void)?
   /// Where the song's menu sends what it asks of a file; with none, it offers none.
   public var files: ((FileAction) -> Void)?
   /// Ask whether to go on and lose the song's unsaved edits, and do `then` if so; with none, the

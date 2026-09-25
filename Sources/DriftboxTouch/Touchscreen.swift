@@ -2,6 +2,7 @@ import DriftboxCanvas
 import DriftboxGPU
 import DriftboxHost
 import DriftboxInterface
+import DriftboxRackSession
 import DriftboxScenes
 import DriftboxSession
 import DriftboxShell
@@ -50,8 +51,13 @@ public final class Touchscreen {
   /// Seconds on a clock of the touch screen's own; a test sets its own.
   var clock: () -> Double = { HostTime.seconds(from: 0, to: HostTime.now()) }
   /// A long press's menu, and where it was pressed, for the platform to show as its own: whatever
-  /// is chosen from it goes to `interface.choose`.
+  /// is chosen from it goes to `choose`.
   public var onMenu: ((Menu, SIMD2<Float>) -> Void)?
+
+  /// The rack, where the platform has one: shown in the groovebox's place, over no scene, while
+  /// `showsRack` says. Each offers the way to the other, in the song's menu and the patches'.
+  public private(set) var rack: RackInterface?
+  public private(set) var showsRack = false
 
   public init(
     session: Session, device: any GPUDevice, typesetter: any Typesetter, scale: Float, scene: String? = nil
@@ -91,6 +97,17 @@ public final class Touchscreen {
   public func draw(into surface: any GPUSurface) throws {
     session.tick()
     checkLongPress()
+    if showsRack, let rack {
+      // The rack covers the screen while it shows, and the scene waits, as on a desktop.
+      let target = try surface.target()
+      rack.size = SIMD2(Float(surface.width), Float(surface.height)) / scale
+      try canvas.begin(width: target.width, height: target.height)
+      canvas.scale(scale, scale)
+      rack.draw(on: canvas)
+      presenter.overlay(canvas.finish(), into: target, on: device)
+      try surface.present()
+      return
+    }
     showScene()
     let drawn = Self.drawn(width: surface.width, height: surface.height, scale: scale)
     if frame?.width != drawn.width || frame?.height != drawn.height {
@@ -129,6 +146,40 @@ public final class Touchscreen {
 
   // MARK: - Fingers
 
+  /// Put `rack` beside the groovebox: the song's menu offers it, and its patches' the way back.
+  public func add(_ rack: RackSession) {
+    let shown = RackInterface(rack: rack)
+    shown.touch = true
+    shown.showGroovebox = { [weak self] in self?.show(rack: false) }
+    interface.showRack = { [weak self] in self?.show(rack: true) }
+    self.rack = shown
+  }
+
+  /// The rack in the groovebox's place, or back. Whatever a finger was doing on the one leaving is
+  /// let go of, and the pad lifted.
+  public func show(rack showing: Bool) {
+    guard showing != showsRack, rack != nil || !showing else { return }
+    if let finger = padFinger {
+      pad(PointerEvent(phase: .cancelled, id: finger.id, kind: .touch, location: .zero))
+    }
+    otherFingers = []
+    resting = nil
+    showsRack = showing
+  }
+
+  /// What was chosen from the menu last shown: the rack's, while it shows, or the groovebox's.
+  public func choose(_ id: String) {
+    if showsRack, let rack { rack.choose(id) } else { interface.choose(id) }
+  }
+
+  /// Whether a command of the menu last shown can be chosen, and whether it shows as on.
+  public func menuIsEnabled(_ id: String) -> Bool {
+    showsRack ? rack?.menuIsEnabled(id) ?? false : interface.menuIsEnabled(id)
+  }
+  public func menuIsChecked(_ id: String) -> Bool {
+    showsRack ? rack?.menuIsChecked(id) ?? false : interface.menuIsChecked(id)
+  }
+
   /// A finger, in points from the top left of the surface.
   public func touch(_ event: PointerEvent) {
     var event = event
@@ -137,6 +188,13 @@ public final class Touchscreen {
       let moved = event.location - rest.at
       // Moved as far as a drag, or lifted: not resting any more.
       if event.phase != .moved || (moved * moved).sum() > 100 { resting = nil }
+    }
+    if showsRack, let rack {
+      // The whole screen is the rack's; a finger that rests on it asks for its module's menu.
+      rack.pointer(event)
+      if event.phase == .began { resting = (event.id, event.location, clock()) }
+      if let request = rack.takeMenuRequest() { onMenu?(request.menu, request.at) }
+      return
     }
     if interface.pointer(event) {
       if event.phase == .began { resting = (event.id, event.location, clock()) }
@@ -166,6 +224,12 @@ public final class Touchscreen {
   public func checkLongPress() {
     guard let rest = resting, clock() - rest.since >= Self.longPress else { return }
     resting = nil
+    if showsRack, let rack {
+      guard let menu = rack.menu(at: rest.at) else { return }
+      rack.pointer(PointerEvent(phase: .cancelled, id: rest.id, kind: .touch, location: rest.at))
+      onMenu?(menu, rest.at)
+      return
+    }
     guard !interface.performing, let menu = interface.menu(at: rest.at) else { return }
     _ = interface.pointer(PointerEvent(phase: .cancelled, id: rest.id, kind: .touch, location: rest.at))
     onMenu?(menu, rest.at)

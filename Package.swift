@@ -162,8 +162,8 @@ let package = Package(
     .target(
       name: "DriftboxTouch",
       dependencies: [
-        "DriftboxCanvas", "DriftboxGPU", "DriftboxHost", "DriftboxInterface", "DriftboxScenes",
-        "DriftboxSession", "DriftboxShell", "DriftboxText",
+        "DriftboxCanvas", "DriftboxGPU", "DriftboxHost", "DriftboxInterface", "DriftboxRackSession",
+        "DriftboxScenes", "DriftboxSession", "DriftboxShell", "DriftboxText",
       ]),
     // Driftbox for Windows: Windows' parts, chosen, and handed to `Desktop`.
     .executableTarget(
