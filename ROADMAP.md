@@ -588,6 +588,14 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    inspector: each routing's source, target module and knob chosen from menus, its ends typed —
    blank is the knob's own limit — and what it is putting on its target now. Left for the rack
    here: plug-ins, which have no host on Windows yet, so a plug-in module is kept and silent.
+   Begun: VST 3, on Steinberg's SDK (MIT), vendored at 3.8.1 as much as a host uses. `CVST3` is
+   Driftbox's bridge to it in C: the plug-ins in a `.vst3` module listed, one made at the rack's
+   rate, played stereo with notes and the transport, its params listed, set from the main thread
+   and heard at the next block, and its state and its controller's kept as one. It is held to
+   `DriftboxVST3Fixture`, a plug-in of the project's own built beside the tests, an effect with a
+   controller of its own and an instrument that is one component. All of it compiles on Windows
+   alone for now. Next: `RackPluginHosting` on it, the plug-ins installed in the Add menu, their
+   faces, and their own editors in windows of their own.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift
