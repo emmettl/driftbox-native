@@ -87,6 +87,20 @@ void dbvst3_listen(DBVST3Plugin *plugin, DBVST3Listener listener, void *context)
 /// param or the state does this first.
 int32_t dbvst3_idle(DBVST3Plugin *plugin);
 
+/// Told that a person closed a plug-in's editor.
+typedef void (*DBVST3EditorClosed)(void *context);
+
+/// Open its own editor, on the main thread, in a window of its own titled `title` (UTF-8), owned by
+/// `owner` — a window handle, or null — and shown, unless `show` is false; `closed` is told, with
+/// `context`, when a person closes it. One already open is brought to the front. False when it has
+/// no editor, or none that will open in a window.
+bool dbvst3_editor_open(
+  DBVST3Plugin *plugin, const char *title, void *owner, bool show, DBVST3EditorClosed closed, void *context);
+/// Close its editor, if it is open, telling nobody. Closing the plug-in does this first.
+void dbvst3_editor_close(DBVST3Plugin *plugin);
+/// Its editor's window handle while it is open, or null.
+void *dbvst3_editor_window(const DBVST3Plugin *plugin);
+
 /// One of its params.
 typedef struct DBVST3Parameter {
   uint32_t id;

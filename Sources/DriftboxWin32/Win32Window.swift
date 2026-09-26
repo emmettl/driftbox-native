@@ -108,7 +108,8 @@
     }
 
     /// Everything that has arrived, handled, without waiting for more — shortcuts first, as
-    /// Windows' own applications take them. False once the window has been closed.
+    /// Windows' own applications take them, but only for this window: a plug-in's editor in a
+    /// window of its own has its keys to itself. False once the window has been closed.
     @discardableResult
     public func pump() -> Bool {
       // What the main actor has been handed — the rest of an async load, once its file is read —
@@ -117,7 +118,7 @@
       if Thread.isMainThread { drainMainQueue(nil) }
       var message = MSG()
       while PeekMessageW(&message, nil, 0, 0, UINT(PM_REMOVE)) {
-        if let accelerators = menus?.accelerators, !isText(message),
+        if let accelerators = menus?.accelerators, !isText(message), isOurs(message.hwnd),
           TranslateAcceleratorW(handle, accelerators, &message) != 0
         {
           continue
@@ -126,6 +127,11 @@
         DispatchMessageW(&message)
       }
       return isOpen
+    }
+
+    /// Whether a message is for this window, or one inside it.
+    private func isOurs(_ window: HWND?) -> Bool {
+      window == handle || IsChild(handle, window)
     }
 
     /// A key typed into text, while the app takes it: one held with neither Ctrl nor Alt, which is

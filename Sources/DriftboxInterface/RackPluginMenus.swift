@@ -90,11 +90,19 @@ extension RackInterface {
         }
         var items = Self.runs(choices, names: parameters.map(\.name))
         if items.isEmpty { items = [item("No Params to Map", "macro.\(macro).none", enabled: false) {}] }
+        // Or the next param a hand moves in the plug-in's own editor, which opens for it.
+        let learning = rack.learning.map { $0.module == moduleId && $0.macro == macro } ?? false
+        items += [
+          .separator,
+          learning
+            ? item("Stop Learning", "macro.\(macro).stop") { self.rack.cancelLearning() }
+            : item("Learn from the Plug-in", "macro.\(macro).learn") {
+              self.rack.learnMacro(moduleId, macro)
+              self.rack.showInterface(moduleId)
+            },
+        ]
         if mapped != nil {
-          items += [
-            .separator,
-            item("Unmap", "macro.\(macro).unmap") { self.rack.mapMacro(moduleId, macro, to: nil) },
-          ]
+          items.append(item("Unmap", "macro.\(macro).unmap") { self.rack.mapMacro(moduleId, macro, to: nil) })
         }
         return .submenu(Menu(mapped.map { "Macro \(macro): \($0.name)" } ?? "Macro \(macro)", items))
       })

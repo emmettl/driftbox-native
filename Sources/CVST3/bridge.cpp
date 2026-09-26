@@ -8,8 +8,17 @@
 
 #include "CVST3.h"
 
+// Windows' own, for a plug-in's editor window: without its min and max, which the C++ library has.
+#define NOMINMAX
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0A00
+#endif
+#include <windows.h>
+
 #include "base/source/fstreamer.h"
 #include "pluginterfaces/base/ibstream.h"
+#include "pluginterfaces/gui/iplugview.h"
+#include "pluginterfaces/gui/iplugviewcontentscalesupport.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"
@@ -158,6 +167,8 @@ bool isAudioModule(const VST3::Hosting::ClassInfo &info) { return info.category(
 
 }  // namespace
 
+struct EditorWindow;
+
 struct DBVST3Plugin {
   VST3::Hosting::Module::Ptr module;
   IPtr<IComponent> component;
@@ -191,6 +202,8 @@ struct DBVST3Plugin {
   HostProcessData data;
   ParameterChanges changes {256};
   ParameterChanges outputChanges {64};
+  /// Its editor's window, while it is open.
+  EditorWindow *editor = nullptr;
   EventList events {512};
   ProcessContext context {};
   double sampleRate = 48000;
@@ -411,6 +424,161 @@ struct DBVST3Plugin {
   }
 };
 
+// MARK: - Editors
+
+namespace {
+
+const wchar_t *const editorClass = L"DriftboxPlugInEditor";
+constexpr UINT_PTR idleTimer = 1;
+
+std::wstring wide(const char *text) {
+  int count = MultiByteToWideChar(CP_UTF8, 0, text ? text : "", -1, nullptr, 0);
+  std::wstring out(count > 1 ? count - 1 : 0, L'\0');
+  if (count > 1) MultiByteToWideChar(CP_UTF8, 0, text, -1, out.data(), count);
+  return out;
+}
+
+}  // namespace
+
+/// A plug-in's own editor, in a window of its own on the main thread: sized to the view, resized
+/// when the view asks or, where it may be, by hand, and scaled with the monitor it is on. While it
+/// is open, what the audio thread gave the processor is told to the controller a few times a
+/// second, so the editor follows the macros.
+struct EditorWindow : public IPlugFrame {
+  DBVST3Plugin *plugin = nullptr;
+  IPtr<IPlugView> view;
+  HWND window = nullptr;
+  DBVST3EditorClosed closed = nullptr;
+  void *context = nullptr;
+  /// Set while the host sizes the window to the view, so the size it lands on is not sent back.
+  bool sizing = false;
+
+  /// The window's outer size for a view of `size`, at the window's DPI.
+  void fit(const ViewRect &size) {
+    RECT frame {0, 0, size.getWidth(), size.getHeight()};
+    AdjustWindowRectExForDpi(
+      &frame, static_cast<DWORD>(GetWindowLongW(window, GWL_STYLE)), FALSE,
+      static_cast<DWORD>(GetWindowLongW(window, GWL_EXSTYLE)), GetDpiForWindow(window));
+    sizing = true;
+    SetWindowPos(
+      window, nullptr, 0, 0, frame.right - frame.left, frame.bottom - frame.top,
+      SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    sizing = false;
+  }
+
+  /// Sized by hand: the view told, at the nearest size it takes.
+  void sized() {
+    if (sizing || !view) return;
+    RECT client {};
+    GetClientRect(window, &client);
+    ViewRect size {0, 0, client.right, client.bottom};
+    if (view->checkSizeConstraint(&size) == kResultTrue &&
+        (size.getWidth() != client.right || size.getHeight() != client.bottom)) {
+      fit(size);
+    }
+    view->onSize(&size);
+  }
+
+  /// The monitor's scale, where the view takes one.
+  void scale() {
+    if (FUnknownPtr<IPlugViewContentScaleSupport> scaling {view}) {
+      scaling->setContentScaleFactor(static_cast<float>(GetDpiForWindow(window)) / USER_DEFAULT_SCREEN_DPI);
+    }
+  }
+
+  /// Gone: the view let go of, the plug-in told it has no editor, and whoever asked told, unless
+  /// the host closed it.
+  void destroyed() {
+    KillTimer(window, idleTimer);
+    if (view) {
+      view->removed();
+      view->setFrame(nullptr);
+      view = nullptr;
+    }
+    plugin->editor = nullptr;
+    SetWindowLongPtrW(window, GWLP_USERDATA, 0);
+    DBVST3EditorClosed told = closed;
+    void *with = context;
+    delete this;
+    if (told) told(with);
+  }
+
+  /// Closed by the host, as when its plug-in goes: nobody told.
+  void close() {
+    closed = nullptr;
+    DestroyWindow(window);
+  }
+
+  tresult PLUGIN_API resizeView(IPlugView *resized, ViewRect *size) override {
+    if (!size || !view || resized != view.get()) return kInvalidArgument;
+    fit(*size);
+    return view->onSize(size);
+  }
+
+  tresult PLUGIN_API queryInterface(const TUID iid, void **object) override {
+    if (FUnknownPrivate::iidEqual(iid, IPlugFrame::iid) || FUnknownPrivate::iidEqual(iid, FUnknown::iid)) {
+      *object = static_cast<IPlugFrame *>(this);
+      return kResultOk;
+    }
+    *object = nullptr;
+    return kNoInterface;
+  }
+  // Owned by its window, which outlives everything the view is given.
+  uint32 PLUGIN_API addRef() override { return 1; }
+  uint32 PLUGIN_API release() override { return 1; }
+};
+
+namespace {
+
+LRESULT CALLBACK editorProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+  if (message == WM_NCCREATE) {
+    auto editor = static_cast<EditorWindow *>(reinterpret_cast<CREATESTRUCTW *>(lParam)->lpCreateParams);
+    editor->window = window;
+    SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(editor));
+  }
+  auto editor = reinterpret_cast<EditorWindow *>(GetWindowLongPtrW(window, GWLP_USERDATA));
+  if (editor) {
+    switch (message) {
+    case WM_SIZE:
+      if (wParam != SIZE_MINIMIZED) editor->sized();
+      return 0;
+    case WM_TIMER:
+      if (wParam == idleTimer) editor->plugin->settle();
+      return 0;
+    case WM_DPICHANGED: {
+      editor->scale();
+      const RECT *suggested = reinterpret_cast<const RECT *>(lParam);
+      SetWindowPos(
+        window, nullptr, suggested->left, suggested->top, suggested->right - suggested->left,
+        suggested->bottom - suggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
+      return 0;
+    }
+    case WM_DESTROY:
+      editor->destroyed();
+      return 0;
+    default:
+      break;
+    }
+  }
+  return DefWindowProcW(window, message, wParam, lParam);
+}
+
+bool registerEditorClass() {
+  static bool registered = [] {
+    WNDCLASSEXW windowClass {};
+    windowClass.cbSize = sizeof(windowClass);
+    windowClass.lpfnWndProc = editorProcedure;
+    windowClass.hInstance = GetModuleHandleW(nullptr);
+    windowClass.hCursor = LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_ARROW));
+    windowClass.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
+    windowClass.lpszClassName = editorClass;
+    return RegisterClassExW(&windowClass) != 0 || GetLastError() == ERROR_CLASS_ALREADY_EXISTS;
+  }();
+  return registered;
+}
+
+}  // namespace
+
 extern "C" {
 
 int32_t dbvst3_classes(const char *path, DBVST3Class *classes, int32_t capacity, char *error, size_t errorSize) {
@@ -508,6 +676,7 @@ DBVST3Plugin *dbvst3_open(
 
 void dbvst3_close(DBVST3Plugin *plugin) {
   if (!plugin) return;
+  if (plugin->editor) plugin->editor->close();
   plugin->listener.function.store(nullptr, std::memory_order_release);
   plugin->stop();
   delete plugin;
@@ -637,6 +806,57 @@ bool dbvst3_set_state(DBVST3Plugin *plugin, const uint8_t *data, int64_t size) {
   }
   return true;
 }
+
+bool dbvst3_editor_open(
+  DBVST3Plugin *plugin, const char *title, void *owner, bool show, DBVST3EditorClosed closed, void *context) {
+  if (EditorWindow *open = plugin->editor) {
+    if (show) {
+      ShowWindow(open->window, IsIconic(open->window) ? SW_RESTORE : SW_SHOW);
+      SetForegroundWindow(open->window);
+    }
+    return true;
+  }
+  if (!plugin->controller || !registerEditorClass()) return false;
+  IPtr<IPlugView> view = owned(plugin->controller->createView(ViewType::kEditor));
+  if (!view || view->isPlatformTypeSupported(kPlatformTypeHWND) != kResultTrue) return false;
+
+  auto editor = new EditorWindow;
+  editor->plugin = plugin;
+  editor->closed = closed;
+  editor->context = context;
+  DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+  if (view->canResize() == kResultTrue) style |= WS_THICKFRAME | WS_MAXIMIZEBOX;
+  HWND window = CreateWindowExW(
+    0, editorClass, wide(title).c_str(), style, CW_USEDEFAULT, CW_USEDEFAULT, 400, 300,
+    static_cast<HWND>(owner), nullptr, GetModuleHandleW(nullptr), editor);
+  if (!window) {
+    delete editor;
+    return false;
+  }
+  plugin->editor = editor;
+  // The view is given its scale before it is asked its size, which the scale may change.
+  editor->view = view;
+  editor->scale();
+  ViewRect size {0, 0, 400, 300};
+  view->getSize(&size);
+  editor->fit(size);
+  view->setFrame(editor);
+  if (view->attached(window, kPlatformTypeHWND) != kResultOk) {
+    view->setFrame(nullptr);
+    editor->view = nullptr;
+    editor->close();
+    return false;
+  }
+  SetTimer(window, idleTimer, 30, nullptr);
+  if (show) ShowWindow(window, SW_SHOW);
+  return true;
+}
+
+void dbvst3_editor_close(DBVST3Plugin *plugin) {
+  if (plugin->editor) plugin->editor->close();
+}
+
+void *dbvst3_editor_window(const DBVST3Plugin *plugin) { return plugin->editor ? plugin->editor->window : nullptr; }
 
 }  // extern "C"
 

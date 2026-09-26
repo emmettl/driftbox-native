@@ -60,10 +60,15 @@ public protocol RackPluginUnit: AnyObject {
   /// What the param with `key` says it is at `fraction` of its range, in its own words and units;
   /// nil where the unit cannot say.
   func display(_ key: String, at fraction: Double) -> String?
+  /// Its own interface, in a window titled `title`, brought to the front if it is already open.
+  /// Closing it says the unit has changed, so whatever was done in it is kept.
+  func showInterface(title: String)
 }
 
 extension RackPluginUnit {
   public func display(_ key: String, at fraction: Double) -> String? { nil }
+  /// None to show: a platform whose units have none, or show theirs another way.
+  public func showInterface(title: String) {}
 }
 
 /// One of a plug-in's own params, as a macro maps onto it.
@@ -934,6 +939,15 @@ public final class RackSession {
   /// Map the next param moved in the unit's own interface onto macro `macro`. Opening the
   /// interface is the app's.
   public func learnMacro(_ moduleId: String, _ macro: Int) { learning = (moduleId, macro) }
+
+  /// A plug-in module's unit's own interface, titled for the plug-in and the module, as the Mac's
+  /// is.
+  public func showInterface(_ moduleId: String) {
+    guard let unit = units[moduleId],
+      let reference = patch.modules.first(where: { $0.id == moduleId })?.plugin
+    else { return }
+    unit.showInterface(title: "\(reference.name) — \(moduleId)")
+  }
 
   public func cancelLearning() { learning = nil }
 

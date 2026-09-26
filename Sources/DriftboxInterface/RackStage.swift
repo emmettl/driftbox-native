@@ -159,6 +159,8 @@ public struct RackStage {
     case plugin
     /// Map a plug-in module's macros onto its plug-in's params, from a menu.
     case macros
+    /// Open a plug-in module's plug-in's own editor.
+    case open
 
     /// The param it sets, if it sets one.
     public var param: String? {
@@ -166,8 +168,7 @@ public struct RackStage {
       case .set(let param, _): param
       case .data(_, _, _, let then, _): then
       case .page, .learn, .choose, .sampleBars, .editSong, .startSong, .loopSong, .clearLoop, .routes,
-        .plugin,
-        .macros:
+        .plugin, .macros, .open:
         nil
       case .hold(let param): param
       }

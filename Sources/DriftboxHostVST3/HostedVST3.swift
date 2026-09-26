@@ -23,6 +23,8 @@
 
     final class Listener: Sendable {
       let told = Mutex<(@Sendable (Int64) -> Void)?>(nil)
+      /// Who is told when a person closes the editor.
+      let closed = Mutex<(@Sendable () -> Void)?>(nil)
     }
 
     /// Why a plug-in will not be made, in its own words or the bridge's.
@@ -56,6 +58,13 @@
       guard let context else { return }
       let listener = Unmanaged<Listener>.fromOpaque(context).takeUnretainedValue()
       listener.told.withLock { $0 }?(id)
+    }
+
+    /// A person closing the editor, handed to whoever asked to be told.
+    static let editorClosed: DBVST3EditorClosed = { context in
+      guard let context else { return }
+      let listener = Unmanaged<Listener>.fromOpaque(context).takeUnretainedValue()
+      listener.closed.withLock { $0 }?()
     }
 
     /// Told when the plug-in changes itself — the param it set from its own interface, or -1 for
@@ -142,6 +151,27 @@
 
     /// What the render thread gave the processor, told to its controller, so that it shows it.
     public func idle() { dbvst3_idle(plugin) }
+
+    // MARK: - Its editor
+
+    /// Open its own editor in a window titled `title`, owned by the window `owner`, and shown unless
+    /// `show` is false; or bring it to the front. `closed` is told when a person closes it. False
+    /// when it has none that will open.
+    @discardableResult
+    public func openEditor(
+      title: String, owner: UnsafeMutableRawPointer? = nil, show: Bool = true,
+      closed: (@Sendable () -> Void)? = nil
+    ) -> Bool {
+      listener.closed.withLock { $0 = closed }
+      return dbvst3_editor_open(
+        plugin, title, owner, show, Self.editorClosed, Unmanaged.passUnretained(listener).toOpaque())
+    }
+
+    /// Its editor closed, if it is open, with nobody told.
+    public func closeEditor() { dbvst3_editor_close(plugin) }
+
+    /// Its editor's window, while it is open.
+    public var editorWindow: UnsafeMutableRawPointer? { dbvst3_editor_window(plugin) }
 
     // MARK: - What a patch keeps
 

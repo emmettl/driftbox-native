@@ -27,6 +27,9 @@ struct RackPluginFaceTests {
         owner: self)
     }
     func close() {}
+    /// The titles of the interfaces it was asked to show.
+    var shown: [String] = []
+    func showInterface(title: String) { shown.append(title) }
     func display(_ key: String, at fraction: Double) -> String? {
       key == "cutoff" ? "\(Int(fraction * 1000)) Hz" : nil
     }
@@ -81,7 +84,7 @@ struct RackPluginFaceTests {
     var front = try Self.face(face)
     #expect(
       front.words == "running" && front.light == true && front.mark == "VST3" && front.name == "Plug-in")
-    #expect(front.buttons.map(\.label) == ["Change…", "Map…"])
+    #expect(front.buttons.map(\.label) == ["Change…", "Open", "Map…"])
     #expect(front.controls.map(\.name) == ["Macro 1", "Macro 2", "Macro 3", "Macro 4"])
     #expect(front.controls.allSatisfy { $0.opacity == 0.5 })
     #expect(
@@ -104,6 +107,27 @@ struct RackPluginFaceTests {
     #expect(face.menuIsChecked("macro.1.cutoff"))
     face.choose("macro.1.unmap")
     #expect(face.rack.macroParameter("fx", 1) == nil)
+  }
+
+  /// Its own interface opens from its face, titled for the plug-in and the module; a macro learns the
+  /// next param moved there, which opens it too, and says it is waiting until it has one, or stops.
+  @Test func itsInterfaceOpensAndAMacroLearnsFromIt() async throws {
+    let face = await Self.rack(Plugins.reference("ECHO", "Echo"))
+    let unit = try #require(face.rack.units["fx"] as? Unit)
+    let open = try #require(try Self.face(face).buttons.first { $0.label == "Open" })
+    RackInterfaceTests.press(
+      face, RackInterfaceTests.window(face.stage, RackInterfaceTests.centre(open.frame)))
+    #expect(unit.shown == ["Echo — fx"])
+
+    _ = try Self.menu(face, "Map…")
+    face.choose("macro.2.learn")
+    #expect(face.rack.learning?.module == "fx" && face.rack.learning?.macro == 2)
+    #expect(unit.shown.count == 2, "opened to learn from")
+    #expect(try Self.face(face).controls[1].name == "Learn…")
+    _ = try Self.menu(face, "Map…")
+    face.choose("macro.2.stop")
+    #expect(face.rack.learning == nil)
+    #expect(try Self.face(face).controls[1].name == "Macro 2")
   }
 
   /// Another of its kind is chosen from its own menu, which ticks the one it has, in one step.
