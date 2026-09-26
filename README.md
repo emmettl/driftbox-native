@@ -400,8 +400,12 @@ reader presses a button, turns a step over or sets a knob, and the app does it a
 The rack is described too: its transport, tempo and Add; each module a group of its knobs, choices,
 buttons and numbers, named as its face names them with its abbreviations said whole, a mute or a
 gate said as on or off, and each module's menu a button; and, turned round, its cables from what to
-what. Nothing is described until something reads the window. Moving from control to control with
-the keyboard, and patching cables with a screen reader, are still to come.
+what. Nothing is described until something reads the window. While a screen reader runs, as
+Windows says one is, the keyboard moves between the controls as in any Windows program: Tab and
+Shift+Tab to the next and the one before, Enter to press it, and the arrows to turn a knob or a
+number a notch; the screen reader hears where it is, and a ring shows it. Space still plays and
+stops, and Show Controls and Show Back stay in the View menu, without Tab. Patching cables with a
+screen reader is still to come.
 
 Closing, opening or starting afresh over unsaved work asks first, in Windows' own words. Its
 executable only chooses Windows' parts — WASAPI, WinMM, a Win32 window, Direct3D, DirectWrite — and

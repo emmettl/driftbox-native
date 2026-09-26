@@ -138,6 +138,10 @@ struct Client {
       line += " invoke";
       release(invoke);
     }
+    BOOL focused = FALSE;
+    if (!automationId.empty() && SUCCEEDED(element->get_CurrentHasKeyboardFocus(&focused)) && focused) {
+      line += " focused";
+    }
     out += line + "\n";
 
     IUIAutomationElement *child = nullptr;
@@ -193,6 +197,14 @@ bool axclient_toggle(void *window, const char *automationId) {
       reinterpret_cast<void **>(&toggle))) &&
     toggle && SUCCEEDED(toggle->Toggle());
   release(toggle);
+  release(element);
+  return done;
+}
+
+bool axclient_focus(void *window, const char *automationId) {
+  Client client(window);
+  IUIAutomationElement *element = client.find(automationId);
+  bool done = element && SUCCEEDED(element->SetFocus());
   release(element);
   return done;
 }

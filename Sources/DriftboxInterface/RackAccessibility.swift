@@ -17,12 +17,9 @@ extension RackInterface {
   /// one that does nothing now.
   @discardableResult
   public func perform(_ asked: AccessibilityAction) -> Bool {
-    let id: String
-    switch asked {
-    case .press(let control), .set(let control, _), .increment(let control), .decrement(let control):
-      id = control
-    }
-    guard let handle = described().handlers[id] else { return false }
+    // Where the keyboard is, the window's business, not the controls'.
+    if case .focus = asked { return false }
+    guard let handle = described().handlers[asked.control] else { return false }
     handle(asked)
     return true
   }
@@ -82,7 +79,7 @@ extension RackInterface {
       case .set(_, let value): wanted = value
       case .increment: wanted = rack.tempo + 1
       case .decrement: wanted = rack.tempo - 1
-      case .press: return
+      case .press, .focus: return
       }
       let next = max(20, min(300, wanted.rounded()))
       guard next != rack.tempo else { return }
@@ -180,6 +177,7 @@ extension RackInterface {
         case .set(_, let value): wanted = Int(value.rounded())
         case .increment: wanted = cell.value + 1
         case .decrement: wanted = cell.value - 1
+        case .focus: return
         case .press:
           // As a click on it does, where a click does anything.
           if let click = cell.click { press(click, on: id) }
@@ -298,7 +296,7 @@ extension RackInterface {
       case .set(_, let value): wanted = value
       case .increment: wanted = now + notch
       case .decrement: wanted = now - notch
-      case .press: return
+      case .press, .focus: return
       }
       let clamped = max(def.min, min(def.max, wanted))
       let next = whole ? RackDisplay.jsRound(clamped) : clamped

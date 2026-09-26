@@ -13,12 +13,14 @@ extern "C" {
 #endif
 
 /// The window's controls as UI Automation reads them, one to a line, each indented two spaces a
-/// level under the window: `Button "Play" [transport.play] toggle=on range=0..1@0.5 value="…"`, with
-/// what does not apply left out. False, with why in `out`, when it cannot be read.
+/// level under the window: `Button "Play" [transport.play] toggle=on range=0..1@0.5 value="…"`, and
+/// ` focused` after the control the keyboard is on, with what does not apply left out. False, with why in `out`, when it cannot be read.
 bool axclient_describe(void *window, char *out, size_t size);
 
-/// The control with `automationId` pressed, turned over, or set, through its pattern.
+/// The control with `automationId` pressed, turned over, or set, through its pattern; or the
+/// keyboard moved to it.
 bool axclient_invoke(void *window, const char *automationId);
+bool axclient_focus(void *window, const char *automationId);
 bool axclient_toggle(void *window, const char *automationId);
 bool axclient_set(void *window, const char *automationId, double value);
 
