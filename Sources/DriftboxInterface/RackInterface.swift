@@ -334,6 +334,12 @@ public final class RackInterface {
   /// Take `event`: the rack is the whole window while it shows. On a touchscreen a finger may zoom
   /// or pan it instead of pressing; a mouse always presses.
   public func pointer(_ event: PointerEvent) {
+    // A guide over the rack takes every press, and closes on one off it.
+    if let guide {
+      if event.kind == .mouse { hover = event.phase == .cancelled ? nil : event.location }
+      if guide.pointer(event, in: size) { self.guide = nil }
+      return
+    }
     if touch, event.kind != .mouse {
       finger(event)
     } else {
@@ -670,7 +676,17 @@ public final class RackInterface {
   }
 
   public func scroll(_ event: ScrollEvent) {
+    if let guide { return guide.scroll(by: event.delta.y, in: size) }
     scroll = RackStage(rack: rack, size: size, scroll: scroll + event.delta.y).scroll
+  }
+
+  /// The guide open over the rack, if one is.
+  public private(set) var guide: HelpSheet?
+
+  /// `type`'s guide, over the rack, as the Mac's opens from a module's menu.
+  public func showGuide(_ type: String) {
+    guard let written = RackGuide.guide(for: type) else { return }
+    guide = HelpSheet(trail: written.trail, title: written.title, parts: written.help)
   }
 
   public func pointerLeft() { hover = nil }
@@ -712,6 +728,11 @@ public final class RackInterface {
   /// The keys, as the Mac's rack window plays them: two octaves from `z` and `q`, with `,` and `.`
   /// for the octave. False for any other key, and for anything held with more than Shift.
   public func key(_ event: KeyEvent) -> Bool {
+    // A guide has every key, and Escape closes it.
+    if let guide {
+      if guide.key(event) { self.guide = nil }
+      return true
+    }
     // An end of a routing being typed has every key.
     if typing != nil { return type(event) }
     guard event.modifiers.subtracting(.shift).isEmpty, case .character(let typed) = event.key else {
@@ -746,7 +767,8 @@ public final class RackInterface {
 
   // MARK: - Menus
 
-  /// The menu for the module at `point`: moving it, bypassing it, copying it, taking it out.
+  /// The menu for the module at `point`: its guide, moving it, bypassing it, copying it, taking it
+  /// out.
   public func menu(at point: SIMD2<Float>) -> Menu? {
     menuActions = [:]
     menuDisabled = []
@@ -757,6 +779,10 @@ public final class RackInterface {
     return Menu(
       face.def?.name ?? face.module.type,
       [
+        item("Guide", "module.guide", enabled: RackGuide.guide(for: face.module.type) != nil) {
+          self.showGuide(face.module.type)
+        },
+        .separator,
         item("Move Up", "module.up", enabled: index > 0) { self.rack.move(id, by: -1) },
         item("Move Down", "module.down", enabled: index < rack.patch.modules.count - 1) {
           self.rack.move(id, by: 1)
@@ -881,6 +907,7 @@ public final class RackInterface {
       )
     }
     if let keys = stage.keyboard { drawKeys(keys, on: canvas) }
+    guide?.draw(in: size, hovered: hover, on: canvas)
   }
 
   /// The keys: a panel across the foot, its row of chips and the octave, and the keys, lit where a

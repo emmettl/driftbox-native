@@ -196,6 +196,13 @@ public final class HelpView {
           y = max(keyed, does) + 4
           page.blocks.append(Block(name: key.keys, value: key.does, frame: Rect(left, from, width, y - from)))
         }
+      case .notes(let notes):
+        for note in notes {
+          let from = y
+          page.pieces.append(Piece(text: "•", font: Self.body, colour: Theme.nine, x: left, y: y + 14))
+          y = set([(note, Self.body, Theme.ink.faded(0.86))], x: left + 16, width: width - 16, from: y) + 4
+          page.blocks.append(Block(name: note, frame: Rect(left, from, width, y - from)))
+        }
       }
       if let note = part.note {
         let from = y
