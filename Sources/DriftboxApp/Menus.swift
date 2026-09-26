@@ -118,6 +118,11 @@
         Divider()
       }
 
+      CommandGroup(replacing: .help) {
+        Button("Groovebox Guide") { openWindow(id: "help") }
+          .keyboardShortcut("?", modifiers: .command)
+      }
+
       CommandMenu("Transport") {
         // Space plays and stops at the window, where it has always worked; a key equivalent here
         // as well would be the same key bound twice. This is for finding out that it exists.

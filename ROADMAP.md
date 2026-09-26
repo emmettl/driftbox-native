@@ -357,8 +357,12 @@ parity point.
 
 ## Help and tutorials
 
-Not yet: worth doing once the app is complete enough that the help would not be rewritten with
-every milestone. Then, everything the web app teaches with, and what a Mac does better:
+Begun, now that the app is complete enough that the help would not be rewritten with every
+milestone. The groovebox's guide first: `DriftboxHelp` holds help as words any platform lays out —
+topics of parts, each paragraphs, terms, steps or keys — and `GrooveboxHelp` the reference's guide
+topic for topic, saying what each platform's own controls do and leaving out what only the web has.
+On the Mac it is Help ▸ Groovebox Guide (⌘?), a window of its own beside the editor. Then
+everything else the web app teaches with, and what a Mac does better:
 
 - **The reference's teaching, ported:** its help dialog, the first-run offer of a tour, the guided
   tour and tutorial coach that walk a patch being built, and each module's guide. The words carry
