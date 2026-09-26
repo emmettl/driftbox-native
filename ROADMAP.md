@@ -206,14 +206,16 @@ gone native at all.
    the scene can be chosen at last, from View ▸ Scene or by cycling through them, where before
    the app only ever showed the one the song named.
 
-   The 303's step entry from the keyboard, as the reference's keys have it: `Session` keeps its
-   cursor (`entryStep`) and writes a note, a rest or a tie there in the 303 whose knobs are showing,
-   only while stopped, each one step of undo; on the Mac it is switched on from the 303's panel,
-   which moves its cursor too, and drawn on the line's grid, and the typing keys write into it —
-   Shift accents, Delete rests, Return ties. The keys play the 303 whose knobs are showing now,
-   not always 303 A. Left: automation recording, which `Session` now does —
-   `turn` and `endTurn`, and `recordsAutomation` armed, as the Windows app's AUTO arms it — for the
-   Mac's knobs to use; and more
+   Automation recording on the Mac's knobs, as on Windows and Android: every knob of the face and
+   the tempo and swing are turned through `Session.turn` (`FaceKnob` says what each one turns, in
+   the lanes an app's automation moves too), heard as they turn, and one step of undo let go of;
+   Transport ▸ Record Automation, or the header's `● auto`, arms it, and Clear Automation empties
+   it. And the 303's step entry from the keyboard, as the reference's keys have it: `Session` keeps
+   its cursor (`entryStep`) and writes a note, a rest or a tie there in the 303 whose knobs are
+   showing, only while stopped, each one step of undo; on the Mac it is switched on from the 303's
+   panel, which moves its cursor too, and drawn on the line's grid, and the typing keys write into
+   it — Shift accents, Delete rests, Return ties. The keys play the 303 whose knobs are showing
+   now, not always 303 A. Left: more
    than one song open at once, which is deliberately not done. It is not a scene change: the
    player owns the audio engine, the MIDI ports and the clock, and two of them would be two
    engines fighting over one output and two sources both called Driftbox Clock. The honest
@@ -701,7 +703,9 @@ each question, and the rest is Android's alone:
    without one, 4.8ms from render to speaker. It also reports to a performance hint session.
    That was meant to hold the clock up, and it does when its target is tight. But the render
    costs 60% of each 2ms burst at any clock, against 15 to 18% when the other big cores are busy:
-   what a callback pays for is its core waking cold. There is room in that, but less than the
+   what a callback pays for is the rest of its cluster idling, not its clock and not its waking:
+   callbacks four bursts long, a quarter as many, cost the same 53 to 57%, each four times as
+   long, so fewer, longer callbacks save nothing. There is room in that, but less than the
    bench promised, and the rack and the scenes will want some of it. Left: one device until the
    app can list them from Java's `AudioManager`, and a stream lost to a device going is handled
    but not yet seen to be, for want of anything to unplug.

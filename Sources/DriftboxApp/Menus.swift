@@ -149,6 +149,14 @@
           .disabled(player.loop == nil)
         Divider()
         Toggle(
+          "Record Automation",
+          isOn: Binding(get: { player.recordsAutomation }, set: { player.recordsAutomation = $0 })
+        )
+        .disabled(player.song == nil)
+        Button("Clear Automation") { player.clearAutomation() }
+          .disabled(player.song?.automation.isEmpty != false)
+        Divider()
+        Toggle(
           "Follow MIDI Clock",
           isOn: Binding(get: { player.followsClock }, set: { player.followsClock = $0 }))
         Toggle("Send MIDI Clock", isOn: $sendsClock)

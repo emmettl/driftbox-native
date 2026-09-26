@@ -71,7 +71,10 @@
     var tint: Color = Theme.nine
     var rest: Double?
     var diameter: CGFloat = 40
+    /// Each move while it is dragged, where the song hears the knob as it turns.
     var live: ((Double) -> Void)?
+    /// A drag let go of, however it ended.
+    var ended: (() -> Void)?
     let commit: (Double) -> Void
 
     @State private var dragging: Double?
@@ -170,6 +173,7 @@
         .onEnded { _ in
           if let dragging, dragging != value { commit(dragging) }
           dragging = nil
+          ended?()
         }
     }
 

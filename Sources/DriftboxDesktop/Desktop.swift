@@ -315,6 +315,7 @@ public final class Desktop {
     case DesktopMenus.clearAutomation: session.clearAutomation()
     case DesktopMenus.countIn: session.countsIn.toggle()
     case DesktopMenus.loop: session.loopSection()
+    case DesktopMenus.clearLoop: session.loop = nil
     case DesktopMenus.nextScene: stepScene(by: 1)
     case DesktopMenus.previousScene: stepScene(by: -1)
     case DesktopMenus.songsScene: chosenScene = nil
@@ -383,6 +384,7 @@ public final class Desktop {
       DesktopMenus.previousSection, DesktopMenus.nextSection, DesktopMenus.loop:
       session.song != nil
     case DesktopMenus.recordAutomation: session.song != nil
+    case DesktopMenus.clearLoop: session.loop != nil
     case DesktopMenus.exportMovie: session.song != nil && movieProgress == nil
     case DesktopMenus.stopMovie: movieProgress != nil
     case DesktopMenus.record: session.song != nil && (session.isRecording || movieProgress == nil)
