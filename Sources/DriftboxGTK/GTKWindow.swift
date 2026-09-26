@@ -43,7 +43,7 @@
     public init() throws {
       var error = [CChar](repeating: 0, count: 512)
       handle = db_desktop_new(
-        Unmanaged.passUnretained(self).toOpaque(), drawGTK, inputGTK, commandGTK, closeGTK, &error,
+        Unmanaged.passUnretained(self).toOpaque(), drawGTK, inputGTK, commandGTK, closeGTK, dropGTK, &error,
         error.count)
       guard let handle else {
         throw GPUError(
@@ -231,6 +231,17 @@
       default: value > 0 ? UnicodeScalar(UInt32(value)).map { .character(Character($0)) } : nil
       }
     }
+    /// File portals and GDK drops carry escaped URI lists, not filesystem paths. Reject remote
+    /// schemes/hosts because the shared document and WAV readers operate on local files.
+    static func localFiles(_ uris: String) -> [URL] {
+      uris.split(separator: "\n").compactMap { line in
+        guard let url = URL(string: String(line)), url.isFileURL,
+          url.host == nil || url.host == "" || url.host == "localhost"
+        else { return nil }
+        return url
+      }
+    }
+
     // Legacy synchronous requests cannot run a GTK dialog without a nested loop. Desktop uses
     // the completion forms below; these conservative answers support older ShellWindow clients.
     public func chooseFile(ofTypes types: [FileType]) -> URL? { nil }
@@ -247,7 +258,7 @@
         return
       }
       let reply = Reply { answer, value in
-        completion(answer == 0 ? [] : value.split(separator: "\n").compactMap { URL(string: String($0)) })
+        completion(answer == 0 ? [] : Self.localFiles(value))
       }
       db_desktop_files(
         handle, save ? 1 : 0, multiple ? 1 : 0, types.flatMap(\.extensions).joined(separator: ";"), name,
@@ -321,6 +332,15 @@
     guard let context else { return }
     let window = Unmanaged<GTKWindow>.fromOpaque(context).takeUnretainedValue()
     MainActor.assumeIsolated { window.command(Int(command)) }
+  }
+  private func dropGTK(context: UnsafeMutableRawPointer?, uris: UnsafePointer<CChar>?, x: Double, y: Double) {
+    guard let context, let uris else { return }
+    let window = Unmanaged<GTKWindow>.fromOpaque(context).takeUnretainedValue()
+    let text = String(cString: uris)
+    MainActor.assumeIsolated {
+      let files = GTKWindow.localFiles(text)
+      if !files.isEmpty { window.onEvent?(.dropped(files, at: SIMD2(Float(x), Float(y)))) }
+    }
   }
   private func closeGTK(context: UnsafeMutableRawPointer?) -> Int32 {
     guard let context else { return 1 }

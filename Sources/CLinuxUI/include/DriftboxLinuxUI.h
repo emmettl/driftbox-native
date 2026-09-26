@@ -42,10 +42,12 @@ typedef struct {
 } db_input;
 typedef void (*db_input_callback)(void *, const db_input *);
 typedef void (*db_command)(void *, int);
+// URI text is borrowed for the duration of the callback; coordinates are logical points.
+typedef void (*db_drop_callback)(void *, const char *uris, double x, double y);
 typedef int (*db_can_close)(void *);
 // URI lists are newline-separated (newlines in paths are URI-escaped); answer 0 means cancelled.
 typedef void (*db_reply)(void *, int answer, const char *uris);
-db_desktop *db_desktop_new(void *, db_draw, db_input_callback, db_command, db_can_close, char *, size_t);
+db_desktop *db_desktop_new(void *, db_draw, db_input_callback, db_command, db_can_close, db_drop_callback, char *, size_t);
 int db_desktop_prepare(db_desktop *);
 void db_desktop_run(db_desktop *);
 void db_desktop_current(db_desktop *);

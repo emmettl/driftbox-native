@@ -13,6 +13,7 @@
 struct db_desktop {
     GtkWidget *window, *area, *bar, *popover;
     GObject *dialog;
+    GFile *folder;
     GMainLoop *loop;
     GSimpleActionGroup *actions;
     guint source;
@@ -23,6 +24,7 @@ struct db_desktop {
     db_input_callback input;
     db_command command;
     db_can_close can_close;
+    db_drop_callback dropped;
     gboolean closed;
     double x, y;
     int button;
@@ -129,8 +131,30 @@ static void key_up(GtkEventControllerKey *controller, guint key, guint code,
     (void)controller;
     input(context, (db_input){.kind=7, .key=key_value(key), .code=code, .modifiers=modifiers(state)});
 }
+static gboolean dropped(GtkDropTarget *target, const GValue *value, double x, double y, gpointer context) {
+    (void)target;
+    db_desktop *w=context;
+    if (w->reply || !G_VALUE_HOLDS(value,GDK_TYPE_FILE_LIST)) return FALSE;
+    GdkFileList *list=g_value_get_boxed(value);
+    if (!list) return FALSE;
+    GString *uris=g_string_new("");
+    for (GSList *item=gdk_file_list_get_files(list); item; item=item->next) {
+        GFile *file=item->data;
+        if (!g_file_is_native(file)) continue;
+        char *uri=g_file_get_uri(file);
+        if (uris->len) g_string_append_c(uris,'\n');
+        g_string_append(uris,uri); g_free(uri);
+    }
+    gboolean accepted=uris->len>0;
+    if (accepted) {
+        gtk_widget_grab_focus(w->area);
+        w->dropped(w->context,uris->str,x,y);
+    }
+    g_string_free(uris,TRUE);
+    return accepted;
+}
 db_desktop *db_desktop_new(void *context, db_draw draw, db_input_callback events,
-                          db_command command, db_can_close can_close, char *error, size_t size) {
+                          db_command command, db_can_close can_close, db_drop_callback files, char *error, size_t size) {
     if (!gtk_init_check()) { snprintf(error,size,"GTK could not open the desktop display"); return NULL; }
     int (*handle)(void) = dlsym(RTLD_DEFAULT,"_dispatch_get_main_queue_handle_4CF");
     void (*drain)(void *) = dlsym(RTLD_DEFAULT,"_dispatch_main_queue_callback_4CF");
@@ -138,7 +162,7 @@ db_desktop *db_desktop_new(void *context, db_draw draw, db_input_callback events
     int fd = handle();
     if (fd < 0) { snprintf(error,size,"Swift main-queue handle unavailable"); return NULL; }
     db_desktop *w = g_new0(db_desktop,1);
-    w->context=context; w->draw=draw; w->input=events; w->command=command; w->can_close=can_close; w->drain=drain;
+    w->context=context; w->draw=draw; w->input=events; w->command=command; w->can_close=can_close; w->drain=drain; w->dropped=files;
     w->loop=g_main_loop_new(NULL,FALSE);
     w->window=gtk_window_new(); g_object_ref(w->window);
     gtk_window_set_title(GTK_WINDOW(w->window),"Driftbox · Linux preview");
@@ -176,6 +200,9 @@ db_desktop *db_desktop_new(void *context, db_draw draw, db_input_callback events
     GtkEventController *keys=gtk_event_controller_key_new();
     g_signal_connect(keys,"key-pressed",G_CALLBACK(key_down),w); g_signal_connect(keys,"key-released",G_CALLBACK(key_up),w);
     gtk_widget_add_controller(w->area,keys);
+    GtkDropTarget *drop=gtk_drop_target_new(GDK_TYPE_FILE_LIST,GDK_ACTION_COPY);
+    g_signal_connect(drop,"drop",G_CALLBACK(dropped),w);
+    gtk_widget_add_controller(w->area,GTK_EVENT_CONTROLLER(drop));
     w->source=g_unix_fd_add(fd,G_IO_IN,ready,w);
     return w;
 }
@@ -214,6 +241,7 @@ void db_desktop_free(db_desktop *w) {
     reply(w,0,"");
     g_source_remove(w->source);
     gtk_window_destroy(GTK_WINDOW(w->window)); g_object_unref(w->window);
+    g_clear_object(&w->folder);
     g_object_unref(w->actions); g_main_loop_unref(w->loop); g_free(w);
 }
 // Menus stay native; only command IDs cross the bridge.
@@ -251,6 +279,8 @@ static void file_response(GtkNativeDialog *dialog,int response,gpointer context)
     db_desktop *w=context;
     GString *uris=g_string_new("");
     if (response==GTK_RESPONSE_ACCEPT) {
+        GFile *folder=gtk_file_chooser_get_current_folder(GTK_FILE_CHOOSER(dialog));
+        if (folder) { g_set_object(&w->folder,folder); g_object_unref(folder); }
         GListModel *files=gtk_file_chooser_get_files(GTK_FILE_CHOOSER(dialog));
         for (guint i=0;i<g_list_model_get_n_items(files);i++) {
             GFile *file=g_list_model_get_item(files,i); char *uri=g_file_get_uri(file);
@@ -270,6 +300,7 @@ void db_desktop_files(db_desktop *w,int save,int multiple,const char *extensions
     w->dialog=G_OBJECT(dialog);
     gtk_native_dialog_set_modal(GTK_NATIVE_DIALOG(dialog),TRUE);
     gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog),multiple);
+    if (w->folder) gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog),w->folder,NULL);
     if (save) gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog),name);
     GtkFileFilter *filter=gtk_file_filter_new(); g_object_ref_sink(filter); gtk_file_filter_set_name(filter,extensions);
     char **parts=g_strsplit(extensions,";",-1);

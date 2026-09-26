@@ -379,9 +379,13 @@ are not implemented. `--silent` intentionally supplies no audio route.
 Normal runs use Foundation `UserDefaults` with the `org.driftbox.linux` suite for existing session
 and rack memory; smoke tests do not restore or write preferences. File arguments open a song.
 XDG configuration/data layout and installed-resource discovery still need release qualification.
-No Linux MIDI backend or plug-in host is supplied. Drag/drop, IME composition, canvas accessibility,
-physical keyboard/trackpad behavior and fractional/multi-monitor scaling remain pending. WAV
-import is connected to the rack's shared file request path but has not had a native dialog test.
+No Linux MIDI backend or plug-in host is supplied. GTK file drops now feed the shared song-open
+and rack WAV-import paths with logical-point coordinates. The bridge accepts local files, preserves
+escaped names and ordering, and rejects drops while a native request is pending. File choosers
+remember the last accepted folder for the lifetime of the window. IME composition, canvas
+accessibility, physical keyboard/trackpad behavior and fractional/multi-monitor scaling remain
+pending. WAV import is connected to the rack's shared file request path but has not had a native
+dialog test; external file-manager drag/drop also still needs interactive qualification.
 
 ### Desktop validation
 
@@ -415,7 +419,9 @@ virgl/ANGLE (Apple M4 Max), GLES 3.0. Log: `~/driftbox-desktop-wayland-unlocked.
 Visual inspection confirmed the groovebox and Pocket Sequence rack. Keyboard-driven checks
 confirmed Space play/stop, Ctrl+R rack switching, Ctrl+O Open and Escape cancellation, and
 Ctrl+Shift+S Save As. The native save wrote a new `~/driftbox-native/Acieed.driftbox` test document
-with a valid versioned song payload. Successful reopening through the chooser, dirty-document
+with a valid versioned song payload. A subsequent check saved a new `b.driftbox` copy, confirmed
+Open returned to the saved folder, selected `Acieed.driftbox` and reopened it successfully: the
+song title changed back and its transport advanced. Playback was then stopped. Dirty-document
 confirmation, pointer editing and WAV import still need interactive qualification. UTM computer
 control did not reliably forward pointer movement and dropped characters during long text entry,
 including inside GTK's own chooser; do not treat these automation failures as established app bugs.
@@ -424,7 +430,14 @@ At the user's request, GNOME's idle delay on this development VM is now 1,800 se
 up from 300 seconds. Automatic locking remains enabled, with its existing zero delay after idle.
 This is local development-machine state, not a setting applied by the bootstrap script.
 
-Guest logs: `~/driftbox-desktop-{release,final-tests,capture,silent}.log`.
+After adding file drops and remembered folders, the release build, C bridge warning checks,
+20 desktop tests and two file URI tests passed. The URI tests cover spaces, embedded newlines,
+Unicode names, ordering and rejection of remote/relative locations. The updated silent desktop
+smoke passed with 353 GUI frames and normal shutdown. These checks do not replace a file-manager
+drag/drop check.
+
+Guest logs: `~/driftbox-desktop-{release,final-tests,capture,silent}.log`,
+`~/driftbox-gtk-files-tests.log` and `~/driftbox-desktop-files-{tests,build,smoke,preview}.log`.
 
 ### Local access
 
