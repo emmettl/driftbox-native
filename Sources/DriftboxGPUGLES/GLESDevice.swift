@@ -44,13 +44,20 @@
         throw GLES.eglError("no EGL display")
       }
       guard eglInitialize(display, nil, nil) == EGL_TRUE else { throw GLES.eglError("EGL would not start") }
-      let wanted: [EGLint] = [
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_SURFACE_TYPE, EGL_PBUFFER_BIT | EGL_WINDOW_BIT,
-        EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE,
-      ]
-      var config: EGLConfig?
-      var count: EGLint = 0
-      guard eglChooseConfig(display, wanted, &config, 1, &count) == EGL_TRUE, count > 0, let config else {
+      // One that draws off screen and into a window, as a phone's must for `GLESSurface`; or, on a
+      // display with no windows at all — Mesa's surfaceless platform, which CI tests on — off
+      // screen only.
+      func choose(_ surfaces: EGLint) -> EGLConfig? {
+        let wanted: [EGLint] = [
+          EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_SURFACE_TYPE, surfaces,
+          EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE,
+        ]
+        var config: EGLConfig?
+        var count: EGLint = 0
+        guard eglChooseConfig(display, wanted, &config, 1, &count) == EGL_TRUE, count > 0 else { return nil }
+        return config
+      }
+      guard let config = choose(EGL_PBUFFER_BIT | EGL_WINDOW_BIT) ?? choose(EGL_PBUFFER_BIT) else {
         throw GLES.eglError("no EGL configuration for OpenGL ES 3.0")
       }
       let version: [EGLint] = [EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 0, EGL_NONE]

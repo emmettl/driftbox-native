@@ -53,8 +53,11 @@ jobs:
       EGL_PLATFORM: surfaceless
       LIBGL_ALWAYS_SOFTWARE: 1
     steps:
-      - name: Mesa, for OpenGL ES
-        run: apt-get update && apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri
+      # Mesa for OpenGL ES, and Python for the release scripts' checks, which the image has neither of.
+      - name: Mesa and Python
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri python3
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
@@ -137,6 +140,7 @@ jobs:
           path: |
             ~/swift
             ~/.swiftpm/swift-sdks
+            ~/.config/swiftpm/swift-sdks
           key: android-${{ env.SWIFT_RELEASE }}
       - name: Swift, and its SDK for Android
         run: |
