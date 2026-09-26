@@ -90,7 +90,8 @@ extension GrooveboxHelp {
               HelpTerm(
                 "Pattern bar",
                 "Tap a chip to show that pattern, or FOLLOW to show whichever is playing. + makes a new, empty "
-                  + "one. Hold a finger on a chip to add it to the song, duplicate it or remove it."),
+                  + "one. Hold a finger on a chip to rename it, add it to the song, duplicate it or remove it."
+              ),
             ])),
           HelpPart(
             "Drums",
