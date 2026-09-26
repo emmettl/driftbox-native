@@ -827,13 +827,14 @@ public final class RackInterface {
       let byVendor = Dictionary(grouping: wanted) {
         $0.reference.vendor.isEmpty ? "Other" : $0.reference.vendor
       }
-      let vendors = byVendor.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+      // Case aside, and without the old Foundation's localized comparison, which Android does not link.
+      let vendors = byVendor.keys.sorted { $0.lowercased() < $1.lowercased() }
       return .submenu(
         Menu(
           kind.title,
           vendors.map { vendor in
             let sorted = (byVendor[vendor] ?? []).sorted {
-              $0.reference.name.localizedCaseInsensitiveCompare($1.reference.name) == .orderedAscending
+              $0.reference.name.lowercased() < $1.reference.name.lowercased()
             }
             return .submenu(
               Menu(
