@@ -17,6 +17,16 @@ public protocol MIDIInputPort: AnyObject, Sendable {
   var ignoring: Set<String> { get set }
 }
 
+/// Something besides the groovebox that MIDI can play: the rack, while it is in front. While
+/// `takesMIDI`, it hears every channel message the session is sent, and the groovebox none; it is
+/// told the sources as they change.
+@MainActor
+public protocol MIDIListener: AnyObject {
+  var takesMIDI: Bool { get }
+  func midi(_ bytes: [UInt8])
+  var midiSources: [String] { get set }
+}
+
 /// Where MIDI bytes can be sent: one of the machine's destinations by name, or a source of
 /// Driftbox's own that other software on the machine can listen to, where the platform has one.
 public enum MIDIDestination: Hashable, Sendable {

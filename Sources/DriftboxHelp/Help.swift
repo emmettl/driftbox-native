@@ -49,6 +49,8 @@ public enum HelpBody: Equatable, Sendable {
   case steps([HelpStep])
   /// Keys and what each does.
   case keys([HelpKey])
+  /// Points, in no order.
+  case notes([String])
 }
 
 public struct HelpTerm: Equatable, Sendable {
@@ -62,7 +64,7 @@ public struct HelpTerm: Equatable, Sendable {
 }
 
 public struct HelpStep: Equatable, Sendable {
-  /// What to do, said strongly: "Press play."
+  /// What to do, said strongly: "Press play." Empty for a step said all in one voice.
   public var lead: String
   public var rest: String
 

@@ -1,4 +1,5 @@
 import DriftboxDocument
+import DriftboxEngine
 import DriftboxGPU
 import DriftboxHost
 import DriftboxRackSession
@@ -394,7 +395,9 @@ struct DesktopTests {
     try desktop.drawFrame()
     let told = try #require(window.described.last)
     #expect(told.node("transport.play")?.isOn == false)
-    try desktop.drawFrame()
+    // A frame a moment later, told as of its own time rather than the clock's: a slow runner's next
+    // frame can be later than the moment.
+    desktop.describe(at: desktop.describedAt + Desktop.describing / 2)
     #expect(window.described.count == 1, "not every frame")
 
     window.onEvent?(.accessibility(.set("number.tempo", 100)))
@@ -749,6 +752,55 @@ struct DesktopTests {
     }
   }
 
+  /// A MIDI keyboard plays the rack while it shows, and the groovebox otherwise: the rack's notes,
+  /// and a controller learnt by a param armed for it, reach it only in front. Its MIDI module knows
+  /// the sources there are either way, to say it is listening.
+  @Test func midiPlaysTheRackWhileItShows() throws {
+    for device in try Self.devices() {
+      let cables = Cables()
+      let host = EngineHost(sampleRate: 48000)
+      let window = StandInWindow()
+      let desktop = try Desktop(
+        session: Session(host: host, midiIn: cables), window: window, device: device,
+        surface: StandInSurface(device: device, width: 320, height: 180), typesetter: NoTypesetter(),
+        rack: RackSession())
+      let rack = try #require(desktop.rack)
+      #expect(rack.midiSources == ["Keys"])
+      window.choose(DesktopMenus.songPrefix + "hothouse")
+      desktop.session.stop()
+
+      /// Whether `bytes`, from the cable, played the groovebox's 303.
+      func playsTheGroovebox(_ bytes: [UInt8]) -> Bool {
+        renderAudio(host, frames: 512)
+        desktop.session.tick()
+        _ = desktop.session.takeEvents()
+        cables.send(bytes)
+        renderAudio(host, frames: 512)
+        desktop.session.tick()
+        return desktop.session.takeEvents().contains { $0.kind == .note }
+      }
+
+      rack.startCcLearn("combi", "rotary1")
+      #expect(playsTheGroovebox([0x90, 60, 100]), "the groovebox's while the rack is hidden")
+      cables.send([0xB0, 74, 10])
+      #expect(rack.lastNote == nil && rack.ccLearning != nil, "and not the rack's")
+
+      window.choose(DesktopMenus.showRack)
+      #expect(!playsTheGroovebox([0x90, 62, 100]), "the rack's while it shows")
+      #expect(rack.lastNote == 62)
+      cables.send([0xB0, 74, 10])
+      #expect(rack.ccBindings == [RackCC.Binding(cc: 74, module: "combi", param: "rotary1")])
+
+      cables.sources = ["Keys", "Elektron"]
+      cables.onSourcesChange?(cables.sources)
+      #expect(rack.midiSources == ["Keys", "Elektron"])
+
+      window.choose(DesktopMenus.showRack)
+      #expect(playsTheGroovebox([0x90, 64, 100]), "the groovebox's again once it is hidden")
+      #expect(rack.lastNote == 62)
+    }
+  }
+
   /// The keyboard the window hears is the instrument's.
   @Test func theKeysReachTheInstrument() throws {
     for device in try Self.devices() {
@@ -788,6 +840,42 @@ struct DesktopTests {
       try desktop.drawFrame()
       #expect(surface.width == 400 && surface.height == 300)
     }
+  }
+}
+
+/// A MIDI input with one keyboard plugged in, played by the test: each message goes where a real
+/// port's would, a note to `onNote` as well.
+final class Cables: MIDIInputPort, @unchecked Sendable {
+  var onNote: (@Sendable (Int, Double) -> Void)?
+  var onMessage: (@Sendable ([UInt8]) -> Void)?
+  var onClock: (@Sendable (ClockMessage, Double) -> Void)?
+  var onSourcesChange: (@Sendable ([String]) -> Void)?
+  var sources = ["Keys"]
+  var ignoring: Set<String> = []
+
+  func send(_ bytes: [UInt8]) {
+    if let status = bytes.first, bytes.count == 3,
+      case .note(let note, let velocity) = MIDIMessage(status: status, bytes[1], bytes[2])
+    {
+      onNote?(note, velocity)
+    }
+    onMessage?(bytes)
+  }
+}
+
+/// Run the engine for `frames`, in the blocks an audio device would ask for.
+func renderAudio(_ host: EngineHost, frames: Int) {
+  var left = [Float](repeating: 0, count: 512)
+  var right = [Float](repeating: 0, count: 512)
+  var done = 0
+  while done < frames {
+    let count = min(512, frames - done)
+    left.withUnsafeMutableBufferPointer { l in
+      right.withUnsafeMutableBufferPointer { r in
+        host.render(frames: count, left: l.baseAddress!, right: r.baseAddress!)
+      }
+    }
+    done += count
   }
 }
 

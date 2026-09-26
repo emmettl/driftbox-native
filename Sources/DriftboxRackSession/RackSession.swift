@@ -105,7 +105,7 @@ public enum RackPluginFailure: Error, Equatable {
 /// does; `AudioCapturing` for what the Audio Input module hears; `RackPluginHosting` for the plug-ins it can make; `SampleDecoding` for the audio files it
 /// can read. The app calls `tick` as often as it draws, for the meters and the song's bar.
 @MainActor @Observable
-public final class RackSession {
+public final class RackSession: MIDIListener {
   /// What the rack is playing and showing.
   public private(set) var patch: Patch
   /// The catalogue patch it came from, if it did, for the header to name.
@@ -1373,8 +1373,10 @@ public final class RackSession {
   public var voices: Int { max(1, min(8, Int(patch.voices ?? 1))) }
 
   /// Whether the rack is the one in front, so MIDI from outside comes here rather than to the
-  /// groovebox.
+  /// groovebox: its window key on the Mac, or shown in the window's place on Windows.
   public var inFront = false
+  /// The groovebox's session hands MIDI on while the rack is in front.
+  public var takesMIDI: Bool { inFront }
   /// The MIDI sources there are, for the MIDI module's face to say whether it is listening.
   public var midiSources: [String] = []
 
