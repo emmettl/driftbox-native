@@ -85,6 +85,10 @@ struct ShellTests {
       #expect(Win32Menus.label(for: commands[0]) == "Open…\tCtrl+O")
       #expect(Win32Menus.label(for: commands[3]) == "About")
       #expect(Win32Menus.mnemonic("File") == "&File")
+      #expect(
+        Win32Menus.label(for: MenuItem.Command("Rock & Roll.driftbox", id: "recent.0"))
+          == "Rock && Roll.driftbox",
+        "an ampersand in a title is one")
     }
 
     @Test func aPanelIsOfferedEveryEndingOfAType() {

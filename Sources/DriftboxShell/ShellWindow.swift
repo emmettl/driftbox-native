@@ -54,6 +54,9 @@ public protocol ShellWindow: AnyObject {
   func reveal(_ url: URL)
   /// Something the person should know, in the platform's own box, which waits to be put away.
   func tell(_ message: String)
+  /// A file opened or saved, told to the platform's own list of recent files, where it keeps one:
+  /// Windows' jump list, the Mac's Open Recent.
+  func addToRecents(_ url: URL)
   /// The displays attached, by name, the main one first: where a visuals window can go.
   var displays: [String] { get }
   /// A window for the visuals alone, not yet shown; nil where the platform has no second window.
@@ -102,6 +105,9 @@ extension ShellWindow {
 
   /// Nothing said, where a window has no box to say it in.
   public func tell(_ message: String) {}
+
+  /// Nothing, where a platform keeps no list.
+  public func addToRecents(_ url: URL) {}
 
   /// None, where a platform has one screen, or will not say.
   public var displays: [String] { [] }

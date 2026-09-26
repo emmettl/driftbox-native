@@ -574,6 +574,8 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    from the View menu to a display by the name its monitor gives, full screen there as Windows'
    players are, the pointer hidden when still and the display kept awake, and put back where it
    was at the next launch. One scene draws it, and the backdrop shows the same frame cropped.
+   File ▸ Open Recent lists the ten songs opened or saved lately, however they came, and tells
+   Windows of each, for the taskbar's jump list.
    The rack comes by way of `DriftboxRackSession`, which holds what the Mac's `RackModel` did —
    the patch, its edits and undo, the keys, controllers, samples, song and transport — on every
    platform, with the Mac's audio, plug-ins and file reading behind ports: `AudioRouting`,

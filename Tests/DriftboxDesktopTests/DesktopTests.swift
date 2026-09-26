@@ -52,6 +52,8 @@ final class StandInWindow: ShellWindow {
   var told: [String] = []
   func tell(_ message: String) { told.append(message) }
   var displays: [String] = []
+  var recents: [URL] = []
+  func addToRecents(_ url: URL) { recents.append(url) }
   /// The visuals windows made, the last the one in use.
   var visualsWindows: [StandInVisualsWindow] = []
   func makeVisualsWindow() -> (any ShellVisualsWindow)? {

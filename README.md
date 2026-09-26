@@ -375,7 +375,8 @@ pad, and menus for the rest. Tab hides the controls, to perform. The keyboard is
 as on the Mac: the number row strikes the drums, the home row plays 303 A, `z` and `x` its octave.
 The rack is there too, from Rack ▸ Show Rack (Ctrl+R): the patch's modules with their knobs and
 choices, its catalogue of patches, and the keys playing it, heard beside the groovebox.
-- **File:** New, Open…, the catalogue, Save and Save As… as `.driftbox`; Export Mix… as one WAV, and
+- **File:** New, Open…, Open Recent — the ten songs opened or saved lately, which the taskbar's jump
+  list shows too — the catalogue, Save and Save As… as `.driftbox`; Export Mix… as one WAV, and
   Export Stems… as a WAV for each voice the song uses, in a folder chosen in Windows' own panel;
   Export Movie…, the song and its visuals as an H.264 and AAC `.mp4`, and Record Performance, what
   is played written as one, each written while the app carries on, how far in the title, then

@@ -69,6 +69,8 @@ public final class Desktop {
   /// What makes the visuals window's surface: the platform's GPU on it. Nil, and no visuals window,
   /// where there is none.
   let makeVisualsSurface: ((any ShellVisualsWindow) throws -> any GPUSurface)?
+  /// The song file last seen open, to notice another being opened or saved as.
+  var lastFile: URL?
   /// The displays there were when last asked, and when.
   var displays: [String] = []
   var displaysAsked = -Double.infinity
@@ -192,6 +194,7 @@ public final class Desktop {
   /// The window's title and menus as the session now is. Each is handed over only when it differs
   /// from what the window has, which the window checks itself for the menus.
   func refresh() {
+    noteOpenFile()
     // Typing is the rack's while it shows, as a routing's end is typed, and the controls' otherwise.
     let takesText = showsRack ? rackInterface?.takesText ?? false : interface.takesText
     if window.takesText != takesText { window.takesText = takesText }
@@ -200,7 +203,8 @@ public final class Desktop {
     if window.title != title { window.title = title }
     window.menuBar = DesktopMenus.bar(
       for: session, rack: rack, showsRack: showsRack, writingMovie: movieProgress != nil,
-      displays: makeVisualsSurface == nil ? [] : displaysNow, visualsWindow: makeVisualsSurface != nil)
+      displays: makeVisualsSurface == nil ? [] : displaysNow, visualsWindow: makeVisualsSurface != nil,
+      recent: memory == nil ? nil : recentTitles)
   }
 
   /// As Windows' own programs title a document's window: its name, marked while it has changes
@@ -296,6 +300,7 @@ public final class Desktop {
     case DesktopMenus.redo: if showsRack, let rack { rack.redo() } else { session.redo() }
     case DesktopMenus.toggle: if showsRack, let rack { rack.toggleRunning() } else { session.toggle() }
     case DesktopMenus.visualsWindow: if visualsOpen { closeVisuals() } else { showVisuals() }
+    case DesktopMenus.clearRecent: clearRecent()
     case DesktopMenus.showRack: setShowsRack(!showsRack)
     case DesktopMenus.rackSongFromGroovebox:
       guard let song = session.song else { return }
@@ -345,6 +350,8 @@ public final class Desktop {
       chosenScene = sceneID
     } else if let display = DesktopMenus.value(id, after: DesktopMenus.visualsOnPrefix) {
       showVisuals(on: display, fullScreen: true)
+    } else if let index = DesktopMenus.value(id, after: DesktopMenus.recentPrefix).flatMap({ Int($0) }) {
+      openRecent(index)
     } else if let device = DesktopMenus.value(id, after: DesktopMenus.outputPrefix) {
       session.outputDevice = device
     } else if let source = DesktopMenus.value(id, after: DesktopMenus.inputPrefix) {
@@ -380,7 +387,7 @@ public final class Desktop {
     case DesktopMenus.stopMovie: movieProgress != nil
     case DesktopMenus.record: session.song != nil && (session.isRecording || movieProgress == nil)
     case DesktopMenus.clearAutomation: session.song?.automation.isEmpty == false
-    case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote: false
+    case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote, DesktopMenus.noRecent: false
     default: true
     }
   }

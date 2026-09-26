@@ -16,6 +16,10 @@ public enum DesktopMenus {
   public static let save = "file.save"
   public static let saveAs = "file.saveAs"
   public static let exportMix = "file.exportMix"
+  /// A recent song, by its place in the list; the list cleared; and what an empty list says.
+  public static let recentPrefix = "recent."
+  public static let clearRecent = "file.clearRecent"
+  public static let noRecent = "file.noRecent"
   public static let exportStems = "file.exportStems"
   public static let exportMovie = "file.exportMovie"
   public static let stopMovie = "file.stopMovie"
@@ -63,6 +67,15 @@ public enum DesktopMenus {
   public static let rackSongPrefix = "rackSong."
   public static let rackSongFromGroovebox = "rack.songFromGroovebox"
 
+  /// File ▸ Open Recent: the songs, by the menu's names for them, or word that there are none.
+  static func recentMenu(_ titles: [String]) -> Menu {
+    guard !titles.isEmpty else { return Menu("Open Recent", [.command("No Recent Songs", id: noRecent)]) }
+    let songs: [MenuItem] = titles.enumerated().map {
+      .command($0.element, id: recentPrefix + String($0.offset))
+    }
+    return Menu("Open Recent", songs + [.separator, .command("Clear Menu", id: clearRecent)])
+  }
+
   /// What a command is about, if it is one of `prefix`'s.
   public static func value(_ id: String, after prefix: String) -> String? {
     id.hasPrefix(prefix) ? String(id.dropFirst(prefix.count)) : nil
@@ -73,8 +86,10 @@ public enum DesktopMenus {
   @MainActor
   public static func bar(
     for session: Session, rack: RackSession? = nil, showsRack: Bool = false, writingMovie: Bool = false,
-    displays: [String] = [], visualsWindow: Bool = false
+    displays: [String] = [], visualsWindow: Bool = false, recent: [String]? = nil
   ) -> MenuBar {
+    // The songs opened lately, where the app keeps them.
+    let recentItems = recent.map { [MenuItem.submenu(recentMenu($0))] } ?? []
     // The visuals in a window of their own, where the platform has a second window, and that window
     // full screen on each display there is.
     let visualsItems: [MenuItem] =
@@ -92,6 +107,7 @@ public enum DesktopMenus {
           [
             .command("New", id: new, shortcut: Shortcut("n")),
             .command("Open…", id: open, shortcut: Shortcut("o")),
+          ] + recentItems + [
             .submenu(
               Menu("Open Catalogue Song", session.entries.map { .command($0.name, id: songPrefix + $0.id) })),
             .separator,
