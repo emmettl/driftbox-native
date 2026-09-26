@@ -286,4 +286,45 @@ struct RackTouchTests {
       #expect(dropped.label.hasPrefix("Drop"), "\(type)")
     }
   }
+
+  /// A tablet draws the rack no larger than a desktop does, centred, upright or on its side, which
+  /// is still a finger's size for a knob: fitted to its width it would be a poster of a module or
+  /// two. A phone's is fitted to its width. A finger zooms either past that.
+  @Test func aTabletDrawsTheRackNoLargerThanADesktop() {
+    let face = Self.rack()
+    for size in [TabletLayoutTests.upright, TabletLayoutTests.onItsSide] {
+      face.size = size
+      let stage = face.stage
+      let drawn = Float(RackLayout.width) * stage.scale
+      #expect(stage.scale == 1.35 && stage.maxPan == 0, "\(size)")
+      #expect(34 * stage.scale >= 44, "a knob a finger's size")
+      let left = stage.origin.x - stage.area.x
+      let right = stage.area.maxX - (stage.origin.x + drawn)
+      #expect(abs(left - right) < 0.5 && left > RackStage.inset, "centred, \(size)")
+      face.fit("osc0")
+      #expect(face.stage.scale > 1.35)
+      face.fitRack()
+    }
+    face.size = Self.phone
+    #expect(face.stage.scale < 1.35 && face.stage.origin.x == RackStage.inset, "fitted to the width")
+  }
+
+  /// A chip in the header or over the keys takes a finger anywhere up and down its strip, as tall as
+  /// a finger where the chip is 28 points; a desktop's takes a click on the chip alone.
+  @Test func aChipTakesAFingerAlongItsStrip() throws {
+    let face = Self.rack()
+    face.size = TabletLayoutTests.upright
+    face.keysShown = true
+    let stage = face.stage
+    let add = try #require(stage.chips.first { $0.target == .add })
+    let above = SIMD2(add.frame.x + add.frame.width / 2, stage.header.y + 2)
+    #expect(!add.frame.contains(above) && stage.target(at: above) == .add)
+    let keyboard = try #require(stage.keyboard)
+    let over = SIMD2(keyboard.hide.x + keyboard.hide.width / 2, keyboard.frame.y + 2)
+    #expect(!keyboard.hide.contains(over) && stage.target(at: over) == .keys)
+
+    let desktop = RackStage(rack: face.rack, size: TabletLayoutTests.upright)
+    let chip = try #require(desktop.chips.first { $0.target == .add })
+    #expect(desktop.target(at: SIMD2(chip.frame.x + chip.frame.width / 2, desktop.header.y + 2)) == nil)
+  }
 }

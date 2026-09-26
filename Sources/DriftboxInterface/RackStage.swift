@@ -56,6 +56,10 @@ public enum RoutingPart: Equatable, Sendable {
 public struct RackStage {
   public static let margin: Float = 12
   public static let headerHeight: Float = 44
+  /// The largest the rack is drawn before a finger zooms it: about the reference's size, a little
+  /// larger. Past this the panels stop reading as a rack of modules and start reading as a poster
+  /// of one.
+  static let largest: Float = 1.35
 
   /// A button in the header.
   public struct Chip {
@@ -344,8 +348,6 @@ public struct RackStage {
       }
     }
 
-    // About the reference's size, a little larger when there is room: past this the panels stop
-    // reading as a rack of modules and start reading as a poster of one.
     // A Combinator's routing open beside the rack takes the right of the window, and the rack the rest.
     let combi = rack.editingRoutes.flatMap { id in rack.patch.modules.first { $0.id == id } }
     // On a phone the routing is a sheet across the foot, as the groovebox's knobs are, and the rack
@@ -379,18 +381,21 @@ public struct RackStage {
     placements = layout.placements
     height = Float(max(layout.height, RackLayout.row))
     if touch {
-      // Fitted to the width, and zoomed from there by the fingers; wider than the window, panned.
+      // Fitted to the width, but no larger than a desktop's, which a tablet on its side would take
+      // it past; and zoomed from there by the fingers. Wider than the window, it is panned; narrower,
+      // centred.
       let across = max(1, room - Self.inset * 2)
-      fitScale = across / width
+      fitScale = min(Self.largest, across / width)
       self.zoom = max(1, min(Self.maxZoom, zoom))
       scale = fitScale * self.zoom
       maxPan = max(0, width * scale - across)
       self.pan = min(max(0, pan), maxPan)
       maxScroll = max(0, (height + 24) * scale - area.height)
       self.scroll = min(max(0, scroll), maxScroll)
-      origin = SIMD2(Self.inset - self.pan, area.y - self.scroll)
+      let spare = max(0, across - width * scale)
+      origin = SIMD2(Self.inset + spare / 2 - self.pan, area.y - self.scroll)
     } else {
-      scale = max(0.5, min(1.35, (room - 48) / width))
+      scale = max(0.5, min(Self.largest, (room - 48) / width))
       fitScale = scale
       maxScroll = max(0, (height + 24) * scale - area.height)
       self.scroll = min(max(0, scroll), maxScroll)
@@ -467,13 +472,19 @@ public struct RackStage {
   /// What pressing at `point`, on the window, would do.
   public func target(at point: SIMD2<Float>) -> RackTarget? {
     if let part = routing?.part(at: point) { return .routing(part) }
-    if let chip = chips.first(where: { $0.frame.contains(point) }) { return chip.target }
-    if tempo.contains(point) { return .tempo }
+    // On a touchscreen a chip in the header or over the keys is hit anywhere up and down its strip,
+    // which is a finger's height where the chip is not.
+    func hits(_ frame: Rect, along strip: Rect) -> Bool {
+      touch ? Rect(frame.x, strip.y, frame.width, strip.height).contains(point) : frame.contains(point)
+    }
+    if let chip = chips.first(where: { hits($0.frame, along: header) }) { return chip.target }
+    if hits(tempo, along: header) { return .tempo }
     if let keysChip, keysChip.frame.contains(point) { return .keys }
     if let keyboard, keyboard.frame.contains(point) {
-      if keyboard.down.contains(point) { return .octave(by: -1) }
-      if keyboard.up.contains(point) { return .octave(by: 1) }
-      if keyboard.hide.contains(point) { return .keys }
+      let row = Rect(keyboard.frame.x, keyboard.frame.y, keyboard.frame.width, RackKeys.rowHeight)
+      if hits(keyboard.down, along: row) { return .octave(by: -1) }
+      if hits(keyboard.up, along: row) { return .octave(by: 1) }
+      if hits(keyboard.hide, along: row) { return .keys }
       return nil
     }
     guard area.contains(point) else { return nil }

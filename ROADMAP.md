@@ -796,7 +796,11 @@ desktop, is a sheet across the foot of a phone, over where the keys were, the ra
 pickers and buttons are 32 points tall, and a route's MIN and MAX are dragged up and down across
 the target's range, as a knob is, rather than typed. A tablet keeps it beside the rack. A face
 waiting for recordings asks a finger to tap it — "Tap to choose a sample" — where a desktop's asks
-for them to be dropped. Left: a tablet, seen.
+for them to be dropped. Seen on a tablet — the check emulator given a 10-inch tablet's screen,
+upright and on its side — the rack is drawn no larger than a desktop draws it, 1.35 times the
+reference, centred, where fitted to the width it had been a poster of a module or two; a knob is
+still a finger's size there, and a finger zooms past it. A chip in the header or over the keys,
+28 points tall, takes a finger anywhere up and down its strip. The rack by touch is done.
 
 ### What Milestone 5 asks of Milestone 4
 
