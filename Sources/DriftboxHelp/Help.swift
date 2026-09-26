@@ -88,4 +88,6 @@ public struct HelpKey: Equatable, Sendable {
 /// are the same, and say what each platform's own are where they are not.
 public enum HelpPlatform: Sendable {
   case mac
+  /// The drawn app on Windows: its menus, its keys with Ctrl, and what its drawn controls do.
+  case windows
 }

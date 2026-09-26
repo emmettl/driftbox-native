@@ -174,7 +174,7 @@ let package = Package(
     .target(
       name: "DriftboxDesktop",
       dependencies: [
-        "DriftboxCanvas", "DriftboxDocument", "DriftboxEngine", "DriftboxGPU", "DriftboxHost",
+        "DriftboxCanvas", "DriftboxDocument", "DriftboxEngine", "DriftboxGPU", "DriftboxHelp", "DriftboxHost",
         "DriftboxInterface", "DriftboxMovie",
         "DriftboxRackSession", "DriftboxScenes", "DriftboxSession", "DriftboxShell", "DriftboxText",
       ]),
@@ -286,7 +286,7 @@ let package = Package(
       name: "DriftboxDesktopTests",
       dependencies: [
         "DriftboxDesktop", "DriftboxInterface", "DriftboxRackSession", "DriftboxSession", "DriftboxShell",
-        "DriftboxEngine", "DriftboxGPU",
+        "DriftboxEngine", "DriftboxGPU", "DriftboxHelp",
         "DriftboxHost", "DriftboxSeq",
         "DriftboxText", "DriftboxDocument", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxGPUGLES",
         "DriftboxMovie",

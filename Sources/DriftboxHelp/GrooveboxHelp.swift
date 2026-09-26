@@ -5,6 +5,7 @@ public enum GrooveboxHelp {
   public static func guide(for platform: HelpPlatform) -> HelpGuide {
     switch platform {
     case .mac: mac
+    case .windows: windows
     }
   }
 

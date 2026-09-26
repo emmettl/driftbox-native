@@ -59,6 +59,13 @@ public enum Theme {
       families: ["Cascadia Mono", "Consolas", "Menlo", "Roboto Mono", "Droid Sans Mono", "monospace"],
       weight: weight, size: size)
   }
+
+  /// A typeface to read at length in, as help is: each platform's own.
+  public static func sans(_ size: Float, weight: Int = 400) -> FontRequest {
+    FontRequest(
+      families: ["Segoe UI", "Helvetica Neue", "Roboto", "Noto Sans", "sans-serif"], weight: weight,
+      size: size)
+  }
 }
 
 extension Colour {

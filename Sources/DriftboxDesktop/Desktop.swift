@@ -1,6 +1,7 @@
 import DriftboxCanvas
 import DriftboxDocument
 import DriftboxGPU
+import DriftboxHelp
 import DriftboxHost
 import DriftboxInterface
 import DriftboxMovie
@@ -79,6 +80,8 @@ public final class Desktop {
   /// last told, to ring it.
   var focused: String?
   var focusFrame: SIMD4<Float>?
+  /// A guide open over the window.
+  public internal(set) var help: HelpView?
   /// The song file last seen open, to notice another being opened or saved as.
   var lastFile: URL?
   /// The displays there were when last asked, and when.
@@ -179,19 +182,21 @@ public final class Desktop {
   func drawInterface(into target: any GPUTarget) throws {
     let points = SIMD2(Float(window.width), Float(window.height)) / window.scale
     interface.size = points
-    if showsRack, let rackInterface {
-      rackInterface.size = points
-      try canvas.begin(width: target.width, height: target.height)
-      canvas.scale(window.scale, window.scale)
-      rackInterface.draw(on: canvas)
-      drawFocus(on: canvas)
-      presenter.overlay(canvas.finish(), into: target, on: device)
-      return
-    }
-    guard interface.isShowing else { return }
+    let rack = showsRack ? rackInterface : nil
+    guard rack != nil || interface.isShowing || help != nil else { return }
     try canvas.begin(width: target.width, height: target.height)
     canvas.scale(window.scale, window.scale)
-    interface.draw(on: canvas)
+    if let rack {
+      rack.size = points
+      rack.draw(on: canvas)
+    } else if interface.isShowing {
+      interface.draw(on: canvas)
+    }
+    // A guide over whichever it is.
+    if let help {
+      help.size = points
+      help.draw(on: canvas)
+    }
     drawFocus(on: canvas)
     presenter.overlay(canvas.finish(), into: target, on: device)
   }
@@ -241,6 +246,7 @@ public final class Desktop {
       describeNow()
       return
     }
+    if handleHelp(event) { return }
     if showsRack, handleRack(event) { return }
     switch event {
     case .command(let id):
@@ -330,6 +336,8 @@ public final class Desktop {
     case DesktopMenus.visualsWindow: if visualsOpen { closeVisuals() } else { showVisuals() }
     case DesktopMenus.clearRecent: clearRecent()
     case DesktopMenus.showRack: setShowsRack(!showsRack)
+    case DesktopMenus.grooveboxGuide: showGuide(GrooveboxHelp.guide(for: .windows))
+    case DesktopMenus.rackGuide: showGuide(RackHelp.guide(for: .windows))
     case DesktopMenus.rackSongFromGroovebox:
       guard let song = session.song else { return }
       rack?.openSong(song, name: session.documentName)
