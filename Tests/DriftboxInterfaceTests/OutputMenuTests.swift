@@ -68,7 +68,10 @@ struct OutputMenuTests {
     interface.size = SIMD2(800, 600)
     interface.perform(.songs)
     if let desktop = interface.takeMenuRequest()?.menu {
-      #expect(!desktop.items.contains { if case .submenu(let sub) = $0 { sub.title == "Output" } else { false } })
+      let hasOutput = desktop.items.contains {
+        if case .submenu(let sub) = $0 { sub.title == "Output" } else { false }
+      }
+      #expect(!hasOutput)
     }
   }
 }

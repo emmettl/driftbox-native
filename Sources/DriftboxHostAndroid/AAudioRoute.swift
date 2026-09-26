@@ -29,7 +29,8 @@
     /// The devices there are now, as the app's `AudioManager` lists them, each with the number
     /// AAudio knows it by: the stream moved if the one it should be on has come or gone.
     public func list(_ listed: [(device: AudioDevice, number: Int32)]) {
-      let fresh = Dictionary(listed.map { ($0.device.id, $0.number) }, uniquingKeysWith: { first, _ in first })
+      let fresh = Dictionary(
+        listed.map { ($0.device.id, $0.number) }, uniquingKeysWith: { first, _ in first })
       guard listed.map(\.device) != devices || fresh != numbers else { return }
       devices = listed.map(\.device)
       numbers = fresh
