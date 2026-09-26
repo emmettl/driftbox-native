@@ -578,6 +578,42 @@ drag/drop check.
 Guest logs: `~/driftbox-desktop-{release,final-tests,capture,silent}.log`,
 `~/driftbox-gtk-files-tests.log` and `~/driftbox-desktop-files-{tests,build,smoke,preview}.log`.
 
+### Document and sample qualification
+
+`scripts/test-linux-dialogs.sh` compiles the actual C shell implementation with warnings as errors
+and runs seven GTK bridge checks on a private Xvfb display. It uses a temporary home and in-memory
+settings, leaving the live desktop's file-chooser preferences alone. Coverage includes Save,
+Discard, Cancel and window-manager dismissal; concurrent request rejection; Save followed by its
+chooser; single/multiple Open cancellation and retry; menu action dispatch; teardown cancellation;
+and accepted Open/Save paths with remembered folders. A filename containing spaces, Unicode and
+an embedded newline must survive the URI boundary intact. Selecting a save location does not write
+or overwrite a document; the shared document layer owns that operation.
+
+These checks pass on the Ubuntu ARM64 VM and are wired into CI. The C fixture omits the renderer
+and Swift dispatch integration, and drives GTK response callbacks directly; it does not establish
+that compositor focus, keyboard navigation or a desktop portal works. The executable's existing
+`--smoke-test` additionally checks all four completion-based requests through `any ShellWindow`:
+each must remain pending until GTK responds, cancel exactly once on disposal, and tolerate repeated
+disposal. The release smoke passed all four requests, then rendered 246 GUI frames and closed
+normally on Xvfb/llvmpipe with audio disabled. This belongs in the executable because Swift Testing
+already owns the dispatch main loop, leaving no main-queue eventfd for the GTK shell to borrow.
+
+The targeted Ubuntu test run passed all 20 shared desktop tests and all 11 WAV decoder/sample
+session tests under strict actor checks. The latter cover WAV encodings, malformed files,
+resampling and pitch/duration, sampler playback and graph rebuilds, multisampler note mapping,
+and stereo audio-track playback. They render and inspect samples without a physical audio device.
+Together with the previously verified native save/reopen, these establish the underlying document
+and sample paths. Interactive WAV selection/drop and dirty-document confirmation remain open.
+
+In the installed XWayland preview, clearing Hothouse's automation marked the document edited and
+Undo restored both its automation and clean title. Playback was left stopped, and no song file was
+overwritten. Attempts to invoke New on that edited document did not reliably expose a prompt
+through UTM's automated input. Do not count this as a passing interactive check or an established
+app defect; reproduce it with direct keyboard/mouse input before release.
+
+Guest logs: `~/driftbox-document-sample-tests.log`, `~/driftbox-gtk-dialog-tests.log`,
+`~/driftbox-dialog-build.log` and `~/driftbox-dialog-smoke.log`. Remote CI has not run.
+
 ### Relocatable preview package
 
 Build and package inside the Linux VM (Python 3.11 or later for packaging):

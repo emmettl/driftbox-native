@@ -75,6 +75,8 @@ jobs:
         run: swift run driftbox-play --gpu-info
       - name: Linux window lifecycle
         run: xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 swift run driftbox-linux-window --self-test
+      - name: Linux document dialog bridge
+        run: scripts/test-linux-dialogs.sh
       - name: Linux desktop
         run: xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 swift run driftbox-linux --silent --smoke-test
       - name: Audio targets stay constrained

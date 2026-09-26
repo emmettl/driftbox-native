@@ -116,8 +116,8 @@ let package = Package(
     .executableTarget(
       name: "driftbox-linux",
       dependencies: [
-        "DriftboxGTK", "DriftboxDesktop", "DriftboxHost", "DriftboxHostLinux", "DriftboxSession",
-        "DriftboxRackSession", "DriftboxTextLinux",
+        "DriftboxGTK", "DriftboxShell", "DriftboxDesktop", "DriftboxHost", "DriftboxHostLinux",
+        "DriftboxSession", "DriftboxRackSession", "DriftboxTextLinux",
       ]),
     // The Android app's native library: what `android/`'s Java calls, and the tests it runs on a
     // phone. Built into libdriftbox.so by `scripts/android-app.sh`; nothing off Android.

@@ -31,6 +31,7 @@
           path = argument
         }
       }
+      if smoke { try checkNativeDialogCallbacks() }
       let window = try GTKWindow()
       let route = silent ? nil : PipeWireRoute()
       let midi: ALSAMIDI?
