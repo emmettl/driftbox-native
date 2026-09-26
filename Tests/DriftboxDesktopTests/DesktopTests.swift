@@ -472,6 +472,44 @@ struct DesktopTests {
     #expect(desktop.interface.isShowing)
   }
 
+  /// Help ▸ Groovebox Guide, on F1 while the groovebox shows: drawn over the window, told to a screen
+  /// reader in the controls' place, and having the pointer and the keys until Esc puts it away. With
+  /// the rack showing, F1 is the rack's guide.
+  @Test func aGuideIsShownOverTheWindow() throws {
+    let device = try #require(try Self.devices().first)
+    let window = StandInWindow()
+    let surface = StandInSurface(device: device, width: 320, height: 180)
+    let desktop = try Desktop(
+      session: Session(host: EngineHost(sampleRate: 48000)), window: window, device: device, surface: surface,
+      typesetter: NoTypesetter(), rack: RackSession())
+    desktop.session.open(Self.song(), named: "Groove")
+    func shortcut(_ id: String) -> Shortcut? { window.menuBar?.commands.first { $0.id == id }?.shortcut }
+    #expect(shortcut(DesktopMenus.grooveboxGuide) == Shortcut(.function(1), []))
+    #expect(shortcut(DesktopMenus.rackGuide) == nil)
+
+    window.isDescribed = true
+    window.choose(DesktopMenus.grooveboxGuide)
+    try desktop.drawFrame()
+    #expect(desktop.help?.guide.title == "Groovebox guide")
+    #expect(window.described.last?.node("help") != nil)
+    #expect(window.described.last?.node("transport.play") == nil, "the controls under it are not read")
+    window.onEvent?(.pointer(PointerEvent(phase: .began, location: SIMD2(5, 170))))
+    window.onEvent?(.pointer(PointerEvent(phase: .ended, location: SIMD2(5, 170))))
+    #expect(desktop.session.padTouch == nil, "nor pressed")
+    window.onEvent?(.key(KeyEvent(key: .character("a"))))
+    window.onEvent?(.key(KeyEvent(key: .escape)))
+    #expect(desktop.help == nil)
+    #expect(window.described.last?.node("transport.play") != nil)
+
+    window.choose(DesktopMenus.showRack)
+    try desktop.drawFrame()
+    #expect(shortcut(DesktopMenus.rackGuide) == Shortcut(.function(1), []))
+    window.choose(DesktopMenus.rackGuide)
+    #expect(desktop.help?.guide.title == "Rack guide")
+    window.onEvent?(.accessibility(.press("help.close")))
+    #expect(desktop.help == nil)
+  }
+
   /// Transport ▸ Clear Loop: whatever is looping, one section or several stretched across, which
   /// Loop This Section would only replace; and nothing to clear while nothing loops.
   @Test func aLoopIsCleared() throws {

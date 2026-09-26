@@ -20,9 +20,10 @@ extension Desktop {
   /// runs.
   var keyboardNavigates: Bool { window.screenReaderIsOn }
 
-  /// What is on screen: the rack's controls while it shows, the groovebox's otherwise.
+  /// What is on screen: a guide while one is open; otherwise the rack's controls while it shows,
+  /// and the groovebox's.
   var described: AccessibilityNode {
-    (showsRack ? rackInterface?.accessibility : nil) ?? interface.accessibility
+    help?.accessibility ?? (showsRack ? rackInterface?.accessibility : nil) ?? interface.accessibility
   }
 
   /// Told as of `time`, if something reads the window — or has just `asked` — and it was not told a
@@ -54,7 +55,7 @@ extension Desktop {
   /// false for any other, and for everything while a name is being typed, which is heard as ever.
   func navigate(_ key: KeyEvent) -> Bool {
     guard key.isDown, keyboardNavigates else { return false }
-    let typing = showsRack ? rackInterface?.takesText ?? false : interface.takesText
+    let typing = help == nil && (showsRack ? rackInterface?.takesText ?? false : interface.takesText)
     guard !typing else { return false }
     switch key.key {
     case .tab:
@@ -63,7 +64,7 @@ extension Desktop {
       guard !controls.isEmpty else {
         // Nothing to move between, with the controls put away: Tab brings them back, as it does
         // without a screen reader.
-        if !showsRack, !interface.isShowing { perform(DesktopMenus.controls) }
+        if help == nil, !showsRack, !interface.isShowing { perform(DesktopMenus.controls) }
         describeNow()
         return true
       }

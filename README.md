@@ -392,6 +392,12 @@ choices, its catalogue of patches, and the keys playing it, heard beside the gro
 - **Audio and MIDI:** the output device, the MIDI inputs heard, and the MIDI clock followed or sent,
   and where. Settings are menu items the menu ticks as it opens.
 
+**Help.** Help ▸ Groovebox Guide and Rack Guide, and F1 for the one showing, draw the guide over
+the window: `DriftboxHelp`'s words for Windows, saying what the drawn app's own chips, right-click
+menus, menu bar and keys do, a tab for each topic, scrolled by the wheel and the keys and put away
+with Esc. A screen reader reads it as it reads the controls. `HelpView` lays it out on the canvas,
+so Android can show the same pages.
+
 **Screen readers.** The controls are drawn, not windows of their own, so the app describes them to
 Windows' UI Automation itself, as Narrator and NVDA read it: the transport, the tempo and swing, the
 song's sections and patterns, every lane's steps, each 303 step's note, accent and slide, and the

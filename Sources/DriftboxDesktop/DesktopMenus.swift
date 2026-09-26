@@ -43,6 +43,9 @@ public enum DesktopMenus {
   public static let songsScene = "view.songsScene"
   public static let controls = "view.controls"
   public static let showRack = "rack.show"
+  /// The guides, drawn over the window.
+  public static let grooveboxGuide = "help.groovebox"
+  public static let rackGuide = "help.rack"
   public static let rackBack = "rack.back"
   public static let systemOutput = "audio.system"
   public static let listen = "midi.listen"
@@ -222,6 +225,19 @@ public enum DesktopMenus {
                     ? [.command("No MIDI Outputs", id: noOutputs)]
                     : session.clockDestinations.map { .command($0, id: clockPrefix + $0) })),
             ]),
+          // F1 is the guide to what is showing, as Windows' programs have it.
+          Menu(
+            "Help",
+            [
+              .command(
+                "Groovebox Guide", id: grooveboxGuide, shortcut: showsRack ? nil : Shortcut(.function(1), []))
+            ]
+              + (rack == nil
+                ? []
+                : [
+                  .command(
+                    "Rack Guide", id: rackGuide, shortcut: showsRack ? Shortcut(.function(1), []) : nil)
+                ])),
         ])
   }
 
