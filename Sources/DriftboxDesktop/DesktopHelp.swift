@@ -8,7 +8,7 @@ import DriftboxShell
 extension Desktop {
   /// A guide opened over the window, from its first topic.
   func showGuide(_ guide: HelpGuide) {
-    help = HelpView(guide: guide)
+    help = HelpSheet(guide: guide)
     describeNow()
   }
 

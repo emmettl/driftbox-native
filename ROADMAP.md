@@ -373,7 +373,7 @@ is Help ▸ Groovebox Guide (⌘?), a window of its own beside the editor; and `
 Help ▸ Rack Guide (⌥⌘?), which says what the Mac's rack has — its names for its modules, its
 trims, its menus — and nothing of the web's automation desk or performance views, which it has
 not. On Windows, both guides are the drawn app's own: `GrooveboxHelp` and `RackHelp` for
-`.windows` say what its chips, right-click menus, menu bar and Ctrl do, and `HelpView` draws a
+`.windows` say what its chips, right-click menus, menu bar and Ctrl do, and `HelpSheet` draws a
 guide over the window, a tab a topic — Help ▸ Groovebox Guide and Rack Guide, F1 for the one
 showing — read by a screen reader like the controls. Left: the guides on Android; and the rest of
 what the web app teaches with, and what a Mac does better:

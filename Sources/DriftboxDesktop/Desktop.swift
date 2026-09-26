@@ -81,7 +81,7 @@ public final class Desktop {
   var focused: String?
   var focusFrame: SIMD4<Float>?
   /// A guide open over the window.
-  public internal(set) var help: HelpView?
+  public internal(set) var help: HelpSheet?
   /// The song file last seen open, to notice another being opened or saved as.
   var lastFile: URL?
   /// The displays there were when last asked, and when.
