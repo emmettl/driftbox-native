@@ -399,13 +399,15 @@ knobs showing, each by a name a person would give it and with what it is set to 
 reader presses a button, turns a step over or sets a knob, and the app does it as a hand would.
 The rack is described too: its transport, tempo and Add; each module a group of its knobs, choices,
 buttons and numbers, named as its face names them with its abbreviations said whole, a mute or a
-gate said as on or off, and each module's menu a button; and, turned round, its cables from what to
-what. Nothing is described until something reads the window. While a screen reader runs, as
+gate said as on or off, and each module's menu a button. Turned round, each module's jacks say what
+they are patched to, and a screen reader patches as a hand does: press a jack to take a cable from
+it and one of the other kind to plug it in, pull a cable out of an inlet, and turn an inlet's trim.
+A Combinator's routing is described and edited too: each routing's source, module and knob offer
+the menus a click does, and its two ends are sliders. Nothing is described until something reads the window. While a screen reader runs, as
 Windows says one is, the keyboard moves between the controls as in any Windows program: Tab and
 Shift+Tab to the next and the one before, Enter to press it, and the arrows to turn a knob or a
 number a notch; the screen reader hears where it is, and a ring shows it. Space still plays and
-stops, and Show Controls and Show Back stay in the View menu, without Tab. Patching cables with a
-screen reader is still to come.
+stops, and Show Controls and Show Back stay in the View menu, without Tab.
 
 Closing, opening or starting afresh over unsaved work asks first, in Windows' own words. Its
 executable only chooses Windows' parts — WASAPI, WinMM, a Win32 window, Direct3D, DirectWrite — and
