@@ -722,7 +722,7 @@ public final class RackInterface {
       let playing = keyFingers[event.id] ?? nil
       guard note != playing else { return }
       if let playing { rack.noteUp(playing) }
-      if let note, let found { rack.noteDown(note, velocity: found.velocity) }
+      if let note, let found { rack.keyDown(note, velocity: found.velocity) }
       keyFingers[event.id] = .some(note)
     case .ended, .cancelled:
       if let playing = keyFingers.removeValue(forKey: event.id), let playing { rack.noteUp(playing) }
@@ -758,7 +758,7 @@ public final class RackInterface {
         guard !event.isRepeat, held[character] == nil else { return true }
         let note = RackKeyboard.root + semitone + octave * 12
         held[character] = note
-        rack.noteDown(note)
+        rack.keyDown(note)
       } else if let note = held.removeValue(forKey: character) {
         rack.noteUp(note)
       }

@@ -1395,6 +1395,52 @@ public final class RackSession: MIDIListener {
   /// The MIDI sources there are, for the MIDI module's face to say whether it is listening.
   public var midiSources: [String] = []
 
+  /// A note from the rack's own keys, on screen or typed: as `noteDown`, once the keys have
+  /// somewhere to go (`ensureKeys`).
+  public func keyDown(_ note: Int, velocity: Double = 0.8) {
+    ensureKeys()
+    noteDown(note, velocity: velocity)
+  }
+
+  /// A MIDI module with somewhere to send its notes, made the first time the keys play a patch that
+  /// has none, as the reference's `ensureMidi`: a key that sounds nothing is indistinguishable from
+  /// a broken keyboard. Wired to the newest Voice or Multisample Instrument, or else to a VCO's pitch
+  /// with its gate to an ADSR or a VCA; it takes over those inputs, one cable an input as ever, which
+  /// on a sequenced patch hands the voice to the keys. Nothing where there is a MIDI module already,
+  /// so it never rearranges a patch somebody built, nor where there is nothing to play. One step of
+  /// undo.
+  @discardableResult
+  public func ensureKeys() -> String? {
+    if let existing = patch.modules.first(where: { $0.type == "midi" }) { return existing.id }
+    let instrument = patch.modules.last { $0.type == "multisampler" || $0.type == "voice" }
+    let vco = patch.modules.first { $0.type == "vco" }
+    guard instrument != nil || vco != nil else { return nil }
+    let id = Self.freshId(patch, "midi")
+    structural("Add MIDI") { patch in
+      patch.modules.append(PatchModule(id: id, type: "midi"))
+      func takeOver(_ from: String, _ module: String, _ port: String) {
+        patch.cables.removeAll { $0.to.module == module && $0.to.port == port }
+        patch.cables.append(PatchCable(from: PortReference(id, from), to: PortReference(module, port)))
+      }
+      if let instrument {
+        takeOver("pitch", instrument.id, "pitch")
+        takeOver("gate", instrument.id, "gate")
+        // A Voice has no velocity input; the Multisample Instrument chooses its layer by it.
+        if instrument.type == "multisampler" { takeOver("vel", instrument.id, "velocity") }
+      } else if let vco {
+        takeOver("pitch", vco.id, "pitch")
+        // The gate to an envelope where there is one, and to a VCA's own control where there is not,
+        // so that a patch with no ADSR still articulates rather than droning.
+        if let adsr = patch.modules.first(where: { $0.type == "adsr" }) {
+          takeOver("gate", adsr.id, "gate")
+        } else if let vca = patch.modules.first(where: { $0.type == "vca" }) {
+          takeOver("gate", vca.id, "cv")
+        }
+      }
+    }
+    return id
+  }
+
   public func noteDown(_ note: Int, velocity: Double = 0.8, channel: Int = 1) {
     var keyboard = keyboards[channel] ?? RackKeyboard(voices: voices)
     let changes = keyboard.down(note, velocity: velocity)
