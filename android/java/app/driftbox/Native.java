@@ -80,6 +80,9 @@ final class Native {
    */
   static native void touch(int id, int phase, float x, float y);
 
+  /** The devices sound can go out of, as {@link Outputs} describes them, on the main thread. */
+  static native void outputs(String lines);
+
   /** Once a second, on the main thread: housekeeping, and a line for the log. */
   static native String tick();
 }

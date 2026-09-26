@@ -469,8 +469,11 @@ to 2.6ms, with the heaviest scene drawn, on any of five songs: room in two burst
 been three, 6ms, to hide them. AAudio makes
 the render thread; Driftbox keeps it to the big cores, since left to the scheduler it underran a
 hundred times a second, and reports each callback's work to a performance hint session. A stream
-whose device goes away ends and asks to be replaced, as on Windows. There is one device, the
-system's, until the app can list them: that is Java's `AudioManager`.
+whose device goes away ends and asks to be replaced, as on Windows. AAudio plays through a device
+by number but cannot list them, so the app's Java lists them from `AudioManager`, as they come and
+go, each with an ID that stays the same when it is plugged in again; the song's menu offers them
+under Output, beside Automatic, which is wherever Android sends the sound. A device chosen and
+unplugged is kept, and Automatic played through until it is back.
 
 MIDI is Android's native MIDI, which needs Android 10, so Driftbox builds for API 29. It can play
 through a device but not find or open one: that is Java's `MidiManager`. So the app opens every

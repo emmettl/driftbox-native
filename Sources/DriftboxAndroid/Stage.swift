@@ -135,6 +135,17 @@
       screen.touch(PointerEvent(phase: phases[phase], id: id, kind: .touch, location: SIMD2(x, y)))
     }
 
+    /// The output devices there are, as Java's `AudioManager` lists them: a line each, its ID for
+    /// good, the number AAudio knows it by, and its name, apart by tabs. See `Outputs.java`.
+    func listOutputs(_ lines: String) {
+      let listed = lines.split(separator: "\n").compactMap { line -> (device: AudioDevice, number: Int32)? in
+        let parts = line.split(separator: "\t", maxSplits: 2).map(String.init)
+        guard parts.count == 3, let number = Int32(parts[1]) else { return nil }
+        return (AudioDevice(id: parts[0], name: parts[2]), number)
+      }
+      route.list(listed)
+    }
+
     /// Once a second: the route kept on its device and its buffer tuned, the session caught up
     /// while nothing is drawn to catch it up, and a line saying how it is going.
     func tick() -> String {

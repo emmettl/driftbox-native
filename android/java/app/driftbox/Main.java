@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.media.AudioAttributes;
+import android.media.AudioDeviceCallback;
+import android.media.AudioDeviceInfo;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.os.Build;
@@ -127,11 +129,31 @@ public final class Main extends Activity {
     handler.removeCallbacksAndMessages(null);
     if (playing) {
       getSystemService(AudioManager.class).abandonAudioFocusRequest(focus);
+      getSystemService(AudioManager.class).unregisterAudioDeviceCallback(outputs);
       stopService(new Intent(this, Playback.class));
       Native.stop();
       current = null;
     }
     super.onDestroy();
+  }
+
+  /** Every device sound can go out of, to Swift, whenever one comes or goes. */
+  private final AudioDeviceCallback outputs =
+      new AudioDeviceCallback() {
+        @Override
+        public void onAudioDevicesAdded(AudioDeviceInfo[] added) {
+          sendOutputs();
+        }
+
+        @Override
+        public void onAudioDevicesRemoved(AudioDeviceInfo[] removed) {
+          sendOutputs();
+        }
+      };
+
+  private void sendOutputs() {
+    AudioDeviceInfo[] all = getSystemService(AudioManager.class).getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+    Native.outputs(Outputs.describe(all));
   }
 
   // MARK: - Playing
@@ -175,6 +197,9 @@ public final class Main extends Activity {
         }, handler)
         .build();
     getSystemService(AudioManager.class).requestAudioFocus(focus);
+    // The devices there are, to choose between, now and as they come and go: registering says
+    // what is there at once.
+    getSystemService(AudioManager.class).registerAudioDeviceCallback(outputs, handler);
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     SurfaceView view = new SurfaceView(this);
     view.getHolder().addCallback(

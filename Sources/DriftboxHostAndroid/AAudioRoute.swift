@@ -4,24 +4,37 @@
 
   /// Where the sound goes on Android, kept there: AAudio's `AudioRouting`.
   ///
-  /// One device for now, the system's, which follows headphones and Bluetooth as Android routes
-  /// them. AAudio plays through a device by number but cannot list them: that is Java's
-  /// `AudioManager`, which needs the app around it, and arrives with the app. Until then a choice
-  /// of device is remembered and the system's is played through, as it is for any choice that is
-  /// not there.
+  /// The system's output unless another is chosen, which follows headphones and Bluetooth as
+  /// Android routes them. AAudio plays through a device by number but cannot list them: that is
+  /// Java's `AudioManager`, so the app lists them, and says again as they come and go, through
+  /// `list`. A choice that is not there is kept, and the system's is played through until it is.
   ///
   /// A stream whose device goes away ends, and says so on a thread of its own; `apply` makes the
   /// next one. It works out where the sound should be going from scratch, as `WASAPIRoute` does,
   /// so it does not matter what set it off.
   @MainActor
   public final class AAudioRoute: AudioRouting {
-    /// The system's output, which is the only one there is until the app can list them.
+    /// The system's output, wherever Android sends it: what nothing chosen plays through.
     public static let system = AudioDevice(id: "system", name: "the phone's output")
 
     public var chosen: String? {
       didSet { if chosen != oldValue { apply() } }
     }
-    public private(set) var devices: [AudioDevice] = [AAudioRoute.system]
+    /// The devices the app has listed.
+    public private(set) var devices: [AudioDevice] = []
+    /// AAudio's number for each, by its ID: a number Android gives a device afresh each time it is
+    /// plugged in, where the ID, which a choice is kept by, is the same.
+    private var numbers: [String: Int32] = [:]
+
+    /// The devices there are now, as the app's `AudioManager` lists them, each with the number
+    /// AAudio knows it by: the stream moved if the one it should be on has come or gone.
+    public func list(_ listed: [(device: AudioDevice, number: Int32)]) {
+      let fresh = Dictionary(listed.map { ($0.device.id, $0.number) }, uniquingKeysWith: { first, _ in first })
+      guard listed.map(\.device) != devices || fresh != numbers else { return }
+      devices = listed.map(\.device)
+      numbers = fresh
+      apply()
+    }
     public private(set) var current: AudioDevice?
     public let systemDefault: AudioDevice? = AAudioRoute.system
     public private(set) var error: String?
@@ -32,14 +45,16 @@
     /// Underruns since the stream started.
     public var xruns: Int { output?.xruns ?? 0 }
 
-    /// What the stream is, in words: sharing, burst, buffer, and what the render thread was given.
+    /// What the stream is, in words: its device, sharing, burst, buffer, and what the render thread
+    /// was given.
     public var details: String? {
       guard let shape = output?.shape else { return nil }
       let tenths = Int((Double(shape.framesPerBurst) / Double(shape.sampleRate) * 10_000).rounded())
       let cores =
         shape.cores.isEmpty ? "any core" : "cores \(shape.cores.map(String.init).joined(separator: ","))"
       return
-        "\(shape.exclusive ? "exclusive" : "shared"), \(shape.sampleRate) Hz, "
+        "through \(current?.name ?? "nothing"), \(shape.exclusive ? "exclusive" : "shared"), "
+        + "\(shape.sampleRate) Hz, "
         + "bursts of \(shape.framesPerBurst) frames (\(tenths / 10).\(tenths % 10)ms), "
         + "buffer of \(shape.bufferFrames), render thread on \(cores), "
         + (shape.hinted ? "performance hint on" : "no performance hint")
@@ -126,7 +141,10 @@
         error = "There is nothing to play through."
         return
       }
-      if let output, !output.invalidated {
+      let deviceID =
+        target == Self.system ? Int32(AAUDIO_UNSPECIFIED) : numbers[target.id] ?? Int32(AAUDIO_UNSPECIFIED)
+      // The stream there is, while it is still on the device it should be.
+      if let output, !output.invalidated, output.deviceID == deviceID {
         current = target
         error = nil
         return
@@ -134,11 +152,9 @@
       output?.stop()
       output = nil
       do {
-        output = try AAudioOutput(
-          deviceID: target == Self.system
-            ? Int32(AAUDIO_UNSPECIFIED) : Int32(target.id) ?? Int32(AAUDIO_UNSPECIFIED),
-          mixer: mixer, sampleRate: sampleRate, cores: cores
-        ) { [changed] in changed?() }
+        output = try AAudioOutput(deviceID: deviceID, mixer: mixer, sampleRate: sampleRate, cores: cores) {
+          [changed] in changed?()
+        }
         if relaxed { output?.relax(true) }
         current = target
         error = nil
