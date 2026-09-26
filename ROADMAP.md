@@ -206,9 +206,11 @@ gone native at all.
    the scene can be chosen at last, from View ▸ Scene or by cycling through them, where before
    the app only ever showed the one the song named.
 
-   Left: the 303's step entry from the keyboard; automation recording, which `Session` now does —
-   `turn` and `endTurn`, and `recordsAutomation` armed, as the Windows app's AUTO arms it — for the
-   Mac's knobs to use; and more
+   Automation recording on the Mac's knobs, as on Windows and Android: every knob of the face and
+   the tempo and swing are turned through `Session.turn` (`FaceKnob` says what each one turns, in
+   the lanes an app's automation moves too), heard as they turn, and one step of undo let go of;
+   Transport ▸ Record Automation, or the header's `● auto`, arms it, and Clear Automation empties
+   it. Left: the 303's step entry from the keyboard; and more
    than one song open at once, which is deliberately not done. It is not a scene change: the
    player owns the audio engine, the MIDI ports and the clock, and two of them would be two
    engines fighting over one output and two sources both called Driftbox Clock. The honest
