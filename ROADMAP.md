@@ -676,7 +676,11 @@ each question, and the rest is Android's alone:
    98ms, the session in 45, the song decoded and compiled in 38 to 54, which is all a song
    switched to costs. The rack, made after, takes 100ms more, and Android says the screen is up
    470ms after the app was started. `driftbox-play --bench` spends about a quarter of a second of
-   its own time before it renders. The rack's load is not measured yet.
+   its own time before it renders. The rack's load, live beside the groovebox: every catalogue
+   patch running with a note held, the groovebox playing, each source timed in the mixer, costs
+   the phone 4 to 30% of the audio's time, One Finger and First Light the most; with the
+   groovebox's, 58 to 67%, the slowest callback of both 2.6ms, and never an underrun. A rack
+   nobody had opened cost 10%, rendering silence, until it was made asleep until first shown.
 2. **Audio and MIDI behind the ports.** ← *here.* Audio is done. `DriftboxHostAndroid` answers
    `AudioRouting` with AAudio: low-latency, exclusive, a buffer that starts at two bursts and grows
    a burst at a time on underruns, and a stream that asks to be replaced when its device goes.
