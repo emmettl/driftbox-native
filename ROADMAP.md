@@ -696,7 +696,9 @@ each question, and the rest is Android's alone:
    without one, 4.8ms from render to speaker. It also reports to a performance hint session.
    That was meant to hold the clock up, and it does when its target is tight. But the render
    costs 60% of each 2ms burst at any clock, against 15 to 18% when the other big cores are busy:
-   what a callback pays for is its core waking cold. There is room in that, but less than the
+   what a callback pays for is the rest of its cluster idling, not its clock and not its waking:
+   callbacks four bursts long, a quarter as many, cost the same 53 to 57%, each four times as
+   long, so fewer, longer callbacks save nothing. There is room in that, but less than the
    bench promised, and the rack and the scenes will want some of it. Left: one device until the
    app can list them from Java's `AudioManager`, and a stream lost to a device going is handled
    but not yet seen to be, for want of anything to unplug.
