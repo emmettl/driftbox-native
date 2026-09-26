@@ -207,7 +207,8 @@ let package = Package(
       name: "DriftboxDesktop",
       dependencies: [
         "DriftboxCanvas", "DriftboxDocument", "DriftboxGPU", "DriftboxHost", "DriftboxInterface",
-        "DriftboxRackSession", "DriftboxScenes", "DriftboxSession", "DriftboxShell", "DriftboxText",
+        "DriftboxRack", "DriftboxRackSession", "DriftboxScenes", "DriftboxSession", "DriftboxShell",
+        "DriftboxText",
       ]),
     // Driftbox on a touch screen: the scene, the controls over it, the pad, fingers. The same on every
     // platform with one; Android's app hands it its parts, and iOS's will.

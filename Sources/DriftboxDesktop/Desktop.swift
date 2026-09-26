@@ -295,6 +295,10 @@ public final class Desktop {
   /// The commands that carry what they are about in their id: a song, a scene, a device, a source,
   /// a destination.
   func performNamed(_ id: String) {
+    if let module = DesktopMenus.value(id, after: DesktopMenus.rackAudioPrefix) {
+      chooseRackAudio(into: module)
+      return
+    }
     if let songID = DesktopMenus.value(id, after: DesktopMenus.rackSongPrefix) {
       guard let entry = session.entries.first(where: { $0.id == songID }), let song = Catalogue.song(songID)
       else { return }
@@ -333,6 +337,9 @@ public final class Desktop {
 
   func isEnabled(_ id: String) -> Bool {
     guard !documentRequestPending else { return false }
+    if let module = DesktopMenus.value(id, after: DesktopMenus.rackAudioPrefix) {
+      return canLoadRackAudio(into: module)
+    }
     return switch id {
     case DesktopMenus.undo: showsRack ? rack?.canUndo ?? false : session.canUndo
     case DesktopMenus.redo: showsRack ? rack?.canRedo ?? false : session.canRedo
@@ -343,7 +350,8 @@ public final class Desktop {
       session.song != nil
     case DesktopMenus.recordAutomation: session.song != nil
     case DesktopMenus.clearAutomation: session.song?.automation.isEmpty == false
-    case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote: false
+    case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote, DesktopMenus.noAudioTargets:
+      false
     default: true
     }
   }

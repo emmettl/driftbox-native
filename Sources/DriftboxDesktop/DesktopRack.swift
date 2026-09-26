@@ -37,18 +37,7 @@ extension Desktop {
       }
       if rackInterface.takeSongRequest() { editRackSong() }
       if let module = rackInterface.takeFileRequest() {
-        // A set for a Multisampler, several at once; one file for anything else.
-        documentRequest { done in
-          let loaded: ([URL]) -> Void = { urls in
-            if !urls.isEmpty { rackInterface.load(urls, into: module) }
-            done()
-          }
-          if rackInterface.takesSeveral(module) {
-            window.chooseFiles(ofTypes: [Self.audio], completion: loaded)
-          } else {
-            window.chooseFile(ofTypes: [Self.audio]) { loaded($0.map { [$0] } ?? []) }
-          }
-        }
+        chooseRackAudio(into: module)
       }
       return true
     case .dropped(let urls, let at):
@@ -62,6 +51,28 @@ extension Desktop {
     default:
       return false
     }
+  }
+
+  /// The module face and the native menu share one deferred file request.
+  func chooseRackAudio(into module: String) {
+    guard canLoadRackAudio(into: module), let rackInterface else { return }
+    setShowsRack(true)
+    documentRequest { done in
+      let loaded: ([URL]) -> Void = { urls in
+        if !urls.isEmpty { rackInterface.load(urls, into: module) }
+        done()
+      }
+      if rackInterface.takesSeveral(module) {
+        window.chooseFiles(ofTypes: [Self.audio], completion: loaded)
+      } else {
+        window.chooseFile(ofTypes: [Self.audio]) { loaded($0.map { [$0] } ?? []) }
+      }
+    }
+  }
+
+  func canLoadRackAudio(into module: String) -> Bool {
+    guard let rack, let target = rack.patch.modules.first(where: { $0.id == module }) else { return false }
+    return DesktopMenus.audioModuleTypes.contains(target.type) && !rack.loading.contains(module)
   }
 
   /// The rack's song opened in the groovebox, linked, and the groovebox shown in the rack's place:

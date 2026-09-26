@@ -43,7 +43,14 @@ final class StandInWindow: ShellWindow {
   var pendingQuestion: ((SaveAnswer) -> Void)?
   var pendingSave: ((URL?) -> Void)?
   var pendingOpen: ((URL?) -> Void)?
+  var pendingMultiple: (([URL]) -> Void)?
+  var requestedTypes: [FileType] = []
+  func chooseFiles(ofTypes types: [FileType], completion: @escaping ([URL]) -> Void) {
+    requestedTypes = types
+    if defersDialogs { pendingMultiple = completion } else { completion(chosenFile.map { [$0] } ?? []) }
+  }
   func chooseFile(ofTypes types: [FileType], completion: @escaping (URL?) -> Void) {
+    requestedTypes = types
     if defersDialogs { pendingOpen = completion } else { completion(chooseFile(ofTypes: types)) }
   }
   func chooseSaveLocation(for type: FileType, name: String, completion: @escaping (URL?) -> Void) {
@@ -626,6 +633,57 @@ extension DesktopTests {
       closing(.cancel)
       #expect(!window.closed)
       #expect(!desktop.documentRequestPending)
+    }
+  }
+}
+
+extension DesktopTests {
+  @Test func rackAudioMenuTargetsModulesAndCancelsWithoutChangingThePatch() throws {
+    for device in try Self.devices() {
+      let window = StandInWindow()
+      let rack = RackSession()
+      let desktop = try Desktop(
+        session: Session(host: EngineHost(sampleRate: 48000)), window: window, device: device,
+        surface: StandInSurface(device: device, width: 320, height: 180),
+        typesetter: NoTypesetter(), rack: rack)
+      let sampler = try #require(rack.add("sampler"))
+      let second = try #require(rack.add("sampler"))
+      let instrument = try #require(rack.add("multisampler"))
+      let track = try #require(rack.add("audio-track"))
+      let oscillator = try #require(rack.add("vco"))
+      try desktop.drawFrame()
+      let command = DesktopMenus.rackAudioPrefix
+      #expect(window.title(of: command + sampler) == "Sampler 1…")
+      #expect(window.title(of: command + second) == "Sampler 2…")
+      #expect(window.commandIDs.contains(command + instrument))
+      #expect(window.commandIDs.contains(command + track))
+      #expect(!window.commandIDs.contains(command + oscillator))
+      #expect(window.isEnabled?(command + oscillator) == false)
+      #expect(window.isEnabled?(command + "missing") == false)
+      let before = rack.patch
+      window.defersDialogs = true
+      for module in [sampler, track] {
+        window.choose(command + module)
+        #expect(desktop.showsRack && desktop.documentRequestPending)
+        #expect(window.requestedTypes.first?.extensions == ["wav", "wave"])
+        #expect(window.isEnabled?(command + instrument) == false)
+        let cancel = try #require(window.pendingOpen)
+        window.pendingOpen = nil
+        cancel(nil)
+        #expect(!desktop.documentRequestPending)
+        #expect(rack.patch == before)
+      }
+      window.choose(command + instrument)
+      #expect(window.pendingOpen == nil, "an instrument must allow several files")
+      let cancel = try #require(window.pendingMultiple)
+      window.pendingMultiple = nil
+      cancel([])
+      #expect(!desktop.documentRequestPending)
+      #expect(rack.patch == before)
+      window.choose(DesktopMenus.patchPrefix + "acid")
+      try desktop.drawFrame()
+      #expect(!window.commandIDs.contains(command + sampler), "targets follow the current patch")
+      #expect(window.isEnabled?(command + sampler) == false)
     }
   }
 }

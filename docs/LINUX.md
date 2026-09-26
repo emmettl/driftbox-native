@@ -603,13 +603,12 @@ session tests under strict actor checks. The latter cover WAV encodings, malform
 resampling and pitch/duration, sampler playback and graph rebuilds, multisampler note mapping,
 and stereo audio-track playback. They render and inspect samples without a physical audio device.
 Together with the previously verified native save/reopen, these establish the underlying document
-and sample paths. Interactive WAV selection/drop and dirty-document confirmation remain open.
+and sample paths. Interactive qualification follows below; WAV drop remains open.
 
 In the installed XWayland preview, clearing Hothouse's automation marked the document edited and
 Undo restored both its automation and clean title. Playback was left stopped, and no song file was
-overwritten. Attempts to invoke New on that edited document did not reliably expose a prompt
-through UTM's automated input. Do not count this as a passing interactive check or an established
-app defect; reproduce it with direct keyboard/mouse input before release.
+overwritten. The first attempts to invoke New were inconclusive through UTM input; the later
+keyboard-driven check below successfully exercised the prompt and save continuation.
 
 Guest logs: `~/driftbox-document-sample-tests.log`, `~/driftbox-gtk-dialog-tests.log`,
 `~/driftbox-dialog-build.log` and `~/driftbox-dialog-smoke.log`. Remote CI has not run.
@@ -710,6 +709,37 @@ GTK and physical Linux hardware, and qualify normal dialog cancellation/close an
 before enabling native Wayland for release. The installed preview continues to use XWayland.
 Logs: `~/driftbox-identity-{x11,wayland,gdb,gdb-trace}.log` and
 `~/driftbox-gtk-only-dialog-{crash,x11}.log`.
+
+### Interactive documents and rack audio import
+
+The 2026-09-26 follow-up qualified the edited-document flow in the installed XWayland preview.
+After clearing Hothouse's automation, **File → New** showed the native save question. Cancel kept
+Hothouse edited. Choosing Save, then cancelling Save As, also preserved the edit and allowed a
+second New request. Retrying Save wrote `~/qa-saved.driftbox` (10,839 bytes), then continued to a
+blank, stopped Untitled song. Ubuntu Files reopened that copy with its name, sequence and cleared
+automation intact. The built-in song was not overwritten. Interactive Discard remains to check.
+
+**Rack → Load Audio Into** now lists the current patch's samplers, audio tracks and multisample
+instruments, numbered within each type. It shares the module-face chooser and asynchronous loading
+path, allows several WAVs for multisample instruments, and disables missing/busy targets and
+commands while a dialog is pending. This supplies a keyboard route to import without requiring
+canvas pointer interaction; it is not a complete canvas accessibility implementation.
+
+In Cut Up, **Load Audio Into → Sampler 1** opened the native WAV chooser. Accepting
+`~/Documents/Driftbox QA/QA tone.wav`, a two-second 44.1 kHz 16-bit stereo fixture, returned to the
+rack and started playback at 240 BPM (the existing loader's two-bar fit). Transport stopped it
+successfully. The sampler face was below the viewport; UTM scroll input did not move the canvas,
+so waveform/name display and pointer/drop interaction are still unqualified. Physical listening
+was not assessed in this check.
+
+The installed bundle is `Driftbox-0.1.0-preview-arm64-ce5e48b22bcd`, registered with `--x11`.
+All 67 manifest hashes verify. The release build, 21 desktop tests with strict Swift actor checks,
+and packaged silent Xvfb smoke pass (354 GUI frames, all four deferred dialogs cancelled exactly
+once). The new regression covers single versus multiple selection, cancellation without patch
+mutation, pending-dialog command gating and targets following patch changes. Existing GTK
+`thaw_updates`/transient-parent diagnostics still appear during the rapid dialog smoke; they are
+not resolved by this change. Remote CI and Windows/macOS builds of this follow-up have not run.
+Guest logs: `~/driftbox-audio-menu-{tests,build,package,smoke}.log`.
 
 ### Local access
 

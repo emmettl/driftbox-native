@@ -1,3 +1,4 @@
+import DriftboxRack
 import DriftboxRackSession
 import DriftboxScenes
 import DriftboxSession
@@ -50,6 +51,9 @@ public enum DesktopMenus {
   public static let outputPrefix = "output."
   public static let inputPrefix = "input."
   public static let clockPrefix = "clock."
+  public static let noAudioTargets = "rack.noAudioTargets"
+  public static let rackAudioPrefix = "rackAudio."
+  static let audioModuleTypes: Set<String> = ["sampler", "audio-track", "multisampler"]
   public static let patchPrefix = "patch."
   /// A catalogue song into the rack, by its id; and the groovebox's own song into it.
   public static let rackSongPrefix = "rackSong."
@@ -130,6 +134,7 @@ public enum DesktopMenus {
                 .separator,
                 .submenu(
                   Menu("Open Patch", PatchEntry.all.map { .command($0.name, id: patchPrefix + $0.id) })),
+                .submenu(Menu("Load Audio Into", audioTargets(rack))),
                 // A groovebox song, whole, played beside the rack with its machines on a Groovebox source.
                 .submenu(
                   Menu(
@@ -169,6 +174,19 @@ public enum DesktopMenus {
             ]),
         ])
   }
+
+  @MainActor
+  static func audioTargets(_ rack: RackSession?) -> [MenuItem] {
+    var counts: [String: Int] = [:]
+    let items: [MenuItem] = (rack?.patch.modules ?? []).compactMap { module in
+      guard audioModuleTypes.contains(module.type) else { return nil }
+      counts[module.type, default: 0] += 1
+      let name = RackModules.registry[module.type]?.name ?? module.type
+      return .command("\(name) \(counts[module.type]!)…", id: rackAudioPrefix + module.id)
+    }
+    return items.isEmpty ? [.command("No Samplers or Audio Tracks", id: noAudioTargets)] : items
+  }
+
 }
 
 extension DesktopMenus {
