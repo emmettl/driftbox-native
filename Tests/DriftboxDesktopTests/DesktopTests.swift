@@ -51,6 +51,14 @@ final class StandInWindow: ShellWindow {
   func reveal(_ url: URL) { revealed.append(url) }
   var told: [String] = []
   func tell(_ message: String) { told.append(message) }
+  var displays: [String] = []
+  /// The visuals windows made, the last the one in use.
+  var visualsWindows: [StandInVisualsWindow] = []
+  func makeVisualsWindow() -> (any ShellVisualsWindow)? {
+    let made = StandInVisualsWindow()
+    visualsWindows.append(made)
+    return made
+  }
   func askToSave(_ name: String) -> SaveAnswer {
     asked.append(name)
     return saveAnswer
@@ -78,6 +86,23 @@ final class StandInWindow: ShellWindow {
   /// Every command in the menus, by id.
   var commandIDs: [String] { menuBar?.commands.map(\.id) ?? [] }
   func title(of id: String) -> String? { menuBar?.commands.first { $0.id == id }?.title }
+}
+
+/// A visuals window that keeps where it was sent, and is told what a person does to it.
+@MainActor
+final class StandInVisualsWindow: ShellVisualsWindow {
+  var width = 640
+  var height = 360
+  var scale: Float = 1
+  var isFullScreen = false
+  var display: String?
+  var onEvent: ((VisualsEvent) -> Void)?
+  var closed = false
+  func show(on display: String?, fullScreen: Bool) {
+    if let display { self.display = display }
+    isFullScreen = fullScreen
+  }
+  func close() { closed = true }
 }
 
 /// A surface that is only a target the size it was last told.
