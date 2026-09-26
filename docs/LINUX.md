@@ -1041,3 +1041,18 @@ macOS; the dpkg ordering test runs on Linux). Evidence is in
 which Ubuntu's minimized container normally filters out; this allows dpkg payload verification
 and the obsolete-document upgrade regression. No package code disables that system policy.
 The branch includes main through `40f1981` before this packaging milestone.
+
+
+The `.deb` CI qualification also reproduced the already-documented GTK 4.14 file-model crash
+in the Swift smoke's fixed 250 ms shown-chooser teardown loop. That delay did not establish
+that loading had finished. Normal smoke checks now exercise all five early cancellations,
+the presented save question, queued notices and desktop rendering. The unchanged C suite
+covers file/folder acceptance and ordinary cancellation. Set
+`DRIFTBOX_TEST_LOADING_CHOOSER_TEARDOWN=1` when running `--smoke-test` to retain the timing-based
+stress reproduction explicitly; it is a diagnostic for the known toolkit limitation, not a
+claim that arbitrary already-loading chooser teardown is safe. The standalone C probe remains
+available too. CI evidence: run `36273073254`, Swift job `108490700494`.
+The revised default smoke passes three consecutive local debug runs with GTK critical errors
+fatal, each rendering 348 frames (`~/driftbox-deb-default-smoke.log`). The packaging commit
+`0424c37` already passed both native archive/`.deb` CI jobs in run `36273073270`; the follow-up
+changes only the smoke diagnostic scope and documentation, preserving the stress reproduction.
