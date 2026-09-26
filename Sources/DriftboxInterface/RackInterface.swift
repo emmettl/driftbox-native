@@ -45,6 +45,8 @@ public final class RackInterface {
   var backPointer: SIMD2<Float>?
   /// A trim pot let go of without turning, and when: a second, soon after, puts it back to unity.
   var lastPotTap: (jack: String, at: ContinuousClock.Instant)?
+  /// A jack a screen reader has taken a cable from, to be plugged into the next it presses.
+  var picked: RackLayout.Jack?
   /// The bar a face with more than one shows, or the zone a Key Atlas edits, by module: the Mac
   /// keeps these in the face's view.
   public private(set) var pages: [String: Int] = [:]
@@ -520,7 +522,7 @@ public final class RackInterface {
 
   /// One end of routing `index`, as it is, or its target's own limit where it has none; and the
   /// target's param, whose range it is dragged across.
-  private func routeEnd(_ index: Int, isMax: Bool) -> (Double, ParamDef)? {
+  func routeEnd(_ index: Int, isMax: Bool) -> (Double, ParamDef)? {
     guard rack.patch.modulation.indices.contains(index) else { return nil }
     let route = rack.patch.modulation[index]
     guard let type = rack.patch.modules.first(where: { $0.id == route.to.module })?.type,

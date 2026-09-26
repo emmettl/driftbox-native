@@ -366,8 +366,10 @@ lays out. On the Mac it is Guide, first in a module's menu, as a sheet over the 
 groovebox's guide: `DriftboxHelp` holds help as words any platform lays out — topics of parts,
 each paragraphs, terms, steps or keys — and `GrooveboxHelp` the reference's guide topic for topic,
 saying what each platform's own controls do and leaving out what only the web has. On the Mac it
-is Help ▸ Groovebox Guide (⌘?), a window of its own beside the editor. Left: the drawn apps'
-module guides and help, on Windows and Android; and the rest of what the web app teaches with,
+is Help ▸ Groovebox Guide (⌘?), a window of its own beside the editor; and `RackHelp` the rack's,
+Help ▸ Rack Guide (⌥⌘?), which says what the Mac's rack has — its names for its modules, its
+trims, its menus — and nothing of the web's automation desk or performance views, which it has
+not. Left: the drawn apps' module guides and help, on Windows and Android; and the rest of what the web app teaches with,
 and what a Mac does better:
 
 - **The reference's teaching, ported:** its help dialog, the first-run offer of a tour, the guided
@@ -601,10 +603,10 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    comes back as the window's events and is done as a hand does it. Held to Windows' own UI
    Automation client from a process of its own, as a screen reader is, and to the real app read and
    played that way. The rack is described as well: the header, every module's controls as its
-   face names them, and the cables on its back as words. And while a screen reader runs, the
-   keyboard moves between the controls — Tab, Enter, the arrows — with UI Automation told where it
-   is. Next: patching the back and a Combinator's routings from a screen reader, and trying it all
-   with Narrator and NVDA themselves.
+   face names them, its back patched jack by jack and its trims turned, and a Combinator's routings
+   edited. And while a screen reader runs, the keyboard moves between the controls — Tab, Enter,
+   the arrows — with UI Automation told where it is. Next: trying it all with Narrator and NVDA
+   themselves.
    The rack comes by way of `DriftboxRackSession`, which holds what the Mac's `RackModel` did —
    the patch, its edits and undo, the keys, controllers, samples, song and transport — on every
    platform, with the Mac's audio, plug-ins and file reading behind ports: `AudioRouting`,

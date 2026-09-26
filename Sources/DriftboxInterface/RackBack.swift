@@ -338,6 +338,13 @@ extension RackInterface {
         (at + SIMD2(-2.5, -2.5), at + SIMD2(2.5, 2.5)), (at + SIMD2(2.5, -2.5), at + SIMD2(-2.5, 2.5)),
       ])
     }
+
+    // A jack a screen reader has taken a cable from, ringed until it is plugged in or put down.
+    if let picked, let jack = jacks.first(where: { $0 == picked }) {
+      canvas.stroke = Theme.three
+      canvas.lineWidth = 2
+      canvas.strokeArc(Float(jack.x), Float(jack.y), radius: 12, from: -.pi, to: .pi)
+    }
   }
 
   /// A cable's curve as points along it: close enough together that its lines read as one curve.

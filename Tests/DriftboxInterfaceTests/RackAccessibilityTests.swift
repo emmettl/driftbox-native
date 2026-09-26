@@ -113,14 +113,70 @@ struct RackAccessibilityTests {
     #expect(request.menu.commands.contains { $0.id == "module.bypass" })
   }
 
-  /// Turned round, the cables between the modules, from what to what.
-  @Test func theBackTellsOfTheCables() throws {
+  /// Turned round, each module's jacks, saying what they are patched to; a cable pulled out, taken
+  /// from one jack and plugged into another, and put down again; and an inlet's trim turned.
+  @Test func theBackIsPatched() throws {
     let face = RackInterfaceTests.rack()
     #expect(face.perform(.press("rack.flip")))
     #expect(face.rack.flipped)
-    let back = try Self.node(face, "back")
-    #expect(back.children.count == face.rack.patch.cables.count)
-    #expect(back.children.allSatisfy { $0.role == .text && $0.value?.hasPrefix("to ") == true })
     #expect(face.accessibility.node("module.osc") == nil, "the fronts face away")
+    let outlet = try Self.node(face, "jack.osc.out.out")
+    #expect(outlet.role == .button && outlet.value?.hasPrefix("outlet, to Out ") == true, "\(outlet)")
+    let inlet = try Self.node(face, "jack.out.in.in")
+    #expect(inlet.value?.hasPrefix("inlet, from VCO ") == true, "\(inlet)")
+    #expect(try Self.node(face, "bay.osc").children.contains { $0.id == "trim.osc.pitch" })
+
+    #expect(face.perform(.press("unplug.out.in")))
+    #expect(face.rack.patch.cables.count == 1)
+    #expect(try Self.node(face, "jack.out.in.in").value == "inlet, not patched")
+    #expect(face.accessibility.node("unplug.out.in") == nil)
+
+    #expect(face.perform(.press("jack.osc.out.out")))
+    #expect(try Self.node(face, "back.held").name.hasPrefix("Holding a cable from VCO"))
+    #expect(face.perform(.press("jack.out.in.in")))
+    #expect(face.rack.patch.cables.contains { $0.from.module == "osc" && $0.to.module == "out" })
+    #expect(face.accessibility.node("back.held") == nil, "plugged in, held no longer")
+
+    // Taken up, and put down: nothing patched.
+    #expect(face.perform(.press("jack.osc.out.out")))
+    #expect(face.perform(.press("back.drop")))
+    #expect(face.accessibility.node("back.held") == nil && face.rack.patch.cables.count == 2)
+
+    #expect(face.perform(.set("trim.out.in", 0.504)))
+    #expect(face.rack.trim("out", "in") == 0.5)
+    #expect(face.rack.undoTitle == "Undo Set Input Trim")
+  }
+
+  /// A Combinator's routing: a routing added, its knob offered as a click offers it, its lowest end
+  /// set over the knob's range, and it removed.
+  @Test func aRoutingIsEdited() throws {
+    let rack = RackSession()
+    rack.open(
+      Patch(modules: [PatchModule(id: "c", type: "combi"), PatchModule(id: "osc", type: "vco")], cables: []),
+      name: "Routing")
+    let face = RackInterface(rack: rack)
+    face.size = SIMD2(1000, 700)
+    let routes = try #require(
+      face.accessibility.flattened.first { $0.id.hasPrefix("module.c.button.") && $0.name == "Routing" })
+    #expect(face.perform(.press(routes.id)))
+    #expect(rack.editingRoutes == "c")
+    #expect(face.perform(.press("routing.add")))
+    let row = try Self.node(face, "route.0")
+    #expect(row.name.hasPrefix("Routing 1: Rotary 1 to VCO"), "\(row.name)")
+
+    #expect(face.perform(.press("route.0.knob")))
+    #expect(try #require(face.takeMenuRequest()).menu.commands.map(\.id).contains("route.knob.width"))
+    face.choose("route.knob.width")
+    #expect(try Self.node(face, "route.0.knob").value == "Width")
+
+    let lowest = try Self.node(face, "route.0.min")
+    #expect(lowest.role == .slider && lowest.value?.hasSuffix("the knob's own") == true)
+    #expect(face.perform(.set("route.0.min", 0.25)))
+    #expect(rack.patch.modulation[0].min == 0.25)
+
+    #expect(face.perform(.press("route.0.remove")))
+    #expect(rack.patch.modulation.isEmpty)
+    #expect(face.perform(.press("routing.close")))
+    #expect(rack.editingRoutes == nil)
   }
 }
