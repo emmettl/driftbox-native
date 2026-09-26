@@ -206,7 +206,12 @@ gone native at all.
    the scene can be chosen at last, from View ▸ Scene or by cycling through them, where before
    the app only ever showed the one the song named.
 
-   Left: the 303's step entry from the keyboard; automation recording, which `Session` now does —
+   The 303's step entry from the keyboard, as the reference's keys have it: `Session` keeps its
+   cursor (`entryStep`) and writes a note, a rest or a tie there in the 303 whose knobs are showing,
+   only while stopped, each one step of undo; on the Mac it is switched on from the 303's panel,
+   which moves its cursor too, and drawn on the line's grid, and the typing keys write into it —
+   Shift accents, Delete rests, Return ties. The keys play the 303 whose knobs are showing now,
+   not always 303 A. Left: automation recording, which `Session` now does —
    `turn` and `endTurn`, and `recordsAutomation` armed, as the Windows app's AUTO arms it — for the
    Mac's knobs to use; and more
    than one song open at once, which is deliberately not done. It is not a scene change: the
