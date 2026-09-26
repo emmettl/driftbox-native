@@ -172,6 +172,7 @@
             CloseButton { player.selectedVoice = nil }
           }
         }
+        StepEntry(player: player)
         KnobRack(
           player: player, specs: KnobSpec.bass, indices: Array(KnobSpec.bass.indices), values: { params[$0] },
           rests: { BassParams.defaults[$0] }, tint: Theme.three
@@ -181,6 +182,42 @@
       .padding(14)
       .panel()
       .transition(.scale(scale: 0.97, anchor: .top).combined(with: .opacity))
+    }
+  }
+
+  /// Step entry's switch, and while it is on, its cursor, the buttons that move it, and what the
+  /// keys do: a row of its own under the 303's head, which has no room for it.
+  struct StepEntry: View {
+    let player: Session
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 5) {
+        HStack(spacing: 4) {
+          Button("step entry") { player.toggleStepEntry() }
+            .buttonStyle(.chip(on: player.entryStep != nil, tint: Theme.three, size: 10))
+            .help("Write the notes typed on the keys into the stopped pattern, a step at a time")
+          if let step = player.entryStep {
+            Button("‹") { player.moveEntry(to: step - 1) }
+              .buttonStyle(.chip(on: false, tint: Theme.three, size: 10))
+              .help("Previous entry step")
+            Text("\(step + 1)")
+              .font(Theme.mono(10, .semibold).monospacedDigit()).foregroundStyle(Theme.three)
+              .frame(minWidth: 16)
+            Button("›") { player.moveEntry(to: step + 1) }
+              .buttonStyle(.chip(on: false, tint: Theme.three, size: 10))
+              .help("Next entry step")
+          } else {
+            Spacer(minLength: 6)
+            Text("type notes into the pattern").font(Theme.mono(8.5)).foregroundStyle(Theme.dim).lineLimit(1)
+          }
+        }
+        if player.entryStep != nil {
+          Text(
+            player.isPlaying ? "Stop the song to write into it" : "Shift accents · Delete rests · Return ties"
+          )
+          .font(Theme.mono(8.5)).foregroundStyle(Theme.dim).lineLimit(1)
+        }
+      }
     }
   }
 

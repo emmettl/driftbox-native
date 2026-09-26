@@ -210,7 +210,12 @@ gone native at all.
    the tempo and swing are turned through `Session.turn` (`FaceKnob` says what each one turns, in
    the lanes an app's automation moves too), heard as they turn, and one step of undo let go of;
    Transport ▸ Record Automation, or the header's `● auto`, arms it, and Clear Automation empties
-   it. Left: the 303's step entry from the keyboard; and more
+   it. And the 303's step entry from the keyboard, as the reference's keys have it: `Session` keeps
+   its cursor (`entryStep`) and writes a note, a rest or a tie there in the 303 whose knobs are
+   showing, only while stopped, each one step of undo; on the Mac it is switched on from the 303's
+   panel, which moves its cursor too, and drawn on the line's grid, and the typing keys write into
+   it — Shift accents, Delete rests, Return ties. The keys play the 303 whose knobs are showing
+   now, not always 303 A. Left: more
    than one song open at once, which is deliberately not done. It is not a scene change: the
    player owns the audio engine, the MIDI ports and the clock, and two of them would be two
    engines fighting over one output and two sources both called Driftbox Clock. The honest
