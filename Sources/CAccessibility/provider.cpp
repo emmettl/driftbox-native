@@ -79,6 +79,8 @@ struct State {
   int nextRuntimeId = 1;
   /// The elements made, by id, so a control answers as the same object each time it is asked.
   std::map<std::string, Element *> elements;
+  /// The control the keyboard is on; empty for none.
+  std::string focus;
 
   /// Where `id` is now, or -1 where it has gone. Called with the lock held.
   int find(const std::string &id) const {
@@ -183,8 +185,13 @@ public:
       out->boolVal = VARIANT_TRUE;
       break;
     case UIA_IsKeyboardFocusablePropertyId:
+      // What the keyboard moves between: what can be pressed or set.
       out->vt = VT_BOOL;
-      out->boolVal = VARIANT_FALSE;
+      out->boolVal = focusable(node.role) && !root ? VARIANT_TRUE : VARIANT_FALSE;
+      break;
+    case UIA_HasKeyboardFocusPropertyId:
+      out->vt = VT_BOOL;
+      out->boolVal = !root && node.id == state->focus ? VARIANT_TRUE : VARIANT_FALSE;
       break;
     case UIA_FrameworkIdPropertyId:
       string(L"Driftbox", out);
@@ -286,7 +293,8 @@ public:
     return S_OK;
   }
 
-  HRESULT STDMETHODCALLTYPE SetFocus() override { return S_OK; }
+  // The app moves the keyboard there, and says so when it has.
+  HRESULT STDMETHODCALLTYPE SetFocus() override { return ask(4, 0); }
 
   HRESULT STDMETHODCALLTYPE get_FragmentRoot(IRawElementProviderFragmentRoot **out) override {
     if (!out) return E_POINTER;
@@ -331,6 +339,15 @@ public:
   HRESULT STDMETHODCALLTYPE GetFocus(IRawElementProviderFragment **out) override {
     if (!out) return E_POINTER;
     *out = nullptr;
+    std::string focus;
+    {
+      std::lock_guard<std::mutex> hold(state->lock);
+      if (!state->alive) return UIA_E_ELEMENTNOTAVAILABLE;
+      if (state->find(state->focus) <= 0) return S_OK;
+      focus = state->focus;
+    }
+    Element *found = state->element(focus, state);
+    *out = found ? static_cast<IRawElementProviderFragment *>(found) : nullptr;
     return S_OK;
   }
 
@@ -406,6 +423,8 @@ private:
     default: return false;
     }
   }
+
+  static bool focusable(int32_t role) { return role == button || role == toggle || role == slider; }
 
   static int controlType(int32_t role) {
     switch (role) {
@@ -641,6 +660,31 @@ void dbax_update(DBAX *ax, const DBAXNode *nodes, int32_t count) {
           UiaRaiseStructureChangedEvent(root, StructureChangeType_ChildrenInvalidated, nullptr, 0);
           root->Release();
         }
+      }
+    });
+  }
+  state->wake.notify_one();
+}
+
+void dbax_focus(DBAX *ax, const char *id) {
+  if (!ax) return;
+  std::string focus = id ? id : "";
+  {
+    std::lock_guard<std::mutex> hold(ax->state->lock);
+    if (ax->state->focus == focus) return;
+    ax->state->focus = focus;
+  }
+  if (focus.empty()) return;
+  // Told on the telling thread, as a change is: a screen reader asks about where the keyboard went
+  // before the telling returns.
+  auto state = ax->state;
+  {
+    std::lock_guard<std::mutex> hold(state->jobsLock);
+    state->jobs.push_back([state, focus] {
+      if (!UiaClientsAreListening()) return;
+      if (Element *element = state->element(focus, state)) {
+        UiaRaiseAutomationEvent(element, UIA_AutomationFocusChangedEventId);
+        element->Release();
       }
     });
   }

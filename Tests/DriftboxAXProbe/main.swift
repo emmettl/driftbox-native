@@ -2,7 +2,7 @@
 // reading a window's controls through Windows' UI Automation and acting on them.
 //
 //   DriftboxAXProbe <window> describe
-//   DriftboxAXProbe <window> invoke|toggle <automation id>
+//   DriftboxAXProbe <window> invoke|toggle|focus <automation id>
 //   DriftboxAXProbe <window> set <automation id> <value>
 //
 // The window is its handle, in decimal. What it read is written to standard output; it exits 0
@@ -15,7 +15,7 @@
   guard arguments.count >= 3, let handle = UInt(arguments[1]),
     let window = UnsafeMutableRawPointer(bitPattern: handle)
   else {
-    print("usage: DriftboxAXProbe <window> describe|invoke|toggle|set …")
+    print("usage: DriftboxAXProbe <window> describe|invoke|toggle|focus|set …")
     ExitProcess(64)
   }
   var done = false
@@ -27,8 +27,9 @@
       String(decoding: text.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self), terminator: "")
   case ("invoke", 4): done = axclient_invoke(window, arguments[3])
   case ("toggle", 4): done = axclient_toggle(window, arguments[3])
+  case ("focus", 4): done = axclient_focus(window, arguments[3])
   case ("set", 5): done = axclient_set(window, arguments[3], Double(arguments[4]) ?? .nan)
-  default: print("usage: DriftboxAXProbe <window> describe|invoke|toggle|set …")
+  default: print("usage: DriftboxAXProbe <window> describe|invoke|toggle|focus|set …")
   }
   ExitProcess(done ? 0 : 1)
 #endif

@@ -17,12 +17,9 @@ extension RackInterface {
   /// one that does nothing now.
   @discardableResult
   public func perform(_ asked: AccessibilityAction) -> Bool {
-    let id: String
-    switch asked {
-    case .press(let control), .set(let control, _), .increment(let control), .decrement(let control):
-      id = control
-    }
-    guard let handle = described().handlers[id] else { return false }
+    // Where the keyboard is, the window's business, not the controls'.
+    if case .focus = asked { return false }
+    guard let handle = described().handlers[asked.control] else { return false }
     handle(asked)
     return true
   }
@@ -82,7 +79,7 @@ extension RackInterface {
       case .set(_, let value): wanted = value
       case .increment: wanted = rack.tempo + 1
       case .decrement: wanted = rack.tempo - 1
-      case .press: return
+      case .press, .focus: return
       }
       let next = max(20, min(300, wanted.rounded()))
       guard next != rack.tempo else { return }
@@ -100,28 +97,16 @@ extension RackInterface {
         id: "header", role: .group, name: "Rack", frame: frame(stage.header), children: header))
 
     if rack.flipped {
-      children.append(back(stage, placed: placed))
+      children.append(back(stage, placed: placed, handlers: &handlers))
     } else {
       for face in stage.faces {
         children.append(module(face, stage: stage, placed: placed, handlers: &handlers))
       }
     }
 
-    // A Combinator's routing, open beside the rack: for now, what it is and the way to close it.
+    // A Combinator's routing, open beside the rack.
     if let routing = stage.routing {
-      let name = stage.faces.first { $0.module.id == routing.combi.id }.map(Self.name(of:)) ?? "Combinator"
-      handlers["routing.close"] = pressed(.routing(.close), under: routing.close)
-      children.append(
-        AccessibilityNode(
-          id: "routing", role: .group, name: "\(name)'s routing", frame: frame(routing.frame),
-          children: [
-            AccessibilityNode(
-              id: "routing.close", role: .button, name: "Close the routing", frame: frame(routing.close)),
-            AccessibilityNode(
-              id: "routing.routes", role: .text,
-              name: "\(rack.patch.modulation.count) routing\(rack.patch.modulation.count == 1 ? "" : "s")",
-              value: "Not described to screen readers yet"),
-          ]))
+      children.append(self.routing(routing, stage: stage, handlers: &handlers))
     }
 
     return (AccessibilityNode(id: "window", role: .group, name: "", children: children), handlers)
@@ -180,6 +165,7 @@ extension RackInterface {
         case .set(_, let value): wanted = Int(value.rounded())
         case .increment: wanted = cell.value + 1
         case .decrement: wanted = cell.value - 1
+        case .focus: return
         case .press:
           // As a click on it does, where a click does anything.
           if let click = cell.click { press(click, on: id) }
@@ -298,7 +284,7 @@ extension RackInterface {
       case .set(_, let value): wanted = value
       case .increment: wanted = now + notch
       case .decrement: wanted = now - notch
-      case .press: return
+      case .press, .focus: return
       }
       let clamped = max(def.min, min(def.max, wanted))
       let next = whole ? RackDisplay.jsRound(clamped) : clamped
@@ -340,33 +326,6 @@ extension RackInterface {
     guard def.stepped, def.max - def.min == 1 else { return false }
     return def.name.split(separator: " ").contains { $0 == "Mute" || $0 == "Solo" }
       || labels?.map { $0.lowercased() } == ["off", "on"]
-  }
-
-  // MARK: - The back
-
-  /// The back, turned round to: each cable, from what to what, as words. Patching with a screen
-  /// reader comes later.
-  func back(_ stage: RackStage, placed: (Rect) -> SIMD4<Float>) -> AccessibilityNode {
-    let names = Dictionary(
-      stage.faces.map { ($0.module.id, Self.name(of: $0)) }, uniquingKeysWith: { a, _ in a })
-    let modules = Dictionary(rack.patch.modules.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-    func port(_ end: PortReference, out: Bool) -> String {
-      let def = modules[end.module].flatMap { RackModules.registry[$0.type] }
-      let ports = out ? def?.outlets : def?.inlets
-      let port = ports?.first { $0.id == end.port }?.name ?? end.port
-      return "\(names[end.module] ?? end.module) \(port)"
-    }
-    var cables = rack.patch.cables.enumerated().map { index, cable in
-      AccessibilityNode(
-        id: "cable.\(index)", role: .text, name: port(cable.from, out: true),
-        value: "to \(port(cable.to, out: false))")
-    }
-    if cables.isEmpty {
-      cables.append(AccessibilityNode(id: "cable.none", role: .text, name: "No cables"))
-    }
-    return AccessibilityNode(
-      id: "back", role: .group, name: "The back, where the cables are",
-      frame: SIMD4(stage.area.x, stage.area.y, stage.area.width, stage.area.height), children: cables)
   }
 
   // MARK: - Words

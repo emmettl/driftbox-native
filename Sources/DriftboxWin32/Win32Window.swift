@@ -164,6 +164,17 @@
 
     public var isDescribed: Bool { accessibility.map { dbax_is_described($0) } ?? false }
 
+    public func focus(_ id: String?) {
+      guard let accessibility else { return }
+      dbax_focus(accessibility, id)
+    }
+
+    /// As Narrator, NVDA and JAWS tell Windows they are running.
+    public var screenReaderIsOn: Bool {
+      var on: WindowsBool = false
+      return SystemParametersInfoW(UINT(SPI_GETSCREENREADER), 0, &on, 0) && on.boolValue
+    }
+
     /// The tree as the provider takes it: each node before what it holds, in pixels, its strings
     /// laid end to end in one buffer that lives for the call.
     public func describe(_ root: AccessibilityNode) {
@@ -225,6 +236,7 @@
       case 1: asked = .set(control, value)
       case 2: asked = .increment(control)
       case 3: asked = .decrement(control)
+      case 4: asked = .focus(control)
       default: asked = .press(control)
       }
       let window = inbox.window

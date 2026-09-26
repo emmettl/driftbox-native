@@ -58,6 +58,10 @@ final class StandInWindow: ShellWindow {
   var isDescribed = false
   var described: [AccessibilityNode] = []
   func describe(_ root: AccessibilityNode) { described.append(root) }
+  var screenReaderIsOn = false
+  /// Where the keyboard was said to be, each time it was.
+  var focusedIds: [String?] = []
+  func focus(_ id: String?) { focusedIds.append(id) }
   /// The visuals windows made, the last the one in use.
   var visualsWindows: [StandInVisualsWindow] = []
   func makeVisualsWindow() -> (any ShellVisualsWindow)? {
@@ -375,6 +379,63 @@ struct DesktopTests {
     window.onEvent?(.accessibility(.press("rack.add")))
     #expect(window.popped.last?.title == "Add")
     #expect(!desktop.session.isPlaying, "the groovebox's own untouched")
+  }
+
+  /// With a screen reader running, Tab and Shift+Tab move the keyboard between the controls, which
+  /// the screen reader is told at once; Enter presses the one it is on, and the arrows turn a
+  /// slider. Without one, Tab is the shortcut it always was, and the keys are the instrument's.
+  @Test func theKeyboardMovesBetweenTheControls() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Groove")
+    window.isDescribed = true
+    func press(_ key: Key, _ modifiers: Modifiers = []) {
+      window.onEvent?(.key(KeyEvent(key: key, modifiers: modifiers)))
+    }
+    func tab() -> Shortcut? {
+      window.menuBar?.commands.first { $0.id == DesktopMenus.controls }?.shortcut
+    }
+
+    press(.tab)
+    #expect(window.focusedIds.compactMap { $0 }.isEmpty, "no screen reader, nowhere to move")
+    #expect(tab() == Shortcut(.tab, []))
+
+    window.screenReaderIsOn = true
+    try desktop.drawFrame()
+    #expect(tab() == nil, "Tab is the screen reader's now")
+    press(.tab)
+    let first = try #require(window.focusedIds.last ?? nil)
+    let controls = desktop.described.flattened.filter { Desktop.focusable($0.role) }
+    #expect(first == controls.first?.id, "the first control")
+    press(.tab, .shift)
+    #expect(window.focusedIds.last == controls.last?.id, "and back round to the last")
+    press(.tab)
+    #expect(window.focusedIds.last == first)
+
+    // Pressed where it is: the metronome clicks, and stops.
+    window.onEvent?(.accessibility(.focus("transport.metronome")))
+    press(.return)
+    #expect(desktop.session.metronome)
+    press(.return)
+    #expect(!desktop.session.metronome)
+
+    // A screen reader moves it too, and the arrows turn what it is on.
+    window.onEvent?(.accessibility(.focus("number.tempo")))
+    #expect(window.focusedIds.last == "number.tempo")
+    press(.up)
+    #expect(desktop.session.song?.bpm == 121)
+    press(.left)
+    press(.left)
+    #expect(desktop.session.song?.bpm == 119)
+    try desktop.drawFrame()
+    #expect(desktop.focusFrame != nil, "ringed")
+
+    // Put away, there is nothing to be on; and Tab brings the controls back.
+    desktop.interface.isShowing = false
+    desktop.describeNow()
+    #expect(window.focusedIds.last == .some(nil))
+    press(.tab)
+    #expect(desktop.interface.isShowing)
   }
 
   /// Transport ▸ Clear Loop: whatever is looping, one section or several stretched across, which

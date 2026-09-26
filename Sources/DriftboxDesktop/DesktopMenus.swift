@@ -83,10 +83,12 @@ public enum DesktopMenus {
   }
 
   /// The menus for `session`, and for `rack` when there is one: the Edit menu undoes in whichever
-  /// shows. While a movie is being written, the File menu stops it.
+  /// shows. While a movie is being written, the File menu stops it. With a `screenReader` running,
+  /// Tab moves between the controls, and is no shortcut.
   @MainActor
   public static func bar(
-    for session: Session, rack: RackSession? = nil, showsRack: Bool = false, writingMovie: Bool = false,
+    for session: Session, rack: RackSession? = nil, showsRack: Bool = false, screenReader: Bool = false,
+    writingMovie: Bool = false,
     displays: [String] = [], visualsWindow: Bool = false, recent: [String]? = nil
   ) -> MenuBar {
     // The songs opened lately, where the app keeps them.
@@ -155,8 +157,8 @@ public enum DesktopMenus {
             // Tab turns the rack round while it shows, as it does on the Mac; the controls are the
             // groovebox's.
             showsRack
-              ? .command("Show Back", id: rackBack, shortcut: Shortcut(.tab, []))
-              : .command("Show Controls", id: controls, shortcut: Shortcut(.tab, [])),
+              ? .command("Show Back", id: rackBack, shortcut: screenReader ? nil : Shortcut(.tab, []))
+              : .command("Show Controls", id: controls, shortcut: screenReader ? nil : Shortcut(.tab, [])),
             .separator,
             .command("Run the Visuals", id: visuals),
           ] + visualsItems + [

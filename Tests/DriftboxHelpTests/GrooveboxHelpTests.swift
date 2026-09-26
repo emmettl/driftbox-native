@@ -17,9 +17,9 @@ struct GrooveboxHelpTests {
     #expect(Self.mac.topic("nothing") == nil)
   }
 
-  /// A browser's library, a link to share and the web's reset are the web's alone.
-  @Test func nothingOnlyTheWebHas() {
-    let words = Self.mac.topics.flatMap { topic in
+  /// Everything a guide says, heading by heading.
+  static func words(_ guide: HelpGuide) -> [String] {
+    guide.topics.flatMap { topic in
       topic.parts.flatMap { part -> [String] in
         var said = [part.heading] + (part.note.map { [$0] } ?? [])
         switch part.body {
@@ -32,7 +32,34 @@ struct GrooveboxHelpTests {
         return said
       }
     }
+  }
+
+  /// A browser's library, a link to share and the web's reset are the web's alone.
+  @Test func nothingOnlyTheWebHas() {
+    let words = Self.words(Self.mac)
     for web in ["browser", "URL", "Share", "Library", "Backspace", "Enter "] {
+      #expect(!words.contains { $0.contains(web) }, "\(web)")
+    }
+  }
+}
+
+/// The rack's guide: the reference's topics, but for the performance views and the automation desk
+/// this rack has not got, and nothing only the web has.
+struct RackHelpTests {
+  static let mac = RackHelp.guide(for: .mac)
+
+  @Test func theTopicsAreTheReferences() {
+    #expect(Self.mac.title == "Rack guide")
+    #expect(Self.mac.topics.map(\.id) == ["start", "patching", "modules", "playing", "silence", "keys"])
+    for topic in Self.mac.topics {
+      #expect(!topic.parts.isEmpty, "\(topic.id)")
+      #expect(Set(topic.parts.map(\.heading)).count == topic.parts.count, "\(topic.id)'s headings differ")
+    }
+  }
+
+  @Test func nothingOnlyTheWebHas() {
+    let words = GrooveboxHelpTests.words(Self.mac)
+    for web in ["browser", "URL", "Library", "Start audio", "Automation desk", "VCV", "Pencil"] {
       #expect(!words.contains { $0.contains(web) }, "\(web)")
     }
   }

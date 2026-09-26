@@ -113,5 +113,24 @@
       #expect(Self.heard(window, { events }, .accessibility(.press("top"))))
       #expect(try !Self.run(window, "invoke", "play").done, "a toggle is not a button")
     }
+
+    /// The keyboard on a control, as the app says: read as focused, and only that one. And a screen
+    /// reader moving it there arrives as the window's event.
+    @Test func theKeyboardsControlIsRead() throws {
+      let window = try Win32Window(title: "Driftbox test", width: 320, height: 200, visible: false)
+      defer { window.close() }
+      var events: [ShellEvent] = []
+      window.onEvent = { events.append($0) }
+      window.describe(Self.controls())
+      window.focus("tempo")
+      let text = try Self.run(window, "describe").text
+      let focused = text.split(whereSeparator: \.isNewline).filter { $0.hasSuffix(" focused") }
+      #expect(focused.count == 1 && focused.first?.contains("[tempo]") == true, "\(text)")
+      window.focus(nil)
+      #expect(try !Self.run(window, "describe").text.contains(" focused"))
+
+      #expect(try Self.run(window, "focus", "play").done)
+      #expect(Self.heard(window, { events }, .accessibility(.focus("play"))))
+    }
   }
 #endif

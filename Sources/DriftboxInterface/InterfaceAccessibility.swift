@@ -14,12 +14,9 @@ extension Interface {
   /// What a screen reader asked, done as a hand would do it; false for a control there is not.
   @discardableResult
   public func perform(_ asked: AccessibilityAction) -> Bool {
-    let id: String
-    switch asked {
-    case .press(let control), .set(let control, _), .increment(let control), .decrement(let control):
-      id = control
-    }
-    guard let handle = described().handlers[id] else { return false }
+    // Where the keyboard is, the window's business, not the controls'.
+    if case .focus = asked { return false }
+    guard let handle = described().handlers[asked.control] else { return false }
     handle(asked)
     return true
   }
@@ -238,7 +235,7 @@ extension Interface {
       case .set(_, let value): wanted = value
       case .increment: wanted = now + Self.notch(target)
       case .decrement: wanted = now - Self.notch(target)
-      case .press: return
+      case .press, .focus: return
       }
       let clamped = min(range.upperBound, max(range.lowerBound, wanted))
       let next = target.isNumber ? clamped.rounded() : clamped
@@ -291,7 +288,7 @@ extension Interface {
         case .set(_, let value): wanted = Int(value.rounded())
         case .increment: wanted = now + 1
         case .decrement: wanted = now - 1
-        case .press: return
+        case .press, .focus: return
         }
         let next = min(highest, max(lowest, wanted))
         // The note set, as a click on its cell sets it; the same note again would pause it instead.

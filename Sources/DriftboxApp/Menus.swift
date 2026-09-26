@@ -121,6 +121,8 @@
       CommandGroup(replacing: .help) {
         Button("Groovebox Guide") { openWindow(id: "help") }
           .keyboardShortcut("?", modifiers: .command)
+        Button("Rack Guide") { openWindow(id: "rack-help") }
+          .keyboardShortcut("?", modifiers: [.command, .option])
       }
 
       CommandMenu("Transport") {

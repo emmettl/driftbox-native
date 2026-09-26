@@ -71,4 +71,13 @@ public enum AccessibilityAction: Sendable, Equatable {
   /// A slider turned a notch up or down.
   case increment(String)
   case decrement(String)
+  /// The keyboard moved to a control.
+  case focus(String)
+
+  /// The control it is asked of.
+  public var control: String {
+    switch self {
+    case .press(let id), .set(let id, _), .increment(let id), .decrement(let id), .focus(let id): id
+    }
+  }
 }

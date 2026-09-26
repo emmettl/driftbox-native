@@ -8,9 +8,17 @@
     let guide: HelpGuide
     @State private var topic: String?
 
-    /// The groovebox's guide, as it is on the Mac.
-    public init() {
-      self.init(guide: GrooveboxHelp.guide(for: .mac))
+    /// Which of the app's guides a window shows.
+    public enum Which: Sendable {
+      case groovebox, rack
+    }
+
+    /// The groovebox's guide or the rack's, as it is on the Mac.
+    public init(_ which: Which = .groovebox) {
+      switch which {
+      case .groovebox: self.init(guide: GrooveboxHelp.guide(for: .mac))
+      case .rack: self.init(guide: RackHelp.guide(for: .mac))
+      }
     }
 
     init(guide: HelpGuide) {
