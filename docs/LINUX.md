@@ -132,13 +132,18 @@ To add the graphical development desktop to a minimal cloud guest:
 
 ```sh
 sudo apt-get install --no-install-recommends ubuntu-desktop-minimal gnome-terminal spice-vdagent
+# The cloud kernel omits the emulated HDA sound-card driver.
+sudo apt-get install --no-install-recommends "linux-modules-extra-$(uname -r)" rtkit
+sudo modprobe snd_hda_intel
 sudo usermod -aG render "$USER"
 sudo systemctl set-default graphical.target
 sudo systemctl start gdm3
 ```
 
 Reconnect SSH after changing groups so the account can use the virtual GPU render node.
-Choose a desktop password with `passwd`; the bootstrap deliberately does not set one.
+Choose a desktop password with `sudo passwd "$USER"`; the bootstrap deliberately does not set one.
+After kernel upgrades, install the matching `linux-modules-extra` package again, or use Ubuntu's
+`linux-image-generic` metapackage to track the complete kernel and modules together.
 
 Run `scripts/linux-build.sh doctor`, `build`, `gpu`, `test`, `bench`, or `render` **inside Linux**.
 `gpu` invokes `driftbox-play --gpu-info`, reports the actual GLES renderer and verifies a red
@@ -171,7 +176,7 @@ has been copied into `/home/driftbox/driftbox-native`, and shell syntax checks p
 The disk has been expanded to 50 GiB and Ubuntu automatically grew the root filesystem to about
 48 GiB usable (about 40 GiB free after installing the toolchain and desktop). A SHA-256-verified
 backup of the original imported disk is under `Virtual Machines/Backups` on StudioData.
-Ubuntu's minimal GNOME desktop and GDM are installed; the graphical login screen works.
+Ubuntu's minimal GNOME desktop and GDM are installed; the user has set a password and signed in.
 Swift 6.4.0, Mesa, GTK/Pango, PipeWire and ALSA development dependencies are installed.
 
 Both `driftbox-render` and `driftbox-play` build inside Ubuntu ARM64. An offline render of
@@ -192,7 +197,11 @@ Validation in Ubuntu ARM64:
   working offscreen graphics; it does not qualify window presentation, latency or native GPU speed.
 - Guest logs are `~/driftbox-linux-{tests,gpu,gpu-tests,desktop-tests}.log`; the verified audio file
   is `~/driftbox-linux-smoke.wav`.
-No Linux audio or desktop adapter is implemented yet.
+
+The signed-in session runs PipeWire, WirePlumber and RTKit. Installing the missing HDA kernel
+module replaced Dummy Output with Built-in Audio Analog Stereo. `pw-play` successfully sent the
+two-second offline render to that output; audible playback at the Mac speakers is not independently
+confirmed. No Linux Driftbox audio or desktop adapter is implemented yet.
 
 macOS `driftbox-play` also builds successfully with its scratch directory on StudioData.
 Swift formatting, shell syntax and `git diff --check` pass; both provisioning/build scripts refuse
@@ -212,7 +221,7 @@ in the initial cloud image. To choose a desktop password, run this interactively
 then sign in as `driftbox` in UTM (SSH remains key-only):
 
 ```sh
-ssh -t -F '/Volumes/StudioData/Virtual Machines/Driftbox Access/ssh_config' driftbox-linux passwd
+ssh -t -F '/Volumes/StudioData/Virtual Machines/Driftbox Access/ssh_config' driftbox-linux sudo passwd driftbox
 ```
 
 The guest account has passwordless sudo for development. Automatic desktop login is not enabled.
