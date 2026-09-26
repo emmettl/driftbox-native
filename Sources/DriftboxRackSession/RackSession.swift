@@ -102,7 +102,7 @@ public enum RackPluginFailure: Error, Equatable {
 /// structural one recompiles the patch, a knob only moves its slot.
 ///
 /// What is a platform's comes in by the ports: `AudioRouting` for where it sounds, as the session's
-/// does; `RackPluginHosting` for the plug-ins it can make; `SampleDecoding` for the audio files it
+/// does; `AudioCapturing` for what the Audio Input module hears; `RackPluginHosting` for the plug-ins it can make; `SampleDecoding` for the audio files it
 /// can read. The app calls `tick` as often as it draws, for the meters and the song's bar.
 @MainActor @Observable
 public final class RackSession: MIDIListener {
@@ -201,6 +201,7 @@ public final class RackSession: MIDIListener {
 
   @ObservationIgnored public let host: RackHost
   @ObservationIgnored private let audio: (any AudioRouting)?
+  @ObservationIgnored private let capture: (any AudioCapturing)?
   @ObservationIgnored private let pluginHost: (any RackPluginHosting)?
   /// Whether the platform makes plug-ins at all: where it does not, there are none to offer.
   public var hostsPlugins: Bool { pluginHost != nil }
@@ -232,17 +233,71 @@ public final class RackSession: MIDIListener {
   /// Called with the patch as a document, and its name, whenever it is saved: for a platform that
   /// keeps it somewhere of its own too, as a plug-in host keeps its plug-ins' state.
   @ObservationIgnored public var onSave: ((_ document: String, _ name: String) -> Void)?
+  /// Closed, and not to listen to anything again.
+  @ObservationIgnored private var closed = false
+
+  // MARK: Live input
+
+  /// Whether the platform can listen at all: where it cannot, there is no input to choose, and the
+  /// Audio Input module hears nothing.
+  public var takesInput: Bool { capture != nil }
+  /// The device chosen to listen to, by its id; nil for whatever the system listens to.
+  public var inputDevice: String? {
+    didSet {
+      capture?.chosen = inputDevice
+      memory?.set(inputDevice ?? "", forKey: Self.inputKey)
+      nameInputDevice()
+    }
+  }
+  /// The chosen device's name, remembered with it, for saying which device it is while it is not
+  /// plugged in.
+  public private(set) var inputDeviceName: String?
+  /// Every device there is to listen to, kept up to date as they come and go.
+  public private(set) var inputs: [AudioDevice] = []
+  /// The one being heard, while the patch has an Audio Input module: the chosen one while it is
+  /// there, the system's while it is not.
+  public private(set) var hearing: AudioDevice?
+  /// The device the system listens to.
+  public private(set) var systemInput: AudioDevice?
+  /// Why the Audio Input module hears nothing, while it should hear something.
+  public private(set) var inputError: String?
+
+  public static let inputKey = "rack.input"
+  public static let inputNameKey = "rack.input.name"
+
+  private func nameInputDevice() {
+    guard let chosen = inputDevice else {
+      guard inputDeviceName != nil else { return }
+      inputDeviceName = nil
+      memory?.set("", forKey: Self.inputNameKey)
+      return
+    }
+    guard let found = inputs.first(where: { $0.id == chosen }), found.name != inputDeviceName else { return }
+    inputDeviceName = found.name
+    memory?.set(found.name, forKey: Self.inputNameKey)
+  }
+
+  /// Listening while the rack is sounding a patch with an Audio Input module in it, and only then:
+  /// a patch without one leaves the microphone alone.
+  private func settleInput() {
+    guard let capture else { return }
+    let wanted = live && !closed && patch.modules.contains { $0.type == "audio-input" } ? host.input : nil
+    if capture.destination !== wanted { capture.destination = wanted }
+  }
 
   /// A rack on a host of its own at `sampleRate`, playing through `audio` if there is one, and
   /// making no sound until something renders it if there is not. Not `awake`, it is not played
   /// through `audio` until `wake` is called: a rack beside the groovebox that nobody has opened
   /// yet costs nothing, where rendered it costs a phone a tenth of the audio's time, silent.
+  /// `input` is what its Audio Input modules hear, where the platform can listen.
   public init(
-    sampleRate: Double = 48000, audio: (any AudioRouting)? = nil, plugins: (any RackPluginHosting)? = nil,
-    decoder: any SampleDecoding = WAVDecoder(), memory: (any RackMemory)? = nil, awake: Bool = true
+    sampleRate: Double = 48000, audio: (any AudioRouting)? = nil, input: (any AudioCapturing)? = nil,
+    plugins: (any RackPluginHosting)? = nil, decoder: any SampleDecoding = WAVDecoder(),
+    memory: (any RackMemory)? = nil, awake: Bool = true
   ) {
     host = RackHost(sampleRate: sampleRate)
     self.audio = audio
+    capture = input
     pluginHost = plugins
     self.decoder = decoder
     self.memory = memory
@@ -252,6 +307,20 @@ public final class RackSession: MIDIListener {
     name = saved == nil ? first?.name ?? "Untitled" : memory?.string(forKey: Self.savedNameKey) ?? "Untitled"
     ccBindings = RackCC.load(memory)
     patch = applyModulation(patch, registry: RackModules.registry)
+    if let input {
+      inputDevice = memory?.string(forKey: Self.inputKey).flatMap { $0.isEmpty ? nil : $0 }
+      inputDeviceName = memory?.string(forKey: Self.inputNameKey).flatMap { $0.isEmpty ? nil : $0 }
+      input.chosen = inputDevice
+      input.onChange = { [weak self, weak input] in
+        guard let self, let input else { return }
+        inputs = input.devices
+        nameInputDevice()
+        hearing = input.current
+        systemInput = input.systemDefault
+        inputError = input.error
+      }
+      input.onChange?()
+    }
     rebuild()
     if awake { wake() }
   }
@@ -272,6 +341,8 @@ public final class RackSession: MIDIListener {
   /// Stop sounding: the host let go of by the audio it was playing through.
   public func close() {
     allNotesOff()
+    closed = true
+    settleInput()
     audio?.detach(host.renderSource.context)
     for id in Array(unitIds.keys) { dropUnit(id) }
   }
@@ -288,6 +359,7 @@ public final class RackSession: MIDIListener {
     live = true
     host.load(patch)
     sendSong()
+    settleInput()
     if let loop = songLoop { host.loopSong(startBar: loop.start, bars: loop.bars) }
     host.setTransport(tempo: tempo, running: running, shuffle: swing)
   }
@@ -405,6 +477,7 @@ public final class RackSession: MIDIListener {
     }
     self.delayed = delayed
     self.folded = folded
+    settleInput()
     for (channel, keyboard) in keyboards where keyboard.voices != voices {
       var keyboard = keyboard
       let silenced = keyboard.setVoices(voices)
