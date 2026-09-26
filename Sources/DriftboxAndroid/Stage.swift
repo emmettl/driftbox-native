@@ -39,16 +39,31 @@
     private var frames = 0
     private var said = "starting"
 
-    /// The catalogue's song `id` played, with the scene called `scene` drawn from it, or the one the
-    /// song names, on a screen of `density` pixels to a point.
-    init?(song id: String, scene: String?, density: Float, typesetter: any Typesetter) {
-      guard let entry = Catalogue.entries().first(where: { $0.id == id }) else { return nil }
+    /// The catalogue's song `id` played, or with none the one open last, or acid, with the scene
+    /// called `scene` drawn from it, or the one the song names, on a screen of `density` pixels to
+    /// a point. What the app remembers — its settings, the song, the rack's patch and the
+    /// controllers learnt onto it — is kept in `memory`.
+    init?(song id: String?, scene: String?, density: Float, typesetter: any Typesetter, memory: FileMemory) {
+      let entries = Catalogue.entries()
+      if let id, !entries.contains(where: { $0.id == id }) { return nil }
       host = EngineHost(sampleRate: 48000)
       route = AAudioRoute(hop: { [lost] _ in lost.raise() })
-      session = Session(host: host, audio: route)
-      session.open(entry)
+      session = Session(host: host, audio: route, memory: memory)
+      if let id, let entry = entries.first(where: { $0.id == id }) {
+        session.open(entry)
+      } else {
+        // The song open last, which `restore` opens stopped, played as any song here is.
+        session.restore()
+        if session.song == nil, let acid = entries.first(where: { $0.id == "acid" }) {
+          session.open(acid)
+        } else {
+          session.play()
+        }
+      }
       // Asleep until it is first shown: until then there is nothing it could be playing.
-      rack = RackSession(sampleRate: 48000, audio: route, decoder: MediaDecoder(), awake: false)
+      rack = RackSession(
+        sampleRate: 48000, audio: route, decoder: MediaDecoder(), memory: RackFileMemory(memory),
+        awake: false)
       guard session.song != nil, let device = try? GLESDevice(),
         let screen = try? Touchscreen(
           session: session, device: device, typesetter: typesetter, scale: density, scene: scene)
@@ -234,5 +249,14 @@
     private let raised = Atomic<Bool>(false)
     func raise() { raised.store(true, ordering: .releasing) }
     func take() -> Bool { raised.exchange(false, ordering: .acquiringAndReleasing) }
+  }
+
+  /// The rack keeps its patch, and the controllers learnt onto it, in the file the session keeps the
+  /// rest in.
+  final class RackFileMemory: RackMemory {
+    let file: FileMemory
+    init(_ file: FileMemory) { self.file = file }
+    func string(forKey key: String) -> String? { file.string(forKey: key) }
+    func set(_ value: Any?, forKey key: String) { file.set(value, forKey: key) }
   }
 #endif

@@ -776,7 +776,8 @@ each question, and the rest is Android's alone:
    heads the strip, and a tap on it is the song's menu — Open…, Save, Save As… and the catalogue's
    songs — with Android's own pickers; a document is read and written whole by Java, and known to
    the session by its URI, so Save goes back to where it came from, and Android asks before
-   unsaved edits are lost. The build leaves out Foundation's internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
+   unsaved edits are lost. What the desktops keep in their preferences, it keeps in a file of its
+   own, `FileMemory`: the song open last, its settings, the output, and the rack's patch. The build leaves out Foundation's internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
    `DriftboxDocument` takes Foundation only to write a WAV. The Play Store, or F-Droid, when
    Driftbox is public.
 

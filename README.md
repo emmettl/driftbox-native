@@ -484,6 +484,11 @@ go, each with an ID that stays the same when it is plugged in again; the song's 
 under Output, beside Automatic, which is wherever Android sends the sound. A device chosen and
 unplugged is kept, and Automatic played through until it is back.
 
+What the app remembers between launches — the song open last, which it plays when started without
+one, the click and the other settings, the output chosen, and the rack's patch and the controllers
+learnt onto it — is in `settings.json` among its own files, written by `FileMemory`, since
+`UserDefaults` is the old Foundation's there.
+
 MIDI is Android's native MIDI, which needs Android 10, so Driftbox builds for API 29. It can play
 through a device but not find or open one: that is Java's `MidiManager`. So the app opens every
 device and hands each to `AMidiDevices`, and `AMidiInput` and `AMidiOutput` open their ports from
