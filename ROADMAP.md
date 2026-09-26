@@ -794,8 +794,11 @@ each question, and the rest is Android's alone:
    the session by its URI, so Save goes back to where it came from, and Android asks before
    unsaved edits are lost. What the desktops keep in their preferences, it keeps in a file of its
    own, `FileMemory`: the song open last, its settings, the output, and the rack's patch. The build leaves out Foundation's internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
-   `DriftboxDocument` takes Foundation only to write a WAV. The Play Store, or F-Droid, when
-   Driftbox is public.
+   `DriftboxDocument` takes Foundation only to write a WAV. Ready for a store: an adaptive icon,
+   drawn as vectors from the Mac's picture; a release built without the phone's tests and their
+   MIDI loopback, which every other app would list; built for Android 16, named rather than
+   whatever the machine has newest; and MIDI wanted but not required, so that Google Play offers
+   it to a phone without. The Play Store, or F-Droid, when Driftbox is public.
 
 ### The touch interface
 

@@ -523,11 +523,14 @@ scaled up to the screen: on a Fairphone 6, which has three, every scene but Fros
 display's 120 frames a second, and Frost 98. Graphic Lab, which sets its type there with Android's
 own text stack, takes 5.6ms a frame drawn, and more over its first frames at a size, while the
 glyphs it sets go into its atlas. Given a test's name, the app runs that instead and says what
-happened.
+happened; a release has no tests in it, nor the MIDI loopback they test against, which every
+other app on the phone would list. Its icon is an adaptive one, drawn as vectors, the Mac's and the
+web's picture placed as the web's maskable icon places it: `scripts/android-icon.mjs` writes it.
 
 ```bash
 scripts/android-app.sh                  # build and install; open it for Pulse, playing acid
-scripts/android-app.sh build            # build only, with no phone: what CI does
+scripts/android-app.sh build            # build only, with no phone
+scripts/android-app.sh release          # build it as it is released, without the tests: what CI does
 scripts/android-app.sh bundle           # and an App Bundle beside it, for Google Play
 adb shell am start -n app.driftbox/.Main --es song smallhours --es scene hothouse
 scripts/android-app.sh midi-loopback    # test the MIDI ports against the app's own loopback

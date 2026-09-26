@@ -154,12 +154,15 @@ jobs:
             ~/swift/usr/bin/swift sdk install --checksum "$ANDROID_SDK_CHECKSUM" \
               "https://download.swift.org/${SWIFT_RELEASE,,}/android-sdk/$SWIFT_RELEASE/${SWIFT_RELEASE}_android.artifactbundle.tar.gz"
           fi
-      - name: The NDK the SDK was built against
+      - name: The NDK the SDK was built against, and the platform the app targets
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" >/dev/null
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" \
+            "platforms;android-$(sed -n 's/^target_sdk=//p' scripts/android-app.sh)" >/dev/null
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      # As it is released: the checks left out, which differ only in a little Java that every run
+      # of them on a phone builds.
       - name: Build the app
-        run: sh scripts/android-app.sh build
+        run: sh scripts/android-app.sh release
       - name: Build the player
         run: sh scripts/android-build.sh build
 

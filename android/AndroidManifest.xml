@@ -1,19 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The Android app: a song played with its scene drawn from it, playing on with the screen off
-     through a media playback service; the MIDI devices Java can open handed to Swift, and a MIDI
-     device of its own that sends back what it is sent; and a harness that runs a test it is named
-     when started. Built without Gradle by scripts/android-app.sh. -->
+     through a media playback service; and the MIDI devices Java can open handed to Swift, on a
+     phone that has MIDI. Built without Gradle by scripts/android-app.sh, which leaves out of a
+     release what is between the markers below: the checks' MIDI device of the app's own, which
+     sends back what it is sent, and which every other app on the phone would list. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="app.driftbox">
 
-  <uses-feature android:name="android.software.midi" android:required="true" />
+  <!-- Played with MIDI where a phone has it, and without it where it does not. -->
+  <uses-feature android:name="android.software.midi" android:required="false" />
 
   <!-- Playing on unseen: a foreground service of the media playback kind, and its notification. -->
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-  <application android:label="Driftbox" android:hasCode="true" android:extractNativeLibs="false">
+  <application android:label="Driftbox" android:icon="@mipmap/ic_launcher"
+      android:roundIcon="@mipmap/ic_launcher" android:hasCode="true" android:extractNativeLibs="false">
     <!-- One of it, kept through a turn of a tablet, which only resizes its window: made again,
          it would start the song again. -->
     <activity android:name=".Main" android:exported="true" android:launchMode="singleTask"
@@ -29,6 +32,7 @@
     <service android:name=".Playback" android:exported="false"
         android:foregroundServiceType="mediaPlayback" />
 
+    <!-- checks -->
     <!-- Driftbox Loopback: whatever goes into its one input comes back out of its one output. -->
     <service android:name=".LoopbackService"
         android:permission="android.permission.BIND_MIDI_DEVICE_SERVICE"
@@ -39,5 +43,6 @@
       <meta-data android:name="android.media.midi.MidiDeviceService"
           android:resource="@xml/loopback" />
     </service>
+    <!-- end of checks -->
   </application>
 </manifest>
