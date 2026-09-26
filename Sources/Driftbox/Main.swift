@@ -54,7 +54,12 @@
 
       // The guide, beside what it describes rather than over it.
       Window("Groovebox Guide", id: "help") {
-        HelpWindow()
+        HelpWindow(.groovebox)
+      }
+      .defaultSize(width: 760, height: 640)
+
+      Window("Rack Guide", id: "rack-help") {
+        HelpWindow(.rack)
       }
       .defaultSize(width: 760, height: 640)
 
