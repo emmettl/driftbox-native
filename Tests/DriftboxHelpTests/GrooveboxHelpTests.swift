@@ -27,6 +27,7 @@ struct GrooveboxHelpTests {
         case .terms(let terms): said += terms.flatMap { [$0.term, $0.meaning] }
         case .steps(let steps): said += steps.flatMap { [$0.lead, $0.rest] }
         case .keys(let keys): said += keys.flatMap { [$0.keys, $0.does] }
+        case .notes(let notes): said += notes
         }
         return said
       }

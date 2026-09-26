@@ -362,12 +362,15 @@ milestone. Each module's guide first: the reference's export carries the guides 
 sixteen modules into `modules.json`, and `RackGuide` assembles every module's as the reference's
 `ModuleGuide` does — what it does, its signal flow, how it works and what to try first where a
 guide was written, every control and its range, and what to watch for — in words any platform
-lays out. On the Mac it is Guide, first in a module's menu, as a sheet over the rack. Then the
+lays out. On the Mac it is Guide, first in a module's menu, as a sheet over the rack; on Windows
+and Android, whose screens are drawn, the same first item opens it as a `HelpSheet`, a page drawn
+over the rack that wraps its words to its width, scrolls under a wheel or a finger, and closes on
+its cross, off it, or Escape. Then the
 groovebox's guide: `DriftboxHelp` holds help as words any platform lays out — topics of parts,
 each paragraphs, terms, steps or keys — and `GrooveboxHelp` the reference's guide topic for topic,
 saying what each platform's own controls do and leaving out what only the web has. On the Mac it
 is Help ▸ Groovebox Guide (⌘?), a window of its own beside the editor. Left: the drawn apps'
-module guides and help, on Windows and Android; and the rest of what the web app teaches with,
+help, on Windows and Android; and the rest of what the web app teaches with,
 and what a Mac does better:
 
 - **The reference's teaching, ported:** its help dialog, the first-run offer of a tour, the guided

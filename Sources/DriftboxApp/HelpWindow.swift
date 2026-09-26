@@ -92,8 +92,18 @@
           ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
             HStack(alignment: .firstTextBaseline, spacing: 9) {
               Text("\(index + 1)").font(Theme.mono(11, .semibold)).foregroundStyle(Theme.three)
-              (Text(step.lead).bold() + Text(" " + step.rest))
+              (Text(step.lead).bold() + Text(step.lead.isEmpty ? step.rest : " " + step.rest))
                 .font(.system(size: 13)).foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+          }
+        }
+      case .notes(let notes):
+        VStack(alignment: .leading, spacing: 5) {
+          ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+              Text("·").foregroundStyle(Theme.three)
+              Text(note).font(.system(size: 13)).foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
             }
           }
