@@ -93,7 +93,7 @@
         case .separator:
           AppendMenuW(popup, UINT(MF_SEPARATOR), 0, nil)
         case .submenu(let inner):
-          append(popup, title: inner.title, popup: build(inner, numbering: numbering, from: first))
+          append(popup, title: plain(inner.title), popup: build(inner, numbering: numbering, from: first))
         }
       }
       return popup
@@ -108,11 +108,15 @@
     /// An item's text: its title, then a tab and its shortcut, which Windows sets in a column of
     /// its own on the right.
     static func label(for command: MenuItem.Command) -> String {
-      command.shortcut.map { "\(command.title)\t\($0.label)" } ?? command.title
+      command.shortcut.map { "\(plain(command.title))\t\($0.label)" } ?? plain(command.title)
     }
 
     /// A top-level title with its first letter marked, so Alt and that letter opens it.
-    static func mnemonic(_ title: String) -> String { "&" + title.replacingOccurrences(of: "&", with: "&&") }
+    static func mnemonic(_ title: String) -> String { "&" + plain(title) }
+
+    /// A title as it is written: an ampersand in it, as a song or a device may have, is one, and not
+    /// Windows' mark for the letter after it.
+    static func plain(_ title: String) -> String { title.replacingOccurrences(of: "&", with: "&&") }
 
     /// Every command's shortcut as an accelerator, skipping any this keyboard cannot type.
     static func accelerators(for commands: [MenuItem.Command]) -> [ACCEL] {

@@ -195,6 +195,13 @@
 
     public var displays: [String] { Win32Displays.all().map(\.name) }
 
+    /// Into the recent files Windows keeps, which the taskbar's jump list shows for a program that
+    /// opens the file's type.
+    public func addToRecents(_ url: URL) {
+      let path = url.path.replacingOccurrences(of: "/", with: "\\")
+      path.withCString(encodedAs: UTF16.self) { SHAddToRecentDocs(UINT(SHARD_PATHW.rawValue), $0) }
+    }
+
     public func makeVisualsWindow() -> (any ShellVisualsWindow)? { try? Win32VisualsWindow() }
 
     /// In Windows' own message box, with the window's title as its caption.
