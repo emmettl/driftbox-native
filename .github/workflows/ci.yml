@@ -71,6 +71,8 @@ jobs:
         # from an audio or MIDI thread traps here, rather than only in the app.
         env:
           SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE: swift6
+      - name: Linux GPU diagnostics
+        run: swift run driftbox-play --gpu-info
       - name: Audio targets stay constrained
         run: scripts/check-constrained.sh
 

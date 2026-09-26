@@ -44,8 +44,14 @@
         throw GLES.eglError("no EGL display")
       }
       guard eglInitialize(display, nil, nil) == EGL_TRUE else { throw GLES.eglError("EGL would not start") }
+      #if os(Android)
+        let surfaces = EGL_PBUFFER_BIT | EGL_WINDOW_BIT
+      #else
+        // Linux currently draws offscreen. Mesa's surfaceless platform has no window configs.
+        let surfaces = EGL_PBUFFER_BIT
+      #endif
       let wanted: [EGLint] = [
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_SURFACE_TYPE, EGL_PBUFFER_BIT | EGL_WINDOW_BIT,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_SURFACE_TYPE, surfaces,
         EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE,
       ]
       var config: EGLConfig?

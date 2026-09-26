@@ -803,3 +803,15 @@ the rack; compressed recordings, through Android's own media codecs; and a table
 - **The views' logic moves below the views.** Step 2's move of `Player` out of `DriftboxApp`
   goes further: whatever an interface decides that is not drawing goes in a target that iOS,
   Android and the two desktops share.
+
+## Milestone 6 — Linux
+
+The [Linux port plan](docs/LINUX.md) separates the development VM from the application work.
+The shared engine and GLES contract tests already build on Linux. The first task is a reproducible
+ARM64 environment on external storage, followed by PipeWire playback and a real window.
+
+The shell experiment must prove event-loop/MainActor integration and toolkit-owned GLES contexts
+before the toolkit choice is final. Asynchronous dialogs and text/focus input may require shared
+interface changes. The standalone groovebox and built-in rack are the first release; Linux plug-in
+hosting and a plug-in build are separate milestones. See the plan for acceptance criteria and
+hardware checks that a VM cannot establish.

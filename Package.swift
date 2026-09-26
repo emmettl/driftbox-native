@@ -225,6 +225,7 @@ let package = Package(
         .target(name: "DriftboxHostAndroid", condition: .when(platforms: [.android])),
         .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxGPUMetal", condition: .when(platforms: [.macOS])),
+        .target(name: "DriftboxGPUGLES", condition: .when(platforms: [.linux])),
         .target(name: "DriftboxShell", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
       ]),

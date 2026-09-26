@@ -889,3 +889,10 @@ meant to be picked up, and that is the licence that gets least in the way of doi
 Steinberg's VST 3 SDK, in `Sources/VST3SDK` and `Tests/DriftboxVST3Fixture`, is theirs, under
 [its own MIT licence](Sources/VST3SDK/LICENSE-VST3SDK.txt). VST is a trademark of Steinberg Media
 Technologies GmbH.
+
+## Linux development
+
+Linux already exercises the shared Swift code and offscreen GLES backend in CI. A native Linux
+desktop application is now planned in [docs/LINUX.md](docs/LINUX.md), including the VM setup,
+architecture experiments and release acceptance criteria. In a Linux checkout,
+`scripts/linux-build.sh` provides the initial build, test, render and benchmark entry points.

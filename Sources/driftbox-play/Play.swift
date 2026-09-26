@@ -654,6 +654,17 @@
   struct Play {
     static func main() throws {
       var arguments = Array(CommandLine.arguments.dropFirst())
+      #if os(Linux)
+        if arguments == ["--gpu-info"] {
+          do {
+            try reportLinuxGPU()
+          } catch {
+            print("GPU diagnostic failed: \(error)")
+            exit(1)
+          }
+          return
+        }
+      #endif
       guard let flag = arguments.firstIndex(of: "--bench"), arguments.count == 2 else {
         print("driftbox-play only benches here, with no device: driftbox-play <song.json> --bench")
         exit(64)
