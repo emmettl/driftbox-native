@@ -150,7 +150,10 @@ public enum RackHelp {
               HelpTerm(
                 "Audio Track",
                 "One recording started at a bar and a step of the rack's transport, out on cables."),
-              HelpTerm("Audio Input", "What comes in from a microphone or an interface. Wear headphones."),
+              HelpTerm(
+                "Audio Input",
+                "What comes in from a microphone or an interface, chosen in Settings under Audio In. Wear "
+                  + "headphones."),
               HelpTerm(
                 "Plug-in, Plug-in Instrument",
                 "An Audio Unit effect or instrument from this Mac, with its own controls a click away."),
@@ -286,6 +289,11 @@ public enum RackHelp {
               HelpTerm(
                 "A Seq with no clock",
                 "A Seq has no clock inside it. Patch a Transport division or a Clock into it."),
+              HelpTerm(
+                "Audio Input",
+                "Listens to the device Settings names under Audio In, and only while the patch has one. Settings "
+                  + "says why it hears nothing: the device unplugged, or Privacy & Security keeping the microphone "
+                  + "from Driftbox. The rack as an Audio Unit in another app hears nothing."),
               HelpTerm(
                 "Bypassed or muted",
                 "A bypassed processor passes its input on; a muted Out, or one not soloed while another is, passes "

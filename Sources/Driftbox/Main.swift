@@ -64,7 +64,7 @@
       .defaultSize(width: 760, height: 640)
 
       Settings {
-        SettingsView(player: player)
+        SettingsView(player: player, rack: studio.rack.session)
       }
     }
   }

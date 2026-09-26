@@ -28,10 +28,12 @@
     @ObservationIgnored private(set) var attached = false
 
     /// A rack whose patch is kept in `memory` between launches, silent until `attach` gives it
-    /// somewhere to go. `sampleRate` is the host's, which is the engine's.
-    public init(sampleRate: Double = 48000, memory: UserDefaults? = nil) {
+    /// somewhere to go. `sampleRate` is the host's, which is the engine's; `input` is what its
+    /// Audio Input modules hear.
+    public init(sampleRate: Double = 48000, input: (any AudioCapturing)? = nil, memory: UserDefaults? = nil) {
       session = RackSession(
-        sampleRate: sampleRate, plugins: AudioUnitHosting(), decoder: AudioFileDecoder(), memory: memory)
+        sampleRate: sampleRate, input: input, plugins: AudioUnitHosting(), decoder: AudioFileDecoder(),
+        memory: memory)
     }
 
     /// A face for a rack that is already playing somewhere else: in another app, behind the rack's

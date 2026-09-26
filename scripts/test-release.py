@@ -89,7 +89,8 @@ class ReleaseTests(unittest.TestCase):
         extension = plistlib.loads((scripts / "extension.entitlements").read_bytes())
         self.assertTrue(extension["com.apple.security.app-sandbox"])
         app = plistlib.loads((scripts / "app.entitlements").read_bytes())
-        self.assertEqual(app, {"com.apple.security.cs.disable-library-validation": True})
+        self.assertEqual(app, {"com.apple.security.cs.disable-library-validation": True,
+                               "com.apple.security.device.audio-input": True})
 
     def test_checksum_can_be_verified_in_the_download_directory(self):
         archive = self.root / "Driftbox-0.1.0-macos-arm64.zip"
