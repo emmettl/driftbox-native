@@ -53,6 +53,7 @@ Metal. Next after this is the rack.
 | `Sources/VST3SDK` | Steinberg's VST 3 SDK, as much of it as a host uses, vendored at 3.8.1 under its own MIT licence. Compiled on Windows alone for now. |
 | `Sources/CVST3` | Driftbox's bridge to VST 3 plug-ins, in C for Swift: a plug-in found, made, played, its params set, its state kept, and its own editor opened in a window. Windows only for now; `Tests/DriftboxVST3Fixture` is a plug-in of the project's own to hold it to. |
 | `Sources/DriftboxHostVST3` | The rack's plug-ins on that bridge: the VST 3 plug-ins installed, found, and each a `plugin` module's unit, played, its macros and its state. Windows only for now. |
+| `Sources/DriftboxVST3Scan` | Asks a VST 3 module what it holds, in a process of its own, so a plug-in that crashes as it loads takes this with it rather than the app. |
 | `Sources/DriftboxCanvas` | A 2D canvas on the GPU layer: Canvas2D's shapes, state, type and blends, the same on every platform. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxInterface` | The controls, drawn on the canvas in points over the scene: the transport bar and the step grid, laid out and hit from one layout, on `Session`. |
@@ -397,8 +398,8 @@ node scripts/windows-package.mjs
 ```
 
 makes `dist/Driftbox`, which runs on a machine with no Swift on it, and a zip of it: the program,
-the catalogue's resource bundle, and the Swift and Visual C++ runtime DLLs it loads, found by
-reading their import tables — 18 of them, about 70MB, 26MB zipped.
+the plug-in scanner beside it, the catalogue's resource bundle, and the Swift and Visual C++ runtime DLLs it loads, found by
+reading their import tables — 18 of them, about 86MB, 30MB zipped.
 
 With Inno Setup 6 installed (`winget install JRSoftware.InnoSetup`),
 

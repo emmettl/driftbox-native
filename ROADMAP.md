@@ -623,8 +623,11 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    of its own, in front of the app's: sized to it, resized when it asks or by hand where it may be,
    scaled with its monitor, and following the macros; the app's shortcuts stay in the app's
    window. A macro learns the next param a hand moves there, and closing it keeps the plug-in's
-   state in the patch. All of it compiles on Windows alone for now. Left: a module that crashes
-   while it is scanned takes the app with it, so scanning out of process, later.
+   state in the patch. A module that does not describe itself is asked what it holds by
+   `DriftboxVST3Scan`, in a process of its own with thirty seconds to answer, so one that crashes
+   as it loads, or hangs, holds nothing rather than taking the app with it; what each held is
+   remembered, by its binary's size and time, until it changes. All of it compiles on Windows
+   alone for now.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift
