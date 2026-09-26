@@ -52,6 +52,12 @@
       }
       .defaultSize(width: 900, height: 860)
 
+      // The guide, beside what it describes rather than over it.
+      Window("Groovebox Guide", id: "help") {
+        HelpWindow()
+      }
+      .defaultSize(width: 760, height: 640)
+
       Settings {
         SettingsView(player: player)
       }

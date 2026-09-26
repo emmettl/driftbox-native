@@ -30,6 +30,7 @@ let package = Package(
     .library(name: "DriftboxCanvas", targets: ["DriftboxCanvas"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
     .library(name: "DriftboxSession", targets: ["DriftboxSession"]),
+    .library(name: "DriftboxHelp", targets: ["DriftboxHelp"]),
     .library(name: "DriftboxRackSession", targets: ["DriftboxRackSession"]),
     .library(name: "DriftboxInterface", targets: ["DriftboxInterface"]),
     .library(name: "DriftboxDesktop", targets: ["DriftboxDesktop"]),
@@ -143,6 +144,10 @@ let package = Package(
       dependencies: ["DriftboxDocument", "DriftboxEngine", "DriftboxHost", "DriftboxScenes", "DriftboxSeq"],
       resources: [.copy("Resources/Songs"), .copy("Resources/catalogue.json")]),
 
+    // What the apps say to teach themselves, in words any platform lays out: the reference's guides,
+    // saying what each platform's own controls do.
+    .target(name: "DriftboxHelp"),
+
     // The rack as an app holds it, on every platform: the patch and its edits and undo, the keys and
     // the controllers, the samples, the song it carries, the transport; with the catalogue of patches.
     // Where it sounds, which plug-ins it can host and which files it can read are the platform's ports.
@@ -206,7 +211,7 @@ let package = Package(
       name: "DriftboxApp",
       dependencies: [
         "DriftboxHost", "DriftboxHostMac", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq",
-        "DriftboxScenes", "DriftboxRack", "DriftboxSession", "DriftboxRackSession",
+        "DriftboxScenes", "DriftboxRack", "DriftboxSession", "DriftboxRackSession", "DriftboxHelp",
       ],
       // The rack's patches and module cards are `DriftboxRackSession`'s, as every platform ships them.
       resources: [.copy("Resources/AppIcon.icns")]),
@@ -308,6 +313,7 @@ let package = Package(
         .target(name: "DriftboxGPUMetal", condition: .when(platforms: [.macOS, .iOS])),
         .target(name: "DriftboxGPUGLES", condition: .when(platforms: [.linux])),
       ]),
+    .testTarget(name: "DriftboxHelpTests", dependencies: ["DriftboxHelp"]),
     .testTarget(
       name: "DriftboxTextTests",
       dependencies: [
