@@ -532,13 +532,14 @@ each step stand on the last. The README's "Platforms" says how it is divided.
      kept its tubes' far walls), and `GPUDepth.test` for three's `depthWrite={false}`, which
      Convoy's dust and Machine's sparks use. Both are in the contract tests.
 
-   Left:
-   - A Core Text typesetter for the Mac, so that Graphic Lab sets its type there too. Graphic Lab is
-     on the layer now, printed on `DriftboxCanvas` with DirectWrite's type on Windows and Android's
-     own on Android. Only glyphs are a platform's; the canvas is drawn on the layer, where the
-     Windows app's interface will draw too.
-   - `--window` on the Mac showing the song's scene rather than Pulse, and the Metal `Scene`
-     gone at the end.
+   Graphic Lab sets its type on the Mac too, through `CoreTextTypesetter` (`DriftboxTextMac`), held
+   by `TypesetterTests` to what DirectWrite and Android's are; so every scene on the layer is held
+   to its Metal scene frame by frame, Graphic Lab included, as eight-pixel squares see it, since the
+   canvas puts a glyph on a whole pixel down where Core Graphics puts it anywhere. `--window` on
+   the Mac shows the song's scene, with Core Text's type, rather than Pulse.
+
+   Left: the Mac app onto the layer — its visuals, its movie export and the visuals window drawn by
+   `GPUScenes` on the Metal backend — and the Metal `Scene` gone with it.
 4. **The window, drawn.** ← *here.* The shell first: `DriftboxShell` says what the app asks of a
    window in platform-neutral terms — pointers, keys and scrolling as events in points, a menu bar
    as data with shortcuts on the platform's own modifier, file panels, a loop that keeps drawing

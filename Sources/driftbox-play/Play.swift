@@ -8,7 +8,9 @@
   import DriftboxHost
   import DriftboxHostMac
   import DriftboxScenes
+  import DriftboxSeq
   import DriftboxText
+  import DriftboxTextMac
   import Foundation
   import ImageIO
   import QuartzCore
@@ -119,7 +121,7 @@
         let name = URL(fileURLWithPath: arguments[0]).lastPathComponent
         try MainActor.assumeIsolated {
           try watch(
-            host, bpm: song.bpm, title: "Driftbox — \(SongFile.name(fromFileName: name))", until: until,
+            host, song: song, title: "Driftbox — \(SongFile.name(fromFileName: name))", until: until,
             report: { report(driftbox, peak) })
         }
         audio.stop()
@@ -144,13 +146,13 @@
           load.longestMilliseconds, load.calls))
     }
 
-    /// The song, seen, as on Windows: Pulse in a window, from what the engine reports having
-    /// played, drawn through the GPU layer on Metal once per refresh of the display — taking the
-    /// layer's next drawable waits for one, which is what paces the loop — until the window is
-    /// closed or the time is up.
+    /// The song, seen, as on Windows: its scene in a window, with Core Text's type where the scene
+    /// sets any, from what the engine reports having played, drawn through the GPU layer on Metal
+    /// once per refresh of the display — taking the layer's next drawable waits for one, which is
+    /// what paces the loop — until the window is closed or the time is up.
     @MainActor
     static func watch(
-      _ host: EngineHost, bpm: Double, title: String, until: Date?, report: () -> Void
+      _ host: EngineHost, song: Song, title: String, until: Date?, report: () -> Void
     ) throws {
       let app = NSApplication.shared
       app.setActivationPolicy(.regular)
@@ -177,7 +179,9 @@
       let device = try MetalDevice()
       var size = pixels()
       let surface = try device.makeSurface(layer: layer, width: size.width, height: size.height)
-      let scene = try PulseScene(device: device, typesetter: NoTypesetter())
+      let chosen = GPUScenes.type(for: song.visual)
+      let scene = try chosen.init(device: device, typesetter: CoreTextTypesetter())
+      print("  showing \(chosen.name)")
       let presenter = try Presenter(device: device)
       var frame = try device.makeTarget(width: size.width, height: size.height)
 
@@ -206,7 +210,7 @@
           time: HostTime.seconds(from: began, to: HostTime.now()),
           peakLeft: Float(bitPattern: host.peakLeft.load(ordering: .relaxed)),
           peakRight: Float(bitPattern: host.peakRight.load(ordering: .relaxed)), events: events,
-          running: host.playing.load(ordering: .relaxed), bpm: bpm,
+          running: host.playing.load(ordering: .relaxed), bpm: song.bpm,
           pixelRatio: Float(window.backingScaleFactor))
         scene.draw(input, into: frame, on: device)
         let target = try surface.target()
@@ -215,7 +219,7 @@
         if second, let shots {
           shot += 1
           try png(try device.readPixels(target), width: target.width, height: target.height)
-            .write(to: URL(fileURLWithPath: shots).appendingPathComponent("pulse-\(shot).png"))
+            .write(to: URL(fileURLWithPath: shots).appendingPathComponent("\(chosen.id)-\(shot).png"))
         }
         try surface.present()
         if second {
