@@ -619,9 +619,12 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    A plug-in module's face is the Mac's: the plug-in and who made it, how late it is or why it is
    silent, another of its kind chosen from its menu, and its four macros mapped from theirs, each
    named for its param and reading its value in the plug-in's own words; an instrument's lights
-   the notes it is playing on two octaves of keys. All of it compiles on Windows alone for now.
-   Next: their own editors in windows of their own, and learning a macro from one; and a module that crashes while it is scanned takes the app with it, so
-   scanning out of process, later.
+   the notes it is playing on two octaves of keys. Open shows the plug-in's own editor in a window
+   of its own, in front of the app's: sized to it, resized when it asks or by hand where it may be,
+   scaled with its monitor, and following the macros; the app's shortcuts stay in the app's
+   window. A macro learns the next param a hand moves there, and closing it keeps the plug-in's
+   state in the patch. All of it compiles on Windows alone for now. Left: a module that crashes
+   while it is scanned takes the app with it, so scanning out of process, later.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift

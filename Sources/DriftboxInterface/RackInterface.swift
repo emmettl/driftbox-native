@@ -569,6 +569,8 @@ public final class RackInterface {
       menuRequest = (pluginMenu(module), under)
     case .macros:
       menuRequest = (macroMenu(module), under)
+    case .open:
+      rack.showInterface(module)
     case .learn(let param):
       if pressModifiers.contains(.shift) {
         rack.clearCcBinding(module, param)

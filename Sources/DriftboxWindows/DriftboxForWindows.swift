@@ -66,9 +66,11 @@
         session: session, window: window, device: device, surface: surface,
         typesetter: try DirectWriteTypesetter(),
         // The rack, through the same output: heard beside the groovebox, and shown in its place;
-        // its plug-ins VST 3.
+        // its plug-ins VST 3, their editors in front of this window.
         rack: RackSession(
-          sampleRate: route.sampleRate, audio: route, plugins: VST3Hosting(), memory: UserDefaults.standard))
+          sampleRate: route.sampleRate, audio: route,
+          plugins: VST3Hosting(owner: { UnsafeMutableRawPointer(window.handle) }),
+          memory: UserDefaults.standard))
       try desktop.run()
     }
 

@@ -32,9 +32,12 @@ extension RackFaces {
     for macro in 1...4 {
       let mapped = rack.macroParameter(module.id, macro)
       let key = mapped?.control.key
+      // Waiting for a hand to move a param in the plug-in's editor, it says so.
+      let learning = rack.learning.map { $0.module == module.id && $0.macro == macro } ?? false
       cells.add(
-        "macro\(macro)", tint: Theme.nine, name: mapped?.control.name ?? "Macro \(macro)",
-        opacity: mapped == nil ? 0.5 : 1, display: key.map { words(unit, key: $0) })
+        "macro\(macro)", tint: learning ? Theme.three : Theme.nine,
+        name: learning ? "Learn…" : mapped?.control.name ?? "Macro \(macro)",
+        opacity: mapped == nil && !learning ? 0.5 : 1, display: key.map { words(unit, key: $0) })
     }
     let screen = Rect(x, top, max(0, width - macros - 10), pluginText)
     let row = screen.maxY + 8
@@ -44,13 +47,16 @@ extension RackFaces {
         press: rack.hostsPlugins ? .plugin : nil, isOn: reference == nil, tint: Theme.nine, style: .option,
         opacity: rack.hostsPlugins ? 1 : 0.4)
     ]
-    // Only a plug-in that is running has params to map.
+    // Only a plug-in that is running has an editor to open, or params to map.
     if running {
       buttons.append(
         RackStage.Button(
-          frame: Rect(x + 76, row, 50, pluginRow), label: "Map…", press: .macros, isOn: false,
-          tint: Theme.nine,
+          frame: Rect(x + 76, row, 44, pluginRow), label: "Open", press: .open, isOn: false, tint: Theme.nine,
           style: .option))
+      buttons.append(
+        RackStage.Button(
+          frame: Rect(x + 126, row, 50, pluginRow), label: "Map…", press: .macros, isOn: false,
+          tint: Theme.nine, style: .option))
     }
     return Built(
       words: state(status, chosen: reference != nil), cells: cells, mark: mark(reference),

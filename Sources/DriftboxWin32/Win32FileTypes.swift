@@ -77,7 +77,7 @@
         RegGetValueW(HKEY_CURRENT_USER, key, nil, DWORD(RRF_RT_REG_SZ), nil, &buffer, &size)
       }
       guard status == ERROR_SUCCESS else { return nil }
-      return String(decodingCString: buffer, as: UTF16.self)
+      return String(decoding: buffer.prefix { $0 != 0 }, as: UTF16.self)
     }
 
     private static func withWide<T>(_ string: String?, _ body: (UnsafePointer<WCHAR>?) -> T) -> T {
