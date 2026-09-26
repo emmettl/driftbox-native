@@ -123,6 +123,7 @@ public final class Desktop {
     window.isEnabled = { [weak self] id in self?.isEnabled(id) ?? false }
     window.isChecked = { [weak self] id in self?.isChecked(id) ?? false }
     window.shouldClose = { [weak self] in self?.requestClose() ?? true }
+    rack?.onLoadFailure = { [weak self] message in self?.window.tell(message) }
     refresh()
   }
 

@@ -816,6 +816,40 @@ contains 15 runtime libraries and is 29.7 MiB. Guest logs are
 `~/driftbox-linux-errors-{tests,final-tests,dialogs,build,package,smoke}.log`; upstream integration
 checks are in `~/driftbox-main-followup.log`. Remote CI and Windows builds have not run for this change.
 
+### Audio export and sample-import failures
+
+The next integration brings main through `7b185df`, including drawn module guides and MIDI routing
+to the visible rack. All 121 interface tests, four help tests and 40 desktop tests pass in Ubuntu
+before the audio-error changes. These shared capabilities now reach the Linux executable; physical
+MIDI equipment is still outside the VM qualification.
+
+Mix and stem exports now report write failures through the native shell on the main actor. Each
+WAV is written atomically, so a failed write does not leave a partly replaced file. A stem batch
+stops at its first failure and says how many stems were already written; completed files remain,
+and the batch is not presented as a transaction that rolls back. Rendering continues off the main
+thread from the song snapshot taken when export was requested. Cancelling a chooser is not an error.
+
+Sample loads now preserve the failing filename even when it is one file in a multisample set.
+An optional main-actor callback notifies the desktop of every failure, including concurrent retries,
+without clearing the error still displayed on the module face. The existing audio and patch remain
+intact when decoding fails. Mac module faces retain their existing error display; the callback does
+not accumulate an unconsumed notification queue on hosts that do not install it.
+
+Validation after the audio changes: all 85 rack-session tests and 43 desktop tests pass in Ubuntu
+with strict Swift actor checks. New coverage includes a failed mix followed by a successful retry,
+a failed second stem with the first file retained and later voices unwritten, and failures in
+sampler, audio-track and multisample loads with their previous audio and patch unchanged. Concurrent
+retries produce separate notices. Changed Swift files pass strict formatting, and the shared desktop
+release target builds on macOS. Windows builds and remote CI have not run for this milestone.
+
+The release package `Driftbox-0.1.0-preview-arm64-09751903e119` is installed under the guest's
+`~/Applications` and registered with `--x11` for the next launch. All 67 installed hashes verify,
+and the desktop entry validates. The archive is 29.8 MiB with 15 bundled runtime libraries. Its
+silent Xvfb smoke passes with 288 GUI frames, five deferred chooser/question callbacks cancelled
+exactly once and queued notices disposed. This does not requalify physical audio/MIDI or fix the
+known GTK immediate-teardown race. Guest logs:
+`~/driftbox-audio-errors-{tests,build,package,smoke}.log` and `~/driftbox-main-guides-midi.log`.
+
 ### Local access
 
 The VM uses UTM Shared Network. Its first assigned address is `192.168.64.2`; discover the current

@@ -371,3 +371,10 @@ public struct RackBreak: Sendable {
     return SampleMath.normalise(out)
   }
 }
+
+/// Keep the failing filename when one member of a multisample set cannot be decoded.
+struct SampleFileFailure: LocalizedError {
+  let name: String
+  let reason: String
+  var errorDescription: String? { "Could not load \(name): \(reason)" }
+}
