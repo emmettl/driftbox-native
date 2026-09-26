@@ -53,7 +53,9 @@ def sha256(path):
         return hashlib.file_digest(file, 'sha256').hexdigest()
 
 
-def package(build, toolchain, output):
+def package(build, toolchain, output, source_revision=None, source_dirty=None):
+    if source_revision is not None and not re.fullmatch(r'[0-9a-f]{40}', source_revision):
+        raise ValueError('Source revision must be a full Git SHA-1 commit ID.')
     program = build / 'driftbox-linux'
     with program.open('rb') as file:
         header = file.read(20)
@@ -103,6 +105,7 @@ def package(build, toolchain, output):
         manifest = {
             'format': 1, 'version': release['DRIFTBOX_VERSION'], 'build': release['DRIFTBOX_BUILD'],
             'architecture': arch, 'swift': version, 'resources': list(BUNDLES),
+            'source': {'revision': source_revision, 'dirty': source_dirty},
             'bundledLibraries': sorted(bundled),
             'systemLibraries': sorted(set(libraries) - set(bundled)),
             'buildOS': platform.freedesktop_os_release(),
@@ -114,6 +117,7 @@ def package(build, toolchain, output):
             tar.add(stage, arcname=name)
         stage.rename(folder)
         temp_archive.rename(archive)
+    archive.with_suffix(archive.suffix + '.sha256').write_text(f'{sha256(archive)}  {archive.name}\n')
     print(archive)
     print(f'{len(bundled)} bundled runtime libraries; {archive.stat().st_size / 1048576:.1f} MiB compressed')
     return folder
@@ -124,11 +128,14 @@ def main():
     parser.add_argument('--build-dir', type=Path, default=ROOT / '.build-linux/release')
     parser.add_argument('--toolchain', type=Path, default=Path.home() / '.local/share/driftbox-toolchains/swift-6.4.0-RELEASE')
     parser.add_argument('--output', type=Path, default=ROOT / 'dist/linux')
+    parser.add_argument('--source-revision', help='Full Git commit ID supplied by the build orchestrator')
+    parser.add_argument('--source-dirty', choices=('true', 'false'), help='Whether the build includes uncommitted changes')
     args = parser.parse_args()
     if platform.system() != 'Linux':
         parser.error('Run in Linux against a trusted local build; ldd inspects its runtime closure.')
     try:
-        package(args.build_dir.resolve(), args.toolchain.resolve(), args.output.resolve())
+        package(args.build_dir.resolve(), args.toolchain.resolve(), args.output.resolve(),
+                args.source_revision, None if args.source_dirty is None else args.source_dirty == 'true')
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         parser.exit(1, f'{error}\n')
 

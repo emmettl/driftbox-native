@@ -14,8 +14,9 @@ Target Ubuntu 24.04 LTS first. Test both Wayland and X11 before claiming support
 PipeWire powers both the command-line player and the first shared desktop executable. GTK 4/Pango
 provide its shell/text adapters and GLES the renderer. ALSA sequencer supplies the native MIDI backend.
 The desktop now renders the existing groovebox and rack and passes a live audio capture test;
-a relocatable preview now packages its runtime and resources. Interactive shell qualification and
-fresh-machine release validation remain. Do not introduce a second UI or engine.
+a relocatable preview now packages its runtime and resources. Automated native package builds and
+clean-runtime installation tests are defined for both architectures; real desktop and hardware
+release qualification remain. Do not introduce a second UI or engine.
 
 ## What already exists
 
@@ -630,6 +631,8 @@ architecture and executable hash. It refuses to overwrite an existing output. `-
 `ldd`; do not use it on an untrusted download. It copies the transitive Swift runtime dependency
 closure, the two SwiftPM `.bundle` directories, the existing Driftbox icon and runtime notices.
 A manifest records file hashes, architecture, Swift/build OS versions and bundled/system libraries.
+`--source-revision` and `--source-dirty true|false` record build provenance (otherwise unknown);
+each archive also receives a `.tar.gz.sha256` checksum file.
 GTK, Pango, graphics drivers, PipeWire, ALSA and other distribution libraries stay system dependencies.
 Runtime notices are pinned to Swift 6.4.0; changing toolchains requires requalification.
 
@@ -849,6 +852,62 @@ silent Xvfb smoke passes with 288 GUI frames, five deferred chooser/question cal
 exactly once and queued notices disposed. This does not requalify physical audio/MIDI or fix the
 known GTK immediate-teardown race. Guest logs:
 `~/driftbox-audio-errors-{tests,build,package,smoke}.log` and `~/driftbox-main-guides-midi.log`.
+
+### Automated packages and clean runtime validation
+
+`.github/workflows/linux-package.yml` runs on pull requests, main pushes, version tags and manual
+dispatch. Separate native `ubuntu-24.04` and `ubuntu-24.04-arm` runners build x86-64 and ARM64
+archives. Each job uploads its archive and SHA-256 sidecar only after the clean-runtime test
+passes. Artifacts expire after 14 days; this workflow does not create or publish GitHub releases.
+
+Run the same build and test on a native Linux Docker host:
+
+```sh
+scripts/linux-package-ci.sh                         # output: dist/linux-ci (must be empty)
+scripts/linux-package-ci.sh /path/to/another/output # an alternate empty output directory
+```
+
+`linux/packaging/Build.Dockerfile` pins the multiarchitecture Swift 6.4 image by digest and
+compiles the release product on Ubuntu 24.04, then packages its runtime closure and resources.
+The script records the checkout's exact commit and dirty state. Source copies without `.git` must supply `SOURCE_REVISION` and `SOURCE_DIRTY`.
+`JOBS` defaults to four. `.dockerignore` excludes Git metadata, local build products and unrelated
+files from the build context. Docker retains build cache for subsequent runs; its disk usage is
+inside the Linux VM on StudioData when run there.
+
+`linux/packaging/Runtime.Dockerfile` starts independently from Ubuntu 24.04 and installs only
+runtime libraries, registration utilities and Xvfb/D-Bus test helpers. The test runs as a normal
+user with networking disabled; the archive directory is its only host mount. It receives no
+source tree, compiler, headers, build paths, host display session or audio device.
+
+`scripts/test-linux-runtime.py` verifies archive/file checksums, native architecture and build
+provenance, then checks installation into a path containing spaces, MIME cache creation, desktop
+entry validity, upgrade registration and refusal by the old uninstaller. It removes the original
+extraction, resolves every bundled library from the relocated bundle, and launches the release
+app through its real launcher with Xvfb/Mesa, strict actor checks and `--silent --smoke-test`.
+The existing smoke exercises resource loading, groovebox/rack rendering and deferred native
+dialog disposal. Uninstall must preserve documents, preferences and the bundle, and be safe to
+repeat. Missing dependencies or any failed check prevent artifact upload.
+
+The UTM guest's default Docker bridge could not resolve Ubuntu's package server. Local validation
+uses `BUILD_NETWORK=host` for image build steps only; the runtime check remains `--network none`.
+This does not require changing Docker's daemon configuration or exposing the host desktop.
+The workflow uses the normal Docker build network on GitHub runners.
+
+Local ARM64 validation passes after merging main through `e8513b8`: 124 interface tests,
+44 desktop tests, seven help tests and nine packaging-script tests. The isolated pipeline
+produced `Driftbox-0.1.0-preview-arm64-857509168465.tar.gz` (29.8 MiB, 15 bundled runtime
+libraries). Archive and file integrity, dependency resolution, registration/upgrade/relocation,
+the five native dialog callbacks, 348 GUI frames and uninstall all pass. The artifact is under
+`~/driftbox-native/dist/linux-ci-main-validation` in the VM. Logs:
+`~/driftbox-container-final.log`, `~/driftbox-package-main-tests.log` and
+`~/driftbox-package-script-tests.log`. Its manifest records the merge revision and dirty state
+because packaging changes were still being validated. The existing desktop installation was
+not replaced. GitHub CI has not run yet; x86-64 qualification is pending its first native job.
+
+This establishes an Ubuntu 24.04 preview baseline, not a universal distribution package.
+Debian packages/Flatpak, dependency installation UX, signed public delivery and update handling
+remain later distribution work. Wayland, hardware graphics, physical audio/MIDI and accessibility
+still need their own qualification.
 
 ### Local access
 

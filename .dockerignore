@@ -1,0 +1,17 @@
+# Keep VM copies, build products, credentials and unrelated assets out of Docker contexts.
+**
+!Package.swift
+!LICENSE
+!Sources/
+!Sources/**
+!Tests/
+!Tests/**
+!linux/
+!linux/**
+!windows/
+!windows/Driftbox.ico
+!scripts/
+!scripts/linux-package.py
+!scripts/version.env
+!scripts/test-linux-runtime.py
+**/__pycache__/**
