@@ -873,8 +873,10 @@ longest call 9.7ms of a 10.7ms period. That number is the phone, not the code: w
 the cluster kept busy, the same paced run costs **17.7%** and its longest call 2.5ms. It is not the
 clock, either, though that was the first guess. Played through AAudio, in 2ms bursts, the render
 costs about **60%** of each burst whether a performance hint holds the cluster at 2.2 GHz or lets
-it fall to 0.6; with the other big cores kept busy it costs **15 to 18%**. What a callback pays
-for is its core waking cold from idle. It is still in time: the heaviest song played for thirty
+it fall to 0.6; with the other big cores kept busy it costs **15 to 18%**. Nor is it the waking:
+asked for callbacks four bursts long, a quarter as many, it costs the same **53 to 57%**, each call
+four times as long. A call runs slowly the whole way through while the rest of its cluster idles,
+not only as its core wakes. It is still in time: the heaviest song played for thirty
 seconds without an underrun, its longest call 3.4ms, the speaker 4.8ms behind the render.
 
 ### Listening

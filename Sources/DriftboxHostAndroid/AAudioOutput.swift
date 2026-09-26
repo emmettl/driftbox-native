@@ -22,9 +22,11 @@
   /// each callback's work to a performance hint session, with a burst as the target, which is how
   /// Android asks a real-time thread to say what it needs. Measured, that holds the clock up only
   /// when the target is tighter than the work, and the render costs the same either way — about
-  /// 60% of each 2ms burst, against 16% flat out — because what a callback pays for is the core
-  /// waking cold from idle, not its clock. So the hint is there for phones and apps where it
-  /// matters, and nothing here depends on it.
+  /// 60% of each 2ms burst, against 16% flat out — because a callback runs slowly the whole way
+  /// through while the rest of its cluster idles: not its clock, and not its waking either, since
+  /// callbacks four bursts long, a quarter as many, cost the same share, each four times as long.
+  /// So the hint is there for phones and apps where it matters, and nothing here depends on it,
+  /// and the stream keeps AAudio's own burst for a callback.
   final class AAudioOutput: @unchecked Sendable {
     /// What the stream turned out to be, for whoever wants to say so.
     struct Shape: Sendable {
