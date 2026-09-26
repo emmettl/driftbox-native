@@ -1,0 +1,5 @@
+module CShellDialogs [system] {
+  header "CShellDialogs.h"
+  link "ole32"
+  export *
+}

@@ -95,7 +95,12 @@ let package = Package(
     // What a window gives the app — input, menus, a loop to draw in, file panels — in terms that are
     // the same on every platform, and the Windows shell that answers it with Win32.
     .target(name: "DriftboxShell"),
-    .target(name: "DriftboxWin32", dependencies: ["DriftboxShell"]),
+    .systemLibrary(name: "CShellDialogs"),
+    .target(
+      name: "DriftboxWin32",
+      dependencies: [
+        "DriftboxShell", .target(name: "CShellDialogs", condition: .when(platforms: [.windows])),
+      ]),
     // Type: a line set in a font and a glyph's coverage, which is all that is asked of a platform,
     // and DirectWrite answering it on Windows. DirectWrite's headers are C++ only, so the C target
     // declares the part of it that is called; every call is made from Swift.
@@ -158,7 +163,8 @@ let package = Package(
     .target(
       name: "DriftboxDesktop",
       dependencies: [
-        "DriftboxCanvas", "DriftboxDocument", "DriftboxGPU", "DriftboxHost", "DriftboxInterface",
+        "DriftboxCanvas", "DriftboxDocument", "DriftboxEngine", "DriftboxGPU", "DriftboxHost",
+        "DriftboxInterface",
         "DriftboxRackSession", "DriftboxScenes", "DriftboxSession", "DriftboxShell", "DriftboxText",
       ]),
     // Driftbox on a touch screen: the scene, the controls over it, the pad, fingers. The same on every

@@ -49,6 +49,8 @@ public final class Desktop {
   public let rack: RackSession?
   public let rackInterface: RackInterface?
   public internal(set) var showsRack = false
+  /// The audio being written by the last export, rendered off the main thread.
+  var exporting: Task<Void, Never>?
 
   public init(
     session: Session, window: any ShellWindow, device: any GPUDevice, surface: any GPUSurface,
@@ -237,6 +239,10 @@ public final class Desktop {
       _ = save()
     case DesktopMenus.saveAs:
       _ = saveAs()
+    case DesktopMenus.exportMix:
+      exportMix()
+    case DesktopMenus.exportStems:
+      exportStems()
     case DesktopMenus.exit:
       if mayLoseChanges() { window.close() }
     case DesktopMenus.undo: if showsRack, let rack { rack.undo() } else { session.undo() }
@@ -315,7 +321,8 @@ public final class Desktop {
     case DesktopMenus.redo: showsRack ? rack?.canRedo ?? false : session.canRedo
     case DesktopMenus.toggle: showsRack || session.song != nil
     case DesktopMenus.showRack: rack != nil
-    case DesktopMenus.save, DesktopMenus.saveAs, DesktopMenus.start,
+    case DesktopMenus.save, DesktopMenus.saveAs, DesktopMenus.exportMix, DesktopMenus.exportStems,
+      DesktopMenus.start,
       DesktopMenus.previousSection, DesktopMenus.nextSection, DesktopMenus.loop:
       session.song != nil
     case DesktopMenus.recordAutomation: session.song != nil

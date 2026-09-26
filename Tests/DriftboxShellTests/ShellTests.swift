@@ -95,6 +95,45 @@ struct ShellTests {
       #expect(String(decoding: filter, as: UTF16.self) == expected)
     }
 
+    /// What a thread closing a panel found: whether it was the one titled as asked.
+    final class Closed: @unchecked Sendable {
+      var byTitle = false
+    }
+
+    /// The folder panel opens, titled as asked, and one closed without a choice chooses nothing.
+    /// Another thread closes it once it shows, since the panel runs its own loop on this one: by its
+    /// title if it has it, or else whatever dialog this thread has open, so a panel titled wrongly
+    /// fails the test rather than waiting for ever.
+    @Test func aFolderPanelClosedChoosesNothing() {
+      let title = "Driftbox test \(UUID().uuidString)"
+      let thread = GetCurrentThreadId()
+      let closed = Closed()
+      let closer = Thread {
+        for attempt in 0..<1000 {
+          let named = title.withCString(encodedAs: UTF16.self) { FindWindowW(nil, $0) }
+          if let named {
+            closed.byTitle = true
+            PostMessageW(named, UINT(WM_CLOSE), 0, 0)
+            return
+          }
+          if attempt > 500 {
+            var dialog = "#32770".withCString(encodedAs: UTF16.self) { FindWindowExW(nil, nil, $0, nil) }
+            while let found = dialog {
+              if GetWindowThreadProcessId(found, nil) == thread {
+                PostMessageW(found, UINT(WM_CLOSE), 0, 0)
+                return
+              }
+              dialog = "#32770".withCString(encodedAs: UTF16.self) { FindWindowExW(nil, found, $0, nil) }
+            }
+          }
+          Thread.sleep(forTimeInterval: 0.01)
+        }
+      }
+      closer.start()
+      #expect(Win32Files.folder(owner: nil, title: title, button: "Choose") == nil)
+      #expect(closed.byTitle)
+    }
+
     /// A mouse press, drag and release is one pointer, in points, from the window's top left.
     @Test func theMouseIsAPointer() throws {
       let (window, heard) = try window()

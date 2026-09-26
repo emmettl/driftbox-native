@@ -187,6 +187,10 @@
       Win32Files.save(owner: handle, type: type, name: name)
     }
 
+    public func chooseFolder(title: String, button: String) -> URL? {
+      Win32Files.folder(owner: handle, title: title, button: button)
+    }
+
     /// Windows' own question, in the words its own programs use: Yes, No or Cancel, with the window's
     /// title as its caption.
     public func askToSave(_ name: String) -> SaveAnswer {

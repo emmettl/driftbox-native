@@ -15,6 +15,8 @@ public enum DesktopMenus {
   public static let open = "file.open"
   public static let save = "file.save"
   public static let saveAs = "file.saveAs"
+  public static let exportMix = "file.exportMix"
+  public static let exportStems = "file.exportStems"
   public static let exit = "file.exit"
   public static let undo = "edit.undo"
   public static let redo = "edit.redo"
@@ -78,6 +80,9 @@ public enum DesktopMenus {
             .separator,
             .command("Save", id: save, shortcut: Shortcut("s")),
             .command("Save As…", id: saveAs, shortcut: Shortcut("s", [.primary, .shift])),
+            .separator,
+            .command("Export Mix…", id: exportMix, shortcut: Shortcut("e")),
+            .command("Export Stems…", id: exportStems, shortcut: Shortcut("e", [.primary, .shift])),
             .separator,
             .command("Exit", id: exit, shortcut: Shortcut("q")),
           ]),

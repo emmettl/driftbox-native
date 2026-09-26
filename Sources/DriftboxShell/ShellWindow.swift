@@ -47,6 +47,9 @@ public protocol ShellWindow: AnyObject {
   func chooseFiles(ofTypes types: [FileType]) -> [URL]
   /// Where to save a file of `type`, starting from `name`. Nil when cancelled.
   func chooseSaveLocation(for type: FileType, name: String) -> URL?
+  /// A folder to put files in, from the platform's own panel, titled `title` and chosen with a
+  /// button that says `button`. Nil when cancelled.
+  func chooseFolder(title: String, button: String) -> URL?
   /// The platform's own question before work is lost: save the changes to `name`, throw them
   /// away, or think again.
   func askToSave(_ name: String) -> SaveAnswer
@@ -82,4 +85,7 @@ extension ShellWindow {
   public func chooseFiles(ofTypes types: [FileType]) -> [URL] {
     chooseFile(ofTypes: types).map { [$0] } ?? []
   }
+
+  /// None, where a window has no panel for folders.
+  public func chooseFolder(title: String, button: String) -> URL? { nil }
 }

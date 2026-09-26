@@ -39,12 +39,14 @@ final class StandInWindow: ShellWindow {
   var asked: [String] = []
   var chosenFile: URL?
   var saveLocation: URL?
+  var folder: URL?
 
   func run(frame: () throws -> Void) throws {}
   func close() { closed = true }
   nonisolated func post(_ work: @escaping @Sendable () -> Void) {}
   func chooseFile(ofTypes types: [FileType]) -> URL? { chosenFile }
   func chooseSaveLocation(for type: FileType, name: String) -> URL? { saveLocation }
+  func chooseFolder(title: String, button: String) -> URL? { folder }
   func askToSave(_ name: String) -> SaveAnswer {
     asked.append(name)
     return saveAnswer
@@ -258,6 +260,41 @@ struct DesktopTests {
 
   /// A new song has nowhere to be saved, so saving it asks where; and not saving anywhere is not
   /// having saved.
+  /// The song as audio, from the File menu: the mix as one WAV where it is asked to go, and each
+  /// voice it uses as a WAV of its own in the folder chosen; nothing with no song, or no place.
+  @Test func theSongIsExportedAsAudio() async throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    #expect(window.isEnabled?(DesktopMenus.exportMix) == false, "no song, nothing to export")
+    let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("driftbox-export-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let song = directory.appendingPathComponent("Groove.driftbox")
+    try Data(SongCodec.encode(Self.song()).utf8).write(to: song)
+    window.chosenFile = song
+    window.choose(DesktopMenus.open)
+    #expect(
+      window.commandIDs.contains(DesktopMenus.exportMix)
+        && window.commandIDs.contains(DesktopMenus.exportStems))
+
+    window.choose(DesktopMenus.exportMix)
+    #expect(desktop.exporting == nil, "no place chosen")
+    let mix = directory.appendingPathComponent("Groove.wav")
+    window.saveLocation = mix
+    window.choose(DesktopMenus.exportMix)
+    await desktop.exporting?.value
+    let wav = try Data(contentsOf: mix)
+    #expect(wav.prefix(4) == Data("RIFF".utf8) && wav.count > 44 + 48000)
+
+    let stems = directory.appendingPathComponent("Stems")
+    try FileManager.default.createDirectory(at: stems, withIntermediateDirectories: true)
+    window.folder = stems
+    window.choose(DesktopMenus.exportStems)
+    await desktop.exporting?.value
+    #expect(try FileManager.default.contentsOfDirectory(atPath: stems.path) == ["Groove - 909.bd.wav"])
+  }
+
   @Test func aNewSongIsSavedWhereItIsAskedTo() throws {
     for device in try Self.devices() {
       try withTemporaryDirectory { directory in

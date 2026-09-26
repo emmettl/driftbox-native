@@ -564,7 +564,10 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    The settings are the Mac's Settings window as menus, remembered under the Mac's keys: the
    Audio menu's device — one chosen and unplugged named, and what plays until it is back — the
    MIDI menu's listening, sources and clock, and View's Run the Visuals, the scene stopped behind
-   the controls and running still while they are away.
+   the controls and running still while they are away. The File menu exports the song as the
+   Mac's does: the mix as one WAV, and a WAV for each voice it uses, in a folder chosen in the
+   shell's own panel. Next there: movies, the song and a performance as it was played, through
+   Media Foundation.
    The rack comes by way of `DriftboxRackSession`, which holds what the Mac's `RackModel` did —
    the patch, its edits and undo, the keys, controllers, samples, song and transport — on every
    platform, with the Mac's audio, plug-ins and file reading behind ports: `AudioRouting`,
