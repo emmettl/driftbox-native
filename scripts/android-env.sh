@@ -167,8 +167,10 @@ link() {
   for module in $core; do objects="$objects $out/$module.o"; done
   rm -f "$product"
   # shellcheck disable=SC2086
+  # With LLVM's own linker, which the toolchain and the NDK both have: left to choose, Linux's
+  # swiftc takes the system's ld.gold, which cannot link for Android.
   "$swiftc" -target $target -sdk "$sdk" -resource-dir "$resources/swift_static-aarch64" -static-stdlib \
-    -L "$(newest "$llvm"/lib/clang/*/lib/linux/aarch64)" $runtime \
+    -use-ld=lld -L "$(newest "$llvm"/lib/clang/*/lib/linux/aarch64)" $runtime \
     $objects "$@" -lswiftSynchronization -lswiftDispatch -ldispatch -lBlocksRuntime -lswift_RegexParser \
     -lCoreFoundation -l_FoundationCollections -l_FoundationCShims -l_FoundationICU \
     -o "$product"
