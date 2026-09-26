@@ -408,9 +408,21 @@ then returned the expected smoke-test failure with an audio diagnostic. The C de
 silent desktop smoke run; remote CI and Windows builds have not run for this change.
 
 The first full-desktop Wayland smoke attempt happened while GNOME's display was idle/locked: audio
-advanced but only one GUI frame was delivered, so the frame assertion correctly failed. The full
-app still needs an unlocked desktop visual/interaction check. The earlier window experiment's
-successful Wayland/XWayland runs do not replace that acceptance check.
+advanced but only one GUI frame was delivered, so the frame assertion correctly failed. After
+unlocking, the full app passed the same test: 1,088 GUI frames and 280,576 audio frames through
+virgl/ANGLE (Apple M4 Max), GLES 3.0. Log: `~/driftbox-desktop-wayland-unlocked.log`.
+
+Visual inspection confirmed the groovebox and Pocket Sequence rack. Keyboard-driven checks
+confirmed Space play/stop, Ctrl+R rack switching, Ctrl+O Open and Escape cancellation, and
+Ctrl+Shift+S Save As. The native save wrote a new `~/driftbox-native/Acieed.driftbox` test document
+with a valid versioned song payload. Successful reopening through the chooser, dirty-document
+confirmation, pointer editing and WAV import still need interactive qualification. UTM computer
+control did not reliably forward pointer movement and dropped characters during long text entry,
+including inside GTK's own chooser; do not treat these automation failures as established app bugs.
+
+At the user's request, GNOME's idle delay on this development VM is now 1,800 seconds (30 minutes),
+up from 300 seconds. Automatic locking remains enabled, with its existing zero delay after idle.
+This is local development-machine state, not a setting applied by the bootstrap script.
 
 Guest logs: `~/driftbox-desktop-{release,final-tests,capture,silent}.log`.
 
