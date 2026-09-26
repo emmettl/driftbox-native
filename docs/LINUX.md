@@ -359,6 +359,8 @@ Pango and `PipeWireRoute`. Run it from the signed-in Linux desktop:
 ```sh
 scripts/linux-build.sh desktop
 scripts/linux-build.sh desktop conformance/fixtures/documents/acid.song.json
+# Ubuntu VM workaround for the native Wayland menu issue documented below:
+GDK_BACKEND=x11 EGL_PLATFORM=x11 scripts/linux-build.sh desktop
 # For graphics work without an audio service:
 scripts/linux-build.sh desktop --silent
 ```
@@ -422,12 +424,13 @@ and the release desktop builds. The updated Xvfb/llvmpipe live capture drew 349 
 rendered 279,552 audio frames; its recording contained 277,504 finite stereo frames at 48 kHz,
 with channel peaks of 0.69902 and 0.70040. After unlocking GNOME, the older preview was closed
 and replaced with this release build in the real Wayland session. Play/stop responded, and
-`pw-dump` confirmed both stereo links active to Built-in Audio Analog Stereo. The preview was
-left running with playback stopped. Interactive output selection remains unverified: automated
-UTM input could focus menu labels and open File, but subsequent navigation dismissed popovers.
-This observation does not establish whether the cause is input automation or GTK focus handling.
-The remaining manual check is Audio → Built-in Audio Analog Stereo, verify its checkmark, then
-Audio → System Output and verify that checkmark returns.
+`pw-dump` confirmed both stereo links active to Built-in Audio Analog Stereo.
+
+On 2026-09-26, the MIDI-enabled desktop was also exercised through XWayland. Audio →
+Built-in Audio Analog Stereo changed the checkmark from System Output to the explicit device;
+`pw-link -l` confirmed both stereo links to that sink. System Output was then restored. The
+clean release preview is left running through XWayland with playback stopped. Native Wayland
+menu switching has a separate reproducible GTK/compositor limitation described below.
 Logs: `~/driftbox-audio-private-tests.log`, `~/driftbox-audio-route-release.log`,
 `~/driftbox-audio-route-capture.log`, `~/driftbox-audio-route-tests.log` and
 `~/driftbox-audio-route-preview.log`.
@@ -485,9 +488,42 @@ ALSA enabled passed under Xvfb/llvmpipe with 348 GUI frames and 278,528 audio fr
 This is software-port qualification. USB/Bluetooth MIDI, physical clock drift/jitter under load,
 suspend/resume, sustained input overruns and reconnect after loss of the sequencer itself remain
 unverified. Fatal sequencer failure currently stops MIDI until the app is reopened; runtime MIDI
-errors also need presentation in the UI. The real Wayland preview left open before this change
-still uses the earlier audio-only build because GNOME is locked. Native MIDI menu interaction and
-an end-to-end controller/rack check remain pending alongside the Audio menu check above.
+errors also need presentation in the UI. On 2026-09-26, interactive XWayland checks confirmed
+MIDI → Inputs lists `Midi Through: Midi Through Port-0`, with its checkmark removed when disabled
+and restored when re-enabled. `aconnect -l` confirmed the desktop's Input/Output ports and its
+subscription to Midi Through. The clean release preview now includes this MIDI backend.
+An end-to-end physical controller/rack check remains pending.
+
+### Native Wayland menu qualification
+
+On this Ubuntu 24.04 VM (GTK 4.14.5 / GNOME Wayland), F10 opens File, but Left/Right to another
+menu can dismiss its popup and leave the menu label focused. The same sequence succeeds under
+XWayland. Temporary event/focus tracing confirmed the key arrives and the canvas does not
+intercept it; the menu model is not rebuilt during the transition. A `WAYLAND_DEBUG=1` trace
+shows the old popup destroyed, the replacement requesting a grab, and the compositor replying
+`popup_done`. GTK then retries, but the popup remains unusable. `GSK_RENDERER=gl` also reproduces.
+
+`scripts/linux-menu-probe.c` reproduces the visible failure using only GTK, a native text entry
+and three static menus: no Driftbox, Swift, GLArea, PipeWire or ALSA code. This narrows the problem
+to the environment/toolkit/compositor path; it does not yet identify an upstream defect or rule
+out the VM input delivery mechanism. Run from a terminal in the signed-in guest:
+
+```sh
+cc -Wall -Wextra -Werror scripts/linux-menu-probe.c -o /tmp/driftbox-menu-probe \
+  $(pkg-config --cflags --libs gtk4)
+GDK_BACKEND=wayland /tmp/driftbox-menu-probe
+# Press F10, then Left: the MIDI popup should remain visible and accept Down/Return.
+GDK_BACKEND=x11 /tmp/driftbox-menu-probe
+```
+
+Use `GDK_BACKEND=x11 EGL_PLATFORM=x11 scripts/linux-build.sh desktop` for interactive work in
+this VM. This is a native GTK application using XWayland within the existing GNOME session;
+it does not change the desktop session or system settings. Before claiming native Wayland
+support, repeat with physical keyboard/mouse input and a newer GTK/compositor, then retest all
+menu/submenu transitions. Preserve normal GTK focus handling until that comparison establishes
+which component needs a fix. Diagnostic logs from this run are
+`~/driftbox-menu-wayland-protocol.log`, `~/driftbox-menu-wayland-gl.log` and
+`~/driftbox-menu-x11.log`; the clean release log is `~/driftbox-midi-x11-preview.log`.
 
 ### Desktop validation
 

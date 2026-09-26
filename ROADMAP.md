@@ -820,5 +820,8 @@ ignore/flush, reconnect and shutdown; physical MIDI timing and controller tests 
 The shell's MainActor integration uses private Swift runtime hooks and needs revalidation with
 toolchain updates. Measured audio latency, remaining input/accessibility work, packaging and
 physical hardware qualification are still required for a viable release.
+Interactive audio and MIDI menu selection now passes through XWayland. The Ubuntu VM's native
+Wayland menu-switching failure also reproduces in a standalone GTK-only probe; XWayland is the
+current interactive workaround pending toolkit/compositor qualification.
 Linux plug-in hosting and a plug-in build remain separate milestones. See the plan for detailed
 validation evidence and limitations.
