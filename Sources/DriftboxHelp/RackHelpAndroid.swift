@@ -1,16 +1,8 @@
-/// The rack's guide: the reference's `HelpDialog` for the rack, topic for topic, saying what this
-/// platform's rack does. What the web's rack has and this one has not — a library in the browser, a
-/// link to share, its automation desk and performance views — is left out rather than described.
-public enum RackHelp {
-  public static func guide(for platform: HelpPlatform) -> HelpGuide {
-    switch platform {
-    case .mac: mac
-    case .windows: windows
-    case .android: android
-    }
-  }
-
-  static let mac = HelpGuide(
+/// The rack's guide on Android: the reference's topics, saying what the rack does under a finger —
+/// its chips, pinching and panning, a finger held down for a module's menu, its keys across the foot
+/// — and leaving out what it has not got: plug-ins, live input, a keyboard's keys.
+extension RackHelp {
+  static let android = HelpGuide(
     title: "Rack guide",
     topics: [
       HelpTopic(
@@ -29,26 +21,38 @@ public enum RackHelp {
           HelpPart(
             "Patch something",
             .steps([
-              HelpStep("Open a patch", "from the Patch menu in the header: the factory patches, by kind."),
-              HelpStep("Turn the rack round", "with Back, or Tab. The inputs and outputs are on the back."),
+              HelpStep(
+                "Show the rack",
+                "from the song's chip in the groovebox: Rack. The patch's chip here has the way back, Groovebox."
+              ),
+              HelpStep("Open a patch", "from the patch's chip: Patches, the factory patches."),
+              HelpStep("Turn the rack round", "with BACK. The inputs and outputs are on the back."),
               HelpStep(
                 "Drag from a jack to a jack.", "A basic path is a source, a filter or an effect, then an Out."
               ),
-              HelpStep("Play it", "on the typing keys, from a sequencer module, or from a MIDI keyboard."),
+              HelpStep("Play it", "on the keys across the foot, or from a sequencer module."),
             ])),
           HelpPart(
             "Front, back and header",
             .terms([
               HelpTerm(
-                "Header", "The patch, the transport, the typing keys' octave, Back or Front, and Add."),
+                "Header", "The patch's chip, PLAY, the tempo, BACK or FRONT, and ADD."),
               HelpTerm("Front", "Every module's controls, its screens and meters."),
               HelpTerm(
                 "Back",
                 "Every module's jacks, inputs down the left in teal and outputs down the right in amber, the "
                   + "cables between them, and a trim beside each input."),
+              HelpTerm("ADD", "Every module there is, by what it is for."),
+            ])),
+          HelpPart(
+            "Moving about",
+            .terms([
+              HelpTerm("Pinch", "Zooms in and out, about your fingers."),
               HelpTerm(
-                "Add", "Every module there is, on its shelf and searchable, each with its picture and a line."
-              ),
+                "Drag", "On a panel away from its controls, or between modules, moves the rack about."),
+              HelpTerm(
+                "Double tap",
+                "A module fits it to the screen, a knob a finger's size; again, and the whole rack fits."),
             ])),
           HelpPart(
             "First useful choices",
@@ -56,9 +60,7 @@ public enum RackHelp {
               HelpTerm(
                 "A synth?",
                 "Add a Voice for a whole instrument, or MIDI, a VCO, a VCA and an ADSR to build one."),
-              HelpTerm(
-                "Drums?",
-                "Open a groovebox song from the Patch menu, or load your own recording into a Sampler."),
+              HelpTerm("Drums?", "Add a Groovebox module, or load your own recording into a Sampler."),
               HelpTerm(
                 "Movement?",
                 "Patch an LFO or an envelope into a control input, or have a Combinator turn several knobs at once."
@@ -77,20 +79,21 @@ public enum RackHelp {
                 "Output to input",
                 "Drag from either end; it snaps to the jack it can reach. An output can feed many inputs; an input "
                   + "takes one cable."),
-              HelpTerm("Unplugging", "Click a cable, or the × beside the input it is in."),
-              HelpTerm("Stereo into mono", "Only the left channel reaches a mono input."),
+              HelpTerm("Unplugging", "Tap a cable's middle, or the × beside the input it is in."),
               HelpTerm(
-                "Feedback", "Loops are allowed: the rack puts one block's delay in them so that they can run."
-              ),
+                "Stereo into mono", "Only the left channel reaches a mono input; its cable is drawn thinner."),
+              HelpTerm(
+                "Feedback",
+                "Loops are allowed: the rack puts one block's delay in them so that they can run, and draws them "
+                  + "dashed."),
             ])),
           HelpPart(
             "The back",
             .terms([
               HelpTerm(
                 "Input trim",
-                "The pot beside every input scales what arrives, or turns it upside down. Drag it up and down; "
-                  + "double-click puts it back to 1×."),
-              HelpTerm("Moving", "Drag a module's bay to move it; its cables swing after it."),
+                "The pot beside every input scales what arrives, or turns it upside down. Drag it up and down; tap "
+                  + "it twice quickly to put it back to 1×."),
               HelpTerm(
                 "Control and sound",
                 "Both are signals on cables. A pitch, a gate, an envelope or an LFO is control only because of the "
@@ -103,34 +106,48 @@ public enum RackHelp {
           HelpPart(
             "Modules",
             .terms([
-              HelpTerm("Selecting", "Click a module; ⌘-click adds another to the selection."),
+              HelpTerm("Selecting", "Tap a module."),
               HelpTerm(
                 "Its menu",
-                "Right-click a module for its guide, to move it up or down, bypass it, duplicate it or remove it."
-              ),
+                "Hold a finger on a module, front or back, for its guide, to move it up or down, bypass it, "
+                  + "duplicate it or remove it."),
               HelpTerm(
                 "Bypass and duplicate",
                 "Bypassed, a processor passes its input on untouched. A duplicate copies the settings and none of "
                   + "the cables."),
-              HelpTerm(
-                "Undo",
-                "Edit ▸ Undo, while the rack's window is in front, undoes the rack's cables, moves and knobs."
-              ),
             ])),
           HelpPart(
             "Controls",
             .terms([
               HelpTerm(
                 "Knobs",
-                "Drag up and down; hold Option for fine steps. Double-click puts one back where it started; the "
-                  + "arrow keys move one that has focus."),
+                "Drag up and down; a finger going sideways moves the rack instead. Tap one twice quickly to put it "
+                  + "back where it started."),
+              HelpTerm(
+                "Choices and numbers",
+                "Tap a choice's button, or step it with ‹ and ›. Drag a number up and down; a tap does what it "
+                  + "says."),
               HelpTerm(
                 "Driven",
-                "A knob a Combinator drives is marked as driven, and moves as its rotary or button does."),
+                "A knob a Combinator drives has an amber dot, and moves as its rotary or button does."),
               HelpTerm(
                 "Recordings",
-                "Drop a recording on a Sampler, a Multisample Instrument or an Audio Track, or click its screen to "
-                  + "choose one."),
+                "Tap an empty Sampler, Multisample Instrument or Audio Track to choose a recording, from anywhere "
+                  + "Android keeps them. A Multisample Instrument takes a whole set at once."),
+            ])),
+          HelpPart(
+            "A Combinator's routing",
+            .terms([
+              HelpTerm(
+                "Routing…",
+                "On the Combinator's face: its routing, across the foot of a phone or beside the rack on a tablet; "
+                  + "× puts it away."),
+              HelpTerm(
+                "A routing",
+                "Which of its rotaries or buttons, which module and which knob it turns: each a menu to choose "
+                  + "from. Add Routing adds one, and − takes it out."),
+              HelpTerm(
+                "MIN and MAX", "Drag them up and down: the ends of the knob's travel it turns across."),
             ])),
         ]),
       HelpTopic(
@@ -151,13 +168,6 @@ public enum RackHelp {
               HelpTerm(
                 "Audio Track",
                 "One recording started at a bar and a step of the rack's transport, out on cables."),
-              HelpTerm(
-                "Audio Input",
-                "What comes in from a microphone or an interface, chosen in Settings under Audio In. Wear "
-                  + "headphones."),
-              HelpTerm(
-                "Plug-in, Plug-in Instrument",
-                "An Audio Unit effect or instrument from this Mac, with its own controls a click away."),
             ])),
           HelpPart(
             "Shape and space",
@@ -185,11 +195,9 @@ public enum RackHelp {
                 "ADSR and LFO",
                 "A shape each note, and a movement that repeats. Into a control input, through a VCA or a trim where "
                   + "the depth matters."),
+              HelpTerm("Follower, S&H", "Loudness made into control; a moving signal made into steps."),
               HelpTerm(
-                "Follower, S&H",
-                "Loudness made into control; a moving signal made into steps."),
-              HelpTerm(
-                "Offset, Quantizer", "Shift or turn over a signal; then hold a pitch to the notes of a scale."
+                "Offset, Quantizer", "Move or turn over a signal; then hold a pitch to the notes of a scale."
               ),
               HelpTerm(
                 "Combinator",
@@ -207,7 +215,7 @@ public enum RackHelp {
                 "Steps of pitch and gate. The Arranger changes scenes over bars; the Arp, Chord Player, Scale "
                   + "Player and Note Echo change notes."),
               HelpTerm(
-                "MIDI", "Notes from the keys or a keyboard, as pitch, gate and velocity, a voice each."),
+                "MIDI", "Notes from the keys across the foot, as pitch, gate and velocity, a voice each."),
               HelpTerm(
                 "Mixers and Out",
                 "A Mixer or a Line Mixer brings paths together; an Out is where sound leaves. The VU Meter and the "
@@ -221,37 +229,39 @@ public enum RackHelp {
             "Playing the rack",
             .terms([
               HelpTerm(
-                "Typing keys",
-                "Two rows, from Z and from Q, while the rack's window is in front; comma and full stop move the "
-                  + "octave. The header says where it is."),
-              HelpTerm(
-                "A MIDI keyboard", "Plays the rack while its window is in front, and the groovebox otherwise."
-              ),
+                "The keys",
+                "Across the foot of the screen, when the patch has a MIDI module; KEYS shows them, HIDE puts them "
+                  + "away. A key struck lower plays louder, and several fingers play a chord."),
+              HelpTerm("The octave", "‹ and › on the keys' row, and it says which C they start from."),
               HelpTerm(
                 "Voices",
-                "The MIDI module decides pitch, gate and velocity, and how many notes play at once. Without one, "
-                  + "every voice gets the same note."),
+                "The MIDI module decides pitch, gate and velocity for each voice. Without one, every voice gets the "
+                  + "same note."),
+              HelpTerm(
+                "Transport", "PLAY in the header starts and stops the rack; the groovebox plays on under it."),
             ])),
           HelpPart(
             "The groovebox in the rack",
             .terms([
               HelpTerm(
-                "A song whole",
-                "Patch ▸ Groovebox Songs opens one in the rack, with its Groovebox module wired in."),
+                "The Groovebox module",
+                "A song's four machines, each on outputs of its own; ▶ plays from a section, and ⟳ loops it."),
               HelpTerm(
                 "Unpatched", "A machine whose output is not patched plays on in the song's own mix."),
               HelpTerm(
                 "Patched", "Patch a machine's output and the whole machine goes through the rack instead."),
-              HelpTerm(
-                "Editing",
-                "The Groovebox module opens its song in the groovebox window; every edit plays on here."),
             ])),
           HelpPart(
-            "In another app",
-            .prose([
-              "Driftbox: Rack and Driftbox: Groovebox are Audio Unit instruments in Logic, GarageBand and every "
-                + "other app that plays them, each with its face and its presets. Driftbox has to have been opened "
-                + "once for them to be found."
+            "Recordings",
+            .terms([
+              HelpTerm(
+                "A Sampler",
+                "Loading a recording sets the rack's tempo so that it is whole bars — 1, 2, 4 or 8, as its buttons "
+                  + "choose — and starts the transport."),
+              HelpTerm(
+                "Kept",
+                "Recordings are the rack's while the app is open: a patch opened afresh, or the app next time, "
+                  + "needs them loaded again."),
             ])),
         ]),
       HelpTopic(
@@ -262,8 +272,8 @@ public enum RackHelp {
             .steps([
               HelpStep(
                 "There is sound to be had.",
-                "If the header says No sound, the rack could not start its audio; Settings says what it plays "
-                  + "through."),
+                "In the groovebox, the song's chip has Output: what Driftbox plays through, and a device gone."
+              ),
               HelpStep(
                 "There is an Out, and the chain reaches it.",
                 "An Out is the only way sound leaves the rack. On the back, trace one path from the source to it."
@@ -283,7 +293,8 @@ public enum RackHelp {
             "Silent for a reason",
             .terms([
               HelpTerm(
-                "An empty sampler", "A Sampler with nothing loaded makes nothing. Drop a recording on it."),
+                "An empty sampler",
+                "A Sampler with nothing loaded makes nothing. Tap it to choose a recording."),
               HelpTerm(
                 "Waiting for notes",
                 "The Arp and the Chord Player wait for notes from a MIDI module, played on the keys."),
@@ -291,14 +302,13 @@ public enum RackHelp {
                 "A Seq with no clock",
                 "A Seq has no clock inside it. Patch a Transport division or a Clock into it."),
               HelpTerm(
-                "Audio Input",
-                "Listens to the device Settings names under Audio In, and only while the patch has one. Settings "
-                  + "says why it hears nothing: the device unplugged, or Privacy & Security keeping the microphone "
-                  + "from Driftbox. The rack as an Audio Unit in another app hears nothing."),
-              HelpTerm(
                 "Bypassed or muted",
                 "A bypassed processor passes its input on; a muted Out, or one not soloed while another is, passes "
                   + "nothing."),
+              HelpTerm(
+                "Not on a phone yet",
+                "Audio Input and plug-ins are silent here: live input and plug-ins are still to come on Android."
+              ),
             ])),
           HelpPart(
             "Loud, wrong or distorted",
@@ -313,30 +323,32 @@ public enum RackHelp {
                 "Too deep",
                 "An LFO or an envelope straight into a control input is at full depth. Turn down the trim beside "
                   + "the input, or go through a VCA."),
-              HelpTerm("A knob that moves itself", "A Combinator is driving it, and it says so."),
+              HelpTerm("A knob that moves itself", "A Combinator is driving it, and its amber dot says so."),
             ])),
         ]),
       HelpTopic(
-        "keys", "Patches & shortcuts",
+        "keys", "Patches & gestures",
         [
           HelpPart(
             "Patches",
             .terms([
               HelpTerm(
-                "The Patch menu",
-                "The factory patches, by kind, and the groovebox's songs, whole."),
-              HelpTerm("Kept", "The rack keeps the patch it has, and opens on it next time."),
+                "The patch's chip",
+                "Groovebox, the way back; Patches, the factory patches; and Rack Guide, this guide."),
+              HelpTerm(
+                "Kept",
+                "The rack keeps the patch it has, and opens on it next time. Opening another patch replaces it."
+              ),
             ])),
           HelpPart(
-            "Shortcuts",
+            "Fingers",
             .keys([
-              HelpKey("Space", "Start or stop the rack's transport"),
-              HelpKey("Tab", "Turn the rack round"),
-              HelpKey("Z … M  Q … U", "Two rows of keys"),
-              HelpKey(",  .", "The keys' octave down or up"),
-              HelpKey("⌘Z  ⇧⌘Z", "Undo, redo"),
-              HelpKey("⌘3", "The rack's window"),
-              HelpKey("⌥⌘?", "This guide"),
+              HelpKey("Tap", "Press a chip, a button or a key; select a module"),
+              HelpKey("Drag up and down", "Turn a knob, a number or a trim"),
+              HelpKey("Drag", "From a jack to a jack, on the back"),
+              HelpKey("Pinch", "Zoom"),
+              HelpKey("Double tap", "Fit a module to the screen, or the rack; put a knob or a trim back"),
+              HelpKey("Hold", "A module's menu"),
             ])),
         ]),
     ])

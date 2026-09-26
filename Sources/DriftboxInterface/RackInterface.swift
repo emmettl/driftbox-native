@@ -1,4 +1,5 @@
 import DriftboxCanvas
+import DriftboxHelp
 import DriftboxRack
 import DriftboxRackSession
 import DriftboxShell
@@ -681,6 +682,10 @@ public final class RackInterface {
     scroll = RackStage(rack: rack, size: size, scroll: scroll + event.delta.y).scroll
   }
 
+  /// The rack's guide, where the patches' menu offers it — a touchscreen's; a desktop has its Help
+  /// menu.
+  public var helpGuide: HelpGuide?
+
   /// The guide open over the rack, if one is.
   public internal(set) var guide: HelpSheet?
 
@@ -777,7 +782,7 @@ public final class RackInterface {
     menuActions = [:]
     menuDisabled = []
     menuChecked = []
-    guard let face = stage.face(at: point) else { return nil }
+    guard guide == nil, let face = stage.face(at: point) else { return nil }
     let id = face.module.id
     let index = rack.patch.modules.firstIndex { $0.id == id } ?? 0
     return Menu(
@@ -821,6 +826,17 @@ public final class RackInterface {
       }
     }
     items.append(.submenu(Menu("Patches", patches)))
+    if let helpGuide {
+      let size = size
+      items += [
+        .separator,
+        item("Rack Guide", "help.rack", enabled: true) { [weak self] in
+          let sheet = HelpSheet(guide: helpGuide)
+          sheet.size = size
+          self?.guide = sheet
+        },
+      ]
+    }
     return Menu(rack.name, items)
   }
 

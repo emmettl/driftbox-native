@@ -90,4 +90,6 @@ public enum HelpPlatform: Sendable {
   case mac
   /// The drawn app on Windows: its menus, its keys with Ctrl, and what its drawn controls do.
   case windows
+  /// The touchscreen app on Android: its chips, long presses and fingers, and no keys.
+  case android
 }

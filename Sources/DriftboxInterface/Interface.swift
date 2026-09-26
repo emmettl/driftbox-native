@@ -1,5 +1,6 @@
 import DriftboxCanvas
 import DriftboxEngine
+import DriftboxHelp
 import DriftboxSeq
 import DriftboxSession
 import DriftboxShell
@@ -90,6 +91,10 @@ public final class Interface {
   public var showRack: (() -> Void)?
   /// Where the song's menu sends what it asks of a file; with none, it offers none.
   public var files: ((FileAction) -> Void)?
+  /// The groovebox's guide, where the song's menu offers it — a touchscreen's, whose only menu it
+  /// is; a desktop has its Help menu — and the guide open over the controls, if one is.
+  public var helpGuide: HelpGuide?
+  public internal(set) var guide: HelpSheet?
   /// Ask whether to go on and lose the song's unsaved edits, and do `then` if so; with none, the
   /// interface goes on without asking.
   public var confirm: ((_ question: String, _ then: @escaping () -> Void) -> Void)?
@@ -133,6 +138,10 @@ public final class Interface {
   /// Scroll the grid, if `event` is over it. False for anywhere else.
   @discardableResult
   public func scroll(_ event: ScrollEvent) -> Bool {
+    if let guide {
+      guide.scroll(event)
+      return true
+    }
     guard isShowing, let grid = layout.grid, grid.contains(event.location) else { return false }
     // Sideways as a wheel tilts, or as it turns with Shift held, as Windows' own programs take it.
     let sideways = event.modifiers.contains(.shift) ? event.delta.y + event.delta.x : event.delta.x
@@ -151,6 +160,13 @@ public final class Interface {
   @discardableResult
   public func pointer(_ event: PointerEvent) -> Bool {
     if event.kind == .mouse { hover = event.phase == .cancelled ? nil : event.location }
+    // A guide over the controls takes every press, and closes on one off it.
+    if let guide {
+      guide.size = size
+      guide.pointer(event)
+      if !guide.isOpen { self.guide = nil }
+      return true
+    }
     guard isShowing else { return false }
     if performing { return editChipPointer(event) }
     switch event.phase {
@@ -444,6 +460,13 @@ public final class Interface {
 
   /// Everything, onto `canvas`, whose transform takes points to its pixels.
   public func draw(on canvas: Canvas) {
+    // A guide over everything else.
+    defer {
+      if let guide {
+        guide.size = size
+        guide.draw(on: canvas)
+      }
+    }
     guard isShowing else { return }
     if performing {
       chip(Layout.Chip(frame: editChip, label: "EDIT", action: .perform, isOn: false), on: canvas)

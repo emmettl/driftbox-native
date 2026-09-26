@@ -6,6 +6,7 @@ public enum GrooveboxHelp {
     switch platform {
     case .mac: mac
     case .windows: windows
+    case .android: android
     }
   }
 

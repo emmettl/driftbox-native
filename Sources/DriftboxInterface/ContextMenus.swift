@@ -1,3 +1,4 @@
+import DriftboxHelp
 import DriftboxSeq
 import DriftboxSession
 import DriftboxShell
@@ -12,7 +13,7 @@ extension Interface {
     menuActions = [:]
     menuDisabled = []
     menuChecked = []
-    guard isShowing, let song = session.song else { return nil }
+    guard guide == nil, isShowing, let song = session.song else { return nil }
     let layout = layout
     if let section = layout.sections.first(where: { $0.frame.contains(point) }) {
       return sectionMenu(section, song: song)
@@ -88,6 +89,15 @@ extension Interface {
       return .command(entry.name, id: id)
     }
     items.append(.submenu(Menu("Songs", songs)))
+    if let helpGuide {
+      menuActions["help.groovebox"] = { [weak self] in
+        guard let self else { return }
+        let sheet = HelpSheet(guide: helpGuide)
+        sheet.size = size
+        guide = sheet
+      }
+      items += [.separator, .command("Groovebox Guide", id: "help.groovebox")]
+    }
     return Menu(session.song == nil ? "Driftbox" : session.documentName, items)
   }
 
@@ -347,6 +357,12 @@ extension Interface {
   /// keep the name and Escape to leave it as it was. Every key is the name's while it is; false
   /// when nothing is being named.
   public func key(_ event: KeyEvent) -> Bool {
+    // A guide has every key, and Escape closes it.
+    if let guide {
+      _ = guide.key(event)
+      if !guide.isOpen { self.guide = nil }
+      return true
+    }
     guard var renaming else { return false }
     guard event.isDown else { return true }
     switch event.key {
