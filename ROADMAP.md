@@ -806,14 +806,16 @@ the rack; compressed recordings, through Android's own media codecs; and a table
 
 ## Milestone 6 — Linux
 
-The [Linux port plan](docs/LINUX.md) separates the development VM from the application work.
-The shared engine and GLES contract tests already build on Linux. The first task is a reproducible
-ARM64 environment on external storage, followed by PipeWire playback and a real window. The VM,
-Linux build tooling and default-output command-line playback now work; captured audio, source
-lifetime and shutdown/failure checks pass. Device management and the real window remain next.
+The [Linux port plan](docs/LINUX.md) records the external-storage Ubuntu ARM64 VM, build tooling
+and acceptance criteria. The command-line player and shared GTK/GLES desktop now run with
+PipeWire audio. The groovebox and built-in rack render; native Save As/reopen and keyboard
+transport checks pass. GTK file drops feed the shared import paths, with interactive drag/drop
+qualification still pending.
 
-The shell experiment must prove event-loop/MainActor integration and toolkit-owned GLES contexts
-before the toolkit choice is final. Asynchronous dialogs and text/focus input may require shared
-interface changes. The standalone groovebox and built-in rack are the first release; Linux plug-in
-hosting and a plug-in build are separate milestones. See the plan for acceptance criteria and
-hardware checks that a VM cannot establish.
+The Linux audio adapter lists outputs, remembers a selected node name, falls back when it is
+removed and reconnects after stream/server loss. Source lifetime and detach behavior are tested
+across recovery. The shell's MainActor integration uses private Swift runtime hooks and needs
+revalidation with toolchain updates. MIDI, measured audio latency, remaining input/accessibility
+work, packaging and physical hardware qualification are still required for a viable release.
+Linux plug-in hosting and a plug-in build remain separate milestones. See the plan for detailed
+validation evidence and limitations.

@@ -25,6 +25,7 @@ struct db_pw_output {
 };
 static pthread_once_t initialized = PTHREAD_ONCE_INIT;
 static void initialize(void) { pw_init(NULL, NULL); }
+void db_pw_initialize(void) { pthread_once(&initialized, initialize); }
 static void message(char *dest, size_t size, const char *text) {
     if (dest && size) snprintf(dest, size, "%s", text);
 }
@@ -70,9 +71,9 @@ static const struct pw_stream_events events = {
     PW_VERSION_STREAM_EVENTS, .process = process
 };
 
-db_pw_output *db_pw_open(db_pw_render render, void *context, uint32_t rate,
+db_pw_output *db_pw_open(db_pw_render render, void *context, uint32_t rate, const char *target,
                         char *error, size_t error_size) {
-    pthread_once(&initialized, initialize);
+    db_pw_initialize();
     struct db_pw_output *out = calloc(1, sizeof(*out));
     if (!out) { message(error, error_size, "out of memory"); return NULL; }
     atomic_init(&out->enabled, false);
@@ -91,6 +92,13 @@ db_pw_output *db_pw_open(db_pw_render render, void *context, uint32_t rate,
         pw_properties_new(PW_KEY_MEDIA_TYPE, "Audio", PW_KEY_MEDIA_CATEGORY, "Playback",
             PW_KEY_MEDIA_ROLE, "Music", PW_KEY_NODE_NAME, "driftbox-play", NULL), &events, out);
     if (!out->stream) goto failed;
+    if (target) {
+        struct pw_properties *props = pw_properties_new(
+            PW_KEY_TARGET_OBJECT, target, PW_KEY_NODE_DONT_RECONNECT, "true",
+            "node.dont-move", "true", NULL);
+        pw_stream_update_properties(out->stream, &props->dict);
+        pw_properties_free(props);
+    }
     uint8_t storage[1024];
     struct spa_pod_builder builder = SPA_POD_BUILDER_INIT(storage, sizeof(storage));
     const struct spa_pod *params[] = { spa_format_audio_raw_build(&builder, SPA_PARAM_EnumFormat,

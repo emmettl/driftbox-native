@@ -237,7 +237,7 @@ Startup requires a streaming output within five seconds. A disconnected stream o
 without rendering produces a diagnostic and nonzero exit. Duration expiry, Ctrl-C and SIGTERM
 perform orderly teardown. This is a CLI baseline, not yet the full `AudioRouting` adapter: device
 listing/selection, automatic recovery, measured output latency and underrun reporting are pending.
-The desktop now uses a default-output `AudioRouting` adapter, described below. MIDI and packaging
+The desktop now uses the device-aware `AudioRouting` adapter described below. MIDI and packaging
 remain pending; the rack uses its existing WAV decoder.
 
 ### Audio validation
@@ -370,11 +370,21 @@ while allowing resize and release/cancel events. Cancelling Open preserves the c
 closing after a failed save keeps the window and edits. GTK owns the GL context until the desktop
 and its GPU resources have been released.
 
-The default output mixes the groovebox and rack at 48 kHz using the existing PipeWire bridge.
-`PipeWireRoute` exposes startup/runtime failures through the shared audio status. On stream loss
-or three seconds without rendered frames it stops the route; restart the app after restoring the
-output. Device enumeration/selection, automatic reconnect, measured latency and underrun reporting
-are not implemented. `--silent` intentionally supplies no audio route.
+`PipeWireRoute` mixes the groovebox and rack at 48 kHz using the existing PipeWire bridge.
+The Audio menu lists discovered sinks and remembers a choice by `node.name`, never a transient
+PipeWire object ID. With no choice it follows `default.audio.sink` metadata. If the chosen sink
+is removed, it falls back to the system default while retaining the choice, then returns when
+that name reappears. A profile change that changes the node name represents a different choice.
+The adapter reads registry and metadata events on a separate PipeWire loop and takes synchronized
+snapshots on the main actor every 250 ms. It does not write system audio preferences.
+
+Desktop stream negotiation is asynchronous. A failed stream or server connection retries after
+two seconds, preserving attached source owners; detach still waits for any in-flight callback
+before releasing an owner. Discovery/stream startup has a five-second deadline, and an output
+with attached sources but no rendered frames for three seconds is reopened. No sources means
+intentional silence, not a stalled render callback. Explicit stop cancels recovery and releases
+sources. The command-line player retains its bounded synchronous startup and failure exit behavior.
+Measured latency and underrun reporting remain unimplemented. `--silent` supplies no audio route.
 
 Normal runs use Foundation `UserDefaults` with the `org.driftbox.linux` suite for existing session
 and rack memory; smoke tests do not restore or write preferences. File arguments open a song.
@@ -386,6 +396,38 @@ remember the last accepted folder for the lifetime of the window. IME compositio
 accessibility, physical keyboard/trackpad behavior and fractional/multi-monitor scaling remain
 pending. WAV import is connected to the rack's shared file request path but has not had a native
 dialog test; external file-manager drag/drop also still needs interactive qualification.
+
+### Audio device and recovery validation
+
+```sh
+# Ubuntu 24.04 / WirePlumber 0.4: separate server, hardware monitors disabled.
+python3 scripts/test-linux-route.py
+# Optional tests against the signed-in session (temporary silent sinks only):
+DRIFTBOX_TEST_PIPEWIRE=1 scripts/linux-build.sh test --filter PipeWireRouteTests
+```
+
+The private harness uses temporary runtime, configuration and state directories, a private D-Bus
+session and silent virtual sinks. It restarts only the server it launched. Its four route tests
+cover selection, fallback and return by name, actual graph links, stream destruction, full server
+restart, default-output changes, ownership across reconnect and detach during an outage. The two
+cases that change server state or default metadata run only under that harness. The ordinary
+session opt-in creates/removes its own silent sinks and stream, without changing system settings.
+The original four `PipeWireTests` cover the realtime gate and source lifetime at the output layer.
+
+All four route tests passed on Ubuntu ARM64 with strict actor checks; the original four output
+integration tests also passed after the bridge change. The C bridge passes `-Wall -Wextra -Werror`,
+and the release desktop builds. The updated Xvfb/llvmpipe live capture drew 349 GUI frames and
+rendered 279,552 audio frames; its recording contained 277,504 finite stereo frames at 48 kHz,
+with channel peaks of 0.69902 and 0.70040. Interactive checking of the updated Audio menu remains
+pending because GNOME was locked. The earlier preview process has not been replaced yet.
+Logs: `~/driftbox-audio-private-tests.log`, `~/driftbox-audio-route-release.log`,
+`~/driftbox-audio-route-capture.log` and `~/driftbox-audio-route-tests.log`.
+
+These are ARM64 VM tests using virtual sinks. Physical USB/Bluetooth hotplug, hardware rate/profile
+changes, suspend/resume and latency/glitch measurements remain release qualification work. Sink
+names are read at discovery; a description changed in-place on an existing node may remain stale
+until that node is announced again. The harness currently requires WirePlumber 0.4 configuration;
+it deliberately refuses newer versions rather than enabling hardware monitors by mistake.
 
 ### Desktop validation
 

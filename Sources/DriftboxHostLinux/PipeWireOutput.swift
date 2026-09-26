@@ -8,8 +8,7 @@
     public init(_ description: String) { self.description = description }
   }
 
-  /// A default-output stream. Control operations belong to the main actor; PipeWire renders on
-  /// its realtime thread. A future AudioRouting adapter will add device discovery and recovery.
+  /// Control operations belong to the main actor; PipeWire renders on its realtime thread.
   @MainActor
   public final class PipeWireOutput {
     public let sampleRate: Double
@@ -19,7 +18,7 @@
 
     public var renderedFrames: UInt64 { stream.map(db_pw_frames) ?? finalFrames }
 
-    public init(sampleRate: Double = 48000) throws {
+    public init(sampleRate: Double = 48000, target: String? = nil, waitUntilStreaming: Bool = true) throws {
       guard sampleRate.isFinite, (8000...192000).contains(sampleRate),
         sampleRate.rounded() == sampleRate
       else { throw PipeWireError("unsupported source sample rate") }
@@ -28,12 +27,13 @@
       let context = Unmanaged.passUnretained(callback).toOpaque()
       guard
         let opened = db_pw_open(
-          renderPipeWire, context, UInt32(sampleRate), &error, error.count)
+          renderPipeWire, context, UInt32(sampleRate), target, &error, error.count)
       else {
         throw PipeWireError(
           String(decoding: error.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self))
       }
       stream = opened
+      guard waitUntilStreaming else { return }
       do {
         // A connected but unlinked stream is not a working audio output.
         let began = HostTime.now()
