@@ -185,13 +185,6 @@ public final class HelpView {
               name: "Step \(index + 1): \(step.lead)", value: step.rest,
               frame: Rect(left, from, width, y - from)))
         }
-      case .notes(let notes):
-        for note in notes {
-          let from = y
-          page.pieces.append(Piece(text: "·", font: Self.strong, colour: Theme.nine, x: left, y: y + 14))
-          y = set([(note, Self.body, Theme.ink.faded(0.86))], x: left + 22, width: width - 22, from: y) + 6
-          page.blocks.append(Block(name: note, frame: Rect(left, from, width, y - from)))
-        }
       case .keys(let keys):
         for key in keys {
           let from = y
@@ -202,6 +195,13 @@ public final class HelpView {
             from: beside ? y : keyed)
           y = max(keyed, does) + 4
           page.blocks.append(Block(name: key.keys, value: key.does, frame: Rect(left, from, width, y - from)))
+        }
+      case .notes(let notes):
+        for note in notes {
+          let from = y
+          page.pieces.append(Piece(text: "•", font: Self.body, colour: Theme.nine, x: left, y: y + 14))
+          y = set([(note, Self.body, Theme.ink.faded(0.86))], x: left + 16, width: width - 16, from: y) + 4
+          page.blocks.append(Block(name: note, frame: Rect(left, from, width, y - from)))
         }
       }
       if let note = part.note {
