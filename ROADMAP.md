@@ -671,8 +671,12 @@ each question, and the rest is Android's alone:
    up at all. Paced like a device, the big core costs 67%, but only because its core goes idle
    between calls; with the cluster kept busy, the paced cost is 17.7%. (This said the governor's
    clock at first. Step 2 found the clock makes no difference.) Making the engine and loading a
-   song there takes about four seconds before the first render, which an app switching songs
-   would feel; where that goes is not yet looked at. The rack's load is not measured yet.
+   song took about four seconds before the first render then; now, timed step by step in the
+   app, the song reaches the render thread 0.18 to 0.2s after Swift starts: the engine made in
+   98ms, the session in 45, the song decoded and compiled in 38 to 54, which is all a song
+   switched to costs. The rack, made after, takes 100ms more, and Android says the screen is up
+   470ms after the app was started. `driftbox-play --bench` spends about a quarter of a second of
+   its own time before it renders. The rack's load is not measured yet.
 2. **Audio and MIDI behind the ports.** ← *here.* Audio is done. `DriftboxHostAndroid` answers
    `AudioRouting` with AAudio: low-latency, exclusive, a buffer that starts at two bursts and grows
    a burst at a time on underruns, and a stream that asks to be replaced when its device goes.
