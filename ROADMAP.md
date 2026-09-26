@@ -358,11 +358,17 @@ parity point.
 ## Help and tutorials
 
 Begun, now that the app is complete enough that the help would not be rewritten with every
-milestone. The groovebox's guide first: `DriftboxHelp` holds help as words any platform lays out —
-topics of parts, each paragraphs, terms, steps or keys — and `GrooveboxHelp` the reference's guide
-topic for topic, saying what each platform's own controls do and leaving out what only the web has.
-On the Mac it is Help ▸ Groovebox Guide (⌘?), a window of its own beside the editor. Then
-everything else the web app teaches with, and what a Mac does better:
+milestone. Each module's guide first: the reference's export carries the guides written for
+sixteen modules into `modules.json`, and `RackGuide` assembles every module's as the reference's
+`ModuleGuide` does — what it does, its signal flow, how it works and what to try first where a
+guide was written, every control and its range, and what to watch for — in words any platform
+lays out. On the Mac it is Guide, first in a module's menu, as a sheet over the rack. Then the
+groovebox's guide: `DriftboxHelp` holds help as words any platform lays out — topics of parts,
+each paragraphs, terms, steps or keys — and `GrooveboxHelp` the reference's guide topic for topic,
+saying what each platform's own controls do and leaving out what only the web has. On the Mac it
+is Help ▸ Groovebox Guide (⌘?), a window of its own beside the editor. Left: the drawn apps'
+module guides and help, on Windows and Android; and the rest of what the web app teaches with,
+and what a Mac does better:
 
 - **The reference's teaching, ported:** its help dialog, the first-run offer of a tour, the guided
   tour and tutorial coach that walk a patch being built, and each module's guide. The words carry
@@ -594,7 +600,9 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    of changes from a thread of its own, so the window's is never held; what a screen reader asks
    comes back as the window's events and is done as a hand does it. Held to Windows' own UI
    Automation client from a process of its own, as a screen reader is, and to the real app read and
-   played that way. Next: the rack described, and moving between the controls with the keyboard.
+   played that way. The rack is described as well: the header, every module's controls as its
+   face names them, and the cables on its back as words. Next: moving between the controls with the
+   keyboard, then patching the back and a Combinator's routings from a screen reader.
    The rack comes by way of `DriftboxRackSession`, which holds what the Mac's `RackModel` did —
    the patch, its edits and undo, the keys, controllers, samples, song and transport — on every
    platform, with the Mac's audio, plug-ins and file reading behind ports: `AudioRouting`,
@@ -774,7 +782,8 @@ each question, and the rest is Android's alone:
    heads the strip, and a tap on it is the song's menu — Open…, Save, Save As… and the catalogue's
    songs — with Android's own pickers; a document is read and written whole by Java, and known to
    the session by its URI, so Save goes back to where it came from, and Android asks before
-   unsaved edits are lost. The build leaves out Foundation's internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
+   unsaved edits are lost. What the desktops keep in their preferences, it keeps in a file of its
+   own, `FileMemory`: the song open last, its settings, the output, and the rack's patch. The build leaves out Foundation's internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
    `DriftboxDocument` takes Foundation only to write a WAV. The Play Store, or F-Droid, when
    Driftbox is public.
 

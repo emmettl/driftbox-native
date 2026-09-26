@@ -35,9 +35,10 @@ final class Native {
   static native String rackCheck(String resources);
 
   /**
-   * Play the catalogue's song {@code song}, and draw a scene from it, with the controls over it, in
-   * whatever window it is given: the scene called {@code scene}, or the one the song names when that
-   * is null. {@code resources} is the directory {@link Main} unpacked the catalogue and its songs into.
+   * Play the catalogue's song {@code song}, or when that is null the song open last, and draw a
+   * scene from it, with the controls over it, in whatever window it is given: the scene called
+   * {@code scene}, or the one the song names when that is null. {@code resources} is the directory
+   * {@link Main} unpacked the catalogue and its songs into; what the app remembers is kept beside it.
    */
   static native boolean start(String song, String scene, float density, String resources);
 

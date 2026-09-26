@@ -330,8 +330,8 @@ struct DesktopTests {
     #expect(try FileManager.default.contentsOfDirectory(atPath: stems.path) == ["Groove - 909.bd.wav"])
   }
 
-  /// Told a screen reader's there only while one reads the window, and then what the groovebox shows
-  /// — or, with the rack showing, that it is not described yet; and what it asks, done.
+  /// Told a screen reader's there only while one reads the window, and then what the groovebox shows;
+  /// and what it asks, done.
   @Test func aScreenReaderIsToldWhatIsOnScreen() throws {
     let device = try #require(try Self.devices().first)
     let (desktop, window, _) = try Self.desktop(on: device)
@@ -351,6 +351,30 @@ struct DesktopTests {
     desktop.describedAt = -.infinity
     try desktop.drawFrame()
     #expect(window.described.last?.node("number.tempo")?.current == 100)
+  }
+
+  /// With the rack showing, the rack is what a screen reader is told, and what it asks of it is done
+  /// there: a press that asks for a menu is shown the menu, as a click's is.
+  @Test func aScreenReaderIsToldOfTheRack() throws {
+    let device = try #require(try Self.devices().first)
+    let window = StandInWindow()
+    let surface = StandInSurface(device: device, width: 320, height: 180)
+    let desktop = try Desktop(
+      session: Session(host: EngineHost(sampleRate: 48000)), window: window, device: device, surface: surface,
+      typesetter: NoTypesetter(), rack: RackSession())
+    let rack = try #require(desktop.rack)
+    window.isDescribed = true
+    window.choose(DesktopMenus.showRack)
+    try desktop.drawFrame()
+    let told = try #require(window.described.last)
+    #expect(told.node("rack.run")?.isOn == false)
+    #expect(told.node("transport.play") == nil, "not the groovebox")
+
+    window.onEvent?(.accessibility(.press("rack.run")))
+    #expect(rack.running)
+    window.onEvent?(.accessibility(.press("rack.add")))
+    #expect(window.popped.last?.title == "Add")
+    #expect(!desktop.session.isPlaying, "the groovebox's own untouched")
   }
 
   /// Transport ▸ Clear Loop: whatever is looping, one section or several stretched across, which

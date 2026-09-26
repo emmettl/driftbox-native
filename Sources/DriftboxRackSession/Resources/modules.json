@@ -27,6 +27,29 @@
     "On",
     "Mute"
    ]
+  },
+  "guide": {
+   "overview": "This is the bridge from a retained Groovebox song into the cable rack. It does not make a second copy of the song: it exposes the four authored machines as separate stereo stems so the rack can process and mix them independently.",
+   "concepts": [
+    {
+     "title": "Four stems, one song",
+     "body": "808, 909, 303 A and 303 B each have one stereo output. Their patterns and synthesis still come from the retained Groovebox song; the controls here only set each stem’s level, pan and mute."
+    },
+    {
+     "title": "Retained means embedded",
+     "body": "A rack-native patch may not contain a Groovebox song. In that case every outlet is silent. Open or convert a Groovebox song first if you want this device to produce audio."
+    }
+   ],
+   "firstPatch": [
+    "Open a Groovebox song in the rack so this source has authored material.",
+    "Patch the 808 stereo output to one effect or mixer path and the 303 A output to another.",
+    "Use the strip mutes to confirm which machine each cable is carrying, then balance the four levels."
+   ],
+   "watchFor": [
+    "A stereo output folded into a mono input follows the rack convention: its left channel is heard.",
+    "Older patches with separate left and right Groovebox cables retain the channel each cable originally carried.",
+    "Editing the embedded song changes what these outlets play; it is not a sample frozen at import time."
+   ]
   }
  },
  {
@@ -45,7 +68,8 @@
     "Left / mono",
     "Right"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "audio-track",
@@ -57,7 +81,29 @@
     "M8 37h48"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": {
+   "overview": "Audio Track plays one local recording once when the rack transport reaches its saved position, then routes it through ordinary rack cables.",
+   "concepts": [
+    {
+     "title": "Placement is musical",
+     "body": "Start is measured in rack sixteenths, so the recording keeps its bar-and-step position when the tempo changes."
+    },
+    {
+     "title": "The file is session audio",
+     "body": "The patch remembers the device and placement, but not megabytes of PCM. Reopening a shared patch leaves the track empty."
+    }
+   ],
+   "firstPatch": [
+    "Patch Out to a mixer or terminal output.",
+    "Load an audio file and choose the bar and sixteenth where it should enter.",
+    "Press Play to hear it in time with the rest of the rack."
+   ],
+   "watchFor": [
+    "Audio Track does not time-stretch the recording. Tempo changes move its start on the musical grid without changing its pitch.",
+    "Add another Audio Track for another placement; use Loop Station for a repeating live performance."
+   ]
+  }
  },
  {
   "type": "vco",
@@ -76,7 +122,8 @@
     "Pulse",
     "Tri"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "wavetable",
@@ -89,7 +136,34 @@
     "M4 34l8-8v8l8-8v8l8-8v8l8-8v8l8-8v8l8-8v8"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": {
+   "overview": "A bank of eight waveforms, each built from a spectrum that stops below Nyquist rather than corrected after the fact. Position sweeps between neighbouring waveforms and is a signal, not a switch, so an envelope or an LFO at its inlet changes which harmonics exist instead of filtering the ones that do.",
+   "concepts": [
+    {
+     "title": "Position is the instrument",
+     "body": "The bank runs sine, triangle, organ, square, saw, vocal, 25% pulse, 12% pulse, and the knob crossfades between whichever two it lands between. Sweeping it is the sound this device is for; parking it is merely a waveform selector with extra steps."
+    },
+    {
+     "title": "FM and PM are different jacks on purpose",
+     "body": "FM moves the frequency and matches the VCO exactly, so a cable means the same thing on both devices. PM offsets the phase instead and cannot drift, which is what digital FM synthesis has always actually done — patch an oscillator there, turn Index up, and a sine at Position 0 becomes a two-operator FM voice."
+    },
+    {
+     "title": "It is band-limited by construction",
+     "body": "Nothing here aliases at any pitch, because the harmonics that would fold were never synthesised. The cost is that the very top of the keyboard genuinely loses harmonics — a note near Nyquist has almost nothing left to lose — where the VCO instead keeps them and suppresses the images imperfectly."
+    }
+   ],
+   "firstPatch": [
+    "Patch a MIDI or Seq pitch to V/Oct and the Out to a Ladder, then to the Out module.",
+    "Sweep Position by hand while a note holds. That range is the device.",
+    "Patch an LFO or an ADSR to the Position inlet and set its rear trim to taste for a moving timbre.",
+    "For FM: leave Position at 0 for a sine, patch a second oscillator to PM, and bring Index up from zero."
+   ],
+   "watchFor": [
+    "Index does nothing until something is patched at PM — it scales that inlet rather than generating anything.",
+    "Level varies a little across the bank. A 12% pulse really is quieter than a square at the same peak, and correcting for it would make the morph a volume control."
+   ]
+  }
  },
  {
   "type": "voice",
@@ -114,7 +188,8 @@
     "Pulse",
     "Tri"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "noise",
@@ -126,7 +201,8 @@
     "M5 34h54"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "sampler",
@@ -147,6 +223,28 @@
     "Fwd",
     "Rev"
    ]
+  },
+  "guide": {
+   "overview": "The Sampler divides one loaded recording into equal slices. Every trigger starts the selected slice, making a break behave like a bank of individually playable hits.",
+   "concepts": [
+    {
+     "title": "Selection and triggering are separate",
+     "body": "The Slice knob or Slice input chooses a region; the Trig input actually starts it. Changing Slice without a trigger prepares the next hit but does not interrupt the current one."
+    },
+    {
+     "title": "EOC chains events",
+     "body": "End Of Cycle emits a short pulse when a non-looping slice finishes. Patch it to another trigger input to make one sound hand off to the next."
+    }
+   ],
+   "firstPatch": [
+    "Load a break and leave Slices at 16 for one region per sixteenth note.",
+    "Patch a sequencer trigger to Trig and a stepped CV sequence to Slice.",
+    "Patch Out to the mixer, then try Reverse or raise Start to move the attack point inside every slice."
+   ],
+   "watchFor": [
+    "Slice CV selects a slice; it is not V/Oct pitch. Use the V/Oct inlet when you want transposition.",
+    "Loop keeps the selected region repeating, so EOC is most useful with Loop off."
+   ]
   }
  },
  {
@@ -161,7 +259,29 @@
     "M7 35c7-6 12 4 19-2s12 4 19-2 8 3 12 0"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": {
+   "overview": "A Multisample Instrument chooses one recording when a note begins, based on pitch and velocity, then transposes that recording from its root note. Its zones turn a folder of recordings into one playable instrument.",
+   "concepts": [
+    {
+     "title": "Zones choose the recording",
+     "body": "Each zone has a key range, velocity range and root note. Where zones overlap, the closest root wins; the chosen recording stays fixed until the next note so a pitch bend cannot switch samples halfway through."
+    },
+    {
+     "title": "Gate shapes the note",
+     "body": "A rising Gate selects and starts a sample. Attack and Release shape its envelope, while a zone’s sustain loop repeats only while the gate remains held."
+    }
+   ],
+   "firstPatch": [
+    "Load or map a multisample set on the faceplate.",
+    "Patch MIDI V/Oct, Gate and Velocity to the three matching inputs, then patch Out to a mixer or Out device.",
+    "Hold a low and a high note, then adjust Attack and Release; use Env when another module should follow the same shape."
+   ],
+   "watchFor": [
+    "Zone mapping is saved with the patch, but the recording data is local to this session and device.",
+    "No matching key-and-velocity zone means silence, not the nearest arbitrary sample."
+   ]
+  }
  },
  {
   "type": "ladder",
@@ -174,7 +294,8 @@
     "M34 9c7 0 11 4 11 10s4 10 12 10"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "svf",
@@ -188,7 +309,8 @@
     "M4 7c10 0 14 5 20 14 5 8 10 11 17 11s9-5 18-25"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "alligator",
@@ -201,7 +323,29 @@
     "M42 22h16l-5 5 5 5H42l5-5-5-5"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": {
+   "overview": "Alligator splits one sound through low-pass, band-pass and high-pass lanes. Each lane opens from its own Gate input, so three rhythms can carve different frequency ranges out of the same sustained source.",
+   "concepts": [
+    {
+     "title": "The gate inputs are the rhythm",
+     "body": "A high signal opens that band; a low signal lets it decay. Feed clocks, sequencer gates or trigger patterns into the three Gate jacks rather than expecting an internal pattern."
+    },
+    {
+     "title": "The outputs stay separate",
+     "body": "Low, Band and High are not mixed inside the device. Send them to different effects or mixer channels, or combine them yourself when you want one finished rhythm."
+    }
+   ],
+   "firstPatch": [
+    "Patch a sustained pad, noise or break into In.",
+    "Patch three related gate patterns into Low Gate, Band Gate and High Gate.",
+    "Send the three outputs to mixer channels; make the low lane decay longer and the high lane shorter."
+   ],
+   "watchFor": [
+    "With no gate patched or held high, a lane will not create a rhythm on its own.",
+    "Attack mainly removes clicks; Decay is the more musical control for changing the groove."
+   ]
+  }
  },
  {
   "type": "vocoder",
@@ -219,6 +363,28 @@
     "8",
     "16",
     "32"
+   ]
+  },
+  "guide": {
+   "overview": "A vocoder measures the changing frequency shape of the Mod signal and imposes that shape on the Carrier. The carrier supplies the pitch and texture; the modulator supplies the articulation and rhythm.",
+   "concepts": [
+    {
+     "title": "Carrier versus Mod",
+     "body": "Patch a harmonically rich synth, noise or pad into Carrier. Patch speech, drums or another animated sound into Mod. Swapping them produces a completely different—and often much quieter—result."
+    },
+    {
+     "title": "Bands trade clarity for character",
+     "body": "More bands follow the modulator in finer detail and usually improve intelligibility. Fewer bands sound coarser and more obviously synthetic."
+    }
+   ],
+   "firstPatch": [
+    "Patch a held saw chord into Carrier and a spoken or drum signal into Mod.",
+    "Patch Out to the mixer, start with 16 bands, fast Attack and a short Release.",
+    "Raise Dry briefly if you need to verify that the carrier is sounding, then return it to zero and try Shift."
+   ],
+   "watchFor": [
+    "Silence at either input can make the processed output silent; Dry only passes the carrier.",
+    "A pure sine carrier has too little harmonic material for the filters to shape clearly."
    ]
   }
  },
@@ -238,7 +404,8 @@
     "Lin",
     "Sq"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "drive",
@@ -250,7 +417,8 @@
     "M22 15h12v11H22z"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "distortion",
@@ -270,7 +438,8 @@
     "Fuzz",
     "Digital"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "cabinet",
@@ -290,7 +459,8 @@
     "Stack",
     "Bright"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "eq",
@@ -304,7 +474,8 @@
     "M50 44v-24"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "imager",
@@ -318,7 +489,8 @@
     "M8 38h48"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "compressor",
@@ -331,7 +503,8 @@
     "M50 35v-9M46 30l4-4 4 4"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "limiter",
@@ -344,7 +517,8 @@
     "M20 5v6M44 5v6"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "delay",
@@ -358,7 +532,8 @@
     "M20 32h35M48 29l7 3-7 3"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "ping-pong",
@@ -371,7 +546,8 @@
     "M8 32h15l-5-5M23 32l-5 5"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "phaser",
@@ -384,7 +560,8 @@
     "M18 35v6M32 35v6M46 35v6"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "reverb",
@@ -409,6 +586,33 @@
     "Off",
     "On"
    ]
+  },
+  "guide": {
+   "overview": "Eight delay lines fed back through a unitary matrix, with four algorithms over the same network. Room is the plain one; Hall and Plate add input diffusion so the tail arrives smeared rather than as distinct echoes; Spring puts allpass dispersion inside the feedback path, which is what makes a real spring chirp. An EQ and a gate sit on the wet signal only, and the dry half passes through untouched.",
+   "concepts": [
+    {
+     "title": "The algorithms differ in structure, not in preset",
+     "body": "Room and Hall are not the same network at two sizes — Hall runs longer lines through four Schroeder allpasses first. Plate is short and dense because a plate has no room to have early reflections in. Spring is the only one you could not approximate with the other knobs: its allpasses are inside the loop, so the smearing compounds every pass, which is the chirp."
+    },
+    {
+     "title": "The EQ is on the tail, and that is the point",
+     "body": "Low Cut and High Cut shape the wet signal only, leaving the dry exactly as it arrived. A low cut on the tail is the most reached-for control in fitting a reverb into a mix, because it keeps the room out of the bass without thinning the source. Both are off at the ends of their own travel rather than needing a switch."
+    },
+    {
+     "title": "The gate is keyed from the input",
+     "body": "It watches what you put in, not what comes out — so it follows the drum rather than chasing its own tail, which is what the eighties snare actually is and is also the only version that cannot feed back. Threshold decides what opens it, Hold is how long it stays open after the sound passes, and Release is how fast it shuts."
+    }
+   ],
+   "firstPatch": [
+    "Patch a source to In and the stereo Out onward, then bring Mix up from its default quarter.",
+    "Step through Algorithm on a held chord. Room and Hall differ in the attack, not only the length.",
+    "Bring Low Cut up to around 300Hz on a full mix. That is usually the difference between a reverb that sits and one that muddies.",
+    "For a gated snare: Plate, a short Hold near 0.15s, Release fast, and Mix well up."
+   ],
+   "watchFor": [
+    "Changing Algorithm while a tail is ringing steps the read offsets and can click. The knob is stepped, so it lands on a block boundary rather than mid-sample, but it is a switch and not a crossfade.",
+    "Threshold, Hold and Release do nothing until Gate is switched on, and Gate itself does nothing to the dry signal at any setting."
+   ]
   }
  },
  {
@@ -429,6 +633,28 @@
     "Play",
     "Dub"
    ]
+  },
+  "guide": {
+   "overview": "Loop Station records a performance into a stereo buffer, closes the loop when you leave Record, and can then play or overdub against that exact captured length.",
+   "concepts": [
+    {
+     "title": "The first take sets the length",
+     "body": "Record starts an empty loop. Switching to Play or Dub closes it; later overdubs wrap around that duration instead of making the loop longer."
+    },
+    {
+     "title": "Dry, Loop and Feedback are different",
+     "body": "Dry monitors the live input. Loop sets playback level. Feedback controls how much already-recorded audio survives each overdub pass."
+    }
+   ],
+   "firstPatch": [
+    "Patch a stereo source into In and Out to a mixer or terminal output.",
+    "Choose Rec, perform one phrase, then choose Play exactly at the loop boundary.",
+    "Choose Dub to add a layer; lower Feedback if old layers should fade on every pass."
+   ],
+   "watchFor": [
+    "The recorded take is session-only and is not embedded in a shared patch.",
+    "Clear erases the buffer. Stop preserves it and only halts playback."
+   ]
   }
  },
  {
@@ -442,7 +668,8 @@
     "M16 7v29M28 19v17M45 19v17"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "lfo",
@@ -462,7 +689,8 @@
     "Square",
     "Random"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "follower",
@@ -474,7 +702,8 @@
     "M4 33c12 0 10-24 23-24 12 0 8 23 33 23"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "sample-hold",
@@ -486,7 +715,8 @@
     "M14 35V9M25 35V19M37 35V4M48 35V20"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "offset",
@@ -499,7 +729,8 @@
     "M18 13l14 9 12-7 14 12"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "quantizer",
@@ -536,7 +767,8 @@
     "A#",
     "B"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "combi",
@@ -566,6 +798,28 @@
     "Off",
     "On"
    ]
+  },
+  "guide": {
+   "overview": "The Combinator is a bank of macro controls. A routing maps one rotary or button to another device’s parameter, including values that have no cable inlet, and one macro can drive several targets at once.",
+   "concepts": [
+    {
+     "title": "Routes are not cables",
+     "body": "A cable carries a changing signal between jacks. A Combinator route moves a named front-panel parameter between a target minimum and maximum, so it is created in the routing panel rather than on the back of the rack."
+    },
+    {
+     "title": "Ranges make the gesture",
+     "body": "Each route has target values at the macro’s two ends. Reverse those values to close one parameter while another opens, or use a narrow range for subtle movement."
+    }
+   ],
+   "firstPatch": [
+    "Open the routing panel for Rotary 1 and add a route to a filter Cutoff.",
+    "Set a useful low and high cutoff rather than sweeping the entire parameter range.",
+    "Add a second Rotary 1 route to an effect mix, reversing its range if the dry sound should recede as the filter opens."
+   ],
+   "watchFor": [
+    "If several routes target the same parameter, the later route wins.",
+    "The eight outlets mirror the macro values as signals; they are optional and separate from parameter routing."
+   ]
   }
  },
  {
@@ -579,7 +833,8 @@
     "M47 12h10M47 20h10M47 28h10"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "clock",
@@ -592,7 +847,8 @@
     "M39 28V12h8v16h11"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "seq",
@@ -637,7 +893,8 @@
     "Off",
     "On"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "tracker",
@@ -687,6 +944,33 @@
     "Unit",
     "Curve"
    ]
+  },
+  "guide": {
+   "overview": "Tracker stores eight patterns, each with four independent lanes. Every clock edge advances one row; a lane can emit pitch CV, a held gate and a short trigger from that same row so it can drive melodic voices or percussion.",
+   "concepts": [
+    {
+     "title": "CV, Gate and Trig answer different needs",
+     "body": "CV carries the row’s value continuously. Gate stays high for the step when it is active. Trig is a brief pulse at the step edge—use it to strike envelopes and samplers."
+    },
+    {
+     "title": "A Curve lane draws modulation, not notes",
+     "body": "Set a lane’s Mode to Curve and its numbers stop meaning pitch and start meaning a shape: zero is a value rather than a rest, so the lane can be drawn down to nothing and back. It emits CV only — no gate, no trigger — and negative steps simply go below centre, so a bipolar sweep needs no second control."
+    },
+    {
+     "title": "Pattern is a bank address",
+     "body": "The Pattern control and inlet choose one of eight stored grids; they do not transpose the notes. The Arranger automates that choice to build sections into a song."
+    }
+   ],
+   "firstPatch": [
+    "Patch a sixteenth-note clock to Clock and a transport-start pulse to Reset.",
+    "Use Lane 1 Trig to fire a Sampler and Lane 2 CV plus Gate to play a synth voice.",
+    "Enter a few rows, keep Steps at 16 for one bar, then duplicate the idea into Pattern 2 and vary it."
+   ],
+   "watchFor": [
+    "Mode changes how a lane’s stored numbers are interpreted; choose it before fine-tuning values.",
+    "A Curve lane treats zero as a value rather than a rest, so it emits no gate and no trigger. Patch its CV at a cutoff or a level, not at an envelope.",
+    "Mute stops a lane’s outputs but keeps its pattern data intact."
+   ]
   }
  },
  {
@@ -700,7 +984,29 @@
     "M54 24l3 3-3 3"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": {
+   "overview": "The Arranger turns a short bank of Tracker patterns into a song form. Each row names a pattern and says how many incoming bar pulses it should last before the next row begins.",
+   "concepts": [
+    {
+     "title": "Bar advances the song",
+     "body": "The Bar inlet expects one pulse per bar, not the Tracker’s step clock. A section with four bars holds its Pattern output for four of those pulses."
+    },
+    {
+     "title": "Pattern selects; Trig restarts",
+     "body": "Pattern is a number for the Tracker’s Pattern inlet. Trig fires at each section change so the Tracker can be reset to step one when a new part begins."
+    }
+   ],
+   "firstPatch": [
+    "Create two contrasting patterns in a Tracker.",
+    "Patch a one-pulse-per-bar source to Bar, Arranger Pattern to Tracker Pattern, and Arranger Trig to Tracker Reset.",
+    "Set the first rows to pattern 1 for four bars and pattern 2 for two bars, then start the step clock separately."
+   ],
+   "watchFor": [
+    "A sixteenth-note clock at Bar will rush through sections sixteen times too fast.",
+    "Shortening Sections hides later rows without deleting their stored values."
+   ]
+  }
  },
  {
   "type": "arp",
@@ -787,6 +1093,59 @@
     "Off",
     "On"
    ]
+  },
+  "guide": {
+   "overview": "Arp turns a set of notes into a timed monophonic line. It can build a chord from one root or collect the individual notes you play, then traverse them across octaves according to its mode and rhythm pattern.",
+   "concepts": [
+    {
+     "title": "Root and Played are two instruments",
+     "body": "Root treats V/Oct as one note and constructs the selected Chord. Played collects a polyphonic chord from the Pitch and Gate inputs; Hold can latch it after your fingers leave the keys."
+    },
+    {
+     "title": "Off is a monophonic converter",
+     "body": "Arpeggiator Off mirrors Root Pitch and Gate directly. Velocity follows the Played or Fixed policy and its rear CV. In Played source mode the converter follows the most recently pressed held note rather than attempting to collapse a chord."
+    },
+    {
+     "title": "Start can arm and restart the figure",
+     "body": "With nothing patched to Start, Arp runs exactly as before. Patching Start holds the arpeggio silent until a rising trigger, which restarts the note figure, insertion and rhythm pattern from their first positions. Start Out marks every figure restart and stays high for the opening note’s Gate Length."
+    },
+    {
+     "title": "Rear CV merges with the panel",
+     "body": "Gate Length and Velocity CV add to their panel values. Octave Shift CV adds in octave units and remains quantized to whole octaves. Rate CV moves Free timing exponentially: +1 doubles the rate, matching the rack’s other frequency inputs."
+    },
+    {
+     "title": "Performance CV passes through",
+     "body": "Mod, Pitch Bend, Aftertouch, Expression and Breath pass through continuously. Sustain is normalled to Hold until Sustain Out is patched; then the link breaks and the pedal leaves as a velocity-scaled gate. All remain live while Arp waits for Start or acts as a converter."
+    },
+    {
+     "title": "Choose split or combined note control",
+     "body": "Gate is a binary timing signal and Velocity is its independent level. Gate / Velocity multiplies them into the amplitude-encoded Gate CV used by RPG-8. The combined jack is additive; existing patches keep the more flexible split pair."
+    },
+    {
+     "title": "Choose one timing authority",
+     "body": "External advances from Clock cable edges. Tempo uses the rack transport, Division and optional shared Shuffle. Free runs at Free Rate. The inactive timing controls keep their values but do not affect playback."
+    },
+    {
+     "title": "Pitch order and rhythm are independent",
+     "body": "Mode chooses which note comes next. The step pattern decides whether that position sounds or rests, so adding a rest does not shift every later pitch."
+    }
+   ],
+   "firstPatch": [
+    "Set Source to Root, Timing to Tempo, Chord to Minor and Division to 1/16.",
+    "Patch a pitch and gate into Arp, then patch its Pitch and Gate outputs to a synth voice.",
+    "Try Played source with Hold on, play a chord, and toggle a few pattern steps off to create rests."
+   ],
+   "watchFor": [
+    "External timing needs Clock edges; Tempo timing needs the rack transport running.",
+    "Shuffle affects Tempo timing only and uses the host transport’s global amount.",
+    "Gate Length at zero closes Gate completely; at Tie it stays legato until a rest or reset condition.",
+    "Arpeggiator Off bypasses the figure controls, retains velocity policy and uses last-note priority in Played mode.",
+    "A patched Start inlet arms the figure; it stays silent until a rising trigger arrives.",
+    "Gate Length, Velocity, Free Rate and Octave Shift each have an additive rear CV input.",
+    "Patching Sustain Out breaks the pedal’s normalled Hold link and sends a velocity-scaled gate instead.",
+    "Gate / Velocity is the RPG-compatible combined signal; separate Gate and Velocity remain available.",
+    "Trig is a short strike at every sounding step, while Gate lasts for the Gate Length fraction."
+   ]
   }
  },
  {
@@ -833,6 +1192,32 @@
    "filter": [
     "Correct",
     "Filter"
+   ]
+  },
+  "guide": {
+   "overview": "Scale Player sits between a note source and an instrument. It leaves notes in the selected key alone, then either moves outside notes to the nearest scale tone or silences their gates.",
+   "concepts": [
+    {
+     "title": "Correct changes pitch",
+     "body": "With Wrong Notes set to Correct, an outside note is quantized to the nearest allowed semitone while Gate and Velocity continue through."
+    },
+    {
+     "title": "Filter changes rhythm",
+     "body": "With Wrong Notes set to Filter, pitch still passes but the gate is suppressed for outside notes. That turns the scale into a rhythmic mask instead of pitch correction."
+    },
+    {
+     "title": "Custom uses the faceplate notes",
+     "body": "The named scales follow Key automatically. Custom uses the twelve note switches on the device, transposed by Key, so you can define a pitch collection that is not in the menu."
+    }
+   ],
+   "firstPatch": [
+    "Patch sequencer or MIDI Pitch, Gate and Velocity through the three matching inputs and outputs.",
+    "Choose a Key and Scale, leave Wrong Notes on Correct, and deliberately play chromatic notes.",
+    "Switch to Filter to hear the same notes become rests, then try Custom and enable only a few note buttons."
+   ],
+   "watchFor": [
+    "This device changes note messages, not audio; place it before an oscillator or complete voice.",
+    "Velocity is passed through unchanged even when pitch is corrected."
    ]
   }
  },
@@ -897,7 +1282,8 @@
     "Off",
     "Held"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "note-echo",
@@ -929,6 +1315,32 @@
     "Mute",
     "On"
    ]
+  },
+  "guide": {
+   "overview": "Note Echo repeats note events rather than audio. Every repeat can move by a fixed pitch interval, change velocity and emit a new gate, so the downstream instrument plays each echo as a fresh note.",
+   "concepts": [
+    {
+     "title": "It belongs before the instrument",
+     "body": "Patch Pitch, Gate and Velocity from MIDI or a sequencer into Note Echo, then send its three outputs to a voice. For an audible delay line after the instrument, use an audio Delay instead."
+    },
+    {
+     "title": "Each change accumulates",
+     "body": "Pitch is added again on every repeat. Velocity is a per-repeat multiplier, so values below one fade and values above one grow until the output limit is reached."
+    },
+    {
+     "title": "Dry controls the original note",
+     "body": "Dry On passes the played note before its repeats. Dry Mute emits only the generated echoes, useful for a separate harmony or call-and-response path."
+    }
+   ],
+   "firstPatch": [
+    "Patch MIDI Pitch, Gate and Velocity into Note Echo and its matching outputs into a synth voice.",
+    "Choose Tempo sync, three repeats, a 1/8 division and Pitch +7 for rising fifths.",
+    "Set Velocity below 1 for a fade, then shorten Gate if repeated notes overlap too much."
+   ],
+   "watchFor": [
+    "Tempo mode follows the rack transport; Free mode uses Time ms.",
+    "Whole played chords repeat together because the device is polyphonic."
+   ]
   }
  },
  {
@@ -942,7 +1354,8 @@
     "M10 8v14h7V8M26 8v14h7V8M42 8v14h7V8"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "meter",
@@ -962,7 +1375,8 @@
     "LED",
     "Wave"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "tuner",
@@ -980,7 +1394,8 @@
     "Thru",
     "Mute"
    ]
-  }
+  },
+  "guide": null
  },
  {
   "type": "mixer",
@@ -993,7 +1408,8 @@
     "M10 36l22 2 17-2"
    ]
   },
-  "labels": {}
+  "labels": {},
+  "guide": null
  },
  {
   "type": "line-mixer",
@@ -1056,6 +1472,33 @@
     "—",
     "Solo"
    ]
+  },
+  "guide": {
+   "overview": "Six stereo channels into one stereo pair, with two aux buses alongside. Each channel has a level, a balance, a mute and a solo; each also has an amount for Send A and Send B, which leave by their own stereo outlets. Patch a send to an effect, patch that effect back to the matching Return, and one reverb is shared by six channels at six different depths.",
+   "concepts": [
+    {
+     "title": "Sends are post-fader, and that is what makes solo work",
+     "body": "A channel that is muted, or that is not the one soloed, contributes nothing to either send. So soloing a channel leaves the returns carrying only that channel’s effect, once the tail of everything else has decayed — rather than the whole mix arriving through the reverb you were trying to audition."
+    },
+    {
+     "title": "Solo here is not the Out’s solo",
+     "body": "An Out’s solo is applied by the Graph, because one terminal module cannot know the others exist. This module is the set of channels, so its solo is ordinary arithmetic and silences only its own channels. Soloing here says nothing about any other Out in the rack, which is what you want when the mixer is one voice among several."
+    },
+    {
+     "title": "Returns arrive after the channels and never reach the sends",
+     "body": "A return is summed into the main pair before the master fader, so the master rides the effects with everything else. It deliberately does not feed the send buses: that would be a feedback loop inside one device, with no cable anywhere to explain why the reverb was building. Patch one if you want it, and then it is visible."
+    }
+   ],
+   "firstPatch": [
+    "Patch two or three sources to In 1, In 2 and In 3, and the Main outlet to an Out.",
+    "Set the balance on each channel — a mono source into a stereo inlet arrives centred until you move it.",
+    "Patch Send A to a Reverb, and the Reverb back to Return A. Bring Send A up on one channel at a time.",
+    "Hold Solo on a channel to hear it alone, with its own share of the reverb and nothing else’s."
+   ],
+   "watchFor": [
+    "Six channels at once can add up past full scale. The master fader goes to 1.5 rather than 1 so that a quiet mix can be brought up, which means it can also be brought too far.",
+    "There is no level CV inlet. Automation lanes and Combinator routings both reach every one of these knobs, and the plain Mixer is still the module for mixing control signals."
+   ]
   }
  },
  {
@@ -1079,6 +1522,7 @@
     "—",
     "Solo"
    ]
-  }
+  },
+  "guide": null
  }
 ]
