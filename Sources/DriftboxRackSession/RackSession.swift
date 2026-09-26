@@ -234,10 +234,12 @@ public final class RackSession {
   @ObservationIgnored public var onSave: ((_ document: String, _ name: String) -> Void)?
 
   /// A rack on a host of its own at `sampleRate`, playing through `audio` if there is one, and
-  /// making no sound until something renders it if there is not.
+  /// making no sound until something renders it if there is not. Not `awake`, it is not played
+  /// through `audio` until `wake` is called: a rack beside the groovebox that nobody has opened
+  /// yet costs nothing, where rendered it costs a phone a tenth of the audio's time, silent.
   public init(
     sampleRate: Double = 48000, audio: (any AudioRouting)? = nil, plugins: (any RackPluginHosting)? = nil,
-    decoder: any SampleDecoding = WAVDecoder(), memory: (any RackMemory)? = nil
+    decoder: any SampleDecoding = WAVDecoder(), memory: (any RackMemory)? = nil, awake: Bool = true
   ) {
     host = RackHost(sampleRate: sampleRate)
     self.audio = audio
@@ -251,10 +253,15 @@ public final class RackSession {
     ccBindings = RackCC.load(memory)
     patch = applyModulation(patch, registry: RackModules.registry)
     rebuild()
-    if let audio {
-      audio.attach(host.renderSource)
-      listen()
-    }
+    if awake { wake() }
+  }
+
+  /// Played through the audio from now on, if it was made not awake: attached, and handed the
+  /// patch. Nothing once it is.
+  public func wake() {
+    guard let audio, !live else { return }
+    audio.attach(host.renderSource)
+    listen()
   }
 
   public static let savedKey = "rack.patch"

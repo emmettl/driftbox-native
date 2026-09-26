@@ -77,6 +77,23 @@ struct RackPortsTests {
     #expect(!RackSession().live, "and with nowhere to sound, is not live")
   }
 
+  /// Made asleep, as beside the groovebox on a phone, it is not played through its audio until it
+  /// is woken, and then once, however often woken; edits meanwhile are there when it wakes.
+  @Test func asleepItSoundsOnlyOnceWoken() throws {
+    let speakers = Speakers()
+    let rack = RackSession(audio: speakers, awake: false)
+    #expect(!rack.live && speakers.attached.isEmpty)
+    let entry = try #require(PatchEntry.all.first { $0.id == "acid" })
+    rack.open(entry)
+    rack.wake()
+    rack.wake()
+    #expect(rack.live)
+    #expect(speakers.attached == [rack.host.renderSource.context])
+    #expect(rack.name == entry.name)
+    rack.close()
+    #expect(speakers.attached.isEmpty)
+  }
+
   /// A plug-in module gets a unit from the platform, or says why it has none; a unit changed has
   /// its settings in the patch at the next save; a module that goes lets its unit go.
   @Test func pluginsComeFromThePlatform() async throws {

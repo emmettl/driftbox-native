@@ -169,6 +169,8 @@ public final class Touchscreen {
     otherFingers = []
     resting = nil
     showsRack = showing
+    // Heard from the first time it is seen, if it was made asleep; and after, whichever shows.
+    if showing { rack?.rack.wake() }
   }
 
   /// Recordings the platform's picker chose, as files, into the rack's `module`.
