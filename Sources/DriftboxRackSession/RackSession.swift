@@ -369,6 +369,7 @@ public final class RackSession: MIDIListener {
 
   /// As often as the app draws: the host's latest readings, and the bar its song is on.
   public func tick() {
+    advanceTour()
     guard live else { return }
     readings = host.readings()
     let bar: Int? =
@@ -1394,6 +1395,93 @@ public final class RackSession: MIDIListener {
   public var takesMIDI: Bool { inFront }
   /// The MIDI sources there are, for the MIDI module's face to say whether it is listening.
   public var midiSources: [String] = []
+
+  // MARK: - A guided tour
+
+  /// How a tour's step stands: to do, done, or passed over, which is not done and says so.
+  public enum TourMark: Equatable, Sendable {
+    case todo, done, skipped
+  }
+
+  /// A tour being taken: which, how each step stands, the step it is on, and the rack as it was when
+  /// it began, which a step's "moved" is measured from.
+  public struct TourRun: Sendable {
+    public var tour: RackTour
+    public var marks: [TourMark]
+    /// The step it is on; the steps' count once none is left.
+    public var at: Int
+    public var baseline: RackTourState
+    /// The patch the rack had before the tour's own, to go back to.
+    public var before: (patch: Patch, name: String)?
+
+    public var finished: Bool { marks.allSatisfy { $0 == .done } }
+  }
+
+  /// The tour being taken, if one is.
+  public private(set) var tourRun: TourRun?
+
+  /// The tours taken to the end, remembered by id.
+  public var finishedTours: Set<String> {
+    Set((memory?.string(forKey: Self.toursKey) ?? "").split(separator: ",").map(String.init))
+  }
+  static let toursKey = "rack.tours.finished"
+
+  /// The rack as a tour sees it.
+  public var tourState: RackTourState {
+    RackTourState(patch: patch, playing: running, flipped: flipped, sounding: sounding.count)
+  }
+
+  /// Take `tour`: from its own small patch, stopped and facing front, with the rack's own patch kept
+  /// to go back to; or, `fromItsPatch` false, from the rack as it is.
+  public func startTour(_ tour: RackTour, fromItsPatch: Bool = true) {
+    var before: (Patch, String)?
+    if fromItsPatch {
+      if !patch.modules.isEmpty { before = (patch, name) }
+      if running { toggleRunning() }
+      if flipped { flip() }
+      open(tour.setup, name: tour.name)
+    }
+    tourRun = TourRun(
+      tour: tour, marks: tour.steps.map { _ in .todo }, at: 0, baseline: tourState, before: before)
+    advanceTour()
+  }
+
+  /// Every step looked at again, not only the one it is on — a step done early is done — and the
+  /// ones that hold ticked for good, a skipped one too. It moves on to the first step left, and never
+  /// back; and the first time every step is done, the tour is remembered as finished.
+  public func advanceTour() {
+    guard var run = tourRun else { return }
+    let state = tourState
+    var changed = false
+    for (index, step) in run.tour.steps.enumerated() where run.marks[index] != .done {
+      if step.isDone(state, from: run.baseline) {
+        run.marks[index] = .done
+        changed = true
+      }
+    }
+    guard changed else { return }
+    let next = run.marks.firstIndex(of: .todo) ?? run.tour.steps.count
+    if next > run.at { run.at = next }
+    if run.finished, !finishedTours.contains(run.tour.id) {
+      memory?.set((finishedTours.union([run.tour.id])).sorted().joined(separator: ","), forKey: Self.toursKey)
+    }
+    tourRun = run
+  }
+
+  /// The step it is on passed over, which the tour will say at its end.
+  public func skipTourStep() {
+    guard var run = tourRun, run.at < run.tour.steps.count else { return }
+    if run.marks[run.at] == .todo { run.marks[run.at] = .skipped }
+    run.at = run.marks.indices.first { $0 > run.at && run.marks[$0] == .todo } ?? run.tour.steps.count
+    tourRun = run
+  }
+
+  /// The tour put away, keeping the rack as it is, or going back to the patch the rack had before it.
+  public func closeTour(goingBack: Bool = false) {
+    guard let run = tourRun else { return }
+    tourRun = nil
+    if goingBack, let before = run.before { open(before.patch, name: before.name) }
+  }
 
   public func noteDown(_ note: Int, velocity: Double = 0.8, channel: Int = 1) {
     var keyboard = keyboards[channel] ?? RackKeyboard(voices: voices)

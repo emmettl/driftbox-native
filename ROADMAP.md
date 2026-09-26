@@ -378,7 +378,15 @@ guide over the window, a tab a topic — Help ▸ Groovebox Guide and Rack Guide
 showing — read by a screen reader like the controls. On Android, `.android` says what a finger
 does — taps, holds, the step keyboard, pinching the rack — and nothing of keys; the song's chip
 offers Groovebox Guide and the rack's patch chip Rack Guide, over the screen as the same sheet.
-Left: the rest of what the web app teaches with, and what a Mac does better:
+The guided tours next: `RackTour` holds five of the reference's six lessons — its automation one is the
+web's rack's alone — each a small patch to start from and steps that tick themselves as the rack's own
+state says they are done, looked at by the reference's predicates (a module there, a cable patched, a
+module reaching an Out, a knob or a trim moved), in each platform's words. `RackSession` runs one:
+every step looked at on each tick, done ones ticked for good, a skipped one ticked if done later, never
+moving back, the rack's own patch kept to go back to and a tour taken to the end remembered. On the
+Mac, Help ▸ Rack Tours starts one, the rack offers the first once, and its panel sits in the rack's
+corner, the control a step names breathing a ring. Left: the tours on the drawn rack, on Windows and
+Android; and the rest of what the web app teaches with, and what a Mac does better:
 
 - **The reference's teaching, ported:** its help dialog, the first-run offer of a tour, the guided
   tour and tutorial coach that walk a patch being built, and each module's guide. The words carry

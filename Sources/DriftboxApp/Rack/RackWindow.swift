@@ -29,6 +29,15 @@
         RackHeader(rack: rack, octave: octave)
         if let notice = model.notice { NoticeBar(notice: notice) }
         RackStage(rack: rack)
+          // A tour's panel, or the first offer of one, in the corner of the rack it is about.
+          .overlay(alignment: .bottomTrailing) {
+            VStack(alignment: .trailing, spacing: 10) {
+              TourOffer(model: model)
+              TourCoach(model: model)
+            }
+            .padding(16)
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: model.tourRun == nil)
+          }
       }
       .background(Theme.ground)
       // The rack's own minimum, inside the inspector, so opening the routing beside it makes the
@@ -125,6 +134,7 @@
             .labelStyle(.titleAndIcon)
         }
         .buttonStyle(.chip(on: model.running, tint: Theme.live))
+        .tourSpot(model.tourSpot == .transport)
         .help("Start or stop the rack's transport (space)")
         DragNumber(
           label: "BPM", value: model.tempo, range: 20...300, perPoint: 0.5, format: { "\(Int($0.rounded()))" }
@@ -139,6 +149,7 @@
           Label(model.flipped ? "Front" : "Back", systemImage: "arrow.left.arrow.right")
         }
         .buttonStyle(.chip(on: model.flipped, tint: Theme.three))
+        .tourSpot(model.tourSpot == .flip)
         .help("Turn the rack round to patch its cables (tab)")
         Button {
           adding = true
@@ -146,6 +157,7 @@
           Label("Add", systemImage: "plus")
         }
         .buttonStyle(.chip)
+        .tourSpot({ if case .add = model.tourSpot { true } else { false } }())
         .popover(isPresented: $adding, arrowEdge: .bottom) {
           ModulePicker { type in
             adding = false
@@ -383,6 +395,7 @@
             .contentShape(Rectangle())
             .onTapGesture { model.select(placement.id, adding: NSEvent.modifierFlags.contains(.command)) }
             .contextMenu { menu(for: module) }
+            .tourSpot(!model.flipped && model.tourSpot == .module(placement.type))
             .offset(x: placement.x, y: placement.y)
             .transition(.scale(scale: 0.96).combined(with: .opacity))
           } else {
