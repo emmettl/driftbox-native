@@ -256,6 +256,14 @@ extension RackHelp {
             "The groovebox in the rack",
             .terms([
               HelpTerm(
+                "A song whole",
+                "Groovebox Songs, from the patch's chip, opens one in the rack with its Groovebox module wired in: "
+                  + "the song open in the groovebox, or one of the catalogue's."),
+              HelpTerm(
+                "Editing it",
+                "Edit in Groovebox, on the module, opens the rack's song in the groovebox, and every edit there "
+                  + "plays on in the rack."),
+              HelpTerm(
                 "The Groovebox module",
                 "A song's four machines, each on outputs of its own; ▶ plays from a section, and ⟳ loops it."),
               HelpTerm(
@@ -347,8 +355,8 @@ extension RackHelp {
             .terms([
               HelpTerm(
                 "The patch's chip",
-                "Groovebox, the way back; Undo and Redo; Patches, the factory patches; and Rack Guide, this "
-                  + "guide."),
+                "Groovebox, the way back; Undo and Redo; Patches, the factory patches; Groovebox Songs, a "
+                  + "groovebox song whole; and Rack Guide, this guide."),
               HelpTerm(
                 "Kept",
                 "The rack keeps the patch it has, and opens on it next time. Opening another patch replaces it."

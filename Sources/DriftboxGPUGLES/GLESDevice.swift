@@ -21,11 +21,11 @@
   /// swaps red and blue; a target stores what its shaders write, and is swapped as it is read back.
   public final class GLESDevice: GPUDevice {
     public var backend: GPUBackend { .openGLES }
-    let display: EGLDisplay
-    let context: EGLContext
+    let display: EGLDisplay?
+    let context: EGLContext?
     /// A one-pixel surface for the context to be current on when drawing only into targets.
-    let offscreen: EGLSurface
-    let config: EGLConfig
+    let offscreen: EGLSurface?
+    let config: EGLConfig?
     /// The one vertex array everything is drawn through, set up again for each draw.
     private var vertexArray: GLuint = 0
     /// Uniform buffers by binding, each the size of the largest block of any program made so far.
@@ -78,6 +78,10 @@
       self.context = context
       self.offscreen = offscreen
       self.config = config
+      initializeState()
+    }
+
+    private func initializeState() {
       glGenVertexArrays(1, &vertexArray)
       glBindVertexArray(vertexArray)
       glPixelStorei(GLenum(GL_UNPACK_ALIGNMENT), 4)
@@ -92,10 +96,58 @@
         glDeleteBuffers(1, &name)
       }
       glDeleteVertexArrays(1, &vertexArray)
-      eglMakeCurrent(display, nil, nil, nil)
-      eglDestroySurface(display, offscreen)
-      eglDestroyContext(display, context)
+      if let display, let context {
+        eglMakeCurrent(display, nil, nil, nil)
+        eglDestroySurface(display, offscreen)
+        eglDestroyContext(display, context)
+      }
     }
+
+    #if os(Linux)
+      /// Borrow the toolkit's current GLES context. All use and destruction must occur with that
+      /// same context current. This device never makes another context current or destroys it.
+      public init(borrowingCurrentContext: Void) throws {
+        guard let version = glGetString(GLenum(GL_VERSION)),
+          String(cString: version).hasPrefix("OpenGL ES 3")
+        else { throw GPUError("the toolkit must make an OpenGL ES 3 context current") }
+        display = nil
+        context = nil
+        offscreen = nil
+        config = nil
+        initializeState()
+      }
+
+      /// Call at the start of each toolkit render callback, before touching any other framebuffer.
+      /// GTK may have changed context state since the last callback.
+      public func beginToolkitFrame() -> (framebuffer: UInt32, width: Int, height: Int) {
+        var framebuffer: GLint = 0
+        var viewport = [GLint](repeating: 0, count: 4)
+        glGetIntegerv(GLenum(GL_DRAW_FRAMEBUFFER_BINDING), &framebuffer)
+        glGetIntegerv(GLenum(GL_VIEWPORT), &viewport)
+        glBindVertexArray(vertexArray)
+        glDisable(GLenum(GL_SCISSOR_TEST))
+        glDisable(GLenum(GL_STENCIL_TEST))
+        glColorMask(GLboolean(GL_TRUE), GLboolean(GL_TRUE), GLboolean(GL_TRUE), GLboolean(GL_TRUE))
+        glPixelStorei(GLenum(GL_UNPACK_ALIGNMENT), 4)
+        glPixelStorei(GLenum(GL_PACK_ALIGNMENT), 4)
+        return (UInt32(framebuffer), Int(viewport[2]), Int(viewport[3]))
+      }
+
+      /// Copy the top-down scene into the toolkit's current drawable, turned upright. The toolkit
+      /// owns presentation and frame pacing; this does not swap buffers or wait for a refresh.
+      public func presentToToolkit(_ target: any GPUTarget, framebuffer: UInt32, width: Int, height: Int)
+        throws
+      {
+        let frame = target as! GLESTarget
+        glBindFramebuffer(GLenum(GL_READ_FRAMEBUFFER), frame.framebuffer)
+        glBindFramebuffer(GLenum(GL_DRAW_FRAMEBUFFER), framebuffer)
+        glBlitFramebuffer(
+          0, 0, GLint(frame.width), GLint(frame.height), 0, GLint(height), GLint(width), 0,
+          GLbitfield(GL_COLOR_BUFFER_BIT), GLenum(GL_NEAREST))
+        glBindFramebuffer(GLenum(GL_FRAMEBUFFER), framebuffer)
+        try GLES.check("presenting to the toolkit framebuffer")
+      }
+    #endif
 
     /// The version and renderer the context turned out to be, for whoever wants to say so.
     public var renderer: String {

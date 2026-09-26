@@ -1,0 +1,344 @@
+// Exercise the real GTK response bridge on a private Xvfb display, without UTM
+// input or the Swift renderer. Including the implementation keeps test-only
+// dialog inspection out of the public C API.
+#include "../Sources/CLinuxUI/Desktop.c"
+
+typedef struct { int calls, answer; } Result;
+static void received(void *context, int answer, const char *value) {
+    Result *result=context;
+    result->calls++; result->answer=answer;
+    g_assert_cmpstr(value,==,"");
+}
+static gboolean idle(gpointer context) { (void)context; return G_SOURCE_CONTINUE; }
+static db_desktop *fixture_with_visibility(gboolean visible) {
+    db_desktop *w=g_new0(db_desktop,1);
+    w->window=gtk_window_new(); g_object_ref(w->window);
+    w->area=gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
+    gtk_window_set_child(GTK_WINDOW(w->window),w->area);
+    w->loop=g_main_loop_new(NULL,FALSE);
+    w->actions=g_simple_action_group_new();
+    w->source=g_timeout_add_seconds(60,idle,NULL);
+    if (visible) gtk_window_present(GTK_WINDOW(w->window));
+    else gtk_widget_realize(w->window);
+    return w;
+}
+static db_desktop *fixture(void) { return fixture_with_visibility(TRUE); }
+static void present_pending(db_desktop *w) {
+    while (w->dialog_source) g_main_context_iteration(NULL,TRUE);
+    g_assert_nonnull(w->dialog);
+}
+static void empty(db_desktop *w) {
+    g_assert_null(w->dialog); g_assert_null(w->reply); g_assert_null(w->reply_context);
+}
+static void question_answers(void) {
+    db_desktop *w=fixture();
+    const int responses[]={1,2,GTK_RESPONSE_CANCEL,GTK_RESPONSE_DELETE_EVENT};
+    const int answers[]={1,2,0,0};
+    for (guint i=0;i<G_N_ELEMENTS(responses);i++) {
+        Result result={0};
+        db_desktop_save_question(w,"Unsaved café",&result,received);
+        g_assert_true(GTK_IS_MESSAGE_DIALOG(w->dialog));
+        g_assert_true(gtk_window_get_modal(GTK_WINDOW(w->dialog)));
+        g_assert_true(gtk_window_get_transient_for(GTK_WINDOW(w->dialog))==GTK_WINDOW(w->window));
+        g_assert_cmpint(result.calls,==,0);
+        gtk_dialog_response(GTK_DIALOG(w->dialog),responses[i]);
+        g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,answers[i]);
+        empty(w);
+    }
+    db_desktop_free(w);
+}
+static void concurrent_requests(void) {
+    db_desktop *w=fixture(); Result first={0}, second={0}, third={0};
+    db_desktop_save_question(w,"First",&first,received);
+    GObject *dialog=w->dialog;
+    db_desktop_save_question(w,"Second",&second,received);
+    db_desktop_files(w,0,0,"wav;wave","",&third,received);
+    g_assert_true(w->dialog==dialog);
+    g_assert_cmpint(first.calls,==,0);
+    g_assert_cmpint(second.calls,==,1); g_assert_cmpint(second.answer,==,0);
+    g_assert_cmpint(third.calls,==,1); g_assert_cmpint(third.answer,==,0);
+    gtk_dialog_response(GTK_DIALOG(dialog),GTK_RESPONSE_CANCEL);
+    g_assert_cmpint(first.calls,==,1); empty(w);
+    db_desktop_free(w);
+}
+typedef struct { db_desktop *window; Result question, file; } Chain;
+static void save_chosen(void *context,int answer,const char *value) {
+    Chain *chain=context;
+    received(&chain->question,answer,value);
+    empty(chain->window);
+    if (answer==1) db_desktop_files(chain->window,1,0,"driftbox","Unsaved.driftbox",&chain->file,received);
+}
+static void save_then_chooser(void) {
+    db_desktop *w=fixture(); Chain chain={.window=w};
+    db_desktop_save_question(w,"Unsaved",&chain,save_chosen);
+    gtk_dialog_response(GTK_DIALOG(w->dialog),1);
+    g_assert_cmpint(chain.question.calls,==,1); g_assert_cmpint(chain.question.answer,==,1);
+    present_pending(w);
+    g_assert_true(GTK_IS_FILE_CHOOSER_NATIVE(w->dialog));
+    g_assert_cmpint(gtk_file_chooser_get_action(GTK_FILE_CHOOSER(w->dialog)),==,GTK_FILE_CHOOSER_ACTION_SAVE);
+    char *name=gtk_file_chooser_get_current_name(GTK_FILE_CHOOSER(w->dialog));
+    g_assert_cmpstr(name,==,"Unsaved.driftbox"); g_free(name);
+    g_assert_cmpint(chain.file.calls,==,0);
+    g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_CANCEL);
+    g_assert_cmpint(chain.file.calls,==,1); g_assert_cmpint(chain.file.answer,==,0);
+    empty(w); db_desktop_free(w);
+}
+static void open_cancel_and_retry(void) {
+    db_desktop *w=fixture();
+    for (int multiple=0;multiple<=1;multiple++) {
+        Result result={0};
+        db_desktop_files(w,0,multiple,"wav;wave","",&result,received);
+        g_assert_cmpint(result.calls,==,0);
+        present_pending(w);
+        GtkFileChooser *chooser=GTK_FILE_CHOOSER(w->dialog);
+        g_assert_cmpint(gtk_file_chooser_get_action(chooser),==,GTK_FILE_CHOOSER_ACTION_OPEN);
+        g_assert_cmpint(gtk_file_chooser_get_select_multiple(chooser),==,multiple);
+        g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_CANCEL);
+        g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,0); empty(w);
+    }
+    db_desktop_free(w);
+}
+typedef struct { db_desktop *window; Result result; int commands; } Command;
+static void new_document(void *context,int id) {
+    Command *command=context; g_assert_cmpint(id,==,0); command->commands++;
+    db_desktop_save_question(command->window,"Edited song",&command->result,received);
+}
+static void menu_to_question(void) {
+    db_desktop *w=fixture(); Command command={.window=w};
+    w->context=&command; w->command=new_document;
+    db_desktop_action(w,0,1,0);
+    g_action_group_activate_action(G_ACTION_GROUP(w->actions),"c0",NULL);
+    g_assert_cmpint(command.commands,==,1);
+    g_assert_true(GTK_IS_MESSAGE_DIALOG(w->dialog));
+    g_assert_cmpint(command.result.calls,==,0);
+    gtk_dialog_response(GTK_DIALOG(w->dialog),2);
+    g_assert_cmpint(command.result.calls,==,1); g_assert_cmpint(command.result.answer,==,2);
+    empty(w); db_desktop_free(w);
+}
+static void teardown_cancels(void) {
+    for (int file=0;file<=1;file++) {
+        db_desktop *w=fixture(); Result result={0};
+        if (file) db_desktop_files(w,0,0,"driftbox","",&result,received);
+        else db_desktop_save_question(w,"Unsaved",&result,received);
+        db_desktop_free(w);
+        g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,0);
+    }
+}
+typedef struct { int calls, answer; char *uris; } FileResult;
+static void file_received(void *context,int answer,const char *uris) {
+    FileResult *result=context;
+    result->calls++; result->answer=answer; result->uris=g_strdup(uris);
+}
+static void wait_for_file(GtkFileChooser *chooser,GFile *expected,gboolean folder) {
+    gint64 deadline=g_get_monotonic_time()+10*G_TIME_SPAN_SECOND;
+    do {
+        while (g_main_context_iteration(NULL,FALSE)) {}
+        GFile *actual=folder ? gtk_file_chooser_get_current_folder(chooser) : gtk_file_chooser_get_file(chooser);
+        gboolean matches=actual && g_file_equal(actual,expected);
+        g_clear_object(&actual);
+        if (matches) return;
+        g_usleep(1000);
+    } while (g_get_monotonic_time()<deadline);
+    g_error("File chooser did not load the expected %s",folder?"folder":"file");
+}
+static void accepted_files_and_folder(void) {
+    GError *error=NULL;
+    char *directory=g_dir_make_tmp("driftbox-dialog-files-XXXXXX",&error); g_assert_no_error(error);
+    char *path=g_build_filename(directory,"café loop\none.wav",NULL);
+    g_assert_true(g_file_set_contents(path,"test fixture",-1,&error)); g_assert_no_error(error);
+    GFile *file=g_file_new_for_path(path), *folder=g_file_new_for_path(directory);
+    char *uri=g_file_get_uri(file);
+    db_desktop *w=fixture(); FileResult result={0};
+    db_desktop_files(w,0,0,"wav;wave","",&result,file_received);
+    present_pending(w);
+    g_assert_true(gtk_file_chooser_set_file(GTK_FILE_CHOOSER(w->dialog),file,&error)); g_assert_no_error(error);
+    wait_for_file(GTK_FILE_CHOOSER(w->dialog),file,FALSE);
+    g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_ACCEPT);
+    g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,1);
+    g_assert_cmpstr(result.uris,==,uri); g_free(result.uris);
+    g_assert_true(g_file_equal(w->folder,folder)); empty(w);
+    // The next chooser inherits the accepted folder and returns a new save path.
+    result=(FileResult){0};
+    db_desktop_files(w,1,0,"driftbox","copy.driftbox",&result,file_received);
+    present_pending(w);
+    wait_for_file(GTK_FILE_CHOOSER(w->dialog),folder,TRUE);
+    GFile *saved=g_file_get_child(folder,"copy.driftbox");
+    wait_for_file(GTK_FILE_CHOOSER(w->dialog),saved,FALSE);
+    char *save_uri=g_file_get_uri(saved);
+    g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_ACCEPT);
+    g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,1);
+    g_assert_cmpstr(result.uris,==,save_uri); empty(w);
+    // The bridge chooses a location; only the document layer writes the song.
+    g_assert_false(g_file_query_exists(saved,NULL));
+    g_free(result.uris); g_free(save_uri); g_object_unref(saved); db_desktop_free(w);
+    g_assert_cmpint(unlink(path),==,0); g_assert_cmpint(rmdir(directory),==,0);
+    g_free(uri); g_object_unref(file); g_object_unref(folder); g_free(path); g_free(directory);
+}
+static void folder_selection(void) {
+    db_desktop *w=fixture(); FileResult result={0};
+    char *directory=g_dir_make_tmp("driftbox-folder-XXXXXX",NULL);
+    GFile *folder=g_file_new_for_path(directory); char *uri=g_file_get_uri(folder);
+    db_desktop_folder(w,"Export Stems","Export Here",&result,file_received);
+    present_pending(w);
+    GtkFileChooser *chooser=GTK_FILE_CHOOSER(w->dialog);
+    g_assert_cmpint(gtk_file_chooser_get_action(chooser),==,GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+    g_assert_true(gtk_file_chooser_set_file(chooser,folder,NULL));
+    wait_for_file(chooser,folder,FALSE);
+    g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_ACCEPT);
+    g_assert_cmpint(result.calls,==,1); g_assert_cmpstr(result.uris,==,uri); empty(w);
+    g_free(result.uris); result=(FileResult){0};
+    db_desktop_folder(w,"Export Stems","Export Here",&result,file_received);
+    present_pending(w);
+    g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_CANCEL);
+    g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,0); empty(w);
+    g_free(result.uris); db_desktop_free(w);
+    g_assert_cmpint(rmdir(directory),==,0); g_free(directory); g_free(uri); g_object_unref(folder);
+}
+static void notices_are_queued_and_literal(void) {
+    db_desktop *w=fixture();
+    db_desktop_tell(w,"100% <literal> & café");
+    db_desktop_tell(w,"Second failure");
+    char *text=NULL; gboolean markup=TRUE;
+    g_object_get(w->notice,"text",&text,"use-markup",&markup,NULL);
+    g_assert_cmpstr(text,==,"100% <literal> & café"); g_assert_false(markup); g_free(text);
+    g_assert_true(gtk_window_get_transient_for(GTK_WINDOW(w->notice))==GTK_WINDOW(w->window));
+    g_assert_cmpuint(g_queue_get_length(w->notices),==,1);
+    gtk_dialog_response(GTK_DIALOG(w->notice),GTK_RESPONSE_CLOSE);
+    g_object_get(w->notice,"text",&text,NULL);
+    g_assert_cmpstr(text,==,"Second failure"); g_free(text);
+    gtk_dialog_response(GTK_DIALOG(w->notice),GTK_RESPONSE_DELETE_EVENT);
+    g_assert_null(w->notice); g_assert_true(g_queue_is_empty(w->notices));
+    db_desktop_free(w);
+}
+static void notice_preserves_pending_reply(void) {
+    db_desktop *w=fixture(); Result result={0};
+    db_desktop_save_question(w,"Edited",&result,received);
+    GObject *question=w->dialog;
+    db_desktop_tell(w,"A background operation failed");
+    gtk_dialog_response(GTK_DIALOG(w->notice),GTK_RESPONSE_CLOSE);
+    g_assert_true(w->dialog==question); g_assert_cmpint(result.calls,==,0);
+    gtk_dialog_response(GTK_DIALOG(w->dialog),2);
+    g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,2);
+    empty(w); db_desktop_free(w);
+}
+typedef struct { db_desktop *window; int calls; } CancelNotice;
+static void notice_from_cancel(void *context,int answer,const char *value) {
+    (void)value;
+    CancelNotice *result=context; result->calls++; g_assert_cmpint(answer,==,0);
+    db_desktop_tell(result->window,"A callback during teardown");
+    g_assert_null(result->window->notice); g_assert_null(result->window->notices);
+}
+static void notices_close_with_parent(void) {
+    db_desktop *w=fixture();
+    db_desktop_tell(w,"First"); db_desktop_tell(w,"Queued");
+    CancelNotice result={.window=w};
+    db_desktop_save_question(w,"Unsaved",&result,notice_from_cancel);
+    GtkWidget *notice=w->notice;
+    g_object_add_weak_pointer(G_OBJECT(notice),(gpointer *)&notice);
+    db_desktop_free(w);
+    g_assert_null(notice); g_assert_cmpint(result.calls,==,1);
+}
+static gboolean finished_waiting(gpointer context) {
+    g_main_loop_quit(context); return G_SOURCE_REMOVE;
+}
+static void settle(void) {
+    GMainLoop *loop=g_main_loop_new(NULL,FALSE);
+    g_timeout_add(150,finished_waiting,loop);
+    g_main_loop_run(loop); g_main_loop_unref(loop);
+}
+// GTK 4.8 can dispatch compute-size after a realized, never-mapped window dies.
+// Include the bare parent so dialog implementation details cannot hide that regression.
+static void realized_unshown_teardown(void) {
+    if (!g_test_subprocess()) {
+        g_test_trap_subprocess(NULL,10*G_TIME_SPAN_SECOND,0);
+        g_test_trap_assert_passed(); return;
+    }
+    for (int repeat=0;repeat<3;repeat++) {
+        for (int kind=0;kind<4;kind++) {
+            db_desktop *w=fixture_with_visibility(FALSE); Result result={0};
+            if (kind==1) db_desktop_save_question(w,"Unsaved",&result,received);
+            if (kind==2) db_desktop_tell(w,"A failure before presentation");
+            if (kind==3) db_desktop_files(w,0,0,"wav","",&result,received);
+            GtkWidget *window=w->window;
+            g_object_add_weak_pointer(G_OBJECT(window),(gpointer *)&window);
+            db_desktop_free(w);
+            g_assert_null(window);
+            g_assert_cmpint(result.calls,==,(kind==1 || kind==3)?1:0);
+            g_assert_cmpint(result.answer,==,0);
+            settle();
+            g_assert_cmpuint(g_list_model_get_n_items(gtk_window_get_toplevels()),==,0);
+        }
+    }
+}
+// Seed Recent explicitly: an empty CI home otherwise hides GTK's cancelled-query crash.
+// Destruction happens before dispatching any chooser work, not after a grace period.
+static void rapid_chooser_teardown_with_recent_files(void) {
+    if (!g_test_subprocess()) {
+        g_test_trap_subprocess(NULL,15*G_TIME_SPAN_SECOND,0);
+        g_test_trap_assert_passed(); return;
+    }
+    char *directory=g_dir_make_tmp("driftbox-recent-XXXXXX",NULL);
+    char *path=g_build_filename(directory,"recent.wav",NULL);
+    g_assert_true(g_file_set_contents(path,"sample",-1,NULL));
+    char *uri=g_filename_to_uri(path,NULL,NULL);
+    GtkRecentData data={.display_name="Recent sample",.mime_type="audio/x-wav",
+        .app_name="Driftbox tests",.app_exec="driftbox %u"};
+    GtkRecentManager *manager=gtk_recent_manager_get_default();
+    g_assert_true(gtk_recent_manager_add_full(manager,uri,&data));
+    for (int repeat=0;repeat<4;repeat++) {
+        for (int kind=0;kind<4;kind++) {
+            db_desktop *w=fixture(); Result result={0};
+            if (kind==3) db_desktop_folder(w,"Stems","Export",&result,received);
+            else db_desktop_files(w,kind==2,kind==1,"wav","Unsaved.wav",&result,received);
+            db_desktop_free(w);
+            g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,0);
+            settle();
+            g_assert_cmpuint(g_list_model_get_n_items(gtk_window_get_toplevels()),==,0);
+
+        }
+    }
+    g_assert_true(gtk_recent_manager_remove_item(manager,uri,NULL));
+    g_assert_cmpint(unlink(path),==,0); g_assert_cmpint(rmdir(directory),==,0);
+    g_free(uri); g_free(path); g_free(directory);
+}
+typedef struct { db_desktop *window; Result files, folder, question, popup; int calls; } ReentrantCancel;
+static void requests_from_cancel(void *context,int answer,const char *value) {
+    (void)value;
+    ReentrantCancel *result=context; result->calls++; g_assert_cmpint(answer,==,0);
+    db_desktop *w=result->window;
+    db_desktop_files(w,0,0,"wav","",&result->files,received);
+    db_desktop_folder(w,"Folder","Choose",&result->folder,received);
+    db_desktop_save_question(w,"Song",&result->question,received);
+    db_menu *menu=db_menu_new();
+    db_desktop_popup(w,menu,0,0,&result->popup,received); db_menu_free(menu);
+    g_assert_null(w->dialog); g_assert_null(w->popover); g_assert_null(w->reply);
+}
+static void disposal_rejects_new_requests(void) {
+    db_desktop *w=fixture(); ReentrantCancel result={.window=w};
+    db_desktop_save_question(w,"Song",&result,requests_from_cancel);
+    db_desktop_free(w);
+    g_assert_cmpint(result.calls,==,1);
+    g_assert_cmpint(result.files.calls,==,1); g_assert_cmpint(result.folder.calls,==,1);
+    g_assert_cmpint(result.question.calls,==,1); g_assert_cmpint(result.popup.calls,==,1);
+}
+int main(int argc,char **argv) {
+    g_test_init(&argc,&argv,NULL);
+    // A minimal CI container may lack a session bus; critical GTK errors still fail.
+    g_log_set_always_fatal(G_LOG_LEVEL_ERROR|G_LOG_LEVEL_CRITICAL);
+    gtk_init();
+    g_test_add_func("/dialogs/question-answers",question_answers);
+    g_test_add_func("/dialogs/concurrent-requests",concurrent_requests);
+    g_test_add_func("/dialogs/save-then-chooser",save_then_chooser);
+    g_test_add_func("/dialogs/open-cancel-and-retry",open_cancel_and_retry);
+    g_test_add_func("/dialogs/menu-to-question",menu_to_question);
+    g_test_add_func("/dialogs/teardown-cancels",teardown_cancels);
+    g_test_add_func("/dialogs/accepted-files-and-folder",accepted_files_and_folder);
+    g_test_add_func("/dialogs/folder-selection",folder_selection);
+    g_test_add_func("/notices/queued-literal",notices_are_queued_and_literal);
+    g_test_add_func("/notices/preserve-reply",notice_preserves_pending_reply);
+    g_test_add_func("/notices/parent-teardown",notices_close_with_parent);
+    g_test_add_func("/dialogs/rapid-teardown-with-recent-files",rapid_chooser_teardown_with_recent_files);
+    g_test_add_func("/dialogs/disposal-rejects-new-requests",disposal_rejects_new_requests);
+    g_test_add_func("/dialogs/realized-unshown-teardown",realized_unshown_teardown);
+    return g_test_run();
+}

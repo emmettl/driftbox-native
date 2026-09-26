@@ -134,3 +134,42 @@ struct DesktopRecentTests {
     #expect(Self.titles(window) == ["Launch.driftbox"])
   }
 }
+
+extension DesktopRecentTests {
+  @Test func recentOpenWaitsForTheUnsavedQuestion() throws {
+    let (memory, suite) = try Self.memory()
+    defer { memory.removePersistentDomain(forName: suite) }
+    let folder = try Self.directory()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let (desktop, window) = try Self.desktop(memory: memory)
+    let url = try Self.song("Recent.driftbox", in: folder)
+    desktop.noteRecent(url)
+    desktop.session.open(DesktopTests.song(), named: "Edited")
+    desktop.session.edit("Tempo") { $0.bpm = 99 }
+    desktop.refresh()
+    window.defersDialogs = true
+    window.choose(DesktopMenus.recentPrefix + "0")
+    #expect(desktop.documentRequestPending && desktop.session.isEdited)
+    let cancel = try #require(window.pendingQuestion)
+    cancel(.cancel)
+    window.pendingQuestion = nil
+    #expect(!desktop.documentRequestPending && desktop.session.isEdited)
+    window.choose(DesktopMenus.recentPrefix + "0")
+    let discard = try #require(window.pendingQuestion)
+    discard(.discard)
+    window.pendingQuestion = nil
+    #expect(!desktop.documentRequestPending)
+    #expect(desktop.session.fileURL == url)
+  }
+
+  #if os(Linux)
+    @Test func linuxRecentPathsKeepCaseDistinct() throws {
+      let (memory, suite) = try Self.memory()
+      defer { memory.removePersistentDomain(forName: suite) }
+      let (desktop, _) = try Self.desktop(memory: memory)
+      desktop.noteRecent(URL(fileURLWithPath: "/tmp/Groove.driftbox"))
+      desktop.noteRecent(URL(fileURLWithPath: "/tmp/groove.driftbox"))
+      #expect(desktop.recentFiles.count == 2)
+    }
+  #endif
+}

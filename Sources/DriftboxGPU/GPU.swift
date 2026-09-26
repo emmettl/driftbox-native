@@ -72,7 +72,8 @@ public protocol GPUSurface: AnyObject {
   /// The target this frame is drawn into. Drawn into and presented once per frame.
   func target() throws -> any GPUTarget
   /// Show what has been drawn, at the display's next refresh, waiting for it if the one before
-  /// is still showing: what paces a loop that draws a frame, presents, and draws the next.
+  /// is still showing on swap-chain shells. A toolkit-driven shell instead schedules each frame
+  /// itself; its surface copies into the current toolkit drawable without waiting or swapping.
   func present() throws
 }
 

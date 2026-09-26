@@ -116,7 +116,12 @@ extension RackInterface {
     } else {
       canvas.font = Theme.mono(9)
       canvas.fill = Theme.dim
-      canvas.fillText("No song: choose one under Rack ▸ Groovebox Songs,", r.x, top + 6)
+      // Where the songs are: the patch's chip, where there is no menu bar, as on a touchscreen.
+      canvas.fillText(
+        groovebox == nil
+          ? "No song: choose one under Rack ▸ Groovebox Songs,"
+          : "No song: the patch's chip has Groovebox Songs,",
+        r.x, top + 6)
       canvas.fillText("and its machines come in here.", r.x, top + 18)
     }
     // Each strip's name, and its meter: −48 dB to +3, pink where it clipped.

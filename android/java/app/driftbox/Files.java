@@ -6,7 +6,12 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
+import android.text.InputFilter;
 import android.util.Log;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -81,9 +86,48 @@ final class Files {
             .setNegativeButton("Keep them", null)
             .show();
         return true;
+      case "name":
+        name(activity, fields[1], Integer.parseInt(fields[2]), fields[3]);
+        return true;
       default:
         return false;
     }
+  }
+
+  /**
+   * A name asked for under {@code title}, in place of {@code name} and no longer than {@code
+   * longest}, in a dialog with the keyboard up: what is typed goes to Swift once kept, with the
+   * dialog's button or the keyboard's own.
+   */
+  private static void name(Activity activity, String title, int longest, String name) {
+    EditText field = new EditText(activity);
+    field.setSingleLine(true);
+    field.setFilters(new InputFilter[] {new InputFilter.LengthFilter(longest)});
+    field.setText(name);
+    field.setSelectAllOnFocus(true);
+    field.setImeOptions(EditorInfo.IME_ACTION_DONE);
+    // Inset from the dialog's edges, as its title is.
+    int inset = Math.round(24 * activity.getResources().getDisplayMetrics().density);
+    FrameLayout frame = new FrameLayout(activity);
+    frame.setPadding(inset, inset / 2, inset, 0);
+    frame.addView(field);
+    AlertDialog dialog =
+        new AlertDialog.Builder(activity)
+            .setTitle(title)
+            .setView(frame)
+            .setPositiveButton("Rename", (shown, which) -> Native.named(field.getText().toString()))
+            .setNegativeButton("Cancel", null)
+            .create();
+    field.setOnEditorActionListener(
+        (view, action, event) -> {
+          if (action != EditorInfo.IME_ACTION_DONE) return false;
+          Native.named(field.getText().toString());
+          dialog.dismiss();
+          return true;
+        });
+    dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+    dialog.show();
+    field.requestFocus();
   }
 
   /** What a picker chose, if it is one of these. */

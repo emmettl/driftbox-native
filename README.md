@@ -523,11 +523,14 @@ scaled up to the screen: on a Fairphone 6, which has three, every scene but Fros
 display's 120 frames a second, and Frost 98. Graphic Lab, which sets its type there with Android's
 own text stack, takes 5.6ms a frame drawn, and more over its first frames at a size, while the
 glyphs it sets go into its atlas. Given a test's name, the app runs that instead and says what
-happened.
+happened; a release has no tests in it, nor the MIDI loopback they test against, which every
+other app on the phone would list. Its icon is an adaptive one, drawn as vectors, the Mac's and the
+web's picture placed as the web's maskable icon places it: `scripts/android-icon.mjs` writes it.
 
 ```bash
 scripts/android-app.sh                  # build and install; open it for Pulse, playing acid
-scripts/android-app.sh build            # build only, with no phone: what CI does
+scripts/android-app.sh build            # build only, with no phone
+scripts/android-app.sh release          # build it as it is released, without the tests: what CI does
 scripts/android-app.sh bundle           # and an App Bundle beside it, for Google Play
 adb shell am start -n app.driftbox/.Main --es song smallhours --es scene hothouse
 scripts/android-app.sh midi-loopback    # test the MIDI ports against the app's own loopback
@@ -953,3 +956,18 @@ meant to be picked up, and that is the licence that gets least in the way of doi
 Steinberg's VST 3 SDK, in `Sources/VST3SDK` and `Tests/DriftboxVST3Fixture`, is theirs, under
 [its own MIT licence](Sources/VST3SDK/LICENSE-VST3SDK.txt). VST is a trademark of Steinberg Media
 Technologies GmbH.
+
+## Linux development
+
+Linux runs the shared groovebox and rack through a native GTK 4/Pango shell, GLES renderer,
+PipeWire audio and ALSA MIDI adapters. The Ubuntu ARM64 development VM, architecture work,
+validation and remaining release criteria are recorded in [docs/LINUX.md](docs/LINUX.md).
+Inside a Linux checkout, `scripts/linux-build.sh` provides build, test, render, playback and
+`desktop` entry points. The Ubuntu VM currently uses XWayland for a native Wayland menu issue.
+
+`scripts/linux-package.py` packages a release desktop build with its Swift runtime and resources.
+The extracted [Linux preview](linux/README.md) runs without a compiler and supports per-user app-menu
+registration. CI also builds Ubuntu 24.04 ARM64 and x86-64 [`.deb` packages](linux/packaging/README-deb.md)
+with APT dependencies and system app-menu registration; both formats are tested in clean runtime
+containers. This remains a preview: other distributions, physical audio/MIDI hardware and the
+remaining desktop interactions still need qualification.

@@ -98,6 +98,10 @@ public final class Interface {
   /// Ask whether to go on and lose the song's unsaved edits, and do `then` if so; with none, the
   /// interface goes on without asking.
   public var confirm: ((_ question: String, _ then: @escaping () -> Void) -> Void)?
+  /// Ask, under `title`, for a new name for what is called `name`, and hand what is typed to
+  /// `then`: a touchscreen's own prompt, since it has no keys to type into a field with. With none,
+  /// a pattern's chip becomes a field that keys type into.
+  public var askName: ((_ title: String, _ name: String, _ then: @escaping (String) -> Void) -> Void)?
   var menuDisabled: Set<String> = []
   var menuChecked: Set<String> = []
 

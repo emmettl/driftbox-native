@@ -34,6 +34,12 @@ public final class Session {
   /// engine, and the output converts.
   public var sampleRate: Double { host.sampleRate }
   public private(set) var error: String?
+  /// Hand a pending failure to the shell once. A later identical failure is a new notification.
+  public func takeError() -> String? {
+    guard let error else { return nil }
+    self.error = nil
+    return error
+  }
   /// The last voice struck, by index into `allVoices`, and when, in the engine's frames.
   private var lastHits: [Int: Int] = [:]
   /// The voices struck in the last tenth of a second, by index into `allVoices`: for anything that
@@ -538,14 +544,14 @@ public final class Session {
     load(loaded)
   }
 
-  /// Write the song back where it came from. Nothing without a file: that is Save As's question.
-  public func save() {
-    guard let fileURL else { return }
-    save(to: fileURL)
+  /// Write the song back where it came from. True only when written; without a file, ask Save As.
+  @discardableResult public func save() -> Bool {
+    guard let fileURL else { return false }
+    return save(to: fileURL)
   }
 
-  public func save(to url: URL) {
-    guard let song else { return }
+  @discardableResult public func save(to url: URL) -> Bool {
+    guard let song else { return false }
     do {
       try Data(SongCodec.encode(song).utf8).write(to: url)
       fileURL = url
@@ -558,8 +564,10 @@ public final class Session {
         id: url.path, name: name, blurb: current?.blurb ?? "", visual: current?.visual ?? "")
       // Saved somewhere new, it comes back from there.
       if let current { remember(current, at: url) }
+      return true
     } catch {
-      self.error = "\(error)"
+      self.error = "Could not save \(url.lastPathComponent): \(FailureMessage.describe(error))"
+      return false
     }
   }
 

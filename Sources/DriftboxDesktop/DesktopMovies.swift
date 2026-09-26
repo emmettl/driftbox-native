@@ -19,14 +19,18 @@ extension Desktop {
 
   /// The song and its visuals, seen as the scene chosen or the song's own, where the person says.
   func exportMovie() {
-    guard let song = session.song, movieProgress == nil,
-      let url = window.chooseSaveLocation(for: Self.movie, name: session.documentName)
-    else { return }
+    guard let song = session.song, movieProgress == nil else { return }
     let scene = chosenScene
-    writeMovie(to: url) { format, device, typesetter, writer, progress in
-      try await Movie.write(
-        song, scene: scene, format: format, device: device, typesetter: typesetter, to: writer,
-        progress: progress)
+    documentRequest { done in
+      window.chooseSaveLocation(for: Self.movie, name: session.documentName) { [self] url in
+        defer { done() }
+        guard let url else { return }
+        writeMovie(to: url) { format, device, typesetter, writer, progress in
+          try await Movie.write(
+            song, scene: scene, format: format, device: device, typesetter: typesetter, to: writer,
+            progress: progress)
+        }
+      }
     }
   }
 
@@ -42,12 +46,16 @@ extension Desktop {
   /// Stop recording and ask where its movie goes. Cancelled, the take goes with it: it is a
   /// performance, and there is no other copy of it.
   func stopRecording() {
-    guard let take = session.stopRecording(),
-      let url = window.chooseSaveLocation(for: Self.movie, name: "\(session.documentName) Performance")
-    else { return }
-    writeMovie(to: url) { format, device, typesetter, writer, progress in
-      try await Movie.write(
-        take, format: format, device: device, typesetter: typesetter, to: writer, progress: progress)
+    guard let take = session.stopRecording() else { return }
+    documentRequest { done in
+      window.chooseSaveLocation(for: Self.movie, name: "\(session.documentName) Performance") { [self] url in
+        defer { done() }
+        guard let url else { return }
+        writeMovie(to: url) { format, device, typesetter, writer, progress in
+          try await Movie.write(
+            take, format: format, device: device, typesetter: typesetter, to: writer, progress: progress)
+        }
+      }
     }
   }
 

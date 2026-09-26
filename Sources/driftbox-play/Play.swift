@@ -640,6 +640,22 @@
       route.detach(host.renderSource.context)
     }
   }
+#elseif os(Linux)
+  import Foundation
+  import Glibc
+
+  @main
+  struct Play {
+    @MainActor static func main() {
+      do {
+        try runLinuxPlayer(Array(CommandLine.arguments.dropFirst()))
+      } catch {
+        FileHandle.standardError.write(Data("driftbox-play: \(error)\n".utf8))
+        exit(1)
+      }
+    }
+  }
+
 #else
   import DriftboxDocument
   #if canImport(FoundationEssentials)
@@ -651,7 +667,7 @@
     import Glibc
   #endif
 
-  /// No player here yet — Linux has no route behind the ports — but the bench needs no device.
+  /// Platforms without an audio adapter can still run the benchmark without a device.
   ///
   ///     driftbox-play song.json --bench
   @main

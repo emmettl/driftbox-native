@@ -33,14 +33,16 @@ extension Desktop {
   /// more is taken off the list, and the person told.
   func openRecent(_ index: Int) {
     let files = recentFiles
-    guard files.indices.contains(index), mayLoseChanges() else { return }
+    guard files.indices.contains(index) else { return }
     let url = files[index]
-    guard FileManager.default.fileExists(atPath: url.path) else {
-      memory?.set(others(than: url.standardizedFileURL.path), forKey: Self.recentKey)
-      window.tell("\(url.lastPathComponent) is not there any more, so it has been taken off the list.")
-      return
+    replacingDocument { [self] in
+      guard FileManager.default.fileExists(atPath: url.path) else {
+        memory?.set(others(than: url.standardizedFileURL.path), forKey: Self.recentKey)
+        window.tell("\(url.lastPathComponent) is not there any more, so it has been taken off the list.")
+        return
+      }
+      session.open(file: url)
     }
-    session.open(file: url)
   }
 
   func clearRecent() { memory?.removeObject(forKey: Self.recentKey) }
@@ -62,7 +64,12 @@ extension Desktop {
     }
   }
 
-  /// Whether two paths are one file: case aside, as Windows' file system has it, and the Mac's
-  /// usually does.
-  static func samePath(_ a: String, _ b: String) -> Bool { a.lowercased() == b.lowercased() }
+  /// Preserve case on Linux; Windows and the usual Mac volumes compare paths without it.
+  static func samePath(_ a: String, _ b: String) -> Bool {
+    #if os(Linux)
+      return a == b
+    #else
+      return a.lowercased() == b.lowercased()
+    #endif
+  }
 }

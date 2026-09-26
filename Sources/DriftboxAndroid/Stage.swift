@@ -96,6 +96,11 @@
         self?.confirmed = then
         self?.pendingMenu = FileLines.ask(question)
       }
+      // A name asked for in a dialog of Android's own, since no keys come here to type one with.
+      screen.interface.askName = { [weak self] title, name, then in
+        self?.naming = then
+        self?.pendingMenu = FileLines.name(title, name, longest: Interface.longestName)
+      }
     }
 
     /// Stop playing and drawing, and let go of the window.
@@ -204,6 +209,15 @@
         return
       }
       screen.choose(id)
+    }
+
+    /// What to do with the name typed into the dialog last asked for.
+    private var naming: ((String) -> Void)?
+
+    /// The name typed, and kept.
+    func named(_ name: String) {
+      naming?(name)
+      naming = nil
     }
 
     // MARK: - The song's file

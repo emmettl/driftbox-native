@@ -139,7 +139,7 @@ extension Interface {
   }
 
   /// `then`, once the platform has said to go on if the song has edits that are not saved.
-  private func unlessEdited(_ then: @escaping () -> Void) {
+  public func unlessEdited(_ then: @escaping () -> Void) {
     guard session.isEdited, let confirm else { return then() }
     confirm("\(session.documentName) has changes that are not saved. Lose them?", then)
   }
@@ -301,8 +301,9 @@ extension Interface {
     let name = song.pattern(id: id)?.name ?? id
     return Menu(
       name,
-      [
-        item("Rename…", "pattern.rename") { self.rename(pattern: id) },
+      // Renamed in the chip, typed into with keys, or in the platform's own prompt; not at all on a
+      // touchscreen that has none.
+      (touch && askName == nil ? [] : [item("Rename…", "pattern.rename") { self.rename(pattern: id) }]) + [
         item("Add to Song", "pattern.addToSong") {
           self.session.edit("Add to Song") { $0 = $0.appendingToChain(id) }
         },
@@ -359,10 +360,23 @@ extension Interface {
 // MARK: - Renaming
 
 extension Interface {
-  /// Start renaming a pattern: its chip becomes a field holding its name, typed into from here.
+  /// Start renaming a pattern: the platform asked for its name, where it has a way to ask, or else
+  /// its chip becomes a field holding its name, typed into from here.
   public func rename(pattern id: String) {
     guard let pattern = session.song?.pattern(id: id) else { return }
+    if let askName {
+      askName("Rename Pattern", pattern.name) { [weak self] name in self?.rename(pattern: id, to: name) }
+      return
+    }
     renaming = (id, pattern.name)
+  }
+
+  /// Name a pattern `name`, cut to the longest a name may be typed: an empty one, or one only of
+  /// spaces, is not kept, as the song's own renaming has it.
+  public func rename(pattern id: String, to name: String) {
+    let name = String(name.prefix(Self.longestName))
+    guard session.song?.pattern(id: id)?.name != name else { return }
+    session.edit("Rename Pattern") { $0 = $0.renamingPattern(id, to: name) }
   }
 
   /// A key, while a name is being typed: a character to add, Backspace to take one away, Return to
@@ -401,12 +415,10 @@ extension Interface {
   /// The longest a pattern's name may be typed.
   public static let longestName = 24
 
-  /// Keep the name typed: an empty one, or one only of spaces, is not kept, as the song's own
-  /// renaming has it.
+  /// Keep the name typed.
   func finishRenaming() {
     guard let renaming else { return }
     self.renaming = nil
-    guard session.song?.pattern(id: renaming.pattern)?.name != renaming.text else { return }
-    session.edit("Rename Pattern") { $0 = $0.renamingPattern(renaming.pattern, to: renaming.text) }
+    rename(pattern: renaming.pattern, to: renaming.text)
   }
 }

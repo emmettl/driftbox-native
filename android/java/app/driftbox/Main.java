@@ -44,7 +44,8 @@ import java.nio.charset.StandardCharsets;
  * Or a harness, started with a test's name, which runs it and says what happened, on screen and in
  * the log under "Driftbox": {@code --es run midi-loopback}, {@code gpu} for the GPU contract on this
  * phone's GPU, {@code scenes} for every scene drawn, checked and timed, {@code text} for the
- * typesetter, or {@code rack} for every patch of the rack's opened and run.
+ * typesetter, or {@code rack} for every patch of the rack's opened and run. A release has none of
+ * them, as {@link Checks} says.
  */
 public final class Main extends Activity {
   static final String TAG = "Driftbox";
@@ -77,8 +78,8 @@ public final class Main extends Activity {
     }
     midi = new Midi(this);
     String run = getIntent().getStringExtra("run");
-    if ("midi-loopback".equals(run) || "gpu".equals(run) || "scenes".equals(run) || "text".equals(run)
-        || "rack".equals(run)) {
+    if (Checks.INCLUDED && ("midi-loopback".equals(run) || "gpu".equals(run) || "scenes".equals(run)
+        || "text".equals(run) || "rack".equals(run))) {
       test(run);
     } else {
       String song = getIntent().getStringExtra("song");

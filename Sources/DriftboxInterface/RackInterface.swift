@@ -2,6 +2,8 @@ import DriftboxCanvas
 import DriftboxHelp
 import DriftboxRack
 import DriftboxRackSession
+import DriftboxSeq
+import DriftboxSession
 import DriftboxShell
 import Foundation
 
@@ -90,6 +92,9 @@ public final class RackInterface {
   public private(set) var pan: Float = 0
   /// The way back to the groovebox, where there is one to go back to: the patches' menu offers it.
   public var showGroovebox: (() -> Void)?
+  /// The groovebox beside the rack, where there is one and no menu bar to offer its songs: the
+  /// patches' menu offers them, its own and the catalogue's, to open in the rack.
+  public weak var groovebox: Session?
 
   /// Every finger down, and where.
   private var fingers: [Int: SIMD2<Float>] = [:]
@@ -835,6 +840,7 @@ public final class RackInterface {
       }
     }
     items.append(.submenu(Menu("Patches", patches)))
+    if let groovebox { items.append(grooveboxSongs(groovebox)) }
     if let helpGuide {
       let size = size
       items += [
@@ -847,6 +853,34 @@ public final class RackInterface {
       ]
     }
     return Menu(rack.name, items)
+  }
+
+  /// A groovebox song, whole, to play in the rack with its machines on a Groovebox module: the one
+  /// open in the groovebox, unless it is the rack's own already, and the catalogue's.
+  private func grooveboxSongs(_ groovebox: Session) -> MenuItem {
+    var items: [MenuItem] = []
+    if let song = groovebox.song, !groovebox.linkedToRack {
+      let name = groovebox.documentName
+      items += [
+        item("\(name), from the Groovebox", "rackSong.groovebox") { [weak self] in
+          self?.openSong(song, name: name)
+        },
+        .separator,
+      ]
+    }
+    for entry in groovebox.entries {
+      items.append(
+        item(entry.name, "rackSong." + entry.id) { [weak self] in
+          guard let song = Catalogue.song(entry.id) else { return }
+          self?.openSong(song, name: entry.name)
+        })
+    }
+    return .submenu(Menu("Groovebox Songs", items))
+  }
+
+  private func openSong(_ song: Song, name: String) {
+    rack.openSong(song, name: name)
+    fitRack()
   }
 
   func addMenu() -> Menu {

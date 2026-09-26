@@ -34,6 +34,7 @@ public final class Desktop {
   public let interface: Interface
   let canvas: Canvas
   var frame: any GPUTarget
+  var documentRequestPending = false
   var resized: (width: Int, height: Int)?
 
   /// The scene chosen from the View menu, or nil to show the song's own. A performance being
@@ -66,6 +67,8 @@ public final class Desktop {
   var movieStopped = false
   /// The size and rates movies are written in; smaller in a test.
   public var movieFormat = MovieFormat()
+  /// Hosts without a movie encoder disable the movie and performance-recording commands.
+  public var supportsMovies = true
   /// The visuals window, while it is open, and what draws into it.
   var visuals: (any ShellVisualsWindow)?
   var visualsSurface: (any GPUSurface)?
@@ -122,18 +125,21 @@ public final class Desktop {
     window.onEvent = { [weak self] event in self?.handle(event) }
     window.isEnabled = { [weak self] id in self?.isEnabled(id) ?? false }
     window.isChecked = { [weak self] id in self?.isChecked(id) ?? false }
-    window.shouldClose = { [weak self] in self?.mayLoseChanges() ?? true }
+    window.shouldClose = { [weak self] in self?.requestClose() ?? true }
+    rack?.onLoadFailure = { [weak self] message in self?.window.tell(message) }
     refresh()
   }
 
   /// Until the window closes: the session caught up, the menus and the title brought up to date,
   /// and a frame of the scene, once for every refresh of the display.
   public func run() throws {
+    defer {
+      session.close()
+      rack?.close()
+      // Preserve the remembered open state while releasing the visuals window.
+      dropVisuals()
+    }
     try window.run { try drawFrame() }
-    session.close()
-    rack?.close()
-    // Quitting with the visuals window open leaves it remembered as open.
-    dropVisuals()
   }
 
   // MARK: - A frame
@@ -214,6 +220,7 @@ public final class Desktop {
   /// The window's title and menus as the session now is. Each is handed over only when it differs
   /// from what the window has, which the window checks itself for the menus.
   func refresh() {
+    if !documentRequestPending, let error = session.takeError() { window.tell(error) }
     noteOpenFile()
     // Typing is the rack's while it shows, as a routing's end is typed, and the controls' otherwise.
     let takesText = showsRack ? rackInterface?.takesText ?? false : interface.takesText
@@ -238,6 +245,14 @@ public final class Desktop {
   // MARK: - What the window hears
 
   func handle(_ event: ShellEvent) {
+    if documentRequestPending {
+      switch event {
+      case .resized: break
+      case .key(let key) where !key.isDown: break
+      case .pointer(let pointer) where pointer.phase == .cancelled || pointer.phase == .ended: break
+      default: return
+      }
+    }
     // With a screen reader, the keyboard moves between the controls first, and where a screen reader
     // moves it is the window's to keep.
     if case .key(let key) = event, navigate(key) { return }
@@ -277,10 +292,12 @@ public final class Desktop {
   /// The menu for what is at `point`, shown as the window shows one, and what is chosen from it done.
   func contextMenu(at point: SIMD2<Float>) {
     guard let menu = interface.menu(at: point) else { return }
-    let chosen = window.popUp(
+    window.popUp(
       menu, at: point, isEnabled: { [interface] in interface.menuIsEnabled($0) },
-      isChecked: { [interface] in interface.menuIsChecked($0) })
-    if let chosen { interface.choose(chosen) }
+      isChecked: { [interface] in interface.menuIsChecked($0) },
+      completion: { [weak self] chosen in
+        if let chosen { self?.interface.choose(chosen) }
+      })
   }
 
   /// The window as the pad: 0...1 from the bottom left, as the engine and the scenes take it.
@@ -308,16 +325,25 @@ public final class Desktop {
   func perform(_ id: String) {
     switch id {
     case DesktopMenus.new:
-      guard mayLoseChanges() else { return }
-      session.new()
+      replacingDocument { self.session.new() }
     case DesktopMenus.open:
-      guard mayLoseChanges() else { return }
-      let songs = FileType(name: "Driftbox Song", extensions: SongFile.extensions)
-      if let url = window.chooseFile(ofTypes: [songs]) { session.open(file: url) }
+      documentRequest { done in
+        self.mayLoseChanges { allowed in
+          guard allowed else {
+            done()
+            return
+          }
+          let songs = FileType(name: "Driftbox Song", extensions: SongFile.extensions)
+          self.window.chooseFile(ofTypes: [songs]) { url in
+            if let url { self.session.open(file: url) }
+            done()
+          }
+        }
+      }
     case DesktopMenus.save:
-      _ = save()
+      documentRequest { done in self.save { _ in done() } }
     case DesktopMenus.saveAs:
-      _ = saveAs()
+      documentRequest { done in self.saveAs { _ in done() } }
     case DesktopMenus.exportMix:
       exportMix()
     case DesktopMenus.exportStems:
@@ -329,7 +355,7 @@ public final class Desktop {
     case DesktopMenus.record:
       toggleRecording()
     case DesktopMenus.exit:
-      if mayLoseChanges() { window.close() }
+      if requestClose() { window.close() }
     case DesktopMenus.undo: if showsRack, let rack { rack.undo() } else { session.undo() }
     case DesktopMenus.redo: if showsRack, let rack { rack.redo() } else { session.redo() }
     case DesktopMenus.toggle: if showsRack, let rack { rack.toggleRunning() } else { session.toggle() }
@@ -370,6 +396,10 @@ public final class Desktop {
   /// The commands that carry what they are about in their id: a song, a scene, a device, a source,
   /// a destination.
   func performNamed(_ id: String) {
+    if let module = DesktopMenus.value(id, after: DesktopMenus.rackAudioPrefix) {
+      chooseRackAudio(into: module)
+      return
+    }
     if let songID = DesktopMenus.value(id, after: DesktopMenus.rackSongPrefix) {
       guard let entry = session.entries.first(where: { $0.id == songID }), let song = Catalogue.song(songID)
       else { return }
@@ -382,8 +412,8 @@ public final class Desktop {
       rack?.open(entry)
       setShowsRack(true)
     } else if let entryID = DesktopMenus.value(id, after: DesktopMenus.songPrefix) {
-      guard let entry = session.entries.first(where: { $0.id == entryID }), mayLoseChanges() else { return }
-      session.open(entry)
+      guard let entry = session.entries.first(where: { $0.id == entryID }) else { return }
+      replacingDocument { self.session.open(entry) }
     } else if let sceneID = DesktopMenus.value(id, after: DesktopMenus.scenePrefix) {
       chosenScene = sceneID
     } else if let display = DesktopMenus.value(id, after: DesktopMenus.visualsOnPrefix) {
@@ -413,7 +443,11 @@ public final class Desktop {
   }
 
   func isEnabled(_ id: String) -> Bool {
-    switch id {
+    guard !documentRequestPending else { return false }
+    if let module = DesktopMenus.value(id, after: DesktopMenus.rackAudioPrefix) {
+      return canLoadRackAudio(into: module)
+    }
+    return switch id {
     case DesktopMenus.undo: showsRack ? rack?.canUndo ?? false : session.canUndo
     case DesktopMenus.redo: showsRack ? rack?.canRedo ?? false : session.canRedo
     case DesktopMenus.toggle: showsRack || session.song != nil
@@ -424,11 +458,14 @@ public final class Desktop {
       session.song != nil
     case DesktopMenus.recordAutomation: session.song != nil
     case DesktopMenus.clearLoop: session.loop != nil
-    case DesktopMenus.exportMovie: session.song != nil && movieProgress == nil
+    case DesktopMenus.exportMovie: supportsMovies && session.song != nil && movieProgress == nil
     case DesktopMenus.stopMovie: movieProgress != nil
-    case DesktopMenus.record: session.song != nil && (session.isRecording || movieProgress == nil)
+    case DesktopMenus.record:
+      supportsMovies && session.song != nil && (session.isRecording || movieProgress == nil)
     case DesktopMenus.clearAutomation: session.song?.automation.isEmpty == false
-    case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote, DesktopMenus.noRecent: false
+    case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote, DesktopMenus.noAudioTargets,
+      DesktopMenus.noRecent:
+      false
     default: true
     }
   }
@@ -478,27 +515,75 @@ public final class Desktop {
 
   /// Whether what is in the window may go: yes when nothing has changed, and otherwise as the
   /// person asked says — saved first, thrown away, or not after all.
-  func mayLoseChanges() -> Bool {
-    guard session.isEdited else { return true }
-    switch window.askToSave(session.documentName) {
-    case .save: return save()
-    case .discard: return true
-    case .cancel: return false
+  func documentRequest(_ operation: (@escaping () -> Void) -> Void) {
+    guard !documentRequestPending else { return }
+    documentRequestPending = true
+    operation { [weak self] in self?.documentRequestPending = false }
+  }
+
+  func replacingDocument(_ action: @escaping () -> Void) {
+    documentRequest { done in
+      mayLoseChanges { allowed in
+        if allowed { action() }
+        done()
+      }
     }
   }
 
-  /// Save where the song came from, or ask where when it came from nowhere. False if it was not.
-  func save() -> Bool {
-    guard session.fileURL != nil else { return saveAs() }
-    session.save()
-    return !session.isEdited
+  /// Synchronous shells return their answer immediately; deferred shells close only after
+  /// confirmation and a successful save. Repeated close requests cannot open another dialog.
+  func requestClose() -> Bool {
+    guard !documentRequestPending else { return false }
+    var immediate: Bool?
+    var requesting = true
+    documentRequest { done in
+      mayLoseChanges { [weak self] allowed in
+        done()
+        if requesting { immediate = allowed } else if allowed { self?.window.close() }
+      }
+    }
+    requesting = false
+    return immediate ?? false
   }
 
-  func saveAs() -> Bool {
-    guard session.song != nil else { return false }
+  func mayLoseChanges(completion: @escaping (Bool) -> Void) {
+    guard session.isEdited else {
+      completion(true)
+      return
+    }
+    window.askToSave(session.documentName) { [weak self] answer in
+      guard let self else {
+        completion(false)
+        return
+      }
+      switch answer {
+      case .save: self.save(completion: completion)
+      case .discard: completion(true)
+      case .cancel: completion(false)
+      }
+    }
+  }
+
+  func save(completion: @escaping (Bool) -> Void) {
+    guard session.fileURL != nil else {
+      saveAs(completion: completion)
+      return
+    }
+    completion(session.save())
+  }
+
+  func saveAs(completion: @escaping (Bool) -> Void) {
+    guard session.song != nil else {
+      completion(false)
+      return
+    }
     let type = FileType(name: "Driftbox Song", extensions: SongFile.extensions)
-    guard let url = window.chooseSaveLocation(for: type, name: session.documentName) else { return false }
-    session.save(to: url)
-    return !session.isEdited
+    window.chooseSaveLocation(for: type, name: session.documentName) { [weak self] url in
+      guard let self, let url else {
+        completion(false)
+        return
+      }
+      completion(self.session.save(to: url))
+    }
   }
 }

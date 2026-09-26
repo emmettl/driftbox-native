@@ -26,7 +26,8 @@ public protocol ShellWindow: AnyObject {
   /// asked first. Nil is yes. `close` is not asked: it is the app deciding.
   var shouldClose: (() -> Bool)? { get set }
 
-  /// Until the window closes: take what has arrived, then `frame`, and again. `frame` is also
+  /// Until the window closes: draw each scheduled frame. Swap-chain shells pace their loop
+  /// through surface presentation; toolkit shells invoke this from render callbacks. `frame` is also
   /// called while the window is being moved or resized, when the platform would otherwise hold the
   /// loop and leave the picture frozen, so a frame is whatever makes the window's content current.
   /// An error from a frame ends the loop and is thrown from here — one from a frame drawn inside the
@@ -52,7 +53,8 @@ public protocol ShellWindow: AnyObject {
   func chooseFolder(title: String, button: String) -> URL?
   /// The file at `url` shown where the platform keeps files, picked out: Explorer, the Finder.
   func reveal(_ url: URL)
-  /// Something the person should know, in the platform's own box, which waits to be put away.
+  /// Something the person should know, in the platform's own box. Callback-driven shells
+  /// present it without blocking the main loop.
   func tell(_ message: String)
   /// A file opened or saved, told to the platform's own list of recent files, where it keeps one:
   /// Windows' jump list, the Mac's Open Recent.
@@ -82,6 +84,18 @@ public protocol ShellWindow: AnyObject {
   func popUp(
     _ menu: Menu, at point: SIMD2<Float>, isEnabled: (String) -> Bool, isChecked: (String) -> Bool
   ) -> String?
+
+  /// Completion-based requests let callback-driven shells keep their main loop running.
+  /// Complete exactly once, on the main actor, including cancellation.
+  func chooseFile(ofTypes types: [FileType], completion: @escaping (URL?) -> Void)
+  func chooseFiles(ofTypes types: [FileType], completion: @escaping ([URL]) -> Void)
+  func chooseSaveLocation(for type: FileType, name: String, completion: @escaping (URL?) -> Void)
+  func chooseFolder(title: String, button: String, completion: @escaping (URL?) -> Void)
+  func askToSave(_ name: String, completion: @escaping (SaveAnswer) -> Void)
+  func popUp(
+    _ menu: Menu, at point: SIMD2<Float>, isEnabled: @escaping (String) -> Bool,
+    isChecked: @escaping (String) -> Bool, completion: @escaping (String?) -> Void)
+
 }
 
 /// What someone said when asked whether to save their changes.
@@ -132,4 +146,28 @@ extension ShellWindow {
 
   /// None, where a platform has room for one window only.
   public func makeVisualsWindow() -> (any ShellVisualsWindow)? { nil }
+}
+
+extension ShellWindow {
+  public func chooseFile(ofTypes types: [FileType], completion: @escaping (URL?) -> Void) {
+    completion(chooseFile(ofTypes: types))
+  }
+  public func chooseFiles(ofTypes types: [FileType], completion: @escaping ([URL]) -> Void) {
+    completion(chooseFiles(ofTypes: types))
+  }
+  public func chooseSaveLocation(for type: FileType, name: String, completion: @escaping (URL?) -> Void) {
+    completion(chooseSaveLocation(for: type, name: name))
+  }
+  public func chooseFolder(title: String, button: String, completion: @escaping (URL?) -> Void) {
+    completion(chooseFolder(title: title, button: button))
+  }
+  public func askToSave(_ name: String, completion: @escaping (SaveAnswer) -> Void) {
+    completion(askToSave(name))
+  }
+  public func popUp(
+    _ menu: Menu, at point: SIMD2<Float>, isEnabled: @escaping (String) -> Bool,
+    isChecked: @escaping (String) -> Bool, completion: @escaping (String?) -> Void
+  ) {
+    completion(popUp(menu, at: point, isEnabled: isEnabled, isChecked: isChecked))
+  }
 }
