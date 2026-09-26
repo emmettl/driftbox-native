@@ -21,6 +21,10 @@ static db_desktop *fixture(void) {
     gtk_window_present(GTK_WINDOW(w->window));
     return w;
 }
+static void present_pending(db_desktop *w) {
+    while (w->dialog_source) g_main_context_iteration(NULL,TRUE);
+    g_assert_nonnull(w->dialog);
+}
 static void empty(db_desktop *w) {
     g_assert_null(w->dialog); g_assert_null(w->reply); g_assert_null(w->reply_context);
 }
@@ -67,6 +71,7 @@ static void save_then_chooser(void) {
     db_desktop_save_question(w,"Unsaved",&chain,save_chosen);
     gtk_dialog_response(GTK_DIALOG(w->dialog),1);
     g_assert_cmpint(chain.question.calls,==,1); g_assert_cmpint(chain.question.answer,==,1);
+    present_pending(w);
     g_assert_true(GTK_IS_FILE_CHOOSER_NATIVE(w->dialog));
     g_assert_cmpint(gtk_file_chooser_get_action(GTK_FILE_CHOOSER(w->dialog)),==,GTK_FILE_CHOOSER_ACTION_SAVE);
     char *name=gtk_file_chooser_get_current_name(GTK_FILE_CHOOSER(w->dialog));
@@ -82,6 +87,7 @@ static void open_cancel_and_retry(void) {
         Result result={0};
         db_desktop_files(w,0,multiple,"wav;wave","",&result,received);
         g_assert_cmpint(result.calls,==,0);
+        present_pending(w);
         GtkFileChooser *chooser=GTK_FILE_CHOOSER(w->dialog);
         g_assert_cmpint(gtk_file_chooser_get_action(chooser),==,GTK_FILE_CHOOSER_ACTION_OPEN);
         g_assert_cmpint(gtk_file_chooser_get_select_multiple(chooser),==,multiple);
@@ -142,6 +148,7 @@ static void accepted_files_and_folder(void) {
     char *uri=g_file_get_uri(file);
     db_desktop *w=fixture(); FileResult result={0};
     db_desktop_files(w,0,0,"wav;wave","",&result,file_received);
+    present_pending(w);
     g_assert_true(gtk_file_chooser_set_file(GTK_FILE_CHOOSER(w->dialog),file,&error)); g_assert_no_error(error);
     wait_for_file(GTK_FILE_CHOOSER(w->dialog),file,FALSE);
     g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_ACCEPT);
@@ -151,6 +158,7 @@ static void accepted_files_and_folder(void) {
     // The next chooser inherits the accepted folder and returns a new save path.
     result=(FileResult){0};
     db_desktop_files(w,1,0,"driftbox","copy.driftbox",&result,file_received);
+    present_pending(w);
     wait_for_file(GTK_FILE_CHOOSER(w->dialog),folder,TRUE);
     GFile *saved=g_file_get_child(folder,"copy.driftbox");
     wait_for_file(GTK_FILE_CHOOSER(w->dialog),saved,FALSE);
@@ -169,6 +177,7 @@ static void folder_selection(void) {
     char *directory=g_dir_make_tmp("driftbox-folder-XXXXXX",NULL);
     GFile *folder=g_file_new_for_path(directory); char *uri=g_file_get_uri(folder);
     db_desktop_folder(w,"Export Stems","Export Here",&result,file_received);
+    present_pending(w);
     GtkFileChooser *chooser=GTK_FILE_CHOOSER(w->dialog);
     g_assert_cmpint(gtk_file_chooser_get_action(chooser),==,GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
     g_assert_true(gtk_file_chooser_set_file(chooser,folder,NULL));
@@ -177,6 +186,7 @@ static void folder_selection(void) {
     g_assert_cmpint(result.calls,==,1); g_assert_cmpstr(result.uris,==,uri); empty(w);
     g_free(result.uris); result=(FileResult){0};
     db_desktop_folder(w,"Export Stems","Export Here",&result,file_received);
+    present_pending(w);
     g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_CANCEL);
     g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,0); empty(w);
     g_free(result.uris); db_desktop_free(w);
@@ -226,6 +236,65 @@ static void notices_close_with_parent(void) {
     db_desktop_free(w);
     g_assert_null(notice); g_assert_cmpint(result.calls,==,1);
 }
+static gboolean finished_waiting(gpointer context) {
+    g_main_loop_quit(context); return G_SOURCE_REMOVE;
+}
+static void settle(void) {
+    GMainLoop *loop=g_main_loop_new(NULL,FALSE);
+    g_timeout_add(150,finished_waiting,loop);
+    g_main_loop_run(loop); g_main_loop_unref(loop);
+}
+// Seed Recent explicitly: an empty CI home otherwise hides GTK's cancelled-query crash.
+// Destruction happens before dispatching any chooser work, not after a grace period.
+static void rapid_chooser_teardown_with_recent_files(void) {
+    if (!g_test_subprocess()) {
+        g_test_trap_subprocess(NULL,15*G_TIME_SPAN_SECOND,0);
+        g_test_trap_assert_passed(); return;
+    }
+    char *directory=g_dir_make_tmp("driftbox-recent-XXXXXX",NULL);
+    char *path=g_build_filename(directory,"recent.wav",NULL);
+    g_assert_true(g_file_set_contents(path,"sample",-1,NULL));
+    char *uri=g_filename_to_uri(path,NULL,NULL);
+    GtkRecentData data={.display_name="Recent sample",.mime_type="audio/x-wav",
+        .app_name="Driftbox tests",.app_exec="driftbox %u"};
+    GtkRecentManager *manager=gtk_recent_manager_get_default();
+    g_assert_true(gtk_recent_manager_add_full(manager,uri,&data));
+    for (int repeat=0;repeat<4;repeat++) {
+        for (int kind=0;kind<4;kind++) {
+            db_desktop *w=fixture(); Result result={0};
+            if (kind==3) db_desktop_folder(w,"Stems","Export",&result,received);
+            else db_desktop_files(w,kind==2,kind==1,"wav","Unsaved.wav",&result,received);
+            db_desktop_free(w);
+            g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,0);
+            settle();
+            g_assert_cmpuint(g_list_model_get_n_items(gtk_window_get_toplevels()),==,0);
+
+        }
+    }
+    g_assert_true(gtk_recent_manager_remove_item(manager,uri,NULL));
+    g_assert_cmpint(unlink(path),==,0); g_assert_cmpint(rmdir(directory),==,0);
+    g_free(uri); g_free(path); g_free(directory);
+}
+typedef struct { db_desktop *window; Result files, folder, question, popup; int calls; } ReentrantCancel;
+static void requests_from_cancel(void *context,int answer,const char *value) {
+    (void)value;
+    ReentrantCancel *result=context; result->calls++; g_assert_cmpint(answer,==,0);
+    db_desktop *w=result->window;
+    db_desktop_files(w,0,0,"wav","",&result->files,received);
+    db_desktop_folder(w,"Folder","Choose",&result->folder,received);
+    db_desktop_save_question(w,"Song",&result->question,received);
+    db_menu *menu=db_menu_new();
+    db_desktop_popup(w,menu,0,0,&result->popup,received); db_menu_free(menu);
+    g_assert_null(w->dialog); g_assert_null(w->popover); g_assert_null(w->reply);
+}
+static void disposal_rejects_new_requests(void) {
+    db_desktop *w=fixture(); ReentrantCancel result={.window=w};
+    db_desktop_save_question(w,"Song",&result,requests_from_cancel);
+    db_desktop_free(w);
+    g_assert_cmpint(result.calls,==,1);
+    g_assert_cmpint(result.files.calls,==,1); g_assert_cmpint(result.folder.calls,==,1);
+    g_assert_cmpint(result.question.calls,==,1); g_assert_cmpint(result.popup.calls,==,1);
+}
 int main(int argc,char **argv) {
     g_test_init(&argc,&argv,NULL);
     // A minimal CI container may lack a session bus; critical GTK errors still fail.
@@ -242,5 +311,7 @@ int main(int argc,char **argv) {
     g_test_add_func("/notices/queued-literal",notices_are_queued_and_literal);
     g_test_add_func("/notices/preserve-reply",notice_preserves_pending_reply);
     g_test_add_func("/notices/parent-teardown",notices_close_with_parent);
+    g_test_add_func("/dialogs/rapid-teardown-with-recent-files",rapid_chooser_teardown_with_recent_files);
+    g_test_add_func("/dialogs/disposal-rejects-new-requests",disposal_rejects_new_requests);
     return g_test_run();
 }

@@ -909,6 +909,51 @@ Debian packages/Flatpak, dependency installation UX, signed public delivery and 
 remain later distribution work. Wayland, hardware graphics, physical audio/MIDI and accessibility
 still need their own qualification.
 
+### Native CI and GTK cancellation hardening
+
+Draft [PR #186](https://github.com/emmettl/driftbox-native/pull/186) now carries the Linux port.
+The first [Linux package workflow](https://github.com/emmettl/driftbox-native/actions/runs/36265515264)
+passes on both native Ubuntu 24.04 architectures, including clean-runtime installation, upgrade,
+relocation, graphical launch and uninstall. Both archive/checksum artifacts were uploaded.
+The full CI run also exposed an Android link regression: the new shared failure messages used
+`Error.localizedDescription`, whose implementation belongs to the legacy Foundation overlay that
+Android deliberately does not link. `FailureMessage.describe` uses the error's own `LocalizedError`
+message or textual description on Android, and retains Foundation's localized description on the
+other platforms. Two focused message tests pass locally; Android's existing link check validates
+the dependency boundary in CI.
+
+GTK file chooser construction is now deferred until the next idle turn. The bridge owns copied
+request arguments and a cancellable source; disposing the desktop before presentation removes
+that source and reports cancellation exactly once, before GTK can start file-model work. Disposal
+also rejects any new file/folder/question/popup requested from a cancellation callback, and response
+handlers disconnect before destroying native dialogs. Normal initial-folder and Recent behavior
+are preserved. No fixed production delay or nested event loop is introduced.
+
+Thirteen native C checks pass locally on Xvfb/X11 and a private Sway/Wayland compositor. The new
+rapid-cancellation regression explicitly seeds recent-file history, runs in a fresh process, and
+checks that no GTK top-level windows remain after pending work drains. It covers open, multiple,
+save and folder requests. The Swift executable's smoke now checks cancellation both before and
+after presentation; the updated X11 smoke passes with 359 GUI frames. The Ubuntu 24.04 **Linux GTK
+lifetime** CI job repeats the C checks on both display backends.
+
+```sh
+# Development test tools: libgtk-4-dev, gcc, pkg-config, dbus-x11, sway and wtype.
+scripts/test-linux-wayland.sh
+# Optional diagnostic: currently fails menu switching on the affected GTK/compositor stack.
+DRIFTBOX_TEST_MENUS=1 scripts/test-linux-wayland.sh
+```
+
+The Wayland test starts its own compositor, session bus and temporary home. It does not need the
+real GNOME session unlocked. GTK's existing already-presented chooser Recent/Search teardown
+fault remains outside the early-cancellation fix. The standalone menu switch diagnostic also
+fails under isolated Sway, so the earlier result is not specific to UTM keyboard injection or the
+live GNOME session. Keep the XWayland preview workaround and do not claim native Wayland release
+qualification. A normal-folder startup experiment avoided one callback path but exposed another
+GTK cancellation fault and was discarded; it is not part of the implementation.
+
+Guest logs: `~/driftbox-dialog-{investigation,hardening,regression-before,app-smoke}.log`,
+`~/driftbox-wayland-hardening.log`, and `~/driftbox-portable-error-tests.log`.
+
 ### Local access
 
 The VM uses UTM Shared Network. Its first assigned address is `192.168.64.2`; discover the current

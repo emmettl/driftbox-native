@@ -82,6 +82,19 @@ jobs:
       - name: Audio targets stay constrained
         run: scripts/check-constrained.sh
 
+  linux-gtk:
+    name: Linux GTK lifetime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: GTK and private display test tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc pkg-config libgtk-4-dev xvfb xauth dbus-x11 sway wtype
+      - name: X11 dialogs
+        run: scripts/test-linux-dialogs.sh
+      - name: Native Wayland dialogs
+        run: scripts/test-linux-wayland.sh
+
   # Whether a change can reach the Windows build, since a Windows minute costs twice a Linux one.
   # It can unless every file changed is in something that compiles to nothing there — the Mac app,
   # the Metal backend, GLES, the Android app and its C modules, all behind `#if`s Windows fails —

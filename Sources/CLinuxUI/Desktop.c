@@ -18,7 +18,7 @@ struct db_desktop {
     GFile *folder;
     GMainLoop *loop;
     GSimpleActionGroup *actions;
-    guint source;
+    guint source, dialog_source;
     void (*drain)(void *);
     void *context, *reply_context;
     db_reply reply;
@@ -291,6 +291,7 @@ void db_desktop_free(db_desktop *w) {
         w->notice=NULL;
     }
     if (w->notices) { g_queue_free_full(w->notices,g_free); w->notices=NULL; }
+    if (w->dialog_source) { g_source_remove(w->dialog_source); w->dialog_source=0; }
     if (w->dialog) g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_CANCEL);
     dismiss_popup(w);
     reply(w,0,"");
@@ -344,42 +345,71 @@ static void file_response(GtkNativeDialog *dialog,int response,gpointer context)
         }
         g_object_unref(files);
     }
-    w->dialog=NULL; gtk_native_dialog_destroy(dialog); g_object_unref(dialog);
+    w->dialog=NULL; g_signal_handlers_disconnect_by_data(dialog,w);
+    gtk_native_dialog_destroy(dialog); g_object_unref(dialog);
     reply(w,response==GTK_RESPONSE_ACCEPT,uris->str); g_string_free(uris,TRUE);
 }
-void db_desktop_files(db_desktop *w,int save,int multiple,const char *extensions,const char *name,void *context,db_reply callback) {
-    if (w->reply) { callback(context,0,""); return; }
-    w->reply=callback; w->reply_context=context;
-    GtkFileChooserNative *dialog=gtk_file_chooser_native_new(save?"Save file":"Open file",GTK_WINDOW(w->window),
-        save?GTK_FILE_CHOOSER_ACTION_SAVE:GTK_FILE_CHOOSER_ACTION_OPEN,save?"Save":"Open","Cancel");
+typedef struct {
+    db_desktop *window;
+    gboolean save, multiple, folder;
+    char *title, *button, *extensions, *name;
+} FileRequest;
+static void file_request_free(gpointer context) {
+    FileRequest *request=context;
+    g_free(request->title); g_free(request->button); g_free(request->extensions); g_free(request->name);
+    g_free(request);
+}
+// Construct the chooser only when GTK dispatches the request. Closing a desktop in the same
+// turn cancels this source before any GTK file-model queries exist. No grace-period timer or
+// nested event loop is needed, and request strings remain owned until presentation/cancellation.
+static gboolean present_files(gpointer context) {
+    FileRequest *request=context; db_desktop *w=request->window;
+    w->dialog_source=0;
+    GtkFileChooserNative *dialog=gtk_file_chooser_native_new(request->title,GTK_WINDOW(w->window),
+        request->folder?GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER:
+        request->save?GTK_FILE_CHOOSER_ACTION_SAVE:GTK_FILE_CHOOSER_ACTION_OPEN,request->button,"Cancel");
     w->dialog=G_OBJECT(dialog);
     gtk_native_dialog_set_modal(GTK_NATIVE_DIALOG(dialog),TRUE);
-    gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog),multiple);
+    if (!request->folder) gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog),request->multiple);
     if (w->folder) gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog),w->folder,NULL);
-    if (save) gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog),name);
-    GtkFileFilter *filter=gtk_file_filter_new(); g_object_ref_sink(filter); gtk_file_filter_set_name(filter,extensions);
-    char **parts=g_strsplit(extensions,";",-1);
-    for (int i=0;parts[i];i++) { char *pattern=g_strconcat("*.",parts[i],NULL); gtk_file_filter_add_pattern(filter,pattern); g_free(pattern); }
-    g_strfreev(parts); gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog),filter); g_object_unref(filter);
-    g_signal_connect(dialog,"response",G_CALLBACK(file_response),w); gtk_native_dialog_show(GTK_NATIVE_DIALOG(dialog));
+    if (request->save) gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog),request->name);
+    if (!request->folder) {
+        GtkFileFilter *filter=gtk_file_filter_new(); g_object_ref_sink(filter);
+        gtk_file_filter_set_name(filter,request->extensions);
+        char **parts=g_strsplit(request->extensions,";",-1);
+        for (int i=0;parts[i];i++) {
+            char *pattern=g_strconcat("*.",parts[i],NULL); gtk_file_filter_add_pattern(filter,pattern); g_free(pattern);
+        }
+        g_strfreev(parts); gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog),filter); g_object_unref(filter);
+    }
+    g_signal_connect(dialog,"response",G_CALLBACK(file_response),w);
+    gtk_native_dialog_show(GTK_NATIVE_DIALOG(dialog));
+    return G_SOURCE_REMOVE;
+}
+void db_desktop_files(db_desktop *w,int save,int multiple,const char *extensions,const char *name,void *context,db_reply callback) {
+    if (w->disposing || w->reply) { callback(context,0,""); return; }
+    w->reply=callback; w->reply_context=context;
+    FileRequest *request=g_new0(FileRequest,1);
+    request->window=w; request->save=save; request->multiple=multiple;
+    request->title=g_strdup(save?"Save file":"Open file"); request->button=g_strdup(save?"Save":"Open");
+    request->extensions=g_strdup(extensions); request->name=g_strdup(name);
+    w->dialog_source=g_idle_add_full(G_PRIORITY_DEFAULT_IDLE,present_files,request,file_request_free);
 }
 void db_desktop_folder(db_desktop *w,const char *title,const char *button,void *context,db_reply callback) {
-    if (w->reply) { callback(context,0,""); return; }
+    if (w->disposing || w->reply) { callback(context,0,""); return; }
     w->reply=callback; w->reply_context=context;
-    GtkFileChooserNative *dialog=gtk_file_chooser_native_new(title,GTK_WINDOW(w->window),
-        GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,button,"Cancel");
-    w->dialog=G_OBJECT(dialog);
-    gtk_native_dialog_set_modal(GTK_NATIVE_DIALOG(dialog),TRUE);
-    if (w->folder) gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog),w->folder,NULL);
-    g_signal_connect(dialog,"response",G_CALLBACK(file_response),w); gtk_native_dialog_show(GTK_NATIVE_DIALOG(dialog));
+    FileRequest *request=g_new0(FileRequest,1);
+    request->window=w; request->folder=TRUE; request->title=g_strdup(title); request->button=g_strdup(button);
+    w->dialog_source=g_idle_add_full(G_PRIORITY_DEFAULT_IDLE,present_files,request,file_request_free);
 }
 static void question_response(GtkDialog *dialog,int response,gpointer context) {
     db_desktop *w=context; w->dialog=NULL;
+    g_signal_handlers_disconnect_by_data(dialog,w);
     gtk_window_destroy(GTK_WINDOW(dialog));
     reply(w,response==1?1:response==2?2:0,"");
 }
 void db_desktop_save_question(db_desktop *w,const char *name,void *context,db_reply callback) {
-    if (w->reply) { callback(context,0,""); return; }
+    if (w->disposing || w->reply) { callback(context,0,""); return; }
     w->reply=callback; w->reply_context=context;
     GtkWidget *dialog=gtk_message_dialog_new(GTK_WINDOW(w->window),GTK_DIALOG_MODAL,GTK_MESSAGE_QUESTION,GTK_BUTTONS_NONE,
         "Save changes to “%s”?",name);
@@ -392,7 +422,7 @@ static void popup_closed(GtkPopover *popover,gpointer context) {
     db_desktop *w=context; w->popover=NULL; reply(w,0,""); gtk_widget_unparent(GTK_WIDGET(popover));
 }
 void db_desktop_popup(db_desktop *w,db_menu *menu,double x,double y,void *context,db_reply callback) {
-    if (w->reply) { callback(context,0,""); return; }
+    if (w->disposing || w->reply) { callback(context,0,""); return; }
     w->reply=callback; w->reply_context=context;
     w->popover=gtk_popover_menu_new_from_model((GMenuModel *)menu); gtk_widget_set_parent(w->popover,w->area);
     GdkRectangle point={(int)x,(int)y,1,1}; gtk_popover_set_pointing_to(GTK_POPOVER(w->popover),&point);
