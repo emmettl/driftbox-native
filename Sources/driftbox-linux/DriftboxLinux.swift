@@ -87,7 +87,8 @@
       defer { probe.cancel() }
       try desktop!.run()
       if smoke {
-        guard session.song != nil, desktop?.showsRack == true,
+        guard session.song != nil, !rack.patch.modules.isEmpty, !ModuleFace.shelves.isEmpty,
+          desktop?.showsRack == true,
           window.frames > (rackAt ?? window.frames) + 2,
           silent || (played && (route?.renderedFrames ?? 0) > 48000),
           route?.error == nil

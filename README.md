@@ -892,10 +892,13 @@ Technologies GmbH.
 
 ## Linux development
 
-Linux already exercises the shared Swift code and offscreen GLES backend in CI. A native Linux
-desktop application is now planned in [docs/LINUX.md](docs/LINUX.md), including the VM setup,
-architecture experiments and release acceptance criteria. In a Linux checkout,
-`scripts/linux-build.sh` provides build, test, render and benchmark entry points. Inside a signed-in
-Linux audio session, `scripts/linux-build.sh play conformance/fixtures/documents/acid.song.json
---seconds 10` plays through PipeWire's default output. The Linux window and device-management
-adapters are still to come.
+Linux runs the shared groovebox and rack through a native GTK 4/Pango shell, GLES renderer,
+PipeWire audio and ALSA MIDI adapters. The Ubuntu ARM64 development VM, architecture work,
+validation and remaining release criteria are recorded in [docs/LINUX.md](docs/LINUX.md).
+Inside a Linux checkout, `scripts/linux-build.sh` provides build, test, render, playback and
+`desktop` entry points. The Ubuntu VM currently uses XWayland for a native Wayland menu issue.
+
+`scripts/linux-package.py` packages a release desktop build with its Swift runtime and resources.
+The extracted [Linux preview](linux/README.md) runs without a compiler and supports per-user app-menu
+registration. ARM64 Ubuntu is qualified as a development preview; other distributions, x86-64,
+physical audio/MIDI hardware and the remaining desktop interactions still need validation.

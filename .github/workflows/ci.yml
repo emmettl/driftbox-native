@@ -54,7 +54,7 @@ jobs:
       LIBGL_ALWAYS_SOFTWARE: 1
     steps:
       - name: Linux graphics and audio development libraries
-        run: apt-get update && apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri libpipewire-0.3-dev libasound2-dev libgtk-4-dev fonts-dejavu-core xvfb xauth
+        run: apt-get update && apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri libpipewire-0.3-dev libasound2-dev libgtk-4-dev fonts-dejavu-core xvfb xauth desktop-file-utils shared-mime-info python3-gi
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
@@ -64,7 +64,7 @@ jobs:
         run: swift format lint --strict -r Sources Tests Package.swift
       # The release scripts' checks, which sign, upload and publish nothing.
       - name: Release scripts
-        run: python3 scripts/test-release.py && python3 scripts/test-android-release.py
+        run: python3 scripts/test-release.py && python3 scripts/test-android-release.py && python3 scripts/test-linux-package.py
       - name: Test
         run: swift test
         # Strict actor isolation, as an app runs with: a closure made on the main actor and called

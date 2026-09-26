@@ -14,7 +14,8 @@ Target Ubuntu 24.04 LTS first. Test both Wayland and X11 before claiming support
 PipeWire powers both the command-line player and the first shared desktop executable. GTK 4/Pango
 provide its shell/text adapters and GLES the renderer. ALSA sequencer supplies the native MIDI backend.
 The desktop now renders the existing groovebox and rack and passes a live audio capture test;
-interactive shell qualification and release packaging remain. Do not introduce a second UI or engine.
+a relocatable preview now packages its runtime and resources. Interactive shell qualification and
+fresh-machine release validation remain. Do not introduce a second UI or engine.
 
 ## What already exists
 
@@ -239,7 +240,7 @@ without rendering produces a diagnostic and nonzero exit. Duration expiry, Ctrl-
 perform orderly teardown. This is a CLI baseline, not yet the full `AudioRouting` adapter: device
 listing/selection, automatic recovery, measured output latency and underrun reporting are pending.
 The desktop now uses the device-aware `AudioRouting` adapter described below. Native MIDI is also
-implemented below. Packaging remains pending; the rack uses its existing WAV decoder.
+implemented below. The preview packaging is described below; the rack uses its existing WAV decoder.
 
 ### Audio validation
 
@@ -576,6 +577,58 @@ drag/drop check.
 
 Guest logs: `~/driftbox-desktop-{release,final-tests,capture,silent}.log`,
 `~/driftbox-gtk-files-tests.log` and `~/driftbox-desktop-files-{tests,build,smoke,preview}.log`.
+
+### Relocatable preview package
+
+Build and package inside the Linux VM (Python 3.11 or later for packaging):
+
+```sh
+PATH="$HOME/.local/share/driftbox-toolchains/swift-6.4.0-RELEASE/usr/bin:$PATH" \
+  swift build --scratch-path .build-linux -c release -j 4 --product driftbox-linux
+python3 scripts/linux-package.py
+python3 scripts/test-linux-package.py
+```
+
+The packager writes an extracted folder and `.tar.gz` under `dist/linux`, named by version,
+architecture and executable hash. It refuses to overwrite an existing output. `--build-dir`,
+`--toolchain` and `--output` allow alternate locations. It inspects a trusted local executable with
+`ldd`; do not use it on an untrusted download. It copies the transitive Swift runtime dependency
+closure, the two SwiftPM `.bundle` directories, the existing Driftbox icon and runtime notices.
+A manifest records file hashes, architecture, Swift/build OS versions and bundled/system libraries.
+GTK, Pango, graphics drivers, PipeWire, ALSA and other distribution libraries stay system dependencies.
+Runtime notices are pinned to Swift 6.4.0; changing toolchains requires requalification.
+
+The `Driftbox` launcher finds libraries beside itself, preserves file arguments and working
+directory, and enables strict Swift actor checks. `--x11` selects the tested VM workaround.
+`python3 install.py --x11` registers the extracted folder in place in the user's app menu and adds
+`.driftbox` MIME recognition with an Open With handler. It does not select a default handler or
+claim generic JSON files. Registration needs `desktop-file-utils` and `shared-mime-info` and runs
+without sudo. `--uninstall` removes only owned registration entries, preserving the bundle,
+documents and Foundation preferences. See [the bundled guide](../linux/README.md).
+
+Nine Python checks pass on Ubuntu, including real GIO desktop-entry launch with spaces, quotes,
+dollar signs, backticks and backslashes in the executable path; file argument forwarding; launcher
+environment/cwd; upgrade ownership; foreign/modified entry protection; symlink rejection; and
+incomplete bundles. CI runs these checks with desktop-file-utils and Python GObject bindings.
+
+The 2026-09-26 ARM64 archive is 29.3 MiB compressed, with 15 runtime libraries. Its archive was
+extracted separately and tested inside a temporary Bubblewrap mount namespace with all of `/home`
+hidden (including both the source checkout and Swift toolchain), a fresh HOME, and the bundle mounted
+at a path with spaces. `ldd` resolved the runtime from the bundle without missing libraries. The
+silent Xvfb/llvmpipe test loads the song, requires a populated rack and module picker, draws the rack
+and closes normally (256 GUI frames). The namespace changes only the test process's filesystem view;
+it does not rename, delete or alter the actual development home. This proves relocation and resource/runtime
+independence on the existing Ubuntu installation, not fresh-machine or cross-distribution support.
+
+The final package `Driftbox-0.1.0-preview-arm64-1ce5b839fb3d` is installed under the guest's
+`~/Applications` and registered as **Driftbox Linux Preview** with `--x11`. All 67 manifest file
+hashes match. Live PipeWire capture from that installed bundle verified 280,576 stereo frames at
+48 kHz, finite samples and peaks of 0.67445; the app rendered 282,624 audio frames and 242 GUI frames.
+Ubuntu's app search displays the Driftbox icon and launches the installed app successfully, restoring
+Acieed with playback stopped. Process mappings confirm Swift and ICU are loaded from the installed
+bundle. The running-window dock icon still uses GTK's generic icon; application identity/dock grouping
+needs a follow-up. Logs: `~/driftbox-package-final-isolated.log`,
+`~/driftbox-package-audio-capture.log`, and `~/driftbox-package-build.log`. Remote CI has not run.
 
 ### Local access
 

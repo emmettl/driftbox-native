@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+app_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+case "$app_dir" in *:*) echo 'Move Driftbox to a directory without a colon in its path.' >&2; exit 64;; esac
+if [ "${1:-}" = --x11 ]; then
+    export GDK_BACKEND=x11 EGL_PLATFORM=x11
+    shift
+fi
+export LD_LIBRARY_PATH="$app_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6
+exec "$app_dir/driftbox-linux" "$@"
