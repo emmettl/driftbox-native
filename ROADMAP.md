@@ -601,8 +601,10 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    comes back as the window's events and is done as a hand does it. Held to Windows' own UI
    Automation client from a process of its own, as a screen reader is, and to the real app read and
    played that way. The rack is described as well: the header, every module's controls as its
-   face names them, and the cables on its back as words. Next: moving between the controls with the
-   keyboard, then patching the back and a Combinator's routings from a screen reader.
+   face names them, and the cables on its back as words. And while a screen reader runs, the
+   keyboard moves between the controls — Tab, Enter, the arrows — with UI Automation told where it
+   is. Next: patching the back and a Combinator's routings from a screen reader, and trying it all
+   with Narrator and NVDA themselves.
    The rack comes by way of `DriftboxRackSession`, which holds what the Mac's `RackModel` did —
    the patch, its edits and undo, the keys, controllers, samples, song and transport — on every
    platform, with the Mac's audio, plug-ins and file reading behind ports: `AudioRouting`,

@@ -71,6 +71,10 @@ public final class Desktop {
   let makeVisualsSurface: ((any ShellVisualsWindow) throws -> any GPUSurface)?
   /// When what is on screen was last told to a screen reader.
   var describedAt = -Double.infinity
+  /// The control the keyboard is on, while a screen reader runs, by its id; and where it was when
+  /// last told, to ring it.
+  var focused: String?
+  var focusFrame: SIMD4<Float>?
   /// The song file last seen open, to notice another being opened or saved as.
   var lastFile: URL?
   /// The displays there were when last asked, and when.
@@ -174,6 +178,7 @@ public final class Desktop {
       try canvas.begin(width: target.width, height: target.height)
       canvas.scale(window.scale, window.scale)
       rackInterface.draw(on: canvas)
+      drawFocus(on: canvas)
       presenter.overlay(canvas.finish(), into: target, on: device)
       return
     }
@@ -181,6 +186,7 @@ public final class Desktop {
     try canvas.begin(width: target.width, height: target.height)
     canvas.scale(window.scale, window.scale)
     interface.draw(on: canvas)
+    drawFocus(on: canvas)
     presenter.overlay(canvas.finish(), into: target, on: device)
   }
 
@@ -205,7 +211,8 @@ public final class Desktop {
     if let activity { title = "\(activity) - \(title)" }
     if window.title != title { window.title = title }
     window.menuBar = DesktopMenus.bar(
-      for: session, rack: rack, showsRack: showsRack, writingMovie: movieProgress != nil,
+      for: session, rack: rack, showsRack: showsRack, screenReader: keyboardNavigates,
+      writingMovie: movieProgress != nil,
       displays: makeVisualsSurface == nil ? [] : displaysNow, visualsWindow: makeVisualsSurface != nil,
       recent: memory == nil ? nil : recentTitles)
   }
@@ -220,6 +227,14 @@ public final class Desktop {
   // MARK: - What the window hears
 
   func handle(_ event: ShellEvent) {
+    // With a screen reader, the keyboard moves between the controls first, and where a screen reader
+    // moves it is the window's to keep.
+    if case .key(let key) = event, navigate(key) { return }
+    if case .accessibility(.focus(let id)) = event {
+      focused = id
+      describeNow()
+      return
+    }
     if showsRack, handleRack(event) { return }
     switch event {
     case .command(let id):
@@ -243,8 +258,7 @@ public final class Desktop {
     case .accessibility(let action):
       _ = interface.perform(action)
     case .describe:
-      describedAt = -.infinity
-      describe(at: HostTime.seconds(from: began, to: HostTime.now()), asked: true)
+      describeNow()
     }
   }
 

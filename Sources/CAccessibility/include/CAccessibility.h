@@ -37,7 +37,8 @@ typedef struct DBAXNode {
   int32_t toggle;
 } DBAXNode;
 
-/// What a screen reader asked: 0 press, 1 set to `value`, 2 a notch up, 3 a notch down.
+/// What a screen reader asked: 0 press, 1 set to `value`, 2 a notch up, 3 a notch down, 4 the
+/// keyboard's focus moved to it.
 typedef void (*DBAXAct)(void *context, const char *id, int32_t action, double value);
 
 typedef struct DBAX DBAX;
@@ -50,6 +51,9 @@ void dbax_destroy(DBAX *ax);
 /// What is on screen now: `count` nodes, as `DBAXNode` says. Screen readers listening are told
 /// what changed since the last.
 void dbax_update(DBAX *ax, const DBAXNode *nodes, int32_t count);
+
+/// The control the keyboard is on, by its id; null for none. Screen readers are told when it moves.
+void dbax_focus(DBAX *ax, const char *id);
 
 /// The answer to `WM_GETOBJECT` with these parameters, when it asks for UI Automation's root; 0
 /// otherwise, for the window's procedure to leave to Windows.

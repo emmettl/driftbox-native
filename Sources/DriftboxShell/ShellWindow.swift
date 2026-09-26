@@ -63,6 +63,12 @@ public protocol ShellWindow: AnyObject {
   /// What is on screen now, for the platform's accessibility: handed over as often as it changes
   /// while `isDescribed`. Asked of it, the window answers with `.accessibility` events.
   func describe(_ root: AccessibilityNode)
+  /// The control the keyboard is on, by its id in what was described, or nil for none: screen
+  /// readers are told when it moves.
+  func focus(_ id: String?)
+  /// Whether the person has a screen reader running, as the platform says: the keyboard then moves
+  /// between the controls rather than playing.
+  var screenReaderIsOn: Bool { get }
   /// The displays attached, by name, the main one first: where a visuals window can go.
   var displays: [String] { get }
   /// A window for the visuals alone, not yet shown; nil where the platform has no second window.
@@ -118,6 +124,8 @@ extension ShellWindow {
   /// Nobody, where a platform's window has no accessibility of its own yet.
   public var isDescribed: Bool { false }
   public func describe(_ root: AccessibilityNode) {}
+  public func focus(_ id: String?) {}
+  public var screenReaderIsOn: Bool { false }
 
   /// None, where a platform has one screen, or will not say.
   public var displays: [String] { [] }
