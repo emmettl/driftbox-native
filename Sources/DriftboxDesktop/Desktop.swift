@@ -52,7 +52,11 @@ public final class Desktop {
   /// `showsRack`.
   public let rack: RackSession?
   public let rackInterface: RackInterface?
-  public internal(set) var showsRack = false
+  /// While the rack shows, it is the one in front: the MIDI that arrives is its to play, as the
+  /// Mac's is while its window is key.
+  public internal(set) var showsRack = false {
+    didSet { rack?.inFront = showsRack }
+  }
   /// The audio being written by the last export, rendered off the main thread.
   var exporting: Task<Void, Never>?
   /// The movie being written, and how far it has got from 0 to 1; nil while none is.
@@ -97,6 +101,8 @@ public final class Desktop {
     rackInterface = rack.map(RackInterface.init)
     // The rack lets go of a song it had linked here, as when another patch is opened in it.
     rack?.onUnlinkSong = { [weak session] in session?.unlinkRack() }
+    // The MIDI that arrives is the rack's while it shows, and the groovebox's otherwise.
+    session.midiListener = rack
     self.window = window
     self.device = device
     self.surface = surface

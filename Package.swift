@@ -284,7 +284,7 @@ let package = Package(
       name: "DriftboxDesktopTests",
       dependencies: [
         "DriftboxDesktop", "DriftboxInterface", "DriftboxRackSession", "DriftboxSession", "DriftboxShell",
-        "DriftboxGPU",
+        "DriftboxEngine", "DriftboxGPU",
         "DriftboxHost", "DriftboxSeq",
         "DriftboxText", "DriftboxDocument", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxGPUGLES",
         "DriftboxMovie",
