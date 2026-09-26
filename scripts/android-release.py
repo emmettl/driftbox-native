@@ -21,6 +21,9 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 MINIMUM_SDK = 29
+# The oldest Android a release may be built for: Google Play's floor for new apps and updates, which
+# rises every August. scripts/android-app.sh names what it is built for.
+MINIMUM_TARGET_SDK = 36
 PASSWORD = "DRIFTBOX_ANDROID_KEYSTORE_PASS"
 
 
@@ -44,9 +47,11 @@ def built_version(badging):
     """What `aapt2 dump badging` says the APK is."""
     package = re.search(r"package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'", badging)
     sdk = re.search(r"minSdkVersion:'(\d+)'", badging)
-    if not package or not sdk:
+    target = re.search(r"targetSdkVersion:'(\d+)'", badging)
+    if not package or not sdk or not target:
         raise ValueError("The APK does not say what it is.")
-    return {"applicationId": package[1], "build": package[2], "version": package[3], "minimumSdk": int(sdk[1])}
+    return {"applicationId": package[1], "build": package[2], "version": package[3], "minimumSdk": int(sdk[1]),
+            "targetSdk": int(target[1])}
 
 
 def signing(keystore, alias):
@@ -141,6 +146,13 @@ def release(args):
         raise ValueError("The APK does not carry the release's version and build.")
     if carried["minimumSdk"] != MINIMUM_SDK:
         raise ValueError("Update the release requirements before changing the minimum Android version.")
+    if carried["targetSdk"] < MINIMUM_TARGET_SDK:
+        raise ValueError(f"The APK targets Android {carried['targetSdk']}, older than Google Play takes.")
+    # A release is built without the checks, whose MIDI device every other app would list.
+    manifest = run(tool(build_tools, "aapt2"), "dump", "xmltree", "--file", "AndroidManifest.xml",
+                   str(built / "aligned.apk"), capture=True)
+    if "LoopbackService" in manifest:
+        raise ValueError("The APK has the checks in it: build it with android-app.sh bundle.")
 
     dist.mkdir(exist_ok=True)
     apk_signing, bundle_signing = signing(keystore, args.alias)

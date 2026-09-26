@@ -126,10 +126,13 @@ The password is asked for, or read from `DRIFTBOX_ANDROID_KEYSTORE_PASS`. It rea
 and `jarsigner` through their environment, never their command lines. `prepare`:
 
 - lints, checks the constrained targets, and runs the suite, unless `--skip-tests`;
-- builds with `scripts/android-app.sh bundle`: the APK aligned for 16 KB pages, and the same pieces
+- builds with `scripts/android-app.sh bundle`, which leaves out the phone's tests and the MIDI
+  loopback they use: the APK aligned for 16 KB pages, and the same pieces
   laid out as a bundle's base module and made into an App Bundle by `bundletool`, native libraries
   kept uncompressed and split by ABI;
-- checks that the APK carries the release's version and build, and the minimum Android version;
+- checks that the APK carries the release's version and build, the minimum Android version, a
+  target Android that Google Play takes (`MINIMUM_TARGET_SDK`, which Play raises every August, and
+  `target_sdk` in `scripts/android-app.sh`, which builds for it), and none of the tests;
 - signs the APK with v2 and v3 signatures (no v4 `.idsig`, which is for `adb` streaming) and
   verifies it;
 - signs the bundle with `jarsigner`, as Google Play asks, verifies it, and has `bundletool` validate

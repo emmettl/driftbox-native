@@ -395,7 +395,7 @@ choices, its catalogue of patches, and the keys playing it, heard beside the gro
 **Help.** Help ▸ Groovebox Guide and Rack Guide, and F1 for the one showing, draw the guide over
 the window: `DriftboxHelp`'s words for Windows, saying what the drawn app's own chips, right-click
 menus, menu bar and keys do, a tab for each topic, scrolled by the wheel and the keys and put away
-with Esc. A screen reader reads it as it reads the controls. `HelpView` lays it out on the canvas,
+with Esc. A screen reader reads it as it reads the controls. `HelpSheet` lays it out on the canvas,
 so Android can show the same pages.
 
 **Screen readers.** The controls are drawn, not windows of their own, so the app describes them to
@@ -523,11 +523,14 @@ scaled up to the screen: on a Fairphone 6, which has three, every scene but Fros
 display's 120 frames a second, and Frost 98. Graphic Lab, which sets its type there with Android's
 own text stack, takes 5.6ms a frame drawn, and more over its first frames at a size, while the
 glyphs it sets go into its atlas. Given a test's name, the app runs that instead and says what
-happened.
+happened; a release has no tests in it, nor the MIDI loopback they test against, which every
+other app on the phone would list. Its icon is an adaptive one, drawn as vectors, the Mac's and the
+web's picture placed as the web's maskable icon places it: `scripts/android-icon.mjs` writes it.
 
 ```bash
 scripts/android-app.sh                  # build and install; open it for Pulse, playing acid
-scripts/android-app.sh build            # build only, with no phone: what CI does
+scripts/android-app.sh build            # build only, with no phone
+scripts/android-app.sh release          # build it as it is released, without the tests: what CI does
 scripts/android-app.sh bundle           # and an App Bundle beside it, for Google Play
 adb shell am start -n app.driftbox/.Main --es song smallhours --es scene hothouse
 scripts/android-app.sh midi-loopback    # test the MIDI ports against the app's own loopback

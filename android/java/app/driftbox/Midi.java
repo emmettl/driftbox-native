@@ -14,9 +14,11 @@ import java.util.Map;
 /**
  * Every MIDI device Android has, opened and handed to Swift as it comes, and taken back as it
  * goes. Android's native MIDI plays through a device but cannot find or open one; this is the
- * part that can, and all of it. Everything after the handing over is Swift's.
+ * part that can, and all of it. Everything after the handing over is Swift's. A phone without
+ * MIDI has no manager to ask, and so no devices; the app plays on without them.
  */
 final class Midi {
+  /** Null on a phone without MIDI. */
   private final MidiManager manager;
   private final Handler handler = new Handler(Looper.getMainLooper());
   /** Open devices by Java's ID, kept open for as long as Swift has them. Main thread only. */
@@ -29,6 +31,7 @@ final class Midi {
   @SuppressWarnings("deprecation")
   Midi(Context context) {
     manager = context.getSystemService(MidiManager.class);
+    if (manager == null) return;
     manager.registerDeviceCallback(
         new MidiManager.DeviceCallback() {
           @Override

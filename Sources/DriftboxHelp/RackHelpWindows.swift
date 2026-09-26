@@ -31,7 +31,7 @@ extension RackHelp {
               HelpStep(
                 "Drag from a jack to a jack.", "A basic path is a source, a filter or an effect, then an Out."
               ),
-              HelpStep("Play it", "on the typing keys, or from a sequencer module."),
+              HelpStep("Play it", "on the typing keys, from a sequencer module, or from a MIDI keyboard."),
             ])),
           HelpPart(
             "Front, back and header",
@@ -224,7 +224,8 @@ extension RackHelp {
                 "Seq and Tracker",
                 "Steps of pitch and gate. The Arranger changes scenes over bars; the Arp, Chord Player, Scale "
                   + "Player and Note Echo change notes."),
-              HelpTerm("MIDI", "Notes from the typing keys, as pitch, gate and velocity, a voice each."),
+              HelpTerm(
+                "MIDI", "Notes from the keys or a keyboard, as pitch, gate and velocity, a voice each."),
               HelpTerm(
                 "Mixers and Out",
                 "A Mixer or a Line Mixer brings paths together; an Out is where sound leaves. The VU Meter and the "
@@ -241,6 +242,10 @@ extension RackHelp {
                 "Typing keys",
                 "Two rows, from Z and from Q, with the black keys above each, while the rack shows; comma and full "
                   + "stop move the octave, and the header says where it is."),
+              HelpTerm(
+                "A MIDI keyboard",
+                "Plays the rack while it shows, and the groovebox otherwise; the MIDI menu says which inputs it "
+                  + "listens to. A Combinator's learn chip learns the next controller moved."),
               HelpTerm(
                 "Voices",
                 "The MIDI module decides pitch, gate and velocity for each voice. Without one, every voice gets the "
@@ -314,7 +319,8 @@ extension RackHelp {
                 "An empty sampler", "A Sampler with nothing loaded makes nothing. Drop a WAV file on it."),
               HelpTerm(
                 "Waiting for notes",
-                "The Arp and the Chord Player wait for notes from a MIDI module, played on the typing keys."),
+                "The Arp and the Chord Player wait for notes from a MIDI module, played on the keys or a keyboard."
+              ),
               HelpTerm(
                 "A Seq with no clock",
                 "A Seq has no clock inside it. Patch a Transport division or a Clock into it."),

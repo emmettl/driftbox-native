@@ -4,7 +4,8 @@
 #
 #     scripts/android-app.sh                    # build and install; it opens on Pulse, playing acid
 #     scripts/android-app.sh build              # build only, for a machine with no phone: CI
-#     scripts/android-app.sh bundle             # build, and an App Bundle for Google Play beside it
+#     scripts/android-app.sh release            # build what is released: without the checks below
+#     scripts/android-app.sh bundle             # a release, and an App Bundle for Google Play beside it
 #     scripts/android-app.sh midi-loopback      # and run the MIDI ports against Driftbox Loopback
 #     scripts/android-app.sh gpu                # or the GPU contract on the phone's GPU
 #     scripts/android-app.sh scenes             # or every scene drawn, checked and timed
@@ -13,15 +14,20 @@
 #
 # No Gradle: the SDK's own tools, in the order Gradle would call them. Beyond what
 # `android-env.sh` needs, a JDK (JAVA_HOME; or the newest under Programs/Java on Windows, and the
-# one `java_home` names on a Mac), and the Android SDK's build-tools and a platform, found where
-# `android-env.sh` finds the SDK.
+# one `java_home` names on a Mac), and the Android SDK's build-tools and the platform of
+# `target_sdk` below, found where `android-env.sh` finds the SDK.
 . "$(dirname "$0")/android-env.sh"
 # The version and build the Mac's release carries too: the build is Android's version code, which
 # only ever goes up.
 . scripts/version.env
 
 tools="$(newest "$android_sdk"/build-tools/*)"
-platform="$(newest "$android_sdk"/platforms/android-*)"
+# The Android the app is built for, which Google Play asks to be recent: named, rather than whichever
+# platform the machine has newest, so that what is released does not change with where it was built.
+target_sdk=36
+platform="$android_sdk/platforms/android-$target_sdk"
+# A release leaves out the checks: the harness `Main` runs a test in, and Driftbox Loopback.
+case "${1:-}" in release | bundle) checks=no ;; *) checks=yes ;; esac
 case $host in
   windows) export JAVA_HOME="${JAVA_HOME:-$(newest "$local_app_data"/Programs/Java/jdk-*)}" ;;
   macos) export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home 2>/dev/null || true)}" ;;
@@ -68,9 +74,24 @@ fi
 # Symbols are half of what the libraries weigh, and the NDK's libc++ comes with all of its own.
 for library in "$app"/stage/lib/arm64-v8a/*.so; do "$llvm/bin/llvm-strip$exe" --strip-unneeded "$library"; done
 
-# Java, to dex.
-javac --release 17 -Xlint:-options -classpath "$jar" -d "$app/classes" \
-  $(find android/java -name '*.java')
+# Java, to dex. A release's is without the loopback, and has `Checks` saying the harness is not
+# there, and its manifest is without the loopback's service.
+sources="$(find android/java -name '*.java')"
+manifest=android/AndroidManifest.xml
+if [ $checks = no ]; then
+  mkdir -p "$app/release/app/driftbox"
+  sed 's/INCLUDED = true;/INCLUDED = false;/' android/java/app/driftbox/Checks.java \
+    >"$app/release/app/driftbox/Checks.java"
+  sources="$(echo "$sources" | grep -v -e /Checks.java -e /LoopbackService.java) $app/release/app/driftbox/Checks.java"
+  manifest="$app/release/AndroidManifest.xml"
+  sed '/<!-- checks -->/,/<!-- end of checks -->/d' android/AndroidManifest.xml >"$manifest"
+  if ! grep -q "INCLUDED = false;" "$app/release/app/driftbox/Checks.java" || grep -q Loopback "$manifest"; then
+    echo "the checks could not be left out: see Checks.java, and the markers in the manifest" >&2
+    exit 1
+  fi
+fi
+# shellcheck disable=SC2086
+javac --release 17 -Xlint:-options -classpath "$jar" -d "$app/classes" $sources
 "$tools/d8$bat" --release --min-api 29 --lib "$jar" --output "$app/dex" \
   $(find "$app/classes" -name '*.class')
 cp "$app/dex/classes.dex" "$app/stage/"
@@ -84,8 +105,8 @@ cp "$app/dex/classes.dex" "$app/stage/"
 # aapt2 on Windows would name them with backslashes, which Android cannot find.
 cp -r Sources/DriftboxSession/Resources "$app/stage/assets/"
 cp -r Sources/DriftboxRackSession/Resources/. "$app/stage/assets/Resources/"
-"$tools/aapt2$exe" link -o "$app/unaligned.apk" -I "$jar" --manifest android/AndroidManifest.xml \
-  --min-sdk-version 29 --target-sdk-version "${platform##*android-}" \
+"$tools/aapt2$exe" link -o "$app/unaligned.apk" -I "$jar" --manifest "$manifest" \
+  --min-sdk-version 29 --target-sdk-version "$target_sdk" \
   --version-code "$DRIFTBOX_BUILD" --version-name "$DRIFTBOX_VERSION" "$app/resources.zip"
 (cd "$app/stage" && jar -uf0M ../unaligned.apk classes.dex lib assets)
 "$tools/zipalign$exe" -f -P 16 4 "$app/unaligned.apk" "$app/aligned.apk"
@@ -101,8 +122,8 @@ if [ "${1:-}" = bundle ]; then
   # folder beside the SDK). Unsigned: a release signs it with its upload key.
   bundletool="${DRIFTBOX_BUNDLETOOL:-$(newest "$(dirname "$android_sdk")"/bundletool/bundletool-all-*.jar)}"
   [ -f "$bundletool" ] || { echo "not found: bundletool (DRIFTBOX_BUNDLETOOL)" >&2; exit 1; }
-  "$tools/aapt2$exe" link --proto-format -o "$app/proto.zip" -I "$jar" --manifest android/AndroidManifest.xml \
-    --min-sdk-version 29 --target-sdk-version "${platform##*android-}" \
+  "$tools/aapt2$exe" link --proto-format -o "$app/proto.zip" -I "$jar" --manifest "$manifest" \
+    --min-sdk-version 29 --target-sdk-version "$target_sdk" \
     --version-code "$DRIFTBOX_BUILD" --version-name "$DRIFTBOX_VERSION" "$app/resources.zip"
   base="$app/base"
   rm -rf "$base" "$app/base.zip"
@@ -116,7 +137,7 @@ if [ "${1:-}" = bundle ]; then
     --config=android/bundle.json --overwrite
   echo "  driftbox.aab: ok ($(($(wc -c <"$app/driftbox.aab") / 1024)) KB)"
 fi
-if [ "${1:-}" = build ] || [ "${1:-}" = bundle ]; then
+if [ "${1:-}" = build ] || [ $checks = no ]; then
   echo "built $app/driftbox.apk"
   exit 0
 fi
