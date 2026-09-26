@@ -808,7 +808,9 @@ the rack; compressed recordings, through Android's own media codecs; and a table
 
 The [Linux port plan](docs/LINUX.md) separates the development VM from the application work.
 The shared engine and GLES contract tests already build on Linux. The first task is a reproducible
-ARM64 environment on external storage, followed by PipeWire playback and a real window.
+ARM64 environment on external storage, followed by PipeWire playback and a real window. The VM,
+Linux build tooling and default-output command-line playback now work; captured audio, source
+lifetime and shutdown/failure checks pass. Device management and the real window remain next.
 
 The shell experiment must prove event-loop/MainActor integration and toolkit-owned GLES contexts
 before the toolkit choice is final. Asynchronous dialogs and text/focus input may require shared

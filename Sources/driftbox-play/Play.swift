@@ -636,6 +636,22 @@
       route.detach(host.renderSource.context)
     }
   }
+#elseif os(Linux)
+  import Foundation
+  import Glibc
+
+  @main
+  struct Play {
+    @MainActor static func main() {
+      do {
+        try runLinuxPlayer(Array(CommandLine.arguments.dropFirst()))
+      } catch {
+        FileHandle.standardError.write(Data("driftbox-play: \(error)\n".utf8))
+        exit(1)
+      }
+    }
+  }
+
 #else
   import DriftboxDocument
   #if canImport(FoundationEssentials)
@@ -647,24 +663,13 @@
     import Glibc
   #endif
 
-  /// No player here yet — Linux has no route behind the ports — but the bench needs no device.
+  /// Platforms without an audio adapter can still run the benchmark without a device.
   ///
   ///     driftbox-play song.json --bench
   @main
   struct Play {
     static func main() throws {
       var arguments = Array(CommandLine.arguments.dropFirst())
-      #if os(Linux)
-        if arguments == ["--gpu-info"] {
-          do {
-            try reportLinuxGPU()
-          } catch {
-            print("GPU diagnostic failed: \(error)")
-            exit(1)
-          }
-          return
-        }
-      #endif
       guard let flag = arguments.firstIndex(of: "--bench"), arguments.count == 2 else {
         print("driftbox-play only benches here, with no device: driftbox-play <song.json> --bench")
         exit(64)

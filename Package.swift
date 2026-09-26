@@ -6,6 +6,12 @@ import PackageDescription
 // `scripts/check-constrained.sh` compiles them as Embedded Swift to prove it. It is a lint here,
 // not a product, though it is also what keeps a WebAssembly build of the same sources possible.
 
+#if os(Linux)
+  let pipeWirePkgConfig: String? = "libpipewire-0.3"
+#else
+  let pipeWirePkgConfig: String? = nil
+#endif
+
 let package = Package(
   name: "DriftboxKit",
   platforms: [.macOS(.v26), .iOS(.v26)],
@@ -19,6 +25,7 @@ let package = Package(
     .library(name: "DriftboxHostMac", targets: ["DriftboxHostMac"]),
     .library(name: "DriftboxHostWindows", targets: ["DriftboxHostWindows"]),
     .library(name: "DriftboxHostAndroid", targets: ["DriftboxHostAndroid"]),
+    .library(name: "DriftboxHostLinux", targets: ["DriftboxHostLinux"]),
     .library(name: "DriftboxGPU", targets: ["DriftboxGPU"]),
     .library(name: "DriftboxGPUD3D11", targets: ["DriftboxGPUD3D11"]),
     .library(name: "DriftboxShell", targets: ["DriftboxShell"]),
@@ -69,6 +76,15 @@ let package = Package(
         .target(name: "CAMidi", condition: .when(platforms: [.android])),
         .target(name: "CLooper", condition: .when(platforms: [.android])),
       ]),
+    // PipeWire's variadic SPA format macros and realtime callback live in a small C bridge.
+    .systemLibrary(
+      name: "CPipeWire", pkgConfig: pipeWirePkgConfig, providers: [.apt(["libpipewire-0.3-dev"])]),
+    .target(
+      name: "CPipeWireBridge",
+      dependencies: [.target(name: "CPipeWire", condition: .when(platforms: [.linux]))]),
+    .target(
+      name: "DriftboxHostLinux",
+      dependencies: ["DriftboxHost", .target(name: "CPipeWireBridge", condition: .when(platforms: [.linux]))]),
     // The Android app's native library: what `android/`'s Java calls, and the tests it runs on a
     // phone. Built into libdriftbox.so by `scripts/android-app.sh`; nothing off Android.
     .target(
@@ -214,7 +230,7 @@ let package = Package(
     // `@main` and nothing else, so that everything it starts can be reached from a test.
     .executableTarget(name: "Driftbox", dependencies: ["DriftboxApp"]),
     // A song document in, the speakers out: the engine as an Audio Unit in an AVAudioEngine on the
-    // Mac, a WASAPI stream behind `AudioRouting` on Windows, and an AAudio one on Android.
+    // Mac, a WASAPI stream behind `AudioRouting` on Windows, AAudio on Android, and PipeWire on Linux.
     .executableTarget(
       name: "driftbox-play",
       dependencies: [
@@ -223,6 +239,8 @@ let package = Package(
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostAndroid", condition: .when(platforms: [.android])),
+        .target(name: "DriftboxHostLinux", condition: .when(platforms: [.linux])),
+        .target(name: "CPipeWireBridge", condition: .when(platforms: [.linux])),
         .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxGPUMetal", condition: .when(platforms: [.macOS])),
         .target(name: "DriftboxGPUGLES", condition: .when(platforms: [.linux])),
@@ -233,6 +251,7 @@ let package = Package(
     // Finds and reads `conformance/fixtures` for every test target.
     .target(name: "ConformanceSupport", dependencies: ["DriftboxDocument"], path: "Tests/ConformanceSupport"),
 
+    .testTarget(name: "DriftboxHostLinuxTests", dependencies: ["DriftboxHostLinux", "DriftboxHost"]),
     .testTarget(name: "DriftboxDSPTests", dependencies: ["DriftboxDSP", "ConformanceSupport"]),
     .testTarget(
       name: "DriftboxSeqTests",

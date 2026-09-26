@@ -11,7 +11,7 @@ songs, run the built-in rack, save/reopen documents, import WAV samples, export 
 MIDI notes and clock. Linux plug-in hosting and publishing Driftbox as a plug-in are later work.
 
 Target Ubuntu 24.04 LTS first. Test both Wayland and X11 before claiming support for either.
-PipeWire is the proposed audio backend, ALSA sequencer the proposed MIDI backend, GTK 4/Pango the
+PipeWire now powers the command-line audio output; ALSA sequencer is the proposed MIDI backend, GTK 4/Pango the
 proposed shell/text stack, and GLES the existing renderer. The GTK decision remains provisional
 until the context and event-loop experiments below pass. Do not introduce a second UI or engine.
 
@@ -145,7 +145,7 @@ Choose a desktop password with `sudo passwd "$USER"`; the bootstrap deliberately
 After kernel upgrades, install the matching `linux-modules-extra` package again, or use Ubuntu's
 `linux-image-generic` metapackage to track the complete kernel and modules together.
 
-Run `scripts/linux-build.sh doctor`, `build`, `gpu`, `test`, `bench`, or `render` **inside Linux**.
+Run `scripts/linux-build.sh doctor`, `build`, `gpu`, `test`, `play`, `bench`, or `render` **inside Linux**.
 `gpu` invokes `driftbox-play --gpu-info`, reports the actual GLES renderer and verifies a red
 render target reads back as BGRA. It does not claim window or hardware-acceleration support.
 Use `DRIFTBOX_BUILD_JOBS=4` initially. The script leaves macOS/Windows builds untouched and keeps
@@ -201,11 +201,66 @@ Validation in Ubuntu ARM64:
 The signed-in session runs PipeWire, WirePlumber and RTKit. Installing the missing HDA kernel
 module replaced Dummy Output with Built-in Audio Analog Stereo. `pw-play` successfully sent the
 two-second offline render to that output; audible playback at the Mac speakers is not independently
-confirmed. No Linux Driftbox audio or desktop adapter is implemented yet.
+confirmed. The native PipeWire command-line adapter described below is now implemented; the Linux
+desktop shell is still to come.
 
 macOS `driftbox-play` also builds successfully with its scratch directory on StudioData.
 Swift formatting, shell syntax and `git diff --check` pass; both provisioning/build scripts refuse
 to run on macOS. The existing Linux CI job now invokes `--gpu-info`; remote CI has not run yet.
+
+## Live command-line audio
+
+`DriftboxHostLinux.PipeWireOutput` now plays the existing `Mixer` and `RenderSource` through
+PipeWire's default output. Run these commands **inside the signed-in Linux guest**:
+
+```sh
+cd ~/driftbox-native
+scripts/linux-build.sh play conformance/fixtures/documents/acid.song.json --seconds 10
+# Omit --seconds to play until Ctrl-C; --start-bar and the existing --bench also work.
+```
+
+The player renders stereo float audio at 48 kHz; PipeWire handles conversion to the graph/device
+rate. The C bridge negotiates the stream and interleaves preallocated planar buffers. It splits
+large callback requests into at most 4096-frame chunks. The realtime callback performs no explicit
+allocation, logging, locking or actor dispatch. Its Swift entry point is outside the main actor;
+strict executor checks stay enabled during validation. Only control operations use the main actor.
+
+Before changing mixer sources, a lock-free atomic gate disables rendering and the control thread
+waits for any source callback already in flight. This keeps owners alive until detach is safe,
+even if the graph has stopped requesting buffers. Destruction stops the PipeWire loop and destroys
+the stream before releasing callback storage. A source with a different rate is rejected.
+
+Startup requires a streaming output within five seconds. A disconnected stream or three seconds
+without rendering produces a diagnostic and nonzero exit. Duration expiry, Ctrl-C and SIGTERM
+perform orderly teardown. This is a CLI baseline, not yet the full `AudioRouting` adapter: device
+listing/selection, automatic recovery, measured output latency and underrun reporting are pending.
+The GUI, MIDI, sample import and packaging milestones remain unchanged.
+
+### Audio validation
+
+```sh
+DRIFTBOX_TEST_PIPEWIRE=1 scripts/linux-build.sh test --filter PipeWireTests
+python3 scripts/test-linux-play.py .build-linux/release/driftbox-play
+```
+
+The integration tests opt in because they need an active PipeWire session. Four passed under strict
+Swift actor isolation: invalid-rate rejection, detach/reattach/stop, source-owner lifetime with
+stream reopening, and detach while a test callback is deliberately still running. The test source
+can emit a brief constant signal; use a development output. Without the opt-in, the three live tests
+are skipped and the invalid-rate test still runs in CI.
+
+The Python smoke test creates an unconnected recorder (`--target=0`) and links only its child
+player's output ports, identified by client PID. It never links a microphone. The capture contained
+146,432 stereo frames at 48 kHz, finite samples and peaks of 0.67445 on both channels. The player
+rendered 144,384 frames before stopping; the recorder also includes boundary silence. Both stop
+signals passed, as did removal of the player's own stream, a nonexistent server and invalid
+duration arguments. Missing-server and lost-stream cases exited 1 without a crash. Logs are
+`~/driftbox-pipewire-{build,tests,smoke}.log`. The Mac player build also passed.
+
+These checks verify live rendering and safe ownership in this ARM64 VM. They do not establish
+physical speaker output, sustained glitch-free playback, measured latency, x86-64 behavior or
+real-device hotplug recovery. The next application milestone is the shell/context/concurrency
+experiment, while audio device management can build on this stream implementation.
 
 ### Local access
 

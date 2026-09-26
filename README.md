@@ -895,4 +895,7 @@ Technologies GmbH.
 Linux already exercises the shared Swift code and offscreen GLES backend in CI. A native Linux
 desktop application is now planned in [docs/LINUX.md](docs/LINUX.md), including the VM setup,
 architecture experiments and release acceptance criteria. In a Linux checkout,
-`scripts/linux-build.sh` provides the initial build, test, render and benchmark entry points.
+`scripts/linux-build.sh` provides build, test, render and benchmark entry points. Inside a signed-in
+Linux audio session, `scripts/linux-build.sh play conformance/fixtures/documents/acid.song.json
+--seconds 10` plays through PipeWire's default output. The Linux window and device-management
+adapters are still to come.
