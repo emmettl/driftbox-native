@@ -1,6 +1,7 @@
 /// The rack's guide on Android: the reference's topics, saying what the rack does under a finger —
-/// its chips, pinching and panning, a finger held down for a module's menu, its keys across the foot
-/// — and leaving out what it has not got: plug-ins, live input, a keyboard's keys.
+/// its chips, pinching and panning, a finger held down for a module's menu, its keys across the foot,
+/// a MIDI keyboard, undo in the patch's menu — and leaving out what it has not got: plug-ins, live
+/// input, typing keys.
 extension RackHelp {
   static let android = HelpGuide(
     title: "Rack guide",
@@ -30,7 +31,8 @@ extension RackHelp {
               HelpStep(
                 "Drag from a jack to a jack.", "A basic path is a source, a filter or an effect, then an Out."
               ),
-              HelpStep("Play it", "on the keys across the foot, or from a sequencer module."),
+              HelpStep(
+                "Play it", "on the keys across the foot, from a MIDI keyboard, or from a sequencer module."),
             ])),
           HelpPart(
             "Front, back and header",
@@ -115,6 +117,10 @@ extension RackHelp {
                 "Bypass and duplicate",
                 "Bypassed, a processor passes its input on untouched. A duplicate copies the settings and none of "
                   + "the cables."),
+              HelpTerm(
+                "Undo",
+                "Undo and Redo, in the patch's chip's menu, take back the rack's cables, moves and knobs, and say "
+                  + "which."),
             ])),
           HelpPart(
             "Controls",
@@ -215,7 +221,9 @@ extension RackHelp {
                 "Steps of pitch and gate. The Arranger changes scenes over bars; the Arp, Chord Player, Scale "
                   + "Player and Note Echo change notes."),
               HelpTerm(
-                "MIDI", "Notes from the keys across the foot, as pitch, gate and velocity, a voice each."),
+                "MIDI",
+                "Notes from the keys across the foot or a MIDI keyboard, as pitch, gate and velocity, a voice each."
+              ),
               HelpTerm(
                 "Mixers and Out",
                 "A Mixer or a Line Mixer brings paths together; an Out is where sound leaves. The VU Meter and the "
@@ -233,6 +241,10 @@ extension RackHelp {
                 "Across the foot of the screen, when the patch has a MIDI module; KEYS shows them, HIDE puts them "
                   + "away. A key struck lower plays louder, and several fingers play a chord."),
               HelpTerm("The octave", "‹ and › on the keys' row, and it says which C they start from."),
+              HelpTerm(
+                "A MIDI keyboard",
+                "Plays the rack while it shows, and the groovebox otherwise: over USB, or another app's MIDI. Its "
+                  + "bend, sustain pedal and other controllers reach the modules listening."),
               HelpTerm(
                 "Voices",
                 "The MIDI module decides pitch, gate and velocity for each voice. Without one, every voice gets the "
@@ -297,7 +309,8 @@ extension RackHelp {
                 "A Sampler with nothing loaded makes nothing. Tap it to choose a recording."),
               HelpTerm(
                 "Waiting for notes",
-                "The Arp and the Chord Player wait for notes from a MIDI module, played on the keys."),
+                "The Arp and the Chord Player wait for notes from a MIDI module, played on the keys or a MIDI "
+                  + "keyboard."),
               HelpTerm(
                 "A Seq with no clock",
                 "A Seq has no clock inside it. Patch a Transport division or a Clock into it."),
@@ -334,7 +347,8 @@ extension RackHelp {
             .terms([
               HelpTerm(
                 "The patch's chip",
-                "Groovebox, the way back; Patches, the factory patches; and Rack Guide, this guide."),
+                "Groovebox, the way back; Undo and Redo; Patches, the factory patches; and Rack Guide, this "
+                  + "guide."),
               HelpTerm(
                 "Kept",
                 "The rack keeps the patch it has, and opens on it next time. Opening another patch replaces it."

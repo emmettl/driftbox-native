@@ -55,8 +55,8 @@ struct SongMenuTests {
     interface.files = { asked.append($0) }
     let menu = try Self.menu(interface)
     let ids = Self.ids(menu.items)
-    #expect(ids.prefix(3) == ["file.open", "file.save", "file.saveAs"])
-    #expect(ids.count == 3 + interface.session.entries.count, "and every song of the catalogue")
+    #expect(ids.prefix(5) == ["edit.undo", "edit.redo", "file.open", "file.save", "file.saveAs"])
+    #expect(ids.count == 5 + interface.session.entries.count, "and every song of the catalogue")
     interface.choose("file.saveAs")
     _ = try Self.menu(interface)
     interface.choose("file.save")

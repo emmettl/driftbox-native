@@ -37,4 +37,14 @@ struct AndroidHelpTests {
     #expect(GrooveboxHelpTests.words(Self.guides[0]).contains { $0.contains("Groovebox Guide") })
     #expect(GrooveboxHelpTests.words(Self.guides[1]).contains { $0.contains("Rack Guide") })
   }
+
+  /// Each says where undo is, with no Edit menu to find it in, and what a MIDI keyboard plays.
+  @Test func eachSaysWhereUndoIsAndWhatAKeyboardPlays() {
+    for guide in Self.guides {
+      let words = GrooveboxHelpTests.words(guide)
+      #expect(words.contains { $0.contains("Undo") && $0.contains("menu") }, "\(guide.title): undo")
+      #expect(words.contains { $0.contains("A MIDI keyboard") }, "\(guide.title): a MIDI keyboard")
+      #expect(!words.contains { $0.contains("Edit ▸") }, "\(guide.title): no Edit menu")
+    }
+  }
 }

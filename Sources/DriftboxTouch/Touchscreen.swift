@@ -161,10 +161,13 @@ public final class Touchscreen {
     shown.showGroovebox = { [weak self] in self?.show(rack: false) }
     interface.showRack = { [weak self] in self?.show(rack: true) }
     self.rack = shown
+    // The MIDI that arrives is the rack's while it shows, and the groovebox's otherwise.
+    session.midiListener = rack
+    rack.inFront = showsRack
   }
 
   /// The rack in the groovebox's place, or back. Whatever a finger was doing on the one leaving is
-  /// let go of, and the pad lifted.
+  /// let go of, and the pad lifted. The one showing is played by a MIDI keyboard.
   public func show(rack showing: Bool) {
     guard showing != showsRack, rack != nil || !showing else { return }
     if let finger = padFinger {
@@ -173,6 +176,7 @@ public final class Touchscreen {
     otherFingers = []
     resting = nil
     showsRack = showing
+    rack?.rack.inFront = showing
     // Heard from the first time it is seen, if it was made asleep; and after, whichever shows.
     if showing { rack?.rack.wake() }
   }

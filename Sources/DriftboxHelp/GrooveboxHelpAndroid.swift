@@ -1,6 +1,7 @@
 /// The groovebox's guide on Android: the reference's topics, saying what the touchscreen's own
-/// controls do — its chips, a finger held down for a menu, the song's menu from its chip, the step
-/// keyboard — and leaving out what it has not got: keys, a menu bar, exports.
+/// controls do — its chips, a finger held down for a menu, the song's menu from its chip, undo in it,
+/// the step keyboard, a MIDI keyboard — and leaving out what it has not got: typing keys, a menu bar,
+/// exports.
 extension GrooveboxHelp {
   static let android = HelpGuide(
     title: "Groovebox guide",
@@ -74,6 +75,10 @@ extension GrooveboxHelp {
                 "PERFORM",
                 "Puts the controls away: the whole screen is the visuals and the pad. EDIT, in the corner, brings "
                   + "them back."),
+              HelpTerm(
+                "Undo",
+                "In the song's menu, from its chip, named for what it takes back, as Undo Set Step is. Redo "
+                  + "puts it back."),
             ])),
         ]),
       HelpTopic(
@@ -179,7 +184,7 @@ extension GrooveboxHelp {
             ])),
         ]),
       HelpTopic(
-        "sound", "Sound & files",
+        "sound", "Sound, MIDI & files",
         [
           HelpPart(
             "Voices and the 303s",
@@ -204,6 +209,17 @@ extension GrooveboxHelp {
               HelpTerm("Delay and Reverb", "The one echo and the one space every voice's sends feed."),
             ])),
           HelpPart(
+            "A MIDI keyboard",
+            .terms([
+              HelpTerm(
+                "Plugged in",
+                "Over USB, or another app's MIDI: Driftbox listens to every one Android has, as it comes."),
+              HelpTerm(
+                "Notes",
+                "From A1 up play the 303, the notes below them the drums. Hit hard, a note is accented."),
+              HelpTerm("The rack", "While the rack shows, the keyboard plays it instead."),
+            ])),
+          HelpPart(
             "The song's menu",
             .terms([
               HelpTerm("Its chip", "The song's name, at the left of the song strip: tap it."),
@@ -217,6 +233,10 @@ extension GrooveboxHelp {
                 "What to play through: Automatic, as Android routes it, or a device — the speaker, headphones, "
                   + "USB or Bluetooth. One unplugged stays chosen, and says so."),
               HelpTerm("Rack", "The modular rack, in the groovebox's place, which has its own guide."),
+              HelpTerm(
+                "Undo and Redo",
+                "Take back the last edit to the song, or put it back; each says which. Greyed, there is none."
+              ),
               HelpTerm("Groovebox Guide", "This guide."),
             ])),
           HelpPart(

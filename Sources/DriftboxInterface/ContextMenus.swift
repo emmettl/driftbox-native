@@ -56,7 +56,8 @@ extension Interface {
 
   // MARK: - The menus
 
-  /// The song's: its file, where the platform can open and save one, and the catalogue's songs.
+  /// The song's: undo on a touchscreen, its file, where the platform can open and save one, and the
+  /// catalogue's songs.
   func songMenu() -> Menu {
     menuActions = [:]
     menuDisabled = []
@@ -65,6 +66,17 @@ extension Interface {
     if let showRack {
       menuActions["rack.show"] = showRack
       items += [.command("Rack", id: "rack.show"), .separator]
+    }
+    // Undo and redo, named for what they take back, where there is no Edit menu to hold them.
+    if touch {
+      menuActions["edit.undo"] = { [weak self] in self?.session.undo() }
+      menuActions["edit.redo"] = { [weak self] in self?.session.redo() }
+      if !session.canUndo { menuDisabled.insert("edit.undo") }
+      if !session.canRedo { menuDisabled.insert("edit.redo") }
+      items += [
+        .command(session.undoTitle, id: "edit.undo"), .command(session.redoTitle, id: "edit.redo"),
+        .separator,
+      ]
     }
     if let files {
       menuActions["file.open"] = { [weak self] in self?.unlessEdited { files(.open) } }

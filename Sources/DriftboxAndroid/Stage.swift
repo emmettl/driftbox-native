@@ -1,6 +1,7 @@
 #if os(Android)
   import Android
   import CGLES
+  import Dispatch
   import DriftboxGPU
   import DriftboxGPUGLES
   import DriftboxHost
@@ -42,13 +43,21 @@
     /// The catalogue's song `id` played, or with none the one open last, or acid, with the scene
     /// called `scene` drawn from it, or the one the song names, on a screen of `density` pixels to
     /// a point. What the app remembers — its settings, the song, the rack's patch and the
-    /// controllers learnt onto it — is kept in `memory`.
-    init?(song id: String?, scene: String?, density: Float, typesetter: any Typesetter, memory: FileMemory) {
+    /// controllers learnt onto it — is kept in `memory`. What arrives from the MIDI devices Java has
+    /// opened, `midi`, plays the groovebox, or the rack while it shows.
+    init?(
+      song id: String?, scene: String?, density: Float, typesetter: any Typesetter, memory: FileMemory,
+      midi: AMidiDevices
+    ) {
       let entries = Catalogue.entries()
       if let id, !entries.contains(where: { $0.id == id }) { return nil }
       host = EngineHost(sampleRate: 48000)
       route = AAudioRoute(hop: { [lost] _ in lost.raise() })
-      session = Session(host: host, audio: route, memory: memory)
+      // Word from the input's own thread reaches the main thread through the main queue, which Java's
+      // looper drains (see `MainQueue`).
+      session = Session(
+        host: host, audio: route, midiIn: AMidiInput(devices: midi), memory: memory,
+        hop: { work in DispatchQueue.main.async(execute: work) })
       if let id, let entry = entries.first(where: { $0.id == id }) {
         session.open(entry)
       } else {

@@ -808,7 +808,8 @@ public final class RackInterface {
 
   /// The modules there are to add, by what they are for, as the catalogue of cards groups them.
   /// Plug-ins are not offered where there is nothing to make them.
-  /// The patches to open, and the way back to the groovebox where there is one.
+  /// The patches to open, the way back to the groovebox where there is one, and undo on a
+  /// touchscreen.
   func patchMenu() -> Menu {
     menuActions = [:]
     menuDisabled = []
@@ -816,6 +817,14 @@ public final class RackInterface {
     var items: [MenuItem] = []
     if let showGroovebox {
       items += [item("Groovebox", "rack.groovebox", enabled: true) { showGroovebox() }, .separator]
+    }
+    // Undo and redo, named for what they take back, where there is no Edit menu to hold them.
+    if touch {
+      items += [
+        item(rack.undoTitle, "edit.undo", enabled: rack.canUndo) { [weak self] in self?.rack.undo() },
+        item(rack.redoTitle, "edit.redo", enabled: rack.canRedo) { [weak self] in self?.rack.redo() },
+        .separator,
+      ]
     }
     let patches = PatchEntry.all.map { entry -> MenuItem in
       let id = "patch." + entry.id

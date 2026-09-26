@@ -11,7 +11,8 @@
   // What `app.driftbox.Native` in `android/` declares, one function each, and everything this app
   // shares between them. The names are JNI's: `Java_`, the class, the method.
 
-  /// The MIDI devices Java has opened, for everything in the app to use.
+  /// The MIDI devices Java has opened, for everything in the app to use: the song on the screen,
+  /// and the MIDI loopback's test.
   let midiDevices = AMidiDevices()
 
   @_cdecl("Java_app_driftbox_Native_deviceAdded")
@@ -93,7 +94,7 @@
       let typesetter: any Typesetter = android ?? NoTypesetter()
       stage = Stage(
         song: id, scene: named, density: density, typesetter: typesetter,
-        memory: FileMemory(url: remembered))
+        memory: FileMemory(url: remembered), midi: midiDevices)
       return stage == nil ? jboolean(JNI_FALSE) : jboolean(JNI_TRUE)
     }
   }
