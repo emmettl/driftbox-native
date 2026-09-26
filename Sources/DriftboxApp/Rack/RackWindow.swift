@@ -340,6 +340,8 @@
   struct RackStage: View {
     let rack: MacRack
     var model: RackSession { rack.session }
+    /// The guide open over the rack, if one is.
+    @State private var guide: RackGuide?
 
     var body: some View {
       GeometryReader { geometry in
@@ -358,6 +360,9 @@
           .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.automatic)
+      }
+      .sheet(isPresented: Binding(get: { guide != nil }, set: { if !$0 { guide = nil } })) {
+        if let guide { GuideSheet(guide: guide) { self.guide = nil } }
       }
     }
 
@@ -397,6 +402,8 @@
     }
 
     @ViewBuilder private func menu(for module: PatchModule) -> some View {
+      Button("Guide") { guide = RackGuide.guide(for: module.type) }
+      Divider()
       Button("Move Up") { model.move(module.id, by: -1) }
       Button("Move Down") { model.move(module.id, by: 1) }
       Divider()

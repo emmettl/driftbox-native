@@ -357,8 +357,14 @@ parity point.
 
 ## Help and tutorials
 
-Not yet: worth doing once the app is complete enough that the help would not be rewritten with
-every milestone. Then, everything the web app teaches with, and what a Mac does better:
+Begun, now that the app is complete enough that the help would not be rewritten with every
+milestone. Each module's guide first: the reference's export carries the guides written for
+sixteen modules into `modules.json`, and `RackGuide` assembles every module's as the reference's
+`ModuleGuide` does — what it does, its signal flow, how it works and what to try first where a
+guide was written, every control and its range, and what to watch for — in words any platform
+lays out. On the Mac it is Guide, first in a module's menu, as a sheet over the rack. Left:
+the drawn rack's, on Windows and Android; and the rest of what the web app teaches with, and what
+a Mac does better:
 
 - **The reference's teaching, ported:** its help dialog, the first-run offer of a tour, the guided
   tour and tutorial coach that walk a patch being built, and each module's guide. The words carry
