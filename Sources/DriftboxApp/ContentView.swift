@@ -405,13 +405,15 @@
           } else {
             DragNumber(
               label: "BPM", value: song.bpm, range: 20...300, perPoint: 0.5,
-              format: { "\(Int($0.rounded()))" }
-            ) { value in player.edit("Set Tempo") { $0.bpm = value.rounded() } }
+              format: { "\(Int($0.rounded()))" }, live: { player.turn(.tempo, to: $0) },
+              ended: { player.endTurn() }
+            ) { player.set(.tempo, to: $0) }
           }
           DragNumber(
             label: "Swing", value: song.swing * 100, range: 0...100, perPoint: 0.5,
-            format: { "\(Int($0.rounded()))" }
-          ) { value in player.edit("Set Swing") { $0.swing = value.rounded() / 100 } }
+            format: { "\(Int($0.rounded()))" }, live: { player.turn(.songSwing, to: $0) },
+            ended: { player.endTurn() }
+          ) { player.set(.songSwing, to: $0) }
           if clocks {
             Rectangle().fill(Theme.edge).frame(width: 1, height: 22)
             clockSwitches
@@ -452,6 +454,13 @@
         Button("1·2·3·4") { countIn.toggle() }
           .buttonStyle(.chip(on: countIn, tint: Theme.nine, size: 10))
           .help("Count in a bar of clicks before playing from a stop (⇧⌘K)")
+        // Armed, a knob turned while the song plays is written into it, as the reference's
+        // `● auto` is; with how many lanes the song has, once it has any.
+        let lanes = player.song?.automation.count ?? 0
+        Button(lanes > 0 ? "● auto \(lanes)" : "● auto") { player.recordsAutomation.toggle() }
+          .buttonStyle(.chip(on: player.recordsAutomation, tint: Theme.eight, size: 10))
+          .disabled(player.song == nil)
+          .help("Record automation: a knob turned while the song plays is written into it, where it is")
         if let loop = player.loop {
           Button {
             player.loop = nil
@@ -491,13 +500,16 @@
   }
 
   /// A number set by dragging it up and down, like a knob with no knob: how a hardware tempo
-  /// display is set with a data wheel. Option makes it fine; the song only changes on release.
+  /// display is set with a data wheel. Option makes it fine. `live` hears each move, `ended` the
+  /// drag let go of, and `commit` a value set at once.
   struct DragNumber: View {
     let label: String
     let value: Double
     let range: ClosedRange<Double>
     var perPoint = 0.5
     let format: (Double) -> String
+    var live: ((Double) -> Void)?
+    var ended: (() -> Void)?
     let commit: (Double) -> Void
 
     @State private var dragging: Double?
@@ -529,11 +541,14 @@
             if dragging == nil { from = value }
             let fine = NSEvent.modifierFlags.contains(.option)
             let moved = -gesture.translation.height * perPoint * (fine ? 0.2 : 1)
-            dragging = min(range.upperBound, max(range.lowerBound, from + moved))
+            let next = min(range.upperBound, max(range.lowerBound, from + moved))
+            if let live, format(next) != format(dragging ?? from) { live(next) }
+            dragging = next
           }
           .onEnded { _ in
             if let dragging, format(dragging) != format(value) { commit(dragging) }
             dragging = nil
+            ended?()
           }
       )
       .help("Drag up or down to change \(label.lowercased()); hold Option for fine steps")
