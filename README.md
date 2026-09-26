@@ -437,7 +437,11 @@ the SDK up the first time, as its own script would, and `android-env.sh` says ho
 Audio is AAudio: low-latency mode, exclusive if the device will give it, float stereo at 48 kHz.
 The buffer starts at three bursts, 6ms, and grows a burst at a time if the stream underruns: one, the
 least a stream can have, crackled once the app drew its controls, though AAudio counted no
-underruns, and its slowest callbacks took up to 3.6ms of a 2ms burst; with two, 4.1ms of 4. AAudio makes
+underruns, and its slowest callbacks took up to 3.6ms of a 2ms burst; with two, 4.1ms of 4. Every
+callback timed showed what those were: one in eleven, every 1,024 frames, took twice the rest,
+because the reverb's tail did a whole block's work in the callback its block ended in. It spreads
+that work over the next block now (`SpreadConvolver`), and the slowest callback of a second is 2.1
+to 2.6ms, with the heaviest scene drawn, on any of five songs. AAudio makes
 the render thread; Driftbox keeps it to the big cores, since left to the scheduler it underran a
 hundred times a second, and reports each callback's work to a performance hint session. A stream
 whose device goes away ends and asks to be replaced, as on Windows. There is one device, the
@@ -826,7 +830,7 @@ swift run -c release driftbox-play conformance/fixtures/documents/acid.song.json
 The engine as an Audio Unit in an `AVAudioEngine`, through the speakers, printing what reaches
 the output once a second. `--bench` runs the same engine with no device, as fast as it goes:
 **3.3% of real time** on this machine, of which the reverb — now in two stages, the tail in
-partitions eight blocks long — is about a third. Live, the render callback reports a fifth of
+partitions eight blocks long, its work on each spread over the block after — is about a third. Live, the render callback reports a fifth of
 the audio's time on its own clock, and the difference is the platform, not the code: `--bench`
 also runs the same calls paced as a device paces them, one every 10.7ms with a sleep between,
 and they cost **16%** that way — five times the loop — because a core woken every ten
