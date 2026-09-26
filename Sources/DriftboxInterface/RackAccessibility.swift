@@ -11,7 +11,7 @@ import DriftboxShell
 /// control on it by the param it turns or its place on the face.
 extension RackInterface {
   /// What is on screen, as the window hands it to the platform's accessibility.
-  public var accessibility: AccessibilityNode { described().node }
+  public var accessibility: AccessibilityNode { guide?.accessibility ?? described().node }
 
   /// What a screen reader asked, done as a hand would do it; false for a control there is not, or
   /// one that does nothing now.
@@ -19,6 +19,12 @@ extension RackInterface {
   public func perform(_ asked: AccessibilityAction) -> Bool {
     // Where the keyboard is, the window's business, not the controls'.
     if case .focus = asked { return false }
+    // A guide open over the rack is what is read, and what is asked.
+    if let guide {
+      let done = guide.perform(asked)
+      if !guide.isOpen { self.guide = nil }
+      return done
+    }
     guard let handle = described().handlers[asked.control] else { return false }
     handle(asked)
     return true

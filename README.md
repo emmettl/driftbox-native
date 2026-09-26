@@ -395,7 +395,7 @@ choices, its catalogue of patches, and the keys playing it, heard beside the gro
 **Help.** Help ▸ Groovebox Guide and Rack Guide, and F1 for the one showing, draw the guide over
 the window: `DriftboxHelp`'s words for Windows, saying what the drawn app's own chips, right-click
 menus, menu bar and keys do, a tab for each topic, scrolled by the wheel and the keys and put away
-with Esc. A screen reader reads it as it reads the controls. `HelpView` lays it out on the canvas,
+with Esc. A screen reader reads it as it reads the controls. `HelpSheet` lays it out on the canvas,
 so Android can show the same pages.
 
 **Screen readers.** The controls are drawn, not windows of their own, so the app describes them to
