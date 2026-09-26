@@ -929,3 +929,65 @@ extension DesktopTests {
     #expect(window.isEnabled?(DesktopMenus.record) == false)
   }
 }
+
+extension DesktopTests {
+  @Test func documentFailuresAreReportedOnceAndCanRecur() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Kept")
+    let before = desktop.session.song
+    let missing = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    window.chosenFile = missing
+    window.choose(DesktopMenus.open)
+    desktop.refresh()
+    #expect(desktop.session.song == before)
+    #expect(window.told.count == 1 && window.told[0].contains(missing.lastPathComponent))
+    #expect(desktop.session.error == nil)
+    desktop.refresh()
+    #expect(window.told.count == 1)
+    window.choose(DesktopMenus.open)
+    desktop.refresh()
+    #expect(window.told.count == 2, "the same failure on a new attempt is reported again")
+  }
+
+  @Test func failedSaveAsIsNotSuccessForAnUneditedSong() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Kept")
+    #expect(!desktop.session.isEdited)
+    window.saveLocation = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString).appendingPathComponent("Missing/Save.driftbox")
+    var saved: Bool?
+    desktop.saveAs { saved = $0 }
+    #expect(saved == false)
+    #expect(desktop.session.fileURL == nil && desktop.session.documentName == "Kept")
+    desktop.refresh()
+    #expect(window.told.count == 1)
+    #expect(window.told.first?.hasPrefix("Could not save Save.driftbox:") == true)
+  }
+
+  @Test func failedSaveBeforeClosingKeepsEditsAndReportsAfterTheDialog() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Kept")
+    desktop.session.edit("Tempo") { $0.bpm = 137 }
+    window.defersDialogs = true
+    #expect(window.shouldClose?() == false)
+    let question = try #require(window.pendingQuestion)
+    window.pendingQuestion = nil
+    question(.save)
+    desktop.refresh()
+    #expect(window.told.isEmpty && desktop.documentRequestPending)
+    let save = try #require(window.pendingSave)
+    window.pendingSave = nil
+    save(
+      FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        .appendingPathComponent("Missing/Save.driftbox"))
+    #expect(!window.closed && !desktop.documentRequestPending)
+    #expect(desktop.session.isEdited && desktop.session.song?.bpm == 137)
+    desktop.refresh()
+    #expect(window.told.count == 1)
+    desktop.refresh()
+    #expect(window.told.count == 1)
+  }
+}

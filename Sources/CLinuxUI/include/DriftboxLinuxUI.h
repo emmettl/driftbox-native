@@ -54,6 +54,7 @@ void db_desktop_current(db_desktop *);
 void db_desktop_close(db_desktop *);
 void db_desktop_free(db_desktop *);
 void db_desktop_title(db_desktop *, const char *);
+void db_desktop_tell(db_desktop *, const char *);
 const char *db_desktop_error(db_desktop *);
 db_menu *db_menu_new(void);
 void db_menu_free(db_menu *);

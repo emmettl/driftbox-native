@@ -13,6 +13,8 @@
 struct db_desktop {
     GtkWidget *window, *area, *bar, *popover;
     GObject *dialog;
+    GtkWidget *notice;
+    GQueue *notices;
     GFile *folder;
     GMainLoop *loop;
     GSimpleActionGroup *actions;
@@ -25,7 +27,7 @@ struct db_desktop {
     db_command command;
     db_can_close can_close;
     db_drop_callback dropped;
-    gboolean closed;
+    gboolean closed, disposing;
     double x, y;
     int button;
     char error[512];
@@ -257,7 +259,38 @@ static void dismiss_popup(db_desktop *w) {
     gtk_popover_popdown(GTK_POPOVER(popover));
     gtk_widget_unparent(popover);
 }
+// Notices have their own queue: reporting a failure must not replace a file chooser's reply.
+static void show_notice(db_desktop *w);
+static void notice_response(GtkDialog *dialog,int response,gpointer context) {
+    (void)response;
+    db_desktop *w=context; w->notice=NULL;
+    gtk_window_destroy(GTK_WINDOW(dialog));
+    show_notice(w);
+}
+static void show_notice(db_desktop *w) {
+    if (w->notice || !w->notices || g_queue_is_empty(w->notices)) return;
+    char *message=g_queue_pop_head(w->notices);
+    w->notice=gtk_message_dialog_new(GTK_WINDOW(w->window),GTK_DIALOG_DESTROY_WITH_PARENT,
+        GTK_MESSAGE_INFO,GTK_BUTTONS_CLOSE,"%s",message);
+    g_free(message);
+    gtk_window_set_title(GTK_WINDOW(w->notice),"Driftbox");
+    g_signal_connect(w->notice,"response",G_CALLBACK(notice_response),w);
+    gtk_window_present(GTK_WINDOW(w->notice));
+}
+void db_desktop_tell(db_desktop *w,const char *message) {
+    if (w->disposing || !message || !*message) return;
+    if (!w->notices) w->notices=g_queue_new();
+    g_queue_push_tail(w->notices,g_strdup(message));
+    show_notice(w);
+}
 void db_desktop_free(db_desktop *w) {
+    w->disposing=TRUE;
+    if (w->notice) {
+        g_signal_handlers_disconnect_by_data(w->notice,w);
+        gtk_window_destroy(GTK_WINDOW(w->notice));
+        w->notice=NULL;
+    }
+    if (w->notices) { g_queue_free_full(w->notices,g_free); w->notices=NULL; }
     if (w->dialog) g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_CANCEL);
     dismiss_popup(w);
     reply(w,0,"");

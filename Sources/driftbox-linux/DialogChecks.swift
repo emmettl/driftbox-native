@@ -60,7 +60,21 @@
         throw DialogCheckFailure("\(request) completed again on repeated disposal")
       }
     }
-    print("Native dialogs: five deferred requests cancelled exactly once")
+    // Notices share the live shell but never own a document request's callback.
+    let notices = try GTKWindow()
+    notices.tell("A document could not be opened — 100% <literal> text")
+    notices.tell("A second failure is queued")
+    let closeNotices = Task { @MainActor in
+      try await Task.sleep(for: .milliseconds(250))
+      notices.close()
+    }
+    defer {
+      closeNotices.cancel()
+      notices.dispose()
+    }
+    try notices.run(frame: {})
+    notices.dispose()
+    print("Native dialogs: five deferred requests cancelled exactly once; queued notices disposed")
   }
 
   private struct DialogCheckFailure: Error, CustomStringConvertible {

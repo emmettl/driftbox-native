@@ -90,6 +90,9 @@
       }
     }
     public func close() { if let handle { db_desktop_close(handle) } }
+    public func tell(_ message: String) {
+      if let handle { db_desktop_tell(handle, message) }
+    }
     public nonisolated func post(_ work: @escaping @Sendable () -> Void) {
       DispatchQueue.main.async(execute: work)
     }

@@ -208,6 +208,7 @@ public final class Desktop {
   /// The window's title and menus as the session now is. Each is handed over only when it differs
   /// from what the window has, which the window checks itself for the menus.
   func refresh() {
+    if !documentRequestPending, let error = session.takeError() { window.tell(error) }
     noteOpenFile()
     // Typing is the rack's while it shows, as a routing's end is typed, and the controls' otherwise.
     let takesText = showsRack ? rackInterface?.takesText ?? false : interface.takesText
@@ -546,8 +547,7 @@ public final class Desktop {
       saveAs(completion: completion)
       return
     }
-    session.save()
-    completion(!session.isEdited)
+    completion(session.save())
   }
 
   func saveAs(completion: @escaping (Bool) -> Void) {
@@ -561,8 +561,7 @@ public final class Desktop {
         completion(false)
         return
       }
-      self.session.save(to: url)
-      completion(!self.session.isEdited)
+      completion(self.session.save(to: url))
     }
   }
 }

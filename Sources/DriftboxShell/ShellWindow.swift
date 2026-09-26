@@ -53,7 +53,8 @@ public protocol ShellWindow: AnyObject {
   func chooseFolder(title: String, button: String) -> URL?
   /// The file at `url` shown where the platform keeps files, picked out: Explorer, the Finder.
   func reveal(_ url: URL)
-  /// Something the person should know, in the platform's own box, which waits to be put away.
+  /// Something the person should know, in the platform's own box. Callback-driven shells
+  /// present it without blocking the main loop.
   func tell(_ message: String)
   /// A file opened or saved, told to the platform's own list of recent files, where it keeps one:
   /// Windows' jump list, the Mac's Open Recent.

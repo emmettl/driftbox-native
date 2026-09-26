@@ -783,6 +783,39 @@ new shared changes into `codex/linux-port`. Check new shell requests for synchro
 platform-only capabilities and resource ownership, then run the affected tests in Ubuntu. Keep
 integration commits explicit so Linux adaptation work can be reviewed separately from upstream.
 
+### Native document failure reporting
+
+The next 2026-09-26 milestone first merges main through `002dcf6`, bringing the rack-back
+accessibility actions and rack help into this branch. Its 119 interface and four help tests pass
+in Ubuntu. GTK still needs the assistive-technology adapter described above.
+
+GTK now implements `ShellWindow.tell` with native, transient message dialogs. Notices are queued
+and presented without blocking the main loop or borrowing a document chooser's response callback.
+File names and message text are displayed literally, including percent signs, markup characters
+and Unicode. Closing the parent releases the visible notice and queued messages; cancellation
+callbacks during disposal cannot create another notice.
+
+The shared desktop consumes each pending session document failure once, after a pending document
+request finishes. A fresh attempt that fails the same way produces a fresh notice. Failed reads
+leave the current song intact; failed writes leave edits intact. `Session.save` now returns whether
+a write actually succeeded, so Save As on an unedited song cannot be mistaken for success when
+the write failed. Save failures name the file and use the readable Foundation error description.
+WAV export write failures and rack sample-loading failure presentation remain separate follow-ups.
+
+All 79 session and 39 desktop tests pass with strict actor checks. Three focused failure regressions
+also pass after finalizing the message wording. The eleven native GTK dialog/notice checks pass,
+including queued notice teardown from a document-cancellation callback. The shared desktop release
+target compiles on macOS, and changed Swift files pass strict formatting. These tests do not replace
+physical audio/MIDI qualification or resolve the previously recorded GTK immediate-teardown race.
+
+The release bundle `Driftbox-0.1.0-preview-arm64-20fd09252ca7` is installed in the guest's
+`~/Applications` and registered with `--x11` for the next launch. All 67 installed manifest hashes
+verify; the desktop entry validates. Its packaged silent Xvfb smoke passes with 359 GUI frames,
+five chooser/question callbacks cancelled exactly once and queued notices disposed. The archive
+contains 15 runtime libraries and is 29.7 MiB. Guest logs are
+`~/driftbox-linux-errors-{tests,final-tests,dialogs,build,package,smoke}.log`; upstream integration
+checks are in `~/driftbox-main-followup.log`. Remote CI and Windows builds have not run for this change.
+
 ### Local access
 
 The VM uses UTM Shared Network. Its first assigned address is `192.168.64.2`; discover the current

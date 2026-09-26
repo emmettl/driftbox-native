@@ -182,6 +182,50 @@ static void folder_selection(void) {
     g_free(result.uris); db_desktop_free(w);
     g_assert_cmpint(rmdir(directory),==,0); g_free(directory); g_free(uri); g_object_unref(folder);
 }
+static void notices_are_queued_and_literal(void) {
+    db_desktop *w=fixture();
+    db_desktop_tell(w,"100% <literal> & café");
+    db_desktop_tell(w,"Second failure");
+    char *text=NULL; gboolean markup=TRUE;
+    g_object_get(w->notice,"text",&text,"use-markup",&markup,NULL);
+    g_assert_cmpstr(text,==,"100% <literal> & café"); g_assert_false(markup); g_free(text);
+    g_assert_true(gtk_window_get_transient_for(GTK_WINDOW(w->notice))==GTK_WINDOW(w->window));
+    g_assert_cmpuint(g_queue_get_length(w->notices),==,1);
+    gtk_dialog_response(GTK_DIALOG(w->notice),GTK_RESPONSE_CLOSE);
+    g_object_get(w->notice,"text",&text,NULL);
+    g_assert_cmpstr(text,==,"Second failure"); g_free(text);
+    gtk_dialog_response(GTK_DIALOG(w->notice),GTK_RESPONSE_DELETE_EVENT);
+    g_assert_null(w->notice); g_assert_true(g_queue_is_empty(w->notices));
+    db_desktop_free(w);
+}
+static void notice_preserves_pending_reply(void) {
+    db_desktop *w=fixture(); Result result={0};
+    db_desktop_save_question(w,"Edited",&result,received);
+    GObject *question=w->dialog;
+    db_desktop_tell(w,"A background operation failed");
+    gtk_dialog_response(GTK_DIALOG(w->notice),GTK_RESPONSE_CLOSE);
+    g_assert_true(w->dialog==question); g_assert_cmpint(result.calls,==,0);
+    gtk_dialog_response(GTK_DIALOG(w->dialog),2);
+    g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,2);
+    empty(w); db_desktop_free(w);
+}
+typedef struct { db_desktop *window; int calls; } CancelNotice;
+static void notice_from_cancel(void *context,int answer,const char *value) {
+    (void)value;
+    CancelNotice *result=context; result->calls++; g_assert_cmpint(answer,==,0);
+    db_desktop_tell(result->window,"A callback during teardown");
+    g_assert_null(result->window->notice); g_assert_null(result->window->notices);
+}
+static void notices_close_with_parent(void) {
+    db_desktop *w=fixture();
+    db_desktop_tell(w,"First"); db_desktop_tell(w,"Queued");
+    CancelNotice result={.window=w};
+    db_desktop_save_question(w,"Unsaved",&result,notice_from_cancel);
+    GtkWidget *notice=w->notice;
+    g_object_add_weak_pointer(G_OBJECT(notice),(gpointer *)&notice);
+    db_desktop_free(w);
+    g_assert_null(notice); g_assert_cmpint(result.calls,==,1);
+}
 int main(int argc,char **argv) {
     g_test_init(&argc,&argv,NULL);
     // A minimal CI container may lack a session bus; critical GTK errors still fail.
@@ -195,5 +239,8 @@ int main(int argc,char **argv) {
     g_test_add_func("/dialogs/teardown-cancels",teardown_cancels);
     g_test_add_func("/dialogs/accepted-files-and-folder",accepted_files_and_folder);
     g_test_add_func("/dialogs/folder-selection",folder_selection);
+    g_test_add_func("/notices/queued-literal",notices_are_queued_and_literal);
+    g_test_add_func("/notices/preserve-reply",notice_preserves_pending_reply);
+    g_test_add_func("/notices/parent-teardown",notices_close_with_parent);
     return g_test_run();
 }
