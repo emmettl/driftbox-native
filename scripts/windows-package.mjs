@@ -2,10 +2,13 @@
 // dist/Driftbox-windows-x64.zip of it.
 //
 //   swift build -c release --product DriftboxWindows    (from a Visual Studio x64 prompt)
+//   swift build -c release --product DriftboxVST3Scan
 //   node scripts/windows-package.mjs
 //
 // What goes in:
 //   - the program, as Driftbox.exe;
+//   - DriftboxVST3Scan.exe, which asks each plug-in the program finds what it holds, in a process of
+//     its own, so a plug-in that crashes does not take the program with it;
 //   - the resource bundles it names — the catalogue's songs — which Bundle.module looks for beside
 //     the program;
 //   - the Swift runtime's DLLs it needs, and theirs, found by reading each one's import tables
@@ -22,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..')
 const build = join(root, '.build', 'x86_64-unknown-windows-msvc', 'release')
 const program = join(build, 'DriftboxWindows.exe')
+const scanner = join(build, 'DriftboxVST3Scan.exe')
 const dist = join(root, 'dist')
 const out = join(dist, 'Driftbox')
 
@@ -72,9 +76,11 @@ export function imports(file) {
   return names
 }
 
-if (!existsSync(program)) {
-  console.error(`No ${program}. Build it first: swift build -c release --product DriftboxWindows`)
-  process.exit(1)
+for (const [file, product] of [[program, 'DriftboxWindows'], [scanner, 'DriftboxVST3Scan']]) {
+  if (!existsSync(file)) {
+    console.error(`No ${file}. Build it first: swift build -c release --product ${product}`)
+    process.exit(1)
+  }
 }
 const runtime = runtimeDirectory()
 if (!runtime || !existsSync(runtime)) {
@@ -85,11 +91,13 @@ if (!runtime || !existsSync(runtime)) {
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
 cpSync(program, join(out, 'Driftbox.exe'))
+cpSync(scanner, join(out, 'DriftboxVST3Scan.exe'))
 
-// Every DLL reachable from the program that the runtime has; the rest are Windows' own.
+// Every DLL reachable from the program and the scanner that the runtime has; the rest are Windows'
+// own.
 const available = new Map(readdirSync(runtime).map((file) => [file.toLowerCase(), join(runtime, file)]))
 const needed = new Set()
-const pending = [program]
+const pending = [program, scanner]
 while (pending.length > 0) {
   for (const dll of imports(pending.pop())) {
     const found = available.get(dll.toLowerCase())
@@ -107,7 +115,7 @@ for (const bundle of bundles) cpSync(join(build, bundle), join(out, bundle), { r
 
 const size = (path) =>
   statSync(path).isDirectory() ? readdirSync(path).reduce((sum, name) => sum + size(join(path, name)), 0) : statSync(path).size
-console.log(`dist/Driftbox: Driftbox.exe, ${needed.size} DLLs, ${bundles.join(', ')}  ${(size(out) / 1048576).toFixed(1)}MB`)
+console.log(`dist/Driftbox: Driftbox.exe, DriftboxVST3Scan.exe, ${needed.size} DLLs, ${bundles.join(', ')}  ${(size(out) / 1048576).toFixed(1)}MB`)
 
 // Windows' own tar writes zips; named in full, since a Git shell puts a GNU tar first that does not.
 const zip = join(dist, 'Driftbox-windows-x64.zip')

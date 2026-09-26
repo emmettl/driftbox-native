@@ -352,7 +352,9 @@ let package = Package(
 // the rest, which the manifest's type checker cannot take in one go.
 package.products += [
   .library(name: "DriftboxHostVST3", targets: ["DriftboxHostVST3"]),
+  .executable(name: "DriftboxVST3Scan", targets: ["DriftboxVST3Scan"]),
   .library(name: "DriftboxVST3Fixture", type: .dynamic, targets: ["DriftboxVST3Fixture"]),
+  .library(name: "DriftboxVST3Crash", type: .dynamic, targets: ["DriftboxVST3Crash"]),
 ]
 package.targets += [
   .target(
@@ -384,6 +386,14 @@ package.targets += [
       "DriftboxHost", "DriftboxRack", "DriftboxRackSession",
       .target(name: "CVST3", condition: .when(platforms: [.windows])),
     ]),
+  // A module that crashes as it loads, for the scanner's tests.
+  .target(
+    name: "DriftboxVST3Crash", path: "Tests/DriftboxVST3Crash",
+    linkerSettings: [.linkedLibrary("swiftCore", .when(platforms: [.windows]))]),
+  // What asks a module what it holds, in a process of its own, so a plug-in that crashes as it loads
+  // takes this with it rather than the app.
+  .executableTarget(
+    name: "DriftboxVST3Scan", dependencies: [.target(name: "CVST3", condition: .when(platforms: [.windows]))]),
   .testTarget(
     name: "DriftboxVST3Tests",
     dependencies: [

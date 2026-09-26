@@ -13,19 +13,32 @@
     /// are shown, which a test's are not.
     let owner: (@MainActor () -> UnsafeMutableRawPointer?)?
     let showsEditors: Bool
+    /// The scanner, and where what it was told is kept from one launch to the next.
+    let scanner: VST3Scanner
+    let memory: UserDefaults?
+    static let memoryKey = "vst3.scanned"
     private var catalogue: VST3Catalogue?
     private var scanning: Task<VST3Catalogue, Never>?
 
-    /// Plug-ins from `folders`: where Windows installs them, unless a test says otherwise. Their
-    /// editors belong to the window `owner` gives.
+    /// Plug-ins from `folders`: where Windows installs them, unless a test says otherwise, asked by
+    /// `scanner` what they hold, which is kept in `memory`. Their editors belong to the window
+    /// `owner` gives.
     public init(
-      folders: [URL] = VST3Catalogue.standardFolders,
-      owner: (@MainActor () -> UnsafeMutableRawPointer?)? = nil,
+      folders: [URL] = VST3Catalogue.standardFolders, scanner: VST3Scanner = VST3Scanner(),
+      memory: UserDefaults? = nil, owner: (@MainActor () -> UnsafeMutableRawPointer?)? = nil,
       showsEditors: Bool = true
     ) {
       self.folders = folders
       self.owner = owner
       self.showsEditors = showsEditors
+      self.memory = memory
+      var scanner = scanner
+      if let data = memory?.data(forKey: Self.memoryKey),
+        let known = try? JSONDecoder().decode([String: VST3Scanner.Scanned].self, from: data)
+      {
+        scanner.known.merge(known) { given, _ in given }
+      }
+      self.scanner = scanner
     }
 
     /// The plug-ins installed, found the first time they are asked for and remembered: one
@@ -34,11 +47,17 @@
       if let catalogue { return catalogue }
       if let scanning { return await scanning.value }
       let folders = folders
-      let task = Task.detached { VST3Catalogue.scan(folders) }
-      scanning = task
-      let found = await task.value
+      let scanner = scanner
+      let task = Task.detached {
+        var scanner = scanner
+        let found = VST3Catalogue.scan(folders, with: &scanner)
+        return (found, scanner.known)
+      }
+      scanning = Task { await task.value.0 }
+      let (found, known) = await task.value
       catalogue = found
       scanning = nil
+      if let memory, let data = try? JSONEncoder().encode(known) { memory.set(data, forKey: Self.memoryKey) }
       return found
     }
 

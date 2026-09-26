@@ -69,7 +69,8 @@
         // its plug-ins VST 3, their editors in front of this window.
         rack: RackSession(
           sampleRate: route.sampleRate, audio: route,
-          plugins: VST3Hosting(owner: { UnsafeMutableRawPointer(window.handle) }),
+          plugins: VST3Hosting(
+            memory: UserDefaults.standard, owner: { UnsafeMutableRawPointer(window.handle) }),
           memory: UserDefaults.standard))
       try desktop.run()
     }
