@@ -11,9 +11,10 @@ songs, run the built-in rack, save/reopen documents, import WAV samples, export 
 MIDI notes and clock. Linux plug-in hosting and publishing Driftbox as a plug-in are later work.
 
 Target Ubuntu 24.04 LTS first. Test both Wayland and X11 before claiming support for either.
-PipeWire now powers the command-line audio output; ALSA sequencer is the proposed MIDI backend, GTK 4/Pango the
-shell/text stack under evaluation, and GLES the existing renderer. The standalone GTK experiment
-now passes automated context/event-loop checks; desktop-session and full-shell validation remain. Do not introduce a second UI or engine.
+PipeWire powers both the command-line player and the first shared desktop executable. GTK 4/Pango
+provide its shell/text adapters and GLES the renderer. ALSA sequencer is the proposed MIDI backend.
+The desktop now renders the existing groovebox and rack and passes a live audio capture test;
+interactive shell qualification and release packaging remain. Do not introduce a second UI or engine.
 
 ## What already exists
 
@@ -34,10 +35,10 @@ Swift and allocation checks. Compare audio with the existing fixtures, not a new
 
 ### Prove event-loop and concurrency integration
 
-`Desktop.run()` delegates the loop to `ShellWindow.run(frame:)`. `GPUSurface.present()` currently
-promises to wait for the display and pace that loop. GTK instead schedules render callbacks.
-Test a callback-driven shell before changing these contracts. Separate frame scheduling from
-presentation if necessary; avoid a permanent busy loop, including when hidden or minimized.
+`Desktop.run()` delegates the loop to `ShellWindow.run(frame:)`. The shell contract now permits
+both swap-chain pacing and toolkit-scheduled render callbacks. GTK supplies the frame clock;
+`GTKSurface.present()` copies into its framebuffer without swapping or owning the context. The
+window experiment validates suspension while hidden and continued Swift task execution.
 
 The loop must also run Swift `MainActor` tasks: sample-loading completions, delayed saves and
 plug-in operations. `post` alone does not prove that arbitrary Swift tasks resume. Windows uses
@@ -55,11 +56,12 @@ resource lifetime, frame pacing and fractional display scale. No new shader lang
 
 ### Make document interactions asynchronous
 
-The shell currently returns files, save decisions and context-menu commands synchronously.
-GTK's current file dialogs are asynchronous. Prefer asynchronous completion through the shared
-open/save/close flows over nested event loops. Test cancellation, save failure, a close request
-while a dialog is open and repeated commands; no loss of unsaved work. Evolve Windows alongside
-any shared protocol change. Use desktop file portals where appropriate for distribution.
+The shared shell now has completion-based file, save-question and context-menu requests.
+`Desktop` uses them throughout open/save/close and rack sample loading. Windows keeps its existing
+synchronous implementation through default completion wrappers. GTK uses response callbacks with
+no nested event loop. Regression tests cover cancellation, save failure, repeated close requests
+and gesture release while a dialog is pending. Native dialog interaction still needs manual
+qualification. Validate desktop file portals for the eventual distribution package.
 
 ### Complete input semantics
 
@@ -145,7 +147,7 @@ Choose a desktop password with `sudo passwd "$USER"`; the bootstrap deliberately
 After kernel upgrades, install the matching `linux-modules-extra` package again, or use Ubuntu's
 `linux-image-generic` metapackage to track the complete kernel and modules together.
 
-Run `scripts/linux-build.sh doctor`, `build`, `gpu`, `test`, `window`, `play`, `bench`, or `render` **inside Linux**.
+Run `scripts/linux-build.sh doctor`, `build`, `gpu`, `test`, `window`, `desktop`, `play`, `bench`, or `render` **inside Linux**.
 `gpu` invokes `driftbox-play --gpu-info`, reports the actual GLES renderer and verifies a red
 render target reads back as BGRA. It does not claim window or hardware-acceleration support.
 Use `DRIFTBOX_BUILD_JOBS=4` initially. The script leaves macOS/Windows builds untouched and keeps
@@ -203,7 +205,7 @@ The signed-in session runs PipeWire, WirePlumber and RTKit. Installing the missi
 module replaced Dummy Output with Built-in Audio Analog Stereo. `pw-play` successfully sent the
 two-second offline render to that output; audible playback at the Mac speakers is not independently
 confirmed. The native PipeWire command-line adapter described below is now implemented; the Linux
-desktop shell is still to come.
+desktop shell is connected in the preview described below.
 
 macOS `driftbox-play` also builds successfully with its scratch directory on StudioData.
 Swift formatting, shell syntax and `git diff --check` pass; both provisioning/build scripts refuse
@@ -235,7 +237,8 @@ Startup requires a streaming output within five seconds. A disconnected stream o
 without rendering produces a diagnostic and nonzero exit. Duration expiry, Ctrl-C and SIGTERM
 perform orderly teardown. This is a CLI baseline, not yet the full `AudioRouting` adapter: device
 listing/selection, automatic recovery, measured output latency and underrun reporting are pending.
-The GUI, MIDI, sample import and packaging milestones remain unchanged.
+The desktop now uses a default-output `AudioRouting` adapter, described below. MIDI and packaging
+remain pending; the rack uses its existing WAV decoder.
 
 ### Audio validation
 
@@ -267,7 +270,8 @@ separately, while audio device management can build on this stream implementatio
 
 `driftbox-linux-window` draws the existing Graphic Lab scene through GLES and the shared Canvas,
 with Pango shaping and Cairo glyph coverage. This is a silent graphics/input experiment with
-synthetic music levels; the shared `Desktop`, documents and live audio are not connected yet.
+synthetic music levels. It remains a separate diagnostic; `driftbox-linux`, described below,
+connects the shared desktop, documents and live audio.
 Run from a terminal in the Linux desktop:
 
 ```sh
@@ -343,9 +347,72 @@ xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 \
 CI now includes this lifecycle check; remote CI has not run yet. Remaining shell acceptance covers
 pointer and key interaction, fractional/multi-monitor scale, compositor
 minimize/restore, context recreation/loss, and sustained frame pacing on real graphics drivers.
-The next implementation step is a GTK `ShellWindow` adapter feeding `Desktop` through callbacks,
-followed by asynchronous document dialogs and the Linux session/audio adapters. The experiment
-keeps those shared contracts unchanged until the window path is qualified.
+The `GTKWindow` adapter below now feeds `Desktop` through callbacks. Keep this smaller experiment
+as a diagnostic for context, scaling and event-loop changes.
+
+## Shared desktop preview
+
+`driftbox-linux` connects the existing groovebox and built-in rack to `GTKWindow`, `GTKSurface`,
+Pango and `PipeWireRoute`. Run it from the signed-in Linux desktop:
+
+```sh
+scripts/linux-build.sh desktop
+scripts/linux-build.sh desktop conformance/fixtures/documents/acid.song.json
+# For graphics work without an audio service:
+scripts/linux-build.sh desktop --silent
+```
+
+The native menu bar exposes the shared app commands and keyboard shortcuts. File choosers, save
+confirmation and context menus complete through callbacks; the GLib loop and rendering continue.
+GTK 4.8-compatible `GtkFileChooserNative` and response-based message dialogs keep the Debian
+Bookworm CI baseline supported. Document requests are serialized and reject new editing input
+while allowing resize and release/cancel events. Cancelling Open preserves the current song;
+closing after a failed save keeps the window and edits. GTK owns the GL context until the desktop
+and its GPU resources have been released.
+
+The default output mixes the groovebox and rack at 48 kHz using the existing PipeWire bridge.
+`PipeWireRoute` exposes startup/runtime failures through the shared audio status. On stream loss
+or three seconds without rendered frames it stops the route; restart the app after restoring the
+output. Device enumeration/selection, automatic reconnect, measured latency and underrun reporting
+are not implemented. `--silent` intentionally supplies no audio route.
+
+Normal runs use Foundation `UserDefaults` with the `org.driftbox.linux` suite for existing session
+and rack memory; smoke tests do not restore or write preferences. File arguments open a song.
+XDG configuration/data layout and installed-resource discovery still need release qualification.
+No Linux MIDI backend or plug-in host is supplied. Drag/drop, IME composition, canvas accessibility,
+physical keyboard/trackpad behavior and fractional/multi-monitor scaling remain pending. WAV
+import is connected to the rack's shared file request path but has not had a native dialog test.
+
+### Desktop validation
+
+```sh
+xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 \
+  SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 \
+  scripts/linux-build.sh desktop --silent --smoke-test
+# Live PipeWire capture, restricted to this test's child app output ports:
+xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 \
+  SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 \
+  python3 scripts/test-linux-play.py --desktop .build-linux/release/driftbox-linux
+```
+
+The smoke run loads a song, starts and stops its transport, switches to the rack, requires rendered
+rack frames and closes normally. With audio enabled it also requires at least one second of output
+frames and no route error. The final live capture verified 297,984 stereo frames at 48 kHz, finite samples
+and peaks of 0.67445 on both channels; the desktop drew 357 frames and the audio stream rendered
+296,960 frames. This verifies the shared app and audio path on Xvfb/llvmpipe in the ARM64 VM.
+Physical speaker output and sustained latency/glitch behavior are not established.
+
+The shared desktop builds on macOS. All 20 desktop tests, including synchronous behavior and deferred-dialog regressions, pass on Linux.
+The silent smoke drew 357 frames; an unavailable PipeWire server still allowed 358 GUI frames and
+then returned the expected smoke-test failure with an audio diagnostic. The C desktop bridge passes `-Wall -Wextra -Werror`. CI now includes the
+silent desktop smoke run; remote CI and Windows builds have not run for this change.
+
+The first full-desktop Wayland smoke attempt happened while GNOME's display was idle/locked: audio
+advanced but only one GUI frame was delivered, so the frame assertion correctly failed. The full
+app still needs an unlocked desktop visual/interaction check. The earlier window experiment's
+successful Wayland/XWayland runs do not replace that acceptance check.
+
+Guest logs: `~/driftbox-desktop-{release,final-tests,capture,silent}.log`.
 
 ### Local access
 

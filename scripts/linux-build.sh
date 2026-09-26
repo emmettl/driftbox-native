@@ -30,6 +30,9 @@ case "$mode" in
     EGL_PLATFORM=${EGL_PLATFORM:-surfaceless} \
       swift run --scratch-path .build-linux -j "$jobs" driftbox-play --gpu-info
     ;;
+  desktop)
+    swift run --scratch-path .build-linux -c release -j "$jobs" driftbox-linux "$@"
+    ;;
   window)
     swift run --scratch-path .build-linux -c release -j "$jobs" driftbox-linux-window "$@"
     ;;
@@ -44,7 +47,7 @@ case "$mode" in
     swift run --scratch-path .build-linux -c release -j "$jobs" driftbox-render "$@"
     ;;
   *)
-    echo 'usage: scripts/linux-build.sh {doctor|build|gpu|test [swift-test-options]|window [--seconds n | --self-test]|play [player-options]|bench [song]|render [render-options]}' >&2
+    echo 'usage: scripts/linux-build.sh {doctor|build|gpu|test [swift-test-options]|desktop [desktop-options]|window [--seconds n | --self-test]|play [player-options]|bench [song]|render [render-options]}' >&2
     exit 64
     ;;
 esac

@@ -3,6 +3,7 @@
 
 Run inside a signed-in Linux audio session after a release build:
   python3 scripts/test-linux-play.py .build-linux/release/driftbox-play
+For the desktop, pass --desktop before the executable path and set the graphical display environment.
 Needs pipewire-bin (pw-record, pw-link, pw-dump). Temporary capture is deleted on exit.
 """
 import json
@@ -17,9 +18,13 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
-PLAYER = Path(sys.argv[1]).resolve() if len(sys.argv) == 2 else ROOT / ".build-linux/release/driftbox-play"
+arguments = sys.argv[1:]
+DESKTOP = bool(arguments and arguments[0] == "--desktop")
+if DESKTOP:
+    arguments.pop(0)
+PLAYER = Path(arguments[0]).resolve() if arguments else ROOT / ".build-linux/release/driftbox-play"
 SONG = ROOT / "conformance/fixtures/documents/acid.song.json"
-COMMAND = [str(PLAYER), str(SONG)]
+COMMAND = [str(PLAYER)] + (["--smoke-test"] if DESKTOP else []) + [str(SONG)]
 ENV = {**os.environ, "SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE": "swift6"}
 
 
@@ -64,10 +69,10 @@ with tempfile.TemporaryDirectory(prefix="driftbox-play-test-") as directory:
             ["pw-record", "--target=0", "--rate", "48000", "--channels", "2", "--format", "f32",
              "--properties", '{ node.name = "driftbox-test-capture" }', str(capture)],
             env=ENV, stdout=record_log, stderr=record_log)
-        player = subprocess.Popen(COMMAND + ["--seconds", "3"], env=ENV,
+        player = subprocess.Popen(COMMAND + ([] if DESKTOP else ["--seconds", "3"]), env=ENV,
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         try:
-            deadline = time.monotonic() + 2
+            deadline = time.monotonic() + 5
             while True:
                 objects = graph()
                 outputs = ports(objects, node_for_pid(objects, player.pid), "out")
@@ -79,8 +84,8 @@ with tempfile.TemporaryDirectory(prefix="driftbox-play-test-") as directory:
             for channel in ("FL", "FR"):
                 linked = run(["pw-link", str(outputs[channel]), str(inputs[channel])], env=ENV)
                 assert linked.returncode == 0, linked.stderr
-            output, _ = player.communicate(timeout=10)
-            assert player.returncode == 0 and "stopped cleanly" in output, output
+            output, _ = player.communicate(timeout=15)
+            assert player.returncode == 0 and ("closed:" if DESKTOP else "stopped cleanly") in output, output
             print(output.strip())
             assert recorder.poll() is None, "recorder exited before capture was stopped"
         finally:
@@ -107,6 +112,9 @@ with tempfile.TemporaryDirectory(prefix="driftbox-play-test-") as directory:
     peaks = [max(map(abs, samples[channel::2])) for channel in (0, 1)]
     assert all(.01 < peak < 2 for peak in peaks), peaks
     print(f"Capture: {len(samples)//2} stereo frames at {rate} Hz, peaks {peaks}")
+
+    if DESKTOP:
+        sys.exit(0)
 
     # A signal must unwind the stream rather than abruptly exit or hang.
     for sig in (signal.SIGINT, signal.SIGTERM):

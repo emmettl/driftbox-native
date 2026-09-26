@@ -99,6 +99,18 @@ let package = Package(
         "DriftboxTextLinux",
         .target(name: "CLinuxUI", condition: .when(platforms: [.linux])),
       ]),
+    .target(
+      name: "DriftboxGTK",
+      dependencies: [
+        "DriftboxGPU", "DriftboxGPUGLES", "DriftboxShell",
+        .target(name: "CLinuxUI", condition: .when(platforms: [.linux])),
+      ]),
+    .executableTarget(
+      name: "driftbox-linux",
+      dependencies: [
+        "DriftboxGTK", "DriftboxDesktop", "DriftboxHost", "DriftboxHostLinux", "DriftboxSession",
+        "DriftboxRackSession", "DriftboxTextLinux",
+      ]),
     // The Android app's native library: what `android/`'s Java calls, and the tests it runs on a
     // phone. Built into libdriftbox.so by `scripts/android-app.sh`; nothing off Android.
     .target(

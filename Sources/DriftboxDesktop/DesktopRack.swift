@@ -38,11 +38,17 @@ extension Desktop {
       if rackInterface.takeSongRequest() { editRackSong() }
       if let module = rackInterface.takeFileRequest() {
         // A set for a Multisampler, several at once; one file for anything else.
-        let urls =
-          rackInterface.takesSeveral(module)
-          ? window.chooseFiles(ofTypes: [Self.audio])
-          : window.chooseFile(ofTypes: [Self.audio]).map { [$0] } ?? []
-        if !urls.isEmpty { rackInterface.load(urls, into: module) }
+        documentRequest { done in
+          let loaded: ([URL]) -> Void = { urls in
+            if !urls.isEmpty { rackInterface.load(urls, into: module) }
+            done()
+          }
+          if rackInterface.takesSeveral(module) {
+            window.chooseFiles(ofTypes: [Self.audio], completion: loaded)
+          } else {
+            window.chooseFile(ofTypes: [Self.audio]) { loaded($0.map { [$0] } ?? []) }
+          }
+        }
       }
       return true
     case .dropped(let urls, let at):
@@ -62,12 +68,14 @@ extension Desktop {
   /// each edit there plays on in the rack. Whatever is unsaved in the groovebox is asked about
   /// first, as this replaces it.
   func editRackSong() {
-    guard let rack, let song = rack.song, mayLoseChanges() else { return }
-    session.link(
-      song, name: rack.name, edited: { [weak rack] edited in rack?.songEdited(edited) },
-      ended: { [weak rack] in rack?.songLinked = false })
-    rack.songLinked = true
-    setShowsRack(false)
+    guard let rack, let song = rack.song else { return }
+    replacingDocument { [self, rack] in
+      session.link(
+        song, name: rack.name, edited: { [weak rack] edited in rack?.songEdited(edited) },
+        ended: { [weak rack] in rack?.songLinked = false })
+      rack.songLinked = true
+      setShowsRack(false)
+    }
   }
 
   /// What a face loads: WAV, which the rack reads on every platform.
@@ -75,17 +83,19 @@ extension Desktop {
 
   /// Files dropped where nothing else took them: the first song among them opened, as Open would.
   func openDropped(_ urls: [URL]) {
-    guard let song = urls.first(where: { SongFile.isSong(fileName: $0.lastPathComponent) }),
-      mayLoseChanges()
-    else { return }
-    session.open(file: song)
-    setShowsRack(false)
+    guard let song = urls.first(where: { SongFile.isSong(fileName: $0.lastPathComponent) }) else { return }
+    replacingDocument { [self] in
+      session.open(file: song)
+      setShowsRack(false)
+    }
   }
 
   private func pop(_ menu: Menu, at point: SIMD2<Float>, for rack: RackInterface) {
-    let chosen = window.popUp(
-      menu, at: point, isEnabled: { rack.menuIsEnabled($0) }, isChecked: { rack.menuIsChecked($0) })
-    if let chosen { rack.choose(chosen) }
+    window.popUp(
+      menu, at: point, isEnabled: { rack.menuIsEnabled($0) }, isChecked: { rack.menuIsChecked($0) },
+      completion: { chosen in
+        if let chosen { rack.choose(chosen) }
+      })
   }
 
   /// The rack's title: its patch, and the program's name after it.

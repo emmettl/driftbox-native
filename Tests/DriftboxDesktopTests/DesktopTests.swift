@@ -39,6 +39,28 @@ final class StandInWindow: ShellWindow {
   var asked: [String] = []
   var chosenFile: URL?
   var saveLocation: URL?
+  var defersDialogs = false
+  var pendingQuestion: ((SaveAnswer) -> Void)?
+  var pendingSave: ((URL?) -> Void)?
+  var pendingOpen: ((URL?) -> Void)?
+  func chooseFile(ofTypes types: [FileType], completion: @escaping (URL?) -> Void) {
+    if defersDialogs { pendingOpen = completion } else { completion(chooseFile(ofTypes: types)) }
+  }
+  func chooseSaveLocation(for type: FileType, name: String, completion: @escaping (URL?) -> Void) {
+    if defersDialogs {
+      pendingSave = completion
+    } else {
+      completion(chooseSaveLocation(for: type, name: name))
+    }
+  }
+  func askToSave(_ name: String, completion: @escaping (SaveAnswer) -> Void) {
+    if defersDialogs {
+      asked.append(name)
+      pendingQuestion = completion
+    } else {
+      completion(askToSave(name))
+    }
+  }
 
   func run(frame: () throws -> Void) throws {}
   func close() { closed = true }
@@ -518,4 +540,92 @@ func withTemporaryDirectory<T>(_ body: (URL) throws -> T) rethrows -> T {
   try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
   defer { try? FileManager.default.removeItem(at: directory) }
   return try body(directory)
+}
+
+extension DesktopTests {
+  @Test func deferredCloseWaitsForSaveAndDoesNotLoseChangesOnFailure() throws {
+    for device in try Self.devices() {
+      try withTemporaryDirectory { directory in
+        let (desktop, window, surface) = try Self.desktop(on: device)
+        window.choose(DesktopMenus.new)
+        desktop.session.edit("Tempo") { $0.bpm = 135 }
+        window.defersDialogs = true
+        #expect(window.shouldClose?() == false)
+        #expect(window.shouldClose?() == false)
+        #expect(window.asked.count == 1)
+        window.choose(DesktopMenus.new)
+        #expect(desktop.session.song?.bpm == 135)
+        try desktop.drawFrame()
+        #expect(surface.presented == 1, "drawing continues while a native dialog is pending")
+        let question = try #require(window.pendingQuestion)
+        window.pendingQuestion = nil
+        question(.save)
+        let save = try #require(window.pendingSave)
+        window.pendingSave = nil
+        save(directory.appendingPathComponent("missing/failure.driftbox"))
+        #expect(desktop.session.isEdited)
+        #expect(!window.closed)
+        #expect(!desktop.documentRequestPending)
+        #expect(window.shouldClose?() == false)
+        let again = try #require(window.pendingQuestion)
+        window.pendingQuestion = nil
+        again(.save)
+        let successful = try #require(window.pendingSave)
+        window.pendingSave = nil
+        let path = directory.appendingPathComponent("Saved.driftbox")
+        successful(path)
+        #expect(window.closed)
+        #expect(!desktop.session.isEdited)
+        let saved = SongCodec.decode(String(decoding: try Data(contentsOf: path), as: UTF8.self))
+        #expect(saved?.bpm == 135)
+      }
+    }
+  }
+
+  @Test func aPendingDialogStillReleasesThePerformancePad() throws {
+    for device in try Self.devices() {
+      let (desktop, window, _) = try Self.desktop(on: device)
+      window.choose(DesktopMenus.new)
+      desktop.interface.isShowing = false
+      window.onEvent?(.pointer(PointerEvent(phase: .began, location: SIMD2(80, 135))))
+      #expect(desktop.session.padTouch != nil)
+      window.defersDialogs = true
+      window.choose(DesktopMenus.saveAs)
+      #expect(desktop.documentRequestPending)
+      window.onEvent?(.pointer(PointerEvent(phase: .cancelled, location: .zero)))
+      #expect(desktop.session.padTouch == nil)
+      window.onEvent?(.pointer(PointerEvent(phase: .began, location: SIMD2(80, 135))))
+      #expect(desktop.session.padTouch == nil, "new gestures wait for the modal dialog")
+      let cancel = try #require(window.pendingSave)
+      window.pendingSave = nil
+      cancel(nil)
+      #expect(!desktop.documentRequestPending)
+    }
+  }
+
+  @Test func deferredOpenAndCloseCancellationLeaveTheCurrentSongAlone() throws {
+    for device in try Self.devices() {
+      let (desktop, window, _) = try Self.desktop(on: device)
+      window.choose(DesktopMenus.new)
+      desktop.session.edit("Tempo") { $0.bpm = 137 }
+      window.defersDialogs = true
+      window.choose(DesktopMenus.open)
+      #expect(desktop.documentRequestPending)
+      let question = try #require(window.pendingQuestion)
+      window.pendingQuestion = nil
+      question(.discard)
+      let open = try #require(window.pendingOpen)
+      window.pendingOpen = nil
+      open(nil)
+      #expect(desktop.session.song?.bpm == 137)
+      #expect(desktop.session.isEdited)
+      #expect(!desktop.documentRequestPending)
+      #expect(window.shouldClose?() == false)
+      let closing = try #require(window.pendingQuestion)
+      window.pendingQuestion = nil
+      closing(.cancel)
+      #expect(!window.closed)
+      #expect(!desktop.documentRequestPending)
+    }
+  }
 }

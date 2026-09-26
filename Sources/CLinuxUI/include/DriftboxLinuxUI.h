@@ -32,3 +32,35 @@ void db_window_title(db_window *window, const char *title);
 void db_window_resize(db_window *window, int width, int height);
 void db_window_visible(db_window *window, int visible);
 const char *db_window_error(db_window *window);
+
+// Shared Desktop shell. All calls and callbacks, except dispatch submission, use the main thread.
+typedef struct db_desktop db_desktop;
+typedef struct db_menu db_menu;
+typedef struct {
+    int kind, key, code, modifiers, button;
+    double x, y, dx, dy;
+} db_input;
+typedef void (*db_input_callback)(void *, const db_input *);
+typedef void (*db_command)(void *, int);
+typedef int (*db_can_close)(void *);
+// URI lists are newline-separated (newlines in paths are URI-escaped); answer 0 means cancelled.
+typedef void (*db_reply)(void *, int answer, const char *uris);
+db_desktop *db_desktop_new(void *, db_draw, db_input_callback, db_command, db_can_close, char *, size_t);
+int db_desktop_prepare(db_desktop *);
+void db_desktop_run(db_desktop *);
+void db_desktop_current(db_desktop *);
+void db_desktop_close(db_desktop *);
+void db_desktop_free(db_desktop *);
+void db_desktop_title(db_desktop *, const char *);
+const char *db_desktop_error(db_desktop *);
+db_menu *db_menu_new(void);
+void db_menu_free(db_menu *);
+void db_menu_submenu(db_menu *, const char *, db_menu *);
+void db_menu_section(db_menu *, db_menu *);
+void db_menu_item(db_menu *, const char *, int);
+void db_desktop_menu(db_desktop *, db_menu *);
+void db_desktop_action(db_desktop *, int, int enabled, int checked);
+void db_desktop_files(db_desktop *, int save, int multiple, const char *extensions,
+                      const char *name, void *, db_reply);
+void db_desktop_save_question(db_desktop *, const char *name, void *, db_reply);
+void db_desktop_popup(db_desktop *, db_menu *, double x, double y, void *, db_reply);
