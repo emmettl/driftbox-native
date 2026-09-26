@@ -155,13 +155,20 @@ public struct RackStage {
     case clearLoop
     /// Open the Combinator's routing beside the rack, or close it.
     case routes
+    /// Choose the plug-in a plug-in module hosts, from a menu of those there are.
+    case plugin
+    /// Map a plug-in module's macros onto its plug-in's params, from a menu.
+    case macros
 
     /// The param it sets, if it sets one.
     public var param: String? {
       switch self {
       case .set(let param, _): param
       case .data(_, _, _, let then, _): then
-      case .page, .learn, .choose, .sampleBars, .editSong, .startSong, .loopSong, .clearLoop, .routes: nil
+      case .page, .learn, .choose, .sampleBars, .editSong, .startSong, .loopSong, .clearLoop, .routes,
+        .plugin,
+        .macros:
+        nil
       case .hold(let param): param
       }
     }

@@ -533,7 +533,9 @@ public final class RackInterface {
   }
 
   /// What one of a face's buttons or numbers does, on `module`.
-  private func press(_ press: RackStage.Press, on module: String) {
+  /// What a press on a face's button or number does; a menu it asks for opens under `frame`.
+  private func press(_ press: RackStage.Press, on module: String, from frame: Rect? = nil) {
+    let under = frame.map { SIMD2($0.x, $0.maxY) } ?? .zero
     switch press {
     case .set(let param, let value):
       rack.set(module, param, to: value)
@@ -563,6 +565,10 @@ public final class RackInterface {
       rack.clearSongLoop()
     case .routes:
       rack.editRoutes(rack.editingRoutes == module ? nil : module)
+    case .plugin:
+      menuRequest = (pluginMenu(module), under)
+    case .macros:
+      menuRequest = (macroMenu(module), under)
     case .learn(let param):
       if pressModifiers.contains(.shift) {
         rack.clearCcBinding(module, param)
@@ -596,7 +602,7 @@ public final class RackInterface {
       guard let face = stage.faces.first(where: { $0.module.id == module }),
         face.buttons.indices.contains(index), let press = face.buttons[index].press
       else { return }
-      self.press(press, on: module)
+      self.press(press, on: module, from: face.buttons[index].frame)
     case .routing(let part):
       perform(part, at: point)
     default:
@@ -804,48 +810,6 @@ public final class RackInterface {
     guard rack.hostsPlugins else { return Menu("Add", modules) }
     rack.findPlugins()
     return Menu("Add", modules + [.separator] + pluginMenus())
-  }
-
-  /// The platform's plug-ins, effects and instruments apart, each by who made them: one chosen is
-  /// added with its module, in one step. While they are being found, or where there are none, the
-  /// menu says so.
-  func pluginMenus() -> [MenuItem] {
-    let kinds = [
-      (title: "Effect Plug-ins", instrument: false), (title: "Instrument Plug-ins", instrument: true),
-    ]
-    guard case .found(let choices) = rack.pluginChoices else {
-      return kinds.map {
-        .submenu(Menu($0.title, [item("Finding Plug-ins…", "plugins.finding", enabled: false) {}]))
-      }
-    }
-    return kinds.map { kind in
-      let wanted = choices.filter { $0.instrument == kind.instrument }
-      guard !wanted.isEmpty else {
-        let none = kind.instrument ? "No Instruments Installed" : "No Effects Installed"
-        return .submenu(Menu(kind.title, [item(none, "plugins.none.\(kind.instrument)", enabled: false) {}]))
-      }
-      let byVendor = Dictionary(grouping: wanted) {
-        $0.reference.vendor.isEmpty ? "Other" : $0.reference.vendor
-      }
-      // Case aside, and without the old Foundation's localized comparison, which Android does not link.
-      let vendors = byVendor.keys.sorted { $0.lowercased() < $1.lowercased() }
-      return .submenu(
-        Menu(
-          kind.title,
-          vendors.map { vendor in
-            let sorted = (byVendor[vendor] ?? []).sorted {
-              $0.reference.name.lowercased() < $1.reference.name.lowercased()
-            }
-            return .submenu(
-              Menu(
-                vendor,
-                sorted.map { choice in
-                  item(choice.reference.name, "plugin.\(choice.reference.format).\(choice.reference.id)") {
-                    self.rack.add(choice.moduleType, plugin: choice.reference)
-                  }
-                }))
-          }))
-    }
   }
 
   public func menuIsEnabled(_ id: String) -> Bool { !menuDisabled.contains(id) }

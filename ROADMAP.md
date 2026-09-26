@@ -616,8 +616,11 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    params the plug-in takes them on — with its macros turning its params and its state kept in the
    patch. The rack's Add menu lists them, found while the rack is first shown: effects and
    instruments apart, each by who made it, one chosen added with its module in one step of undo.
-   All of it compiles on Windows alone for now. Next: their faces, and their own editors in
-   windows of their own; and a module that crashes while it is scanned takes the app with it, so
+   A plug-in module's face is the Mac's: the plug-in and who made it, how late it is or why it is
+   silent, another of its kind chosen from its menu, and its four macros mapped from theirs, each
+   named for its param and reading its value in the plug-in's own words; an instrument's lights
+   the notes it is playing on two octaves of keys. All of it compiles on Windows alone for now.
+   Next: their own editors in windows of their own, and learning a macro from one; and a module that crashes while it is scanned takes the app with it, so
    scanning out of process, later.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for

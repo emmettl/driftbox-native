@@ -91,5 +91,13 @@
     }
 
     public func close() { onChange = nil }
+
+    /// In the plug-in's own words, with its units after them where it gives any and its words do
+    /// not already end in them.
+    public func display(_ key: String, at fraction: Double) -> String? {
+      guard let id = UInt32(key), let text = hosted.text(id, at: fraction), !text.isEmpty else { return nil }
+      let units = automatable.first { $0.id == id }?.units ?? ""
+      return units.isEmpty || text.hasSuffix(units) ? text : text + " " + units
+    }
   }
 #endif

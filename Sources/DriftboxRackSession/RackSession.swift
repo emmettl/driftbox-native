@@ -57,6 +57,13 @@ public protocol RackPluginUnit: AnyObject {
   var onChange: ((_ moved: UInt64?) -> Void)? { get set }
   /// Let go of: its interface closed, and nothing more heard from it.
   func close()
+  /// What the param with `key` says it is at `fraction` of its range, in its own words and units;
+  /// nil where the unit cannot say.
+  func display(_ key: String, at fraction: Double) -> String?
+}
+
+extension RackPluginUnit {
+  public func display(_ key: String, at fraction: Double) -> String? { nil }
 }
 
 /// One of a plug-in's own params, as a macro maps onto it.
