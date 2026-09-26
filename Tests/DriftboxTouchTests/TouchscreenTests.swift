@@ -1,5 +1,6 @@
 import DriftboxGPU
 import DriftboxHost
+import DriftboxInterface
 import DriftboxSession
 import DriftboxShell
 import DriftboxText
@@ -115,6 +116,51 @@ struct TouchscreenTests {
     #expect(screen.session.song == before, "and the step it rested on is left as it was")
     screen.interface.choose("lane.rotateRight")
     #expect(screen.session.song != before, "while what is chosen from the menu is done")
+  }
+
+  /// A pattern's chip, pressed long, offers to rename it only where the platform can ask for a
+  /// name, since no keys come to type one into the chip with; and what is typed there names it.
+  @Test func aPatternIsRenamedInThePlatformsPrompt() throws {
+    guard let screen = try Self.screen() else { return }
+    var now = 100.0
+    screen.clock = { now }
+    var shown: Menu?
+    screen.onMenu = { menu, _ in shown = menu }
+    /// The first pattern's chip, and the pattern.
+    func first() -> (chip: Layout.Chip, pattern: String)? {
+      for chip in screen.interface.layout.patternChips {
+        if case .showPattern(let id) = chip.action { return (chip, id) }
+      }
+      return nil
+    }
+    func pressLong() throws -> [String] {
+      let chip = try #require(first()).chip
+      let at = SIMD2(chip.frame.x + chip.frame.width / 2, chip.frame.y + chip.frame.height / 2)
+      shown = nil
+      screen.touch(Self.finger(.began, 1, at))
+      now += 1
+      screen.checkLongPress()
+      screen.touch(Self.finger(.ended, 1, at))
+      return try #require(shown).items.compactMap { if case .command(let c) = $0 { c.id } else { nil } }
+    }
+    #expect(try !pressLong().contains("pattern.rename"), "no way to type a name")
+
+    var asked: (title: String, name: String, then: (String) -> Void)?
+    screen.interface.askName = { asked = ($0, $1, $2) }
+    #expect(try pressLong().contains("pattern.rename"))
+    let id = try #require(first()).pattern
+    let pattern = try #require(screen.session.song?.pattern(id: id))
+    screen.choose("pattern.rename")
+    #expect(asked?.title == "Rename Pattern" && asked?.name == pattern.name)
+    #expect(!screen.interface.takesText, "the chip is no field")
+    let long = "Drop 2, and a great deal longer than a name may be"
+    asked?.then(long)
+    let renamed = screen.session.song?.pattern(id: pattern.id)?.name
+    #expect(renamed == String(long.prefix(Interface.longestName)))
+    #expect(screen.session.undoTitle == "Undo Rename Pattern")
+    screen.interface.rename(pattern: pattern.id)
+    asked?.then("   ")
+    #expect(screen.session.song?.pattern(id: pattern.id)?.name == renamed, "a blank name is not kept")
   }
 
   /// A finger that moves as far as a drag, or lifts, is not a long press.

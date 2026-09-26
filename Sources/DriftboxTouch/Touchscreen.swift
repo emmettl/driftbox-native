@@ -153,14 +153,33 @@ public final class Touchscreen {
 
   // MARK: - Fingers
 
-  /// Put `rack` beside the groovebox: the song's menu offers it, and its patches' the way back.
+  /// Put `rack` beside the groovebox: the song's menu offers it, and its patches' the way back and
+  /// the groovebox's songs.
   public func add(_ rack: RackSession) {
     let shown = RackInterface(rack: rack)
     shown.touch = true
     shown.helpGuide = RackHelp.guide(for: .android)
     shown.showGroovebox = { [weak self] in self?.show(rack: false) }
+    shown.groovebox = session
     interface.showRack = { [weak self] in self?.show(rack: true) }
+    // The rack lets go of a song it had linked here, as when another patch is opened in it.
+    rack.onUnlinkSong = { [weak session] in session?.unlinkRack() }
     self.rack = shown
+  }
+
+  /// The rack's song opened in the groovebox, linked, and the groovebox shown in the rack's place:
+  /// each edit there plays on in the rack. Whatever is unsaved in the groovebox is asked about
+  /// first, as this replaces it.
+  public func editRackSong() {
+    guard rack?.rack.song != nil else { return }
+    interface.unlessEdited { [weak self] in
+      guard let self, let rack = self.rack?.rack, let song = rack.song else { return }
+      session.link(
+        song, name: rack.name, edited: { [weak rack] edited in rack?.songEdited(edited) },
+        ended: { [weak rack] in rack?.songLinked = false })
+      rack.songLinked = true
+      show(rack: false)
+    }
   }
 
   /// The rack in the groovebox's place, or back. Whatever a finger was doing on the one leaving is
@@ -211,6 +230,7 @@ public final class Touchscreen {
       if event.phase == .began { resting = (event.id, event.location, clock()) }
       if let request = rack.takeMenuRequest() { onMenu?(request.menu, request.at) }
       if let module = rack.takeFileRequest() { onFiles?(module, rack.takesSeveral(module)) }
+      if rack.takeSongRequest() { editRackSong() }
       return
     }
     if interface.pointer(event) {

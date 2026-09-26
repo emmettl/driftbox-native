@@ -113,6 +113,13 @@
     MainActor.assumeIsolated { stage?.choose(chosen) }
   }
 
+  /// A name typed into the dialog the last frame asked for, and kept.
+  @_cdecl("Java_app_driftbox_Native_named")
+  public func nativeNamed(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ name: jstring?) {
+    let typed = env.string(name)
+    MainActor.assumeIsolated { stage?.named(typed) }
+  }
+
   /// A song document Java's picker chose, and Java read: its text, its file's name, and its URI.
   @_cdecl("Java_app_driftbox_Native_fileOpened")
   public func nativeFileOpened(
