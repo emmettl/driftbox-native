@@ -61,6 +61,67 @@ struct TouchscreenRackTests {
     #expect(rack.samples["m"] != nil, "the recording in it")
   }
 
+  /// A finger on the rack at `at`, in points on the screen, down and lifted.
+  static func tap(_ screen: Touchscreen, _ at: SIMD2<Float>) {
+    screen.touch(TouchscreenTests.finger(.began, 1, at))
+    screen.touch(TouchscreenTests.finger(.ended, 1, at))
+  }
+
+  /// A groovebox song in the rack: its face's Edit in Groovebox, tapped, links it into the
+  /// groovebox and shows the groovebox in the rack's place, once unsaved edits there are let go
+  /// of; each edit there plays on in the rack.
+  @Test func aRackSongIsEditedInTheGroovebox() throws {
+    guard let (screen, rack) = try Self.screen(), let face = screen.rack else { return }
+    let song = try #require(Catalogue.song("acid"))
+    rack.openSong(song, name: "Acid in the Rack")
+    screen.session.edit("Rename Pattern") { $0 = $0.renamingPattern($0.patterns[0].id, to: "Unsaved") }
+    var asked: (() -> Void)?
+    screen.interface.confirm = { _, then in asked = then }
+    screen.show(rack: true)
+    face.size = SIMD2(372, 828)
+    let stage = face.stage
+    let groovebox = try #require(stage.faces.first { $0.module.type == "groovebox" })
+    let edit = try #require(groovebox.buttons.first { $0.press == .editSong })
+    let at =
+      stage.origin + SIMD2(edit.frame.x + edit.frame.width / 2, edit.frame.y + edit.frame.height / 2)
+      * stage.scale
+
+    Self.tap(screen, at)
+    #expect(screen.showsRack && !screen.session.linkedToRack, "not until the unsaved edits may go")
+    let then = try #require(asked)
+    then()
+    #expect(!screen.showsRack && screen.session.linkedToRack && rack.songLinked)
+    #expect(screen.session.song == rack.song && screen.session.documentName == "Acid in the Rack")
+
+    screen.interface.rename(pattern: song.patterns[0].id, to: "Edited Here")
+    #expect(rack.song?.pattern(id: song.patterns[0].id)?.name == "Edited Here", "and plays on in the rack")
+
+    rack.open(PatchEntry.all[0])
+    #expect(!screen.session.linkedToRack, "another patch lets it go")
+  }
+
+  /// The rack's patch menu offers the groovebox's songs: the one open there and the catalogue's.
+  @Test func thePatchMenuOffersGrooveboxSongs() throws {
+    guard let (screen, rack) = try Self.screen(), let face = screen.rack else { return }
+    screen.show(rack: true)
+    face.size = SIMD2(372, 828)
+    let chip = try #require(face.stage.chips.first { $0.target == .patches })
+    var shown: Menu?
+    screen.onMenu = { menu, _ in shown = menu }
+    Self.tap(screen, SIMD2(chip.frame.x + chip.frame.width / 2, chip.frame.y + chip.frame.height / 2))
+    let songs = try #require(
+      shown?.items.lazy.compactMap {
+        if case .submenu(let menu) = $0, menu.title == "Groovebox Songs" { menu } else { nil }
+      }
+      .first)
+    let ids = songs.items.compactMap { if case .command(let c) = $0 { c.id } else { nil } }
+    #expect(ids.first == "rackSong.groovebox" && ids.contains("rackSong.acid"))
+
+    screen.choose("rackSong.groovebox")
+    #expect(rack.song == screen.session.song && rack.name == screen.session.documentName)
+    #expect(rack.patch.modules.contains { $0.type == "groovebox" })
+  }
+
   /// A second of a sine at 48 kHz, as a WAV.
   static func wav() throws -> URL {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).wav")

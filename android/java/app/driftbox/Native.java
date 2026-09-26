@@ -51,6 +51,9 @@ final class Native {
   /** The command with this id chosen from the menu the last frame returned. */
   static native void menuChosen(String id);
 
+  /** The name typed into the dialog the last frame asked for, and kept. */
+  static native void named(String name);
+
   /** A song document the open picker chose, read whole: its URI, its name, and its text. */
   static native void fileOpened(String uri, String name, String text);
 

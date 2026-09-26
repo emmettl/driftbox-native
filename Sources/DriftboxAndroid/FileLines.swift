@@ -12,6 +12,8 @@
   ///                                   several, and copy them where Swift can read them:
   ///                                   `Native.samplesChosen`
   ///     ask  question                 ask, and choose `confirmed` for yes: `Native.menuChosen`
+  ///     name  title  longest  name    ask for a name in place of `name`, at most `longest`
+  ///                                   characters: `Native.named`
   ///
   /// A menu's first line begins with a number, so neither can be taken for the other.
   enum FileLines {
@@ -26,6 +28,10 @@
     }
 
     static func ask(_ question: String) -> String { "ask\t\(clean(question))" }
+
+    static func name(_ title: String, _ name: String, longest: Int) -> String {
+      "name\t\(clean(title))\t\(longest)\t\(clean(name))"
+    }
 
     static func samples(for module: String, several: Bool) -> String {
       "file\tsamples\t\(clean(module))\t\(several ? 1 : 0)"
