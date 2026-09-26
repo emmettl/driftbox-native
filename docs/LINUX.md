@@ -12,8 +12,8 @@ MIDI notes and clock. Linux plug-in hosting and publishing Driftbox as a plug-in
 
 Target Ubuntu 24.04 LTS first. Test both Wayland and X11 before claiming support for either.
 PipeWire now powers the command-line audio output; ALSA sequencer is the proposed MIDI backend, GTK 4/Pango the
-proposed shell/text stack, and GLES the existing renderer. The GTK decision remains provisional
-until the context and event-loop experiments below pass. Do not introduce a second UI or engine.
+shell/text stack under evaluation, and GLES the existing renderer. The standalone GTK experiment
+now passes automated context/event-loop checks; desktop-session and full-shell validation remain. Do not introduce a second UI or engine.
 
 ## What already exists
 
@@ -145,7 +145,7 @@ Choose a desktop password with `sudo passwd "$USER"`; the bootstrap deliberately
 After kernel upgrades, install the matching `linux-modules-extra` package again, or use Ubuntu's
 `linux-image-generic` metapackage to track the complete kernel and modules together.
 
-Run `scripts/linux-build.sh doctor`, `build`, `gpu`, `test`, `play`, `bench`, or `render` **inside Linux**.
+Run `scripts/linux-build.sh doctor`, `build`, `gpu`, `test`, `window`, `play`, `bench`, or `render` **inside Linux**.
 `gpu` invokes `driftbox-play --gpu-info`, reports the actual GLES renderer and verifies a red
 render target reads back as BGRA. It does not claim window or hardware-acceleration support.
 Use `DRIFTBOX_BUILD_JOBS=4` initially. The script leaves macOS/Windows builds untouched and keeps
@@ -161,6 +161,7 @@ Shut the guest down to release RAM; merely pausing it need not release memory.
 - [UTM scripting](https://docs.getutm.app/scripting/reference/)
 - [Ubuntu cloud images](https://cloud-images.ubuntu.com/noble/)
 - [GTK GLArea context and framebuffer](https://docs.gtk.org/gtk4/class.GLArea.html)
+- [Swift Linux run-loop wakeup integration](https://github.com/swiftlang/swift-corelibs-foundation/blob/main/Sources/CoreFoundation/CFRunLoop.c)
 - [GTK asynchronous file dialogs](https://docs.gtk.org/gtk4/class.FileDialog.html)
 - [PipeWire stream API](https://docs.pipewire.org/group__pw__stream.html)
 - [ALSA sequencer API](https://alsa-project.org/alsa-doc/alsa-lib/seq.html)
@@ -259,8 +260,81 @@ duration arguments. Missing-server and lost-stream cases exited 1 without a cras
 
 These checks verify live rendering and safe ownership in this ARM64 VM. They do not establish
 physical speaker output, sustained glitch-free playback, measured latency, x86-64 behavior or
-real-device hotplug recovery. The next application milestone is the shell/context/concurrency
-experiment, while audio device management can build on this stream implementation.
+real-device hotplug recovery. The shell/context/concurrency experiment below is implemented
+separately, while audio device management can build on this stream implementation.
+
+## Linux window experiment
+
+`driftbox-linux-window` draws the existing Graphic Lab scene through GLES and the shared Canvas,
+with Pango shaping and Cairo glyph coverage. This is a silent graphics/input experiment with
+synthetic music levels; the shared `Desktop`, documents and live audio are not connected yet.
+Run from a terminal in the Linux desktop:
+
+```sh
+scripts/linux-build.sh window
+# Drag to choose a Graphic Lab edition, Space to pause, Escape to close.
+scripts/linux-build.sh window --self-test
+```
+
+`--seconds N` closes after a bounded run and requires rendering and Swift async completion.
+`--self-test` additionally resizes to 800 × 600, hides the window, confirms frame callbacks stop
+while MainActor tasks continue, shows it again and checks that drawing resumes. It exits after
+six seconds with a nonzero result on failure. Use a normal, unmaximized window for this test.
+
+GTK owns the GLES context, render framebuffer and frame clock. `GLESDevice` now has an explicit
+borrowed-context initializer; the original EGL/pbuffer path remains for headless tests. Each frame
+captures GTK's framebuffer and pixel viewport before drawing; a final vertically flipped blit
+presents the shared renderer's top-down target. Resource teardown happens during GLArea unrealize
+with its context current. The pixel-to-logical-width ratio determines Canvas text scale. Pointer
+release, gesture cancellation and focus loss clear the active gesture.
+
+The GLib loop watches libdispatch's main-queue eventfd. It acknowledges the wakeup before invoking
+`_dispatch_main_queue_callback_4CF`, matching CoreFoundation's Linux behavior; failing to acknowledge
+it starves GTK frame sources. There is no periodic queue polling. These underscored symbols are
+**private Swift runtime ABI**, tested with Swift 6.4.0, not a stable public GTK integration API.
+Revalidate the bridge on every toolchain update. Do not run a competing CFRunLoop consumer of the
+same main-queue handle, and introduce one process-wide bridge before supporting multiple windows.
+
+Pango retains the exact fallback font for each glyph run. Cairo supplies grayscale glyph coverage
+to the shared atlas, including fractional horizontal placement. Missing-glyph identifiers that
+exceed the shared UInt16 index are retained through a separate face entry. Colour emoji and IME
+composition are not implemented by this typesetter.
+
+### Window validation
+
+The Ubuntu ARM64 run passed 48 focused Pango, GPU, Canvas, presentation and layout tests. Pango
+checks cover combining marks, trailing spaces, Arabic/fallback shaping, missing-glyph coverage,
+baselines and fractional placement. The C bridges pass `-Wall -Wextra -Werror`. The Mac player
+build still passes.
+
+The Xvfb/llvmpipe lifecycle run rendered 302 frames with strict Swift actor checking. It resized,
+suspended rendering while hidden, ran delayed and background-to-MainActor work, resumed drawing
+and exited cleanly. A second run at 2× scale rendered 202 frames, using 2000 × 1440 pixels before
+resizing to 1600 × 1200; all lifecycle checks passed. That run used an Xvfb screen of 2560 × 1920
+to accommodate the logical window size. Invalid durations and an unavailable display also failed
+cleanly with exit 1.
+
+These checks establish software-rendered X11 integration, not desktop Wayland/X11 support or
+visual/input correctness. The Wayland run created the virgl/ANGLE GLES context and drew an initial
+frame, but failed the sustained-rendering probe while the VM desktop was locked. Visual orientation,
+interactive input and sustained virtual-GPU presentation still await an unlocked desktop. Guest
+logs are `~/driftbox-window-{build,tests,xvfb,scale,wayland}.log` and `~/driftbox-pango-tests.log`.
+
+For a headless development or CI run:
+
+```sh
+sudo apt-get install --no-install-recommends xvfb xauth
+xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 \
+  SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 \
+  scripts/linux-build.sh window --self-test
+```
+
+CI now includes this lifecycle check; remote CI has not run yet. Remaining shell acceptance covers
+visible orientation/alpha, pointer and key interaction, fractional/multi-monitor scale, compositor
+minimize/restore, context recreation/loss, and sustained frame pacing on real graphics drivers.
+The next implementation step is a GTK `ShellWindow` adapter feeding `Desktop` through callbacks,
+followed by asynchronous document dialogs and the Linux session/audio adapters. The experiment
+keeps those shared contracts unchanged until the window path is qualified.
 
 ### Local access
 

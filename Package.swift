@@ -8,8 +8,10 @@ import PackageDescription
 
 #if os(Linux)
   let pipeWirePkgConfig: String? = "libpipewire-0.3"
+  let gtkPkgConfig: String? = "gtk4"
 #else
   let pipeWirePkgConfig: String? = nil
+  let gtkPkgConfig: String? = nil
 #endif
 
 let package = Package(
@@ -85,6 +87,18 @@ let package = Package(
     .target(
       name: "DriftboxHostLinux",
       dependencies: ["DriftboxHost", .target(name: "CPipeWireBridge", condition: .when(platforms: [.linux]))]),
+    .systemLibrary(name: "CGTK", pkgConfig: gtkPkgConfig, providers: [.apt(["libgtk-4-dev"])]),
+    .target(name: "CLinuxUI", dependencies: [.target(name: "CGTK", condition: .when(platforms: [.linux]))]),
+    .target(
+      name: "DriftboxTextLinux",
+      dependencies: ["DriftboxText", .target(name: "CLinuxUI", condition: .when(platforms: [.linux]))]),
+    .executableTarget(
+      name: "driftbox-linux-window",
+      dependencies: [
+        "DriftboxText", "DriftboxCanvas", "DriftboxScenes", "DriftboxGPU", "DriftboxGPUGLES", "DriftboxHost",
+        "DriftboxTextLinux",
+        .target(name: "CLinuxUI", condition: .when(platforms: [.linux])),
+      ]),
     // The Android app's native library: what `android/`'s Java calls, and the tests it runs on a
     // phone. Built into libdriftbox.so by `scripts/android-app.sh`; nothing off Android.
     .target(
@@ -251,6 +265,7 @@ let package = Package(
     // Finds and reads `conformance/fixtures` for every test target.
     .target(name: "ConformanceSupport", dependencies: ["DriftboxDocument"], path: "Tests/ConformanceSupport"),
 
+    .testTarget(name: "DriftboxTextLinuxTests", dependencies: ["DriftboxTextLinux", "DriftboxText"]),
     .testTarget(name: "DriftboxHostLinuxTests", dependencies: ["DriftboxHostLinux", "DriftboxHost"]),
     .testTarget(name: "DriftboxDSPTests", dependencies: ["DriftboxDSP", "ConformanceSupport"]),
     .testTarget(

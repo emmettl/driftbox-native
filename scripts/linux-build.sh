@@ -14,7 +14,7 @@ case "$mode" in
   doctor)
     uname -sm
     swift --version
-    pkg-config --modversion egl glesv2 libpipewire-0.3
+    pkg-config --modversion egl glesv2 libpipewire-0.3 gtk4 pangocairo
     df -h .
     ;;
   build)
@@ -30,6 +30,9 @@ case "$mode" in
     EGL_PLATFORM=${EGL_PLATFORM:-surfaceless} \
       swift run --scratch-path .build-linux -j "$jobs" driftbox-play --gpu-info
     ;;
+  window)
+    swift run --scratch-path .build-linux -c release -j "$jobs" driftbox-linux-window "$@"
+    ;;
   play)
     swift run --scratch-path .build-linux -c release -j "$jobs" driftbox-play "$@"
     ;;
@@ -41,7 +44,7 @@ case "$mode" in
     swift run --scratch-path .build-linux -c release -j "$jobs" driftbox-render "$@"
     ;;
   *)
-    echo 'usage: scripts/linux-build.sh {doctor|build|gpu|test [swift-test-options]|play [player-options]|bench [song]|render [render-options]}' >&2
+    echo 'usage: scripts/linux-build.sh {doctor|build|gpu|test [swift-test-options]|window [--seconds n | --self-test]|play [player-options]|bench [song]|render [render-options]}' >&2
     exit 64
     ;;
 esac

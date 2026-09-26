@@ -17,7 +17,7 @@ sudo apt-get install -y --no-install-recommends \
   tzdata zip unzip zlib1g-dev \
   libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri mesa-utils \
   libpipewire-0.3-dev pipewire pipewire-pulse wireplumber libasound2-dev \
-  libgtk-4-dev libpango1.0-dev qemu-guest-agent
+  libgtk-4-dev libpango1.0-dev fonts-dejavu-core qemu-guest-agent
 release=swift-6.4.0-RELEASE
 archive="$release-$suffix.tar.gz"
 base="https://download.swift.org/swift-6.4.0-release/$platform/$release"
