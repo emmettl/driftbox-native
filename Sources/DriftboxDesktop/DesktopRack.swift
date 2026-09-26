@@ -34,18 +34,12 @@ extension Desktop {
       return true
     case .pointer(let pointer):
       rackInterface.pointer(pointer)
-      if let request = rackInterface.takeMenuRequest() {
-        pop(request.menu, at: request.at, for: rackInterface)
-      }
-      if rackInterface.takeSongRequest() { editRackSong() }
-      if let module = rackInterface.takeFileRequest() {
-        // A set for a Multisampler, several at once; one file for anything else.
-        let urls =
-          rackInterface.takesSeveral(module)
-          ? window.chooseFiles(ofTypes: [Self.audio])
-          : window.chooseFile(ofTypes: [Self.audio]).map { [$0] } ?? []
-        if !urls.isEmpty { rackInterface.load(urls, into: module) }
-      }
+      takeRequests(from: rackInterface)
+      return true
+    case .accessibility(let action):
+      // A screen reader's press, as a click: what it asks for asked of the window as a click's is.
+      rackInterface.perform(action)
+      takeRequests(from: rackInterface)
       return true
     case .dropped(let urls, let at):
       // Onto a module that holds recordings; anything else is the window's, as a song is.
@@ -57,6 +51,23 @@ extension Desktop {
       return rackInterface.key(key)
     default:
       return false
+    }
+  }
+
+  /// What a press on the rack asked the window for: a menu, the song edited in the groovebox, or
+  /// files to load into a module.
+  private func takeRequests(from rackInterface: RackInterface) {
+    if let request = rackInterface.takeMenuRequest() {
+      pop(request.menu, at: request.at, for: rackInterface)
+    }
+    if rackInterface.takeSongRequest() { editRackSong() }
+    if let module = rackInterface.takeFileRequest() {
+      // A set for a Multisampler, several at once; one file for anything else.
+      let urls =
+        rackInterface.takesSeveral(module)
+        ? window.chooseFiles(ofTypes: [Self.audio])
+        : window.chooseFile(ofTypes: [Self.audio]).map { [$0] } ?? []
+      if !urls.isEmpty { rackInterface.load(urls, into: module) }
     }
   }
 
