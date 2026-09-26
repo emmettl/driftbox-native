@@ -32,6 +32,7 @@ public enum DesktopMenus {
   public static let previousSection = "transport.previousSection"
   public static let nextSection = "transport.nextSection"
   public static let loop = "transport.loop"
+  public static let clearLoop = "transport.clearLoop"
   public static let metronome = "transport.metronome"
   public static let recordAutomation = "transport.recordAutomation"
   public static let clearAutomation = "transport.clearAutomation"
@@ -140,6 +141,8 @@ public enum DesktopMenus {
             .command("Next Section", id: nextSection, shortcut: Shortcut(.pageDown, [])),
             .separator,
             .command("Loop This Section", id: loop, shortcut: Shortcut("l")),
+            // Whatever is looping, one section or several stretched across.
+            .command("Clear Loop", id: clearLoop, shortcut: Shortcut("l", [.primary, .shift])),
             .command("Metronome", id: metronome, shortcut: Shortcut("m")),
             .separator,
             .command("Record Automation", id: recordAutomation),

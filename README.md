@@ -382,7 +382,8 @@ choices, its catalogue of patches, and the keys playing it, heard beside the gro
   is played written as one, each written while the app carries on, how far in the title, then
   shown in Explorer.
 - **Edit:** Undo and Redo, named for the edit.
-- **Transport:** play and stop, sections, the loop, the metronome and the count-in.
+- **Transport:** play and stop, sections, the loop set to a section or cleared whatever it spans, the
+  metronome and the count-in.
 - **View:** the controls shown or hidden, and the song's scene or any other; and the visuals in a
   window of their own (Ctrl+2), or full screen on a display chosen by name, for a projector: Escape,
   F11 or a double-click leave full screen, Space plays and stops, the pointer hides when still, and

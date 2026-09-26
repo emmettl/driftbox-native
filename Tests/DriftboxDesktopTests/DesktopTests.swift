@@ -326,6 +326,21 @@ struct DesktopTests {
     #expect(try FileManager.default.contentsOfDirectory(atPath: stems.path) == ["Groove - 909.bd.wav"])
   }
 
+  /// Transport ▸ Clear Loop: whatever is looping, one section or several stretched across, which
+  /// Loop This Section would only replace; and nothing to clear while nothing loops.
+  @Test func aLoopIsCleared() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Groove")
+    #expect(window.isEnabled?(DesktopMenus.clearLoop) == false)
+    desktop.session.toggleLoop(start: 0, bars: 1)
+    desktop.session.extendLoop(toStart: 1, bars: 1)
+    #expect(desktop.session.loop?.bars == 2)
+    #expect(window.isEnabled?(DesktopMenus.clearLoop) == true)
+    window.choose(DesktopMenus.clearLoop)
+    #expect(desktop.session.loop == nil)
+  }
+
   @Test func aNewSongIsSavedWhereItIsAskedTo() throws {
     for device in try Self.devices() {
       try withTemporaryDirectory { directory in
