@@ -41,11 +41,15 @@ elif [ "$(uname)" = Darwin ]; then
   android_sdk="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 else
   host=linux exe= bat=
+  # Where `swift sdk install` puts them, which depends on SwiftPM's version: under ~/.swiftpm, or
+  # under the XDG configuration directory.
   swift_sdks="$HOME/.swiftpm/swift-sdks"
+  [ -d "$swift_sdks" ] || swift_sdks="${XDG_CONFIG_HOME:-$HOME/.config}/swiftpm/swift-sdks"
   android_sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
 fi
 
 bundle="${DRIFTBOX_ANDROID_SWIFT_SDK:-$(newest "$swift_sdks"/swift-*_android.artifactbundle/swift-android)}"
+[ -n "$bundle" ] || { echo "not found: swift.org's Swift SDK for Android, in $swift_sdks" >&2; exit 1; }
 # The toolchain the SDK was made for: its version is in the bundle's name.
 release="$(basename "$(dirname "$bundle")" | sed 's/_android.artifactbundle$//')"
 case $host in
@@ -55,6 +59,8 @@ case $host in
 esac
 ndk="${ANDROID_NDK_HOME:-$(newest "$android_sdk"/ndk/*)}"
 adb="${ADB:-$(command -v adb || echo "$android_sdk/platform-tools/adb$exe")}"
+[ -n "$swiftc" ] || { echo "not found: swiftc, on the PATH" >&2; exit 1; }
+[ -n "$ndk" ] || { echo "not found: the Android NDK, under $android_sdk/ndk" >&2; exit 1; }
 for need in "$swiftc" "$bundle" "$ndk"; do
   [ -e "$need" ] || { echo "not found: $need" >&2; exit 1; }
 done
