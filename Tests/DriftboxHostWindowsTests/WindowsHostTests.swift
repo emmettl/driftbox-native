@@ -51,14 +51,16 @@
       let counter = Counter()
       route.attach(counter.source)
       let began = Date()
-      RunLoop.main.run(until: began.addingTimeInterval(0.5))
+      Thread.sleep(forTimeInterval: 0.5)
       let seconds = Date().timeIntervalSince(began)
       let rendered = Double(counter.frames.load(ordering: .relaxed)) / 48000
+      // It did wait: the sleep can end a timer tick early by the wall clock, never much more.
+      #expect(seconds >= 0.45, "waited \(seconds)s")
       // Within a period or two of the time that passed, plus the buffer filled ahead.
       #expect(abs(rendered - seconds) < 0.1, "rendered \(rendered)s in \(seconds)s")
       route.detach(counter.source.context)
       let after = counter.frames.load(ordering: .relaxed)
-      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      Thread.sleep(forTimeInterval: 0.1)
       #expect(counter.frames.load(ordering: .relaxed) == after)
     }
 
