@@ -17,6 +17,9 @@ public enum DesktopMenus {
   public static let saveAs = "file.saveAs"
   public static let exportMix = "file.exportMix"
   public static let exportStems = "file.exportStems"
+  public static let exportMovie = "file.exportMovie"
+  public static let stopMovie = "file.stopMovie"
+  public static let record = "file.record"
   public static let exit = "file.exit"
   public static let undo = "edit.undo"
   public static let redo = "edit.redo"
@@ -63,9 +66,11 @@ public enum DesktopMenus {
   }
 
   /// The menus for `session`, and for `rack` when there is one: the Edit menu undoes in whichever
-  /// shows.
+  /// shows. While a movie is being written, the File menu stops it.
   @MainActor
-  public static func bar(for session: Session, rack: RackSession? = nil, showsRack: Bool = false) -> MenuBar {
+  public static func bar(
+    for session: Session, rack: RackSession? = nil, showsRack: Bool = false, writingMovie: Bool = false
+  ) -> MenuBar {
     let undoTitle = showsRack ? rack?.undoTitle ?? "Undo" : session.undoTitle
     let redoTitle = showsRack ? rack?.redoTitle ?? "Redo" : session.redoTitle
     return MenuBar(
@@ -83,6 +88,12 @@ public enum DesktopMenus {
             .separator,
             .command("Export Mix…", id: exportMix, shortcut: Shortcut("e")),
             .command("Export Stems…", id: exportStems, shortcut: Shortcut("e", [.primary, .shift])),
+            writingMovie
+              ? .command("Stop Writing Movie", id: stopMovie, shortcut: Shortcut("m", [.primary, .shift]))
+              : .command("Export Movie…", id: exportMovie, shortcut: Shortcut("m", [.primary, .shift])),
+            .command(
+              session.isRecording ? "Stop Recording…" : "Record Performance", id: record,
+              shortcut: Shortcut("r", [.primary, .shift])),
             .separator,
             .command("Exit", id: exit, shortcut: Shortcut("q")),
           ]),

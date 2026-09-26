@@ -50,6 +50,10 @@ public protocol ShellWindow: AnyObject {
   /// A folder to put files in, from the platform's own panel, titled `title` and chosen with a
   /// button that says `button`. Nil when cancelled.
   func chooseFolder(title: String, button: String) -> URL?
+  /// The file at `url` shown where the platform keeps files, picked out: Explorer, the Finder.
+  func reveal(_ url: URL)
+  /// Something the person should know, in the platform's own box, which waits to be put away.
+  func tell(_ message: String)
   /// The platform's own question before work is lost: save the changes to `name`, throw them
   /// away, or think again.
   func askToSave(_ name: String) -> SaveAnswer
@@ -88,4 +92,10 @@ extension ShellWindow {
 
   /// None, where a window has no panel for folders.
   public func chooseFolder(title: String, button: String) -> URL? { nil }
+
+  /// Nowhere, where a platform has nothing to show files in.
+  public func reveal(_ url: URL) {}
+
+  /// Nothing said, where a window has no box to say it in.
+  public func tell(_ message: String) {}
 }

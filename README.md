@@ -49,6 +49,8 @@ Metal. Next after this is the rack.
 | `Sources/DriftboxText` | What the app asks of a platform's type: a line set in a font, and a glyph's coverage. |
 | `Sources/DriftboxTextWindows` | That on DirectWrite: type on Windows. |
 | `Sources/DriftboxTextAndroid` | That on Android's own text stack, through the app's Java: type on Android. |
+| `Sources/DriftboxMovie` | A performance and its visuals as a movie, on every platform with the GPU layer: the take played again on an engine of its own, each frame drawn offscreen and read back, and handed with its sound to the platform's writer — Media Foundation on Windows. |
+| `Sources/CMovieWriter` | That writer: an H.264 and AAC MPEG-4 file through Media Foundation's sink writer, and a movie read back through its source reader, for the tests. Windows only. |
 | `Sources/CDirectWrite` | The part of DirectWrite that is called, declared in C, since its own headers are C++. Declarations only. |
 | `Sources/VST3SDK` | Steinberg's VST 3 SDK, as much of it as a host uses, vendored at 3.8.1 under its own MIT licence. Compiled on Windows alone for now. |
 | `Sources/CVST3` | Driftbox's bridge to VST 3 plug-ins, in C for Swift: a plug-in found, made, played, its params set, its state kept, and its own editor opened in a window. Windows only for now; `Tests/DriftboxVST3Fixture` is a plug-in of the project's own to hold it to. |
@@ -374,7 +376,10 @@ as on the Mac: the number row strikes the drums, the home row plays 303 A, `z` a
 The rack is there too, from Rack ▸ Show Rack (Ctrl+R): the patch's modules with their knobs and
 choices, its catalogue of patches, and the keys playing it, heard beside the groovebox.
 - **File:** New, Open…, the catalogue, Save and Save As… as `.driftbox`; Export Mix… as one WAV, and
-  Export Stems… as a WAV for each voice the song uses, in a folder chosen in Windows' own panel.
+  Export Stems… as a WAV for each voice the song uses, in a folder chosen in Windows' own panel;
+  Export Movie…, the song and its visuals as an H.264 and AAC `.mp4`, and Record Performance, what
+  is played written as one, each written while the app carries on, how far in the title, then
+  shown in Explorer.
 - **Edit:** Undo and Redo, named for the edit.
 - **Transport:** play and stop, sections, the loop, the metronome and the count-in.
 - **View:** the controls shown or hidden, and the song's scene or any other.

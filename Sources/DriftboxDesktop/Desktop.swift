@@ -3,6 +3,7 @@ import DriftboxDocument
 import DriftboxGPU
 import DriftboxHost
 import DriftboxInterface
+import DriftboxMovie
 import DriftboxRackSession
 import DriftboxScenes
 import DriftboxSession
@@ -34,8 +35,11 @@ public final class Desktop {
   var frame: any GPUTarget
   var resized: (width: Int, height: Int)?
 
-  /// The scene chosen from the View menu, or nil to show the song's own.
-  public private(set) var chosenScene: String?
+  /// The scene chosen from the View menu, or nil to show the song's own. A performance being
+  /// recorded sees the switch too.
+  public private(set) var chosenScene: String? {
+    didSet { if chosenScene != oldValue { session.noteScene(chosenScene) } }
+  }
   /// The scene being drawn, and which it is.
   var scene: any GPUScene
   public private(set) var sceneID: String
@@ -51,6 +55,14 @@ public final class Desktop {
   public internal(set) var showsRack = false
   /// The audio being written by the last export, rendered off the main thread.
   var exporting: Task<Void, Never>?
+  /// The movie being written, and how far it has got from 0 to 1; nil while none is.
+  var movie: Task<Void, Never>?
+  public internal(set) var movieProgress: Double?
+  var movieStopped = false
+  /// The size and rates movies are written in; smaller in a test.
+  public var movieFormat = MovieFormat()
+  /// What writes a movie's file: the platform's, unless a test says otherwise.
+  var makeMovieWriter: @MainActor (URL, MovieFormat) throws -> any MovieWriter = Desktop.movieWriter
 
   public init(
     session: Session, window: any ShellWindow, device: any GPUDevice, surface: any GPUSurface,
@@ -157,9 +169,11 @@ public final class Desktop {
     // Typing is the rack's while it shows, as a routing's end is typed, and the controls' otherwise.
     let takesText = showsRack ? rackInterface?.takesText ?? false : interface.takesText
     if window.takesText != takesText { window.takesText = takesText }
-    let title = showsRack ? rack.map(Self.title(for:)) ?? "Driftbox" : Self.title(for: session)
+    var title = showsRack ? rack.map(Self.title(for:)) ?? "Driftbox" : Self.title(for: session)
+    if let activity { title = "\(activity) - \(title)" }
     if window.title != title { window.title = title }
-    window.menuBar = DesktopMenus.bar(for: session, rack: rack, showsRack: showsRack)
+    window.menuBar = DesktopMenus.bar(
+      for: session, rack: rack, showsRack: showsRack, writingMovie: movieProgress != nil)
   }
 
   /// As Windows' own programs title a document's window: its name, marked while it has changes
@@ -243,6 +257,12 @@ public final class Desktop {
       exportMix()
     case DesktopMenus.exportStems:
       exportStems()
+    case DesktopMenus.exportMovie:
+      exportMovie()
+    case DesktopMenus.stopMovie:
+      stopMovie()
+    case DesktopMenus.record:
+      toggleRecording()
     case DesktopMenus.exit:
       if mayLoseChanges() { window.close() }
     case DesktopMenus.undo: if showsRack, let rack { rack.undo() } else { session.undo() }
@@ -326,6 +346,9 @@ public final class Desktop {
       DesktopMenus.previousSection, DesktopMenus.nextSection, DesktopMenus.loop:
       session.song != nil
     case DesktopMenus.recordAutomation: session.song != nil
+    case DesktopMenus.exportMovie: session.song != nil && movieProgress == nil
+    case DesktopMenus.stopMovie: movieProgress != nil
+    case DesktopMenus.record: session.song != nil && (session.isRecording || movieProgress == nil)
     case DesktopMenus.clearAutomation: session.song?.automation.isEmpty == false
     case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote: false
     default: true
