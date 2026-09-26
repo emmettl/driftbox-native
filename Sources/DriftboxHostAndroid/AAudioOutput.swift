@@ -8,11 +8,13 @@
   ///
   /// Low-latency mode, exclusive if the device will give it and shared if not, 32-bit float
   /// stereo at the engine's rate; AAudio converts if the device runs at another. The buffer starts
-  /// at three bursts, and `tune` lets it out a burst at a time once the render thread has fallen
+  /// at two bursts, and `tune` lets it out a burst at a time once the render thread has fallen
   /// behind. One burst, the least a stream can have, crackled: on a Fairphone 6 with the app's
   /// controls drawn, the slowest callback each second took 2.3 to 3.6ms of a 2ms burst, though the
   /// render averaged half of one, and AAudio counted not one underrun for any of it. With two, the
-  /// slowest of a minute took 4.1ms of 4; three, 6ms, is room for it.
+  /// slowest of a minute took 4.1ms of 4, and it started at three; but the slowest were the
+  /// reverb's tail doing a whole block's work at once, and with that spread over the next block
+  /// they take 2.1 to 2.6ms, with Frost drawn, which two bursts, 4ms, has room for.
   ///
   /// AAudio makes the render thread and calls into it. It is kept to the big cores, which AAudio
   /// does not do by itself: on a Fairphone 6, left to the scheduler, it underran a hundred times a
@@ -129,7 +131,7 @@
     }
 
     /// The bursts of buffer a stream starts with.
-    static let startingBursts = 3
+    static let startingBursts = 2
 
     /// Sixteen bursts of buffer at once, or back to what a stream starts with. See
     /// `AAudioRoute.relaxed`.

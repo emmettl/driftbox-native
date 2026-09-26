@@ -663,7 +663,7 @@ each question, and the rest is Android's alone:
    song there takes about four seconds before the first render, which an app switching songs
    would feel; where that goes is not yet looked at. The rack's load is not measured yet.
 2. **Audio and MIDI behind the ports.** ← *here.* Audio is done. `DriftboxHostAndroid` answers
-   `AudioRouting` with AAudio: low-latency, exclusive, a buffer that starts at three bursts and grows
+   `AudioRouting` with AAudio: low-latency, exclusive, a buffer that starts at two bursts and grows
    a burst at a time on underruns, and a stream that asks to be replaced when its device goes.
    `Mixer` moved into `DriftboxHost` for it, so Windows and Android sum their sources the same
    way, tested everywhere. `scripts/android-play.sh` plays a song through the phone. The render
