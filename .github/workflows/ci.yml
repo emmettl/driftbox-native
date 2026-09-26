@@ -54,7 +54,7 @@ jobs:
       LIBGL_ALWAYS_SOFTWARE: 1
     steps:
       - name: Linux graphics and audio development libraries
-        run: apt-get update && apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri libpipewire-0.3-dev libgtk-4-dev fonts-dejavu-core xvfb xauth
+        run: apt-get update && apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri libpipewire-0.3-dev libasound2-dev libgtk-4-dev fonts-dejavu-core xvfb xauth
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:

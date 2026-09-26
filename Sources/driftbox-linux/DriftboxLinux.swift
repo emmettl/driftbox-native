@@ -33,13 +33,20 @@
       }
       let window = try GTKWindow()
       let route = silent ? nil : PipeWireRoute()
+      let midi: ALSAMIDI?
+      do { midi = try ALSAMIDI() } catch {
+        midi = nil
+        FileHandle.standardError.write(Data("MIDI unavailable: \(error)\n".utf8))
+      }
       defer {
+        midi?.stop()
         route?.stop()
         window.dispose()
       }
       let memory = smoke ? nil : UserDefaults(suiteName: "org.driftbox.linux")
       let session = Session(
-        host: EngineHost(sampleRate: route?.sampleRate ?? 48000), audio: route, memory: memory,
+        host: EngineHost(sampleRate: route?.sampleRate ?? 48000), audio: route, midiIn: midi, midiOut: midi,
+        memory: memory,
         hop: { work in window.post(work) })
       if let path {
         session.open(file: URL(fileURLWithPath: path))

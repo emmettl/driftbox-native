@@ -14,7 +14,7 @@ case "$mode" in
   doctor)
     uname -sm
     swift --version
-    pkg-config --modversion egl glesv2 libpipewire-0.3 gtk4 pangocairo
+    pkg-config --modversion egl glesv2 libpipewire-0.3 alsa gtk4 pangocairo
     df -h .
     ;;
   build)

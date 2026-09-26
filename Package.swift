@@ -9,9 +9,11 @@ import PackageDescription
 #if os(Linux)
   let pipeWirePkgConfig: String? = "libpipewire-0.3"
   let gtkPkgConfig: String? = "gtk4"
+  let alsaPkgConfig: String? = "alsa"
 #else
   let pipeWirePkgConfig: String? = nil
   let gtkPkgConfig: String? = nil
+  let alsaPkgConfig: String? = nil
 #endif
 
 let package = Package(
@@ -84,9 +86,15 @@ let package = Package(
     .target(
       name: "CPipeWireBridge",
       dependencies: [.target(name: "CPipeWire", condition: .when(platforms: [.linux]))]),
+    .systemLibrary(name: "CALSA", pkgConfig: alsaPkgConfig, providers: [.apt(["libasound2-dev"])]),
+    .target(
+      name: "CALSABridge", dependencies: [.target(name: "CALSA", condition: .when(platforms: [.linux]))]),
     .target(
       name: "DriftboxHostLinux",
-      dependencies: ["DriftboxHost", .target(name: "CPipeWireBridge", condition: .when(platforms: [.linux]))]),
+      dependencies: [
+        "DriftboxHost", .target(name: "CPipeWireBridge", condition: .when(platforms: [.linux])),
+        .target(name: "CALSABridge", condition: .when(platforms: [.linux])),
+      ]),
     .systemLibrary(name: "CGTK", pkgConfig: gtkPkgConfig, providers: [.apt(["libgtk-4-dev"])]),
     .target(name: "CLinuxUI", dependencies: [.target(name: "CGTK", condition: .when(platforms: [.linux]))]),
     .target(

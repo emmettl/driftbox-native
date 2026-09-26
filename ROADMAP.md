@@ -814,8 +814,11 @@ qualification still pending.
 
 The Linux audio adapter lists outputs, remembers a selected node name, falls back when it is
 removed and reconnects after stream/server loss. Source lifetime and detach behavior are tested
-across recovery. The shell's MainActor integration uses private Swift runtime hooks and needs
-revalidation with toolchain updates. MIDI, measured audio latency, remaining input/accessibility
-work, packaging and physical hardware qualification are still required for a viable release.
+across recovery. ALSA sequencer now supplies MIDI input, scheduled output, hotplug discovery and a
+virtual source through the shared MIDI ports. Software-port tests cover clock and channel messages,
+ignore/flush, reconnect and shutdown; physical MIDI timing and controller tests remain pending.
+The shell's MainActor integration uses private Swift runtime hooks and needs revalidation with
+toolchain updates. Measured audio latency, remaining input/accessibility work, packaging and
+physical hardware qualification are still required for a viable release.
 Linux plug-in hosting and a plug-in build remain separate milestones. See the plan for detailed
 validation evidence and limitations.

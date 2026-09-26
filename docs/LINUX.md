@@ -12,7 +12,7 @@ MIDI notes and clock. Linux plug-in hosting and publishing Driftbox as a plug-in
 
 Target Ubuntu 24.04 LTS first. Test both Wayland and X11 before claiming support for either.
 PipeWire powers both the command-line player and the first shared desktop executable. GTK 4/Pango
-provide its shell/text adapters and GLES the renderer. ALSA sequencer is the proposed MIDI backend.
+provide its shell/text adapters and GLES the renderer. ALSA sequencer supplies the native MIDI backend.
 The desktop now renders the existing groovebox and rack and passes a live audio capture test;
 interactive shell qualification and release packaging remain. Do not introduce a second UI or engine.
 
@@ -80,8 +80,9 @@ Handle variable buffer sizes, rate conversion, server/device loss and reconnect.
 instead of presenting a working route when the stream is not running. Stable device identifiers
 must survive reconnects; PipeWire's transient numeric object IDs are not persistent preferences.
 
-ALSA MIDI needs source changes, virtual ports, scheduled output and explicit conversion between
-queue time and `HostTime`. Validate clock drift and jitter against physical equipment later.
+ALSA MIDI now handles source changes, virtual ports and scheduled output on `HostTime` through
+a dedicated worker. Input currently uses receive-time stamps. Validate clock drift and jitter
+against physical equipment before treating the backend as performance-qualified.
 
 ### Persistence and distribution
 
@@ -237,8 +238,8 @@ Startup requires a streaming output within five seconds. A disconnected stream o
 without rendering produces a diagnostic and nonzero exit. Duration expiry, Ctrl-C and SIGTERM
 perform orderly teardown. This is a CLI baseline, not yet the full `AudioRouting` adapter: device
 listing/selection, automatic recovery, measured output latency and underrun reporting are pending.
-The desktop now uses the device-aware `AudioRouting` adapter described below. MIDI and packaging
-remain pending; the rack uses its existing WAV decoder.
+The desktop now uses the device-aware `AudioRouting` adapter described below. Native MIDI is also
+implemented below. Packaging remains pending; the rack uses its existing WAV decoder.
 
 ### Audio validation
 
@@ -389,7 +390,8 @@ Measured latency and underrun reporting remain unimplemented. `--silent` supplie
 Normal runs use Foundation `UserDefaults` with the `org.driftbox.linux` suite for existing session
 and rack memory; smoke tests do not restore or write preferences. File arguments open a song.
 XDG configuration/data layout and installed-resource discovery still need release qualification.
-No Linux MIDI backend or plug-in host is supplied. GTK file drops now feed the shared song-open
+The ALSA MIDI backend below supplies both shared MIDI ports; Linux plug-in hosting remains absent.
+GTK file drops now feed the shared song-open
 and rack WAV-import paths with logical-point coordinates. The bridge accepts local files, preserves
 escaped names and ordering, and rejects drops while a native request is pending. File choosers
 remember the last accepted folder for the lifetime of the window. IME composition, canvas
@@ -435,6 +437,57 @@ changes, suspend/resume and latency/glitch measurements remain release qualifica
 names are read at discovery; a description changed in-place on an existing node may remain stale
 until that node is announced again. The harness currently requires WirePlumber 0.4 configuration;
 it deliberately refuses newer versions rather than enabling hardware monitors by mistake.
+
+### Native MIDI
+
+`ALSAMIDI` implements `MIDIInputPort` and `MIDIOutputPort` in `DriftboxHostLinux`. The desktop
+passes the same backend to the shared session, so the existing MIDI input/clock settings and rack
+listener use it without changing the shared protocols. The client publishes `Driftbox: Input`
+and `Driftbox: Output`; `.virtual` sends from Output to its subscribers. It does not subscribe to
+its own output. ALSA sequencer access (`/dev/snd/seq`) and `libasound` are required. Failure to
+open MIDI is logged while the desktop continues with audio and editing available.
+
+The worker discovers readable sources and writable destinations, subscribes to sources, and
+reports source changes. Names combine the ALSA client and port names; numeric ALSA addresses
+are used only for the current connection. Duplicate names receive a suffix in enumeration order,
+so identical controllers are not yet reliably distinguishable across reordering. Per-source
+ignore preferences filter delivery. Topology announcements trigger discovery, with a 250 ms
+fallback scan. Port/client exit invalidates queued output and subscriptions before reconnection,
+including when ALSA reuses an address.
+
+Channel messages, MIDI clock, Start/Continue/Stop and song position use MIDI 1.0 short messages.
+Program/channel-pressure callbacks are padded to the shared three-byte format. SysEx output is
+rejected and incoming SysEx is skipped; MIDI 2.0/UMP is not implemented. Input stamps use
+`HostTime` at receipt, not kernel capture timestamps. Output uses the shared `MIDIQueue`, with
+`ppoll` and an eventfd waking the worker when an earlier message arrives. It sends only when the
+monotonic timestamp is due. The queue is capped at 16,384 messages; invalid messages, missing
+ports, shutdown and a full queue return false from `send`. This means accepted for scheduling,
+not a guarantee of eventual hardware delivery. Runtime send errors are exposed by `error`.
+Flush is serialized with delivery and affects only that destination. Shutdown sends messages
+already due (including the session's final Stop), drops future messages, closes the sequencer and
+joins the worker; shutdown from a callback safely avoids joining itself.
+
+```sh
+# Opt-in: publishes temporary named software ports; no physical MIDI device is needed.
+DRIFTBOX_TEST_ALSA=1 scripts/linux-build.sh test --filter ALSAMIDI
+# The message-validation test runs without a sequencer device as part of ordinary CI.
+scripts/linux-build.sh test --filter ALSAMIDIMessageTests
+```
+
+Six tests passed on Ubuntu ARM64 with strict actor checks: short-message validation; callback,
+clock and virtual-port delivery; future timestamps, ignore and selective flush; hotplug with stale
+queued output discarded; bounded scheduling and final Stop delivery; a final Stop surviving
+discovery after its source exits; and shutdown from a callback.
+The C bridge passes `-Wall -Wextra -Werror`. The release desktop smoke test with PipeWire and
+ALSA enabled passed under Xvfb/llvmpipe with 348 GUI frames and 278,528 audio frames. Logs are
+`~/driftbox-midi-tests.log`, `~/driftbox-midi-release.log` and `~/driftbox-midi-desktop.log`.
+
+This is software-port qualification. USB/Bluetooth MIDI, physical clock drift/jitter under load,
+suspend/resume, sustained input overruns and reconnect after loss of the sequencer itself remain
+unverified. Fatal sequencer failure currently stops MIDI until the app is reopened; runtime MIDI
+errors also need presentation in the UI. The real Wayland preview left open before this change
+still uses the earlier audio-only build because GNOME is locked. Native MIDI menu interaction and
+an end-to-end controller/rack check remain pending alongside the Audio menu check above.
 
 ### Desktop validation
 
