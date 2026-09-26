@@ -56,3 +56,28 @@ public protocol AudioRouting: AnyObject {
   /// Stop playing the source whose context is `context`. It is not called again once this returns.
   func detach(_ context: UnsafeMutableRawPointer)
 }
+
+/// Where live sound comes in from — a microphone, an interface's inputs — for the rack's Audio
+/// Input module: a platform's audio input, kept on the device it should be on as devices come and
+/// go, as `AudioRouting` keeps the output.
+///
+/// It captures only while it has somewhere to put what it hears. Until then no device is open,
+/// so a system that shows when something is listening does not say so for a patch that is not.
+@MainActor
+public protocol AudioCapturing: AnyObject {
+  /// The device chosen, by its ID; nil for whatever the system is listening to.
+  var chosen: String? { get set }
+  /// Every device there is to listen to, as of the last change to any of them.
+  var devices: [AudioDevice] { get }
+  /// The device being heard, while one is.
+  var current: AudioDevice? { get }
+  /// The device the system listens to, which is what is heard when nothing else has been chosen,
+  /// or what has been is not there.
+  var systemDefault: AudioDevice? { get }
+  /// Why nothing can be heard, while something should be and nothing can.
+  var error: String? { get }
+  /// Called after anything above changes, on the main actor.
+  var onChange: (() -> Void)? { get set }
+  /// Where what comes in goes, from now on; nil to hear nothing, and let go of the device.
+  var destination: LiveInput? { get set }
+}

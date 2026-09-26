@@ -178,8 +178,14 @@ public final class RackHost: @unchecked Sendable {
   public let song: EngineHost
   /// The same host for the render thread, which may not retain or release it: `song` keeps it.
   let songOnRenderThread: Unmanaged<EngineHost>
-  /// Each machine's block, left then right, the input buses the graph reads.
+  /// The input buses the graph reads, a block each, left then right: the song's four machines on
+  /// buses 0 to 3, and what comes in live on bus 4.
   let buses: UnsafeMutablePointer<UnsafeMutablePointer<Float>>
+  /// What comes in live — a microphone, an interface — for the Audio Input module, from whatever
+  /// captures it: the platform's input, while a patch has the module.
+  public let input = LiveInput()
+  /// The same for the render thread, which may not retain or release it: `input` keeps it.
+  let inputOnRenderThread: Unmanaged<LiveInput>
   /// The song's own mix for a block.
   let songLeft: UnsafeMutablePointer<Float>
   let songRight: UnsafeMutablePointer<Float>
@@ -218,8 +224,9 @@ public final class RackHost: @unchecked Sendable {
     sinceMeters.initialize(to: 0)
     song = EngineHost(sampleRate: sampleRate)
     songOnRenderThread = Unmanaged.passUnretained(song)
-    buses = .allocate(capacity: 8)
-    for index in 0..<8 {
+    inputOnRenderThread = Unmanaged.passUnretained(input)
+    buses = .allocate(capacity: 10)
+    for index in 0..<10 {
       buses[index] = .allocate(capacity: blockFrames)
       buses[index].initialize(repeating: 0, count: blockFrames)
     }
@@ -248,7 +255,7 @@ public final class RackHost: @unchecked Sendable {
     blockRight.deallocate()
     blockUsed.deallocate()
     sinceMeters.deallocate()
-    for index in 0..<8 { buses[index].deallocate() }
+    for index in 0..<10 { buses[index].deallocate() }
     buses.deallocate()
     songLeft.deallocate()
     songRight.deallocate()
@@ -502,6 +509,8 @@ public final class RackHost: @unchecked Sendable {
         if current.pointee == graph { entry.pointee = slot }
       case .hosting(let on, let diverted):
         hosting.pointee = (on, diverted)
+        // Without a song, its machines are silent rather than their last block over and over.
+        if !on { for index in 0..<8 { buses[index].update(repeating: 0, count: blockFrames) } }
       }
     }
     takeLocate()
@@ -518,7 +527,11 @@ public final class RackHost: @unchecked Sendable {
             $0.render(frames: frames, left: left, right: right, sections: sections)
           }
         }
-        let inputs = hosted ? HostInputs(base: buses, buses: 4, channels: 2) : HostInputs.none
+        let (live, liveLeft, liveRight) = (blockFrames, buses[8], buses[9])
+        inputOnRenderThread._withUnsafeGuaranteedRef {
+          $0.read(frames: live, left: liveLeft, right: liveRight)
+        }
+        let inputs = HostInputs(base: buses, buses: 5, channels: 2)
         if let graph = current.pointee {
           graph.pointee.process(left: blockLeft, right: blockRight, host: inputs)
           frame.store(graph.pointee.frame, ordering: .relaxed)

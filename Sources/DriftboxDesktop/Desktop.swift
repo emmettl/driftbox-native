@@ -352,6 +352,7 @@ public final class Desktop {
     case DesktopMenus.controls: interface.isShowing.toggle()
     case DesktopMenus.visuals: session.showsVisuals.toggle()
     case DesktopMenus.systemOutput: session.outputDevice = nil
+    case DesktopMenus.systemInput: rack?.inputDevice = nil
     case DesktopMenus.listen: session.listensToMIDI.toggle()
     case DesktopMenus.followClock: session.followsClock.toggle()
     case DesktopMenus.sendClock: session.sendsClock.toggle()
@@ -385,6 +386,8 @@ public final class Desktop {
       openRecent(index)
     } else if let device = DesktopMenus.value(id, after: DesktopMenus.outputPrefix) {
       session.outputDevice = device
+    } else if let device = DesktopMenus.value(id, after: DesktopMenus.audioInputPrefix) {
+      rack?.inputDevice = device
     } else if let source = DesktopMenus.value(id, after: DesktopMenus.inputPrefix) {
       if session.ignoredMIDISources.contains(source) {
         session.ignoredMIDISources.remove(source)
@@ -435,6 +438,7 @@ public final class Desktop {
     case DesktopMenus.showRack: return showsRack
     case DesktopMenus.rackBack: return rack?.flipped == true
     case DesktopMenus.systemOutput: return session.outputDevice == nil
+    case DesktopMenus.systemInput: return rack?.inputDevice == nil
     case DesktopMenus.visuals: return session.showsVisuals
     case DesktopMenus.visualsWindow: return visualsOpen
     case DesktopMenus.listen: return session.listensToMIDI
@@ -448,6 +452,9 @@ public final class Desktop {
     }
     if let device = DesktopMenus.value(id, after: DesktopMenus.outputPrefix) {
       return session.outputDevice == device
+    }
+    if let device = DesktopMenus.value(id, after: DesktopMenus.audioInputPrefix) {
+      return rack?.inputDevice == device
     }
     if let source = DesktopMenus.value(id, after: DesktopMenus.inputPrefix) {
       return !session.ignoredMIDISources.contains(source)

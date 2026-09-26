@@ -246,6 +246,53 @@ struct DesktopTests {
     }
   }
 
+  /// Two microphones, one of them the system's.
+  final class Microphones: AudioCapturing {
+    var chosen: String?
+    var devices = [AudioDevice(id: "{mic}", name: "Microphone"), AudioDevice(id: "{usb}", name: "Interface")]
+    var current: AudioDevice?
+    var systemDefault: AudioDevice? { devices.first }
+    var error: String?
+    var onChange: (() -> Void)?
+    var destination: LiveInput?
+  }
+
+  /// Audio ▸ Input lists what the rack can listen to, where it can listen at all, ticks the choice,
+  /// and names one chosen and not plugged in, as the outputs do.
+  @Test func theAudioMenuChoosesTheRacksInput() throws {
+    let device = try #require(try Self.devices().first)
+    let window = StandInWindow()
+    let microphones = Microphones()
+    let desktop = try Desktop(
+      session: Session(host: EngineHost(sampleRate: 48000)), window: window, device: device,
+      surface: StandInSurface(device: device, width: 320, height: 180), typesetter: NoTypesetter(),
+      rack: RackSession(input: microphones))
+    let rack = try #require(desktop.rack)
+    try desktop.drawFrame()
+    #expect(window.isChecked?(DesktopMenus.systemInput) == true)
+    #expect(window.title(of: DesktopMenus.audioInputPrefix + "{usb}") == "Interface")
+    window.choose(DesktopMenus.audioInputPrefix + "{usb}")
+    #expect(rack.inputDevice == "{usb}" && microphones.chosen == "{usb}")
+    #expect(window.isChecked?(DesktopMenus.audioInputPrefix + "{usb}") == true)
+    #expect(window.isChecked?(DesktopMenus.systemInput) == false)
+
+    microphones.devices.removeLast()
+    microphones.onChange?()
+    try desktop.drawFrame()
+    #expect(window.title(of: DesktopMenus.audioInputPrefix + "{usb}") == "Interface (Not Connected)")
+    window.choose(DesktopMenus.systemInput)
+    #expect(rack.inputDevice == nil)
+
+    let without = StandInWindow()
+    let plain = try Desktop(
+      session: Session(host: EngineHost(sampleRate: 48000)), window: without, device: device,
+      surface: StandInSurface(device: device, width: 320, height: 180), typesetter: NoTypesetter(),
+      rack: RackSession())
+    try plain.drawFrame()
+    #expect(without.commandIDs.contains(DesktopMenus.systemOutput))
+    #expect(!without.commandIDs.contains(DesktopMenus.systemInput), "no input to choose where there is none")
+  }
+
   /// A song dropped on the window opens, as Open would open it; anything else dropped is let be.
   @Test func aDroppedSongOpens() throws {
     for device in try Self.devices() {

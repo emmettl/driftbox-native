@@ -17,6 +17,9 @@
     static let iidAudioRenderClient = GUID(
       Data1: 0xF294_ACFC, Data2: 0x3146, Data3: 0x4483,
       Data4: (0xA7, 0xBF, 0xAD, 0xDC, 0xA7, 0xC2, 0x60, 0xE2))
+    static let iidAudioCaptureClient = GUID(
+      Data1: 0xC8AD_BD64, Data2: 0xE71E, Data3: 0x48A0,
+      Data4: (0xA4, 0xDE, 0x18, 0x5C, 0x39, 0x5C, 0xD3, 0x17))
     static let iidNotificationClient = GUID(
       Data1: 0x7991_EEC9, Data2: 0x7E89, Data3: 0x4D85,
       Data4: (0x83, 0x90, 0x6C, 0x70, 0x3C, 0xEC, 0x60, 0xC0))
@@ -30,6 +33,11 @@
 
     /// `AUDCLNT_E_DEVICE_INVALIDATED`: the device went away under the stream.
     static let deviceInvalidated = HRESULT(bitPattern: 0x8889_0004)
+    /// `AUDCLNT_E_DEVICE_IN_USE`: another program has the device to itself.
+    static let deviceInUse = HRESULT(bitPattern: 0x8889_000A)
+    /// `E_ACCESSDENIED`, which is what a microphone Windows's privacy settings keep from desktop
+    /// apps says.
+    static let accessDenied = HRESULT(bitPattern: 0x8007_0005)
 
     /// COM for the calling thread, in whatever apartment it already has if it has one: a thread
     /// that has chosen before is left as it chose.
@@ -54,12 +62,14 @@
     var succeeded: Bool { self >= 0 }
   }
 
-  /// Every render device there is, and the system's own: the part of the device API the main
-  /// thread uses. Made on the thread that asks, in that thread's apartment.
+  /// Every device there is one way — render, or capture — and the system's own: the part of the
+  /// device API the main thread uses. Made on the thread that asks, in that thread's apartment.
   final class DeviceEnumerator {
     let pointer: UnsafeMutablePointer<IMMDeviceEnumerator>
+    let flow: EDataFlow
 
-    init?() {
+    init?(flow: EDataFlow = eRender) {
+      self.flow = flow
       var raw: UnsafeMutableRawPointer?
       var clsid = COM.clsidDeviceEnumerator
       var iid = COM.iidDeviceEnumerator
@@ -71,12 +81,12 @@
 
     deinit { _ = pointer.pointee.lpVtbl.pointee.Release(pointer) }
 
-    /// Every active render device, in the system's order.
+    /// Every active device its way, in the system's order.
     func devices() -> [AudioDevice] {
       var collection: UnsafeMutablePointer<IMMDeviceCollection>?
       guard
         pointer.pointee.lpVtbl.pointee.EnumAudioEndpoints(
-          pointer, eRender, DWORD(DEVICE_STATE_ACTIVE), &collection
+          pointer, flow, DWORD(DEVICE_STATE_ACTIVE), &collection
         )
         .succeeded, let collection
       else { return [] }
@@ -93,11 +103,11 @@
       }
     }
 
-    /// The device the system plays music through.
+    /// The device the system plays music through, or listens to.
     func systemDefault() -> AudioDevice? {
       var device: UnsafeMutablePointer<IMMDevice>?
       guard
-        pointer.pointee.lpVtbl.pointee.GetDefaultAudioEndpoint(pointer, eRender, eMultimedia, &device)
+        pointer.pointee.lpVtbl.pointee.GetDefaultAudioEndpoint(pointer, flow, eMultimedia, &device)
           .succeeded,
         let device
       else { return nil }
