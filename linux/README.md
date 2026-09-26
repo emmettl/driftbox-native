@@ -2,7 +2,7 @@
 
 This archive contains the native GTK/GLES app, song/rack resources and Swift 6.4 runtime.
 It targets the architecture and build distribution recorded in `manifest.json`; it is not a
-universal Linux binary. Ubuntu 24.04 ARM64 is the first tested environment. GTK 4, Pango,
+universal Linux binary. Ubuntu 24.04 ARM64 is the first tested environment. GTK 4.14 or newer, Pango,
 Mesa/EGL/GLES, PipeWire, ALSA and their system dependencies must be installed. The manifest lists
 resolved system library names. No Swift compiler is needed to run it.
 

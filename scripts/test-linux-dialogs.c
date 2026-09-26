@@ -10,7 +10,7 @@ static void received(void *context, int answer, const char *value) {
     g_assert_cmpstr(value,==,"");
 }
 static gboolean idle(gpointer context) { (void)context; return G_SOURCE_CONTINUE; }
-static db_desktop *fixture(void) {
+static db_desktop *fixture_with_visibility(gboolean visible) {
     db_desktop *w=g_new0(db_desktop,1);
     w->window=gtk_window_new(); g_object_ref(w->window);
     w->area=gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
@@ -18,9 +18,11 @@ static db_desktop *fixture(void) {
     w->loop=g_main_loop_new(NULL,FALSE);
     w->actions=g_simple_action_group_new();
     w->source=g_timeout_add_seconds(60,idle,NULL);
-    gtk_window_present(GTK_WINDOW(w->window));
+    if (visible) gtk_window_present(GTK_WINDOW(w->window));
+    else gtk_widget_realize(w->window);
     return w;
 }
+static db_desktop *fixture(void) { return fixture_with_visibility(TRUE); }
 static void present_pending(db_desktop *w) {
     while (w->dialog_source) g_main_context_iteration(NULL,TRUE);
     g_assert_nonnull(w->dialog);
@@ -244,6 +246,30 @@ static void settle(void) {
     g_timeout_add(150,finished_waiting,loop);
     g_main_loop_run(loop); g_main_loop_unref(loop);
 }
+// GTK 4.8 can dispatch compute-size after a realized, never-mapped window dies.
+// Include the bare parent so dialog implementation details cannot hide that regression.
+static void realized_unshown_teardown(void) {
+    if (!g_test_subprocess()) {
+        g_test_trap_subprocess(NULL,10*G_TIME_SPAN_SECOND,0);
+        g_test_trap_assert_passed(); return;
+    }
+    for (int repeat=0;repeat<3;repeat++) {
+        for (int kind=0;kind<4;kind++) {
+            db_desktop *w=fixture_with_visibility(FALSE); Result result={0};
+            if (kind==1) db_desktop_save_question(w,"Unsaved",&result,received);
+            if (kind==2) db_desktop_tell(w,"A failure before presentation");
+            if (kind==3) db_desktop_files(w,0,0,"wav","",&result,received);
+            GtkWidget *window=w->window;
+            g_object_add_weak_pointer(G_OBJECT(window),(gpointer *)&window);
+            db_desktop_free(w);
+            g_assert_null(window);
+            g_assert_cmpint(result.calls,==,(kind==1 || kind==3)?1:0);
+            g_assert_cmpint(result.answer,==,0);
+            settle();
+            g_assert_cmpuint(g_list_model_get_n_items(gtk_window_get_toplevels()),==,0);
+        }
+    }
+}
 // Seed Recent explicitly: an empty CI home otherwise hides GTK's cancelled-query crash.
 // Destruction happens before dispatching any chooser work, not after a grace period.
 static void rapid_chooser_teardown_with_recent_files(void) {
@@ -313,5 +339,6 @@ int main(int argc,char **argv) {
     g_test_add_func("/notices/parent-teardown",notices_close_with_parent);
     g_test_add_func("/dialogs/rapid-teardown-with-recent-files",rapid_chooser_teardown_with_recent_files);
     g_test_add_func("/dialogs/disposal-rejects-new-requests",disposal_rejects_new_requests);
+    g_test_add_func("/dialogs/realized-unshown-teardown",realized_unshown_teardown);
     return g_test_run();
 }

@@ -45,7 +45,8 @@ jobs:
     name: Swift
     needs: fixtures
     runs-on: ubuntu-latest
-    container: swift:6.4-bookworm
+    # Match the supported desktop/package runtime; GTK 4.8 has window-teardown defects.
+    container: swift:6.4-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9
     env:
       DRIFTBOX_REQUIRE_GENERATED: 1
       # The GPU layer's OpenGL ES backend runs its contract tests on Mesa's software rasteriser,

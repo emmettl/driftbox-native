@@ -369,8 +369,8 @@ scripts/linux-build.sh desktop --silent
 
 The native menu bar exposes the shared app commands and keyboard shortcuts. File choosers, save
 confirmation and context menus complete through callbacks; the GLib loop and rendering continue.
-GTK 4.8-compatible `GtkFileChooserNative` and response-based message dialogs keep the Debian
-Bookworm CI baseline supported. Document requests are serialized and reject new editing input
+`GtkFileChooserNative` and response-based message dialogs use asynchronous callbacks.
+The desktop runtime now requires GTK 4.14 or newer (see the CI qualification update below). Document requests are serialized and reject new editing input
 while allowing resize and release/cancel events. Cancelling Open preserves the current song;
 closing after a failed save keeps the window and edits. GTK owns the GL context until the desktop
 and its GPU resources have been released.
@@ -976,3 +976,24 @@ There is no shared host directory. The guest sees its own disk, setup image and 
 
 When transferring source with macOS tar, use `--no-xattrs --no-mac-metadata` to avoid carrying host
 extended attributes into the Linux checkout. Keep the guest build products on the guest disk.
+
+
+### GTK runtime baseline qualification
+
+The first full PR CI run passed the Swift suite and C dialog checks, but its desktop smoke
+exposed a GTK 4.8.3 crash on Debian Bookworm. A standalone C reproduction narrowed this to
+realizing and immediately destroying an unshown window, without Swift or a file chooser.
+GTK retained a `compute-size` callback targeting the freed window. Disconnecting that callback
+alone then exposed an `XSyncBadCounter` failure, so the experimental workaround was discarded.
+
+The supported desktop baseline remains Ubuntu 24.04 with GTK 4.14 or newer. Desktop startup
+now rejects older GTK before creating any objects, with a readable version requirement. The
+full Swift CI container uses the same pinned Noble toolchain image as package CI. This corrects
+the earlier claim of Bookworm desktop support; the package baseline is unchanged.
+
+The C suite now has 14 tests, including bare realized/unshown windows and early question,
+notice, and chooser disposal. All 14 pass on the Ubuntu VM under both X11 and native Wayland.
+The new test retains the failure case rather than adding a delay to hide it. Investigation logs:
+`~/driftbox-gtk-bookworm-repro.log` and `~/driftbox-gtk-bookworm-fixed.log` (the latter records the
+rejected partial workaround). Existing native Wayland menus and already-loading chooser
+limitations still apply.

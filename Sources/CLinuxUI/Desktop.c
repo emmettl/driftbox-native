@@ -1,6 +1,6 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "DriftboxLinuxUI.h"
-// Keep the response-based APIs available on the GTK 4.8 CI baseline. They remain
+// Keep the response-based APIs available without deprecation warnings. They remain
 // asynchronous; no gtk_dialog_run or nested main loop is used.
 #define GDK_VERSION_MIN_REQUIRED GDK_VERSION_4_8
 #include <gtk/gtk.h>
@@ -157,6 +157,12 @@ static gboolean dropped(GtkDropTarget *target, const GValue *value, double x, do
 }
 db_desktop *db_desktop_new(void *context, db_draw draw, db_input_callback events,
                           db_command command, db_can_close can_close, db_drop_callback files, char *error, size_t size) {
+    // Ubuntu 24.04 is the desktop baseline. Older GTK has queued-layout teardown
+    // crashes even for a bare realized window; fail before creating any GTK objects.
+    if (gtk_check_version(4,14,0)) {
+        snprintf(error,size,"Driftbox requires GTK 4.14 or newer (Ubuntu 24.04 baseline)");
+        return NULL;
+    }
     // Match the installed desktop-file basename on Wayland and X11. Do this before
     // GTK opens the display; setting a window title does not establish app identity.
     if (!gtk_is_initialized()) {
