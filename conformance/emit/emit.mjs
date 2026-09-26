@@ -796,7 +796,8 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
   }
   write(join(fixtures, 'rack'), 'panels.json', json({ modules, patches }))
   // What the panels say that the sound does not need: each module's shelf, its line of copy, its
-  // picture and its selectors' labels, in the picker's order. The app ships this as it is.
+  // picture, its selectors' labels and the guide written for it, in the picker's order. The app
+  // ships this as it is.
   const { MODULE_LIST } = await import(fileUrl(rack, 'modules', 'index.ts'))
   write(join(fixtures, 'rack'), 'faces.json', json(MODULE_LIST.map((def) => ({
     type: def.type,
@@ -804,6 +805,14 @@ write(fixtures, 'REFERENCE.json', json({ driftbox: git('rev-parse', 'HEAD'), des
     blurb: def.blurb ?? null,
     logo: def.logo ?? null,
     labels: Object.fromEntries(def.params.filter((param) => param.labels).map((param) => [param.id, param.labels])),
+    guide: def.guide
+      ? {
+          overview: def.guide.overview,
+          concepts: def.guide.concepts.map(({ title, body }) => ({ title, body })),
+          firstPatch: [...def.guide.firstPatch],
+          watchFor: def.guide.watchFor ? [...def.guide.watchFor] : null,
+        }
+      : null,
   }))))
   // The patches the app ships with, as the picker lists them.
   const { encodePatch } = await import(fileUrl(rack, 'patch-io.ts'))
