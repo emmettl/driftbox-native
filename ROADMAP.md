@@ -707,9 +707,10 @@ each question, and the rest is Android's alone:
    what a callback pays for is the rest of its cluster idling, not its clock and not its waking:
    callbacks four bursts long, a quarter as many, cost the same 53 to 57%, each four times as
    long, so fewer, longer callbacks save nothing. There is room in that, but less than the
-   bench promised, and the rack and the scenes will want some of it. Left: one device until the
-   app can list them from Java's `AudioManager`, and a stream lost to a device going is handled
-   but not yet seen to be, for want of anything to unplug.
+   bench promised, and the rack and the scenes will want some of it. The devices are listed from
+   Java's `AudioManager` and chosen from the song's menu, and a choice moves the stream: chosen
+   on the Fairphone, its speaker is AAudio's device 3, exclusive as before. Left: a stream lost to
+   a device going is handled but not yet seen to be, for want of anything to unplug.
    Then MIDI, heard. `AMidiInput` and `AMidiOutput` answer the MIDI ports with Android's native
    MIDI, which needs Android 10, so the build moved from API 28 to 29. Input is a thread asking
    each port in turn, framed by `MIDIByteStream` in `DriftboxHost`, which is tested everywhere,

@@ -77,6 +77,10 @@ extension Interface {
         .command("Save As…", id: "file.saveAs"), .separator,
       ]
     }
+    // Where the sound goes, on a touchscreen, whose only menu this is; a desktop has its Audio menu.
+    if touch, !session.outputs.isEmpty || session.outputDevice != nil {
+      items.append(.submenu(outputMenu()))
+    }
     let songs = session.entries.map { entry -> MenuItem in
       let id = "song." + entry.id
       menuActions[id] = { [weak self] in self?.unlessEdited { self?.session.open(entry) } }
@@ -85,6 +89,31 @@ extension Interface {
     }
     items.append(.submenu(Menu("Songs", songs)))
     return Menu(session.song == nil ? "Driftbox" : session.documentName, items)
+  }
+
+  /// Automatic, as the platform routes it, or a device; and a device chosen and not plugged in,
+  /// which is still the choice and says so, as the desktop's Audio menu does.
+  private func outputMenu() -> Menu {
+    menuActions["output.automatic"] = { [weak self] in self?.session.outputDevice = nil }
+    if session.outputDevice == nil { menuChecked.insert("output.automatic") }
+    var items: [MenuItem] = [.command("Automatic", id: "output.automatic"), .separator]
+    for device in session.outputs {
+      let id = "output." + device.id
+      menuActions[id] = { [weak self] in self?.session.outputDevice = device.id }
+      if session.outputDevice == device.id { menuChecked.insert(id) }
+      items.append(.command(device.name, id: id))
+    }
+    if let chosen = session.outputDevice, !session.outputs.contains(where: { $0.id == chosen }) {
+      let id = "output." + chosen
+      menuChecked.insert(id)
+      menuDisabled.insert(id)
+      items.append(.command("\(session.outputDeviceName ?? "A Device") (Not Connected)", id: id))
+    }
+    if let error = session.outputError {
+      menuDisabled.insert("output.note")
+      items.append(.command(error, id: "output.note"))
+    }
+    return Menu("Output", items)
   }
 
   /// `then`, once the platform has said to go on if the song has edits that are not saved.

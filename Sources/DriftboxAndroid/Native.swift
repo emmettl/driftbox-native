@@ -193,6 +193,12 @@
     MainActor.assumeIsolated { stage?.touch(id: Int(id), phase: Int(phase), x: x, y: y) }
   }
 
+  @_cdecl("Java_app_driftbox_Native_outputs")
+  public func nativeOutputs(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ lines: jstring?) {
+    let text = env.string(lines)
+    MainActor.assumeIsolated { stage?.listOutputs(text) }
+  }
+
   @_cdecl("Java_app_driftbox_Native_tick")
   public func nativeTick(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?) -> jstring? {
     env.java(MainActor.assumeIsolated { stage?.tick() ?? "nothing playing" })
