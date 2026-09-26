@@ -55,7 +55,7 @@ jobs:
       LIBGL_ALWAYS_SOFTWARE: 1
     steps:
       - name: Linux graphics and audio development libraries and Python
-        run: apt-get update && apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri libpipewire-0.3-dev libasound2-dev libgtk-4-dev fonts-dejavu-core xvfb xauth desktop-file-utils shared-mime-info python3 python3-gi
+        run: apt-get update && apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri libpipewire-0.3-dev libasound2-dev libgtk-4-dev fonts-dejavu-core xvfb xauth desktop-file-utils shared-mime-info python3 python3-gi gcc
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
@@ -66,22 +66,23 @@ jobs:
       # The release scripts' checks, which sign, upload and publish nothing.
       - name: Release scripts
         run: python3 scripts/test-release.py && python3 scripts/test-android-release.py && python3 scripts/test-linux-package.py
+      - name: Linux document dialog bridge
+        run: scripts/test-linux-dialogs.sh
+      - name: Linux GPU diagnostics
+        run: swift run driftbox-play --gpu-info
+      - name: Linux window lifecycle
+        run: xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 swift run driftbox-linux-window --self-test
+      - name: Linux desktop
+        run: xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 swift run driftbox-linux --silent --smoke-test
+      - name: Audio targets stay constrained
+        run: scripts/check-constrained.sh
+
       - name: Test
         run: swift test
         # Strict actor isolation, as an app runs with: a closure made on the main actor and called
         # from an audio or MIDI thread traps here, rather than only in the app.
         env:
           SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE: swift6
-      - name: Linux GPU diagnostics
-        run: swift run driftbox-play --gpu-info
-      - name: Linux window lifecycle
-        run: xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 swift run driftbox-linux-window --self-test
-      - name: Linux document dialog bridge
-        run: scripts/test-linux-dialogs.sh
-      - name: Linux desktop
-        run: xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 swift run driftbox-linux --silent --smoke-test
-      - name: Audio targets stay constrained
-        run: scripts/check-constrained.sh
 
   linux-gtk:
     name: Linux GTK lifetime
