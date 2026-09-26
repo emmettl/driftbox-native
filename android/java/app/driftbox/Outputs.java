@@ -58,6 +58,11 @@ final class Outputs {
         return "hdmi";
       case AudioDeviceInfo.TYPE_HEARING_AID:
         return "hearing-aid";
+      // A dock's speakers or line out, digital or, from Android 14, analogue: a constant, so
+      // naming the newer one on an older Android costs nothing but never matching.
+      case AudioDeviceInfo.TYPE_DOCK:
+      case AudioDeviceInfo.TYPE_DOCK_ANALOG:
+        return "dock";
       default:
         return null;
     }
@@ -75,6 +80,8 @@ final class Outputs {
         return "HDMI";
       case "hearing-aid":
         return product.isEmpty() ? "Hearing Aid" : product;
+      case "dock":
+        return product.isEmpty() ? "Dock" : product;
       default:
         // USB and Bluetooth by their own names, which say which of them it is.
         return product.isEmpty() ? (kind.equals("usb") ? "USB Audio" : "Bluetooth") : product;
