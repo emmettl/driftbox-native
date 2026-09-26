@@ -1,7 +1,6 @@
 import DriftboxRack
 import DriftboxRackSession
 import DriftboxShell
-import Foundation
 
 /// The rack as a screen reader is told it: the header's transport, tempo and Add; each module as a
 /// group of its knobs, choices, buttons and numbers, each named as its face names it and set to what
@@ -443,10 +442,9 @@ extension RackInterface {
   /// A face's label in words a screen reader says as words: its capitals made a word's, and nil for
   /// one that is only marks.
   static func words(_ label: String) -> String? {
-    let trimmed = label.trimmingCharacters(in: .whitespaces)
-    guard trimmed.unicodeScalars.contains(where: { CharacterSet.alphanumerics.contains($0) }) else {
-      return nil
-    }
+    // Swift's own: Android links only Foundation's essentials, which have no character sets.
+    let trimmed = String(label.drop { $0.isWhitespace }.reversed().drop { $0.isWhitespace }.reversed())
+    guard trimmed.contains(where: { $0.isLetter || $0.isNumber }) else { return nil }
     guard trimmed == trimmed.uppercased(), trimmed.contains(where: \.isLetter) else { return trimmed }
     return trimmed.prefix(1) + trimmed.dropFirst().lowercased()
   }
