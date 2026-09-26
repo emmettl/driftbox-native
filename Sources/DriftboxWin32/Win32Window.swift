@@ -1,4 +1,5 @@
 #if os(Windows)
+  import CAccessibility
   import DriftboxShell
   import Foundation
   import Synchronization
@@ -58,6 +59,11 @@
     private var held: Int?
     private static let resizeTimer: UINT_PTR = 1
     private let mailbox = Mailbox()
+    /// The window's controls for screen readers, and where what they ask arrives.
+    private var accessibility: OpaquePointer?
+    private var inbox: Unmanaged<Inbox>?
+    /// Whether UI Automation has asked for the controls yet.
+    private var read = false
 
     /// A window of `width` by `height` points of drawing area, titled `title`. `visible` false makes
     /// one that is never shown, for a test to draw into.
@@ -80,6 +86,9 @@
       guard let made else { throw Win32Error("the window could not be made (\(GetLastError()))") }
       handle = made
       mailbox.open(made)
+      let inbox = Unmanaged.passRetained(Inbox(mailbox: mailbox, window: UInt(bitPattern: context)))
+      self.inbox = inbox
+      accessibility = dbax_create(UnsafeMutableRawPointer(made), Self.asked, inbox.toOpaque())
       self.scale = Float(GetDpiForWindow(made)) / 96
       // Files dropped on it, from Explorer: a sample onto a sampler, a song onto the window.
       DragAcceptFiles(made, true)
@@ -91,6 +100,7 @@
 
     isolated deinit {
       if isOpen, let handle { DestroyWindow(handle) }
+      letGoOfAccessibility()
     }
 
     public func run(frame: () throws -> Void) throws {
@@ -148,6 +158,89 @@
 
     public nonisolated func post(_ work: @escaping @Sendable () -> Void) {
       mailbox.post(work)
+    }
+
+    // MARK: - Screen readers
+
+    public var isDescribed: Bool { accessibility.map { dbax_is_described($0) } ?? false }
+
+    /// The tree as the provider takes it: each node before what it holds, in pixels, its strings
+    /// laid end to end in one buffer that lives for the call.
+    public func describe(_ root: AccessibilityNode) {
+      guard let accessibility else { return }
+      var root = root
+      // The provider knows the window's own by this id from the start.
+      root.id = "window"
+      var flat: [(node: AccessibilityNode, parent: Int32)] = []
+      func walk(_ node: AccessibilityNode, _ parent: Int32) {
+        let at = Int32(flat.count)
+        flat.append((node, parent))
+        for child in node.children { walk(child, at) }
+      }
+      walk(root, -1)
+      var bytes: [UInt8] = []
+      var offsets: [(id: Int, name: Int, value: Int?)] = []
+      func add(_ text: String) -> Int {
+        let at = bytes.count
+        bytes += Array(text.utf8) + [0]
+        return at
+      }
+      for (node, _) in flat {
+        offsets.append((add(node.id), add(node.name), node.value.map(add)))
+      }
+      let scale = self.scale
+      bytes.withUnsafeBufferPointer { buffer in
+        let base = UnsafeRawPointer(buffer.baseAddress!).assumingMemoryBound(to: CChar.self)
+        let nodes = zip(flat, offsets).map { entry, offset in
+          let node = entry.node
+          return DBAXNode(
+            id: base + offset.id, name: base + offset.name, value: offset.value.map { base + $0 },
+            role: node.role.rawValue, parent: entry.parent, x: node.frame.x * scale, y: node.frame.y * scale,
+            width: node.frame.z * scale, height: node.frame.w * scale, hasRange: node.range != nil,
+            minimum: node.range?.lowerBound ?? 0, maximum: node.range?.upperBound ?? 0,
+            current: node.current ?? 0,
+            step: node.step ?? 0, toggle: node.isOn.map { $0 ? 1 : 0 } ?? -1)
+        }
+        nodes.withUnsafeBufferPointer { dbax_update(accessibility, $0.baseAddress, Int32($0.count)) }
+      }
+    }
+
+    /// Where the provider's requests arrive, on UI Automation's threads: taken to the window's own
+    /// through its mailbox, which takes nothing once the window has gone.
+    final class Inbox: Sendable {
+      let mailbox: Mailbox
+      let window: UInt
+      init(mailbox: Mailbox, window: UInt) {
+        self.mailbox = mailbox
+        self.window = window
+      }
+    }
+
+    private static let asked: DBAXAct = { context, id, action, value in
+      guard let context, let id else { return }
+      let inbox = Unmanaged<Inbox>.fromOpaque(context).takeUnretainedValue()
+      let control = String(cString: id)
+      let asked: AccessibilityAction
+      switch action {
+      case 1: asked = .set(control, value)
+      case 2: asked = .increment(control)
+      case 3: asked = .decrement(control)
+      default: asked = .press(control)
+      }
+      let window = inbox.window
+      inbox.mailbox.post {
+        MainActor.assumeIsolated {
+          guard let pointer = UnsafeRawPointer(bitPattern: window) else { return }
+          Unmanaged<Win32Window>.fromOpaque(pointer).takeUnretainedValue().onEvent?(.accessibility(asked))
+        }
+      }
+    }
+
+    private func letGoOfAccessibility() {
+      if let accessibility { dbax_destroy(accessibility) }
+      accessibility = nil
+      inbox?.release()
+      inbox = nil
     }
 
     /// Work for the window's thread, from any thread: kept under a lock, and the window woken with a
@@ -395,8 +488,19 @@
         for work in mailbox.take() { work() }
         return 0
 
+      case UINT(WM_GETOBJECT):
+        // UI Automation asking for the controls — described at once the first time, so the first
+        // reading finds them; anything else asked is Windows' to answer.
+        if !read, Int32(truncatingIfNeeded: lParam) == -25 {  // UiaRootObjectId
+          read = true
+          onEvent?(.describe)
+        }
+        let answer = dbax_get_object(accessibility, UInt(wParam), Int(lParam))
+        return answer == 0 ? nil : LRESULT(answer)
+
       case UINT(WM_DESTROY):
         isOpen = false
+        letGoOfAccessibility()
         mailbox.shut()
         KillTimer(handle, Self.resizeTimer)
         return 0
@@ -449,6 +553,10 @@
       prepared = true
       // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, which the headers spell as a cast of -4.
       _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT(bitPattern: -4))
+      // The windows' thread in a single-threaded apartment, as a Windows program's UI thread is, unless
+      // it has chosen already: what the shell's dialogs and UI Automation's hosting expect of it, and
+      // what the app's audio route chose for it already.
+      _ = CoInitializeEx(nil, DWORD(COINIT_APARTMENTTHREADED.rawValue))
       className.withCString(encodedAs: UTF16.self) { name in
         var windowClass = WNDCLASSEXW()
         windowClass.cbSize = UINT(MemoryLayout<WNDCLASSEXW>.size)

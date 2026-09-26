@@ -13,6 +13,10 @@ public enum ShellEvent: Sendable, Equatable {
   case command(String)
   /// Files dropped on the window, at a point in it.
   case dropped([URL], at: SIMD2<Float>)
+  /// Something a screen reader asks be done to a control the window described.
+  case accessibility(AccessibilityAction)
+  /// A screen reader has begun reading the window: what is on screen is wanted now, before it looks.
+  case describe
 }
 
 /// A key, pressed or let go. A key that types something is known by what it types, with the

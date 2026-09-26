@@ -100,6 +100,7 @@ let package = Package(
       name: "DriftboxWin32",
       dependencies: [
         "DriftboxShell", .target(name: "CShellDialogs", condition: .when(platforms: [.windows])),
+        .target(name: "CAccessibility", condition: .when(platforms: [.windows])),
       ]),
     // Type: a line set in a font and a glyph's coverage, which is all that is asked of a platform,
     // and DirectWrite answering it on Windows. DirectWrite's headers are C++ only, so the C target
@@ -350,6 +351,28 @@ let package = Package(
   ],
   cxxLanguageStandard: .cxx17
 )
+
+// The app's drawn controls for screen readers on Windows: a UI Automation provider in C++, with a C
+// face for Swift, compiled only there.
+package.targets += [
+  .target(
+    name: "CAccessibility",
+    linkerSettings: ["uiautomationcore", "oleaut32", "ole32"].map {
+      .linkedLibrary($0, .when(platforms: [.windows]))
+    }),
+  // Windows' own UI Automation client, reading and acting on the app's controls as a screen reader
+  // does, for the tests.
+  .target(
+    name: "DriftboxAXClient", path: "Tests/DriftboxAXClient",
+    linkerSettings: ["uiautomationcore", "oleaut32", "ole32"].map {
+      .linkedLibrary($0, .when(platforms: [.windows]))
+    }),
+  // That client as a process of its own, as a screen reader is, for the tests to run beside a window.
+  .executableTarget(
+    name: "DriftboxAXProbe",
+    dependencies: [.target(name: "DriftboxAXClient", condition: .when(platforms: [.windows]))],
+    path: "Tests/DriftboxAXProbe"),
+]
 
 // Movies of a performance and its visuals: `DriftboxMovie` on every platform with the GPU layer, and
 // `CMovieWriter`, the file itself on Windows through Media Foundation, which compiles only there.
