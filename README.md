@@ -373,7 +373,8 @@ pad, and menus for the rest. Tab hides the controls, to perform. The keyboard is
 as on the Mac: the number row strikes the drums, the home row plays 303 A, `z` and `x` its octave.
 The rack is there too, from Rack ▸ Show Rack (Ctrl+R): the patch's modules with their knobs and
 choices, its catalogue of patches, and the keys playing it, heard beside the groovebox.
-- **File:** New, Open…, the catalogue, Save and Save As… as `.driftbox`.
+- **File:** New, Open…, the catalogue, Save and Save As… as `.driftbox`; Export Mix… as one WAV, and
+  Export Stems… as a WAV for each voice the song uses, in a folder chosen in Windows' own panel.
 - **Edit:** Undo and Redo, named for the edit.
 - **Transport:** play and stop, sections, the loop, the metronome and the count-in.
 - **View:** the controls shown or hidden, and the song's scene or any other.
