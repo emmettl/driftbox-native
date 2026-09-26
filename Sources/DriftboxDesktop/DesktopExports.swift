@@ -22,7 +22,7 @@ extension Desktop {
             try WAV.data(audio, sampleRate: sampleRate).write(to: url, options: .atomic)
           } catch {
             await self?.reportAudioExportFailure(
-              "Could not export \(url.lastPathComponent): \(error.localizedDescription)")
+              "Could not export \(url.lastPathComponent): \(FailureMessage.describe(error))")
           }
         }
       }
@@ -55,7 +55,7 @@ extension Desktop {
                 : written == 1
                   ? " 1 stem was already exported." : " \(written) stems were already exported."
               await self?.reportAudioExportFailure(
-                "Could not export \(file.lastPathComponent): \(error.localizedDescription)\(partial)")
+                "Could not export \(file.lastPathComponent): \(FailureMessage.describe(error))\(partial)")
               return
             }
           }

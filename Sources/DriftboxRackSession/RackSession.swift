@@ -1101,7 +1101,7 @@ public final class RackSession: MIDIListener {
       Result {
         try urls.map { url in
           do { return try decoder.decode(url, sampleRate: rate) } catch {
-            throw SampleFileFailure(name: url.lastPathComponent, reason: error.localizedDescription)
+            throw SampleFileFailure(name: url.lastPathComponent, reason: FailureMessage.describe(error))
           }
         }
       }
@@ -1109,7 +1109,7 @@ public final class RackSession: MIDIListener {
   }
 
   private func loadFailed(_ error: any Error, into module: String) {
-    let reason = error.localizedDescription
+    let reason = FailureMessage.describe(error)
     loadFailure = (module, reason)
     onLoadFailure?(reason)
   }

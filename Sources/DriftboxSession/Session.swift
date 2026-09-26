@@ -566,7 +566,7 @@ public final class Session {
       if let current { remember(current, at: url) }
       return true
     } catch {
-      self.error = "Could not save \(url.lastPathComponent): \(error.localizedDescription)"
+      self.error = "Could not save \(url.lastPathComponent): \(FailureMessage.describe(error))"
       return false
     }
   }
