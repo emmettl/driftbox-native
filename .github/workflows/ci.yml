@@ -45,7 +45,8 @@ jobs:
     name: Swift
     needs: fixtures
     runs-on: ubuntu-latest
-    container: swift:6.4-bookworm
+    # Match the supported desktop/package runtime; GTK 4.8 has window-teardown defects.
+    container: swift:6.4-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9
     env:
       DRIFTBOX_REQUIRE_GENERATED: 1
       # The GPU layer's OpenGL ES backend runs its contract tests on Mesa's software rasteriser,
@@ -53,11 +54,8 @@ jobs:
       EGL_PLATFORM: surfaceless
       LIBGL_ALWAYS_SOFTWARE: 1
     steps:
-      # Mesa for OpenGL ES, and Python for the release scripts' checks, which the image has neither of.
-      - name: Mesa and Python
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri python3
+      - name: Linux graphics and audio development libraries and Python
+        run: apt-get update && apt-get install -y --no-install-recommends libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri libpipewire-0.3-dev libasound2-dev libgtk-4-dev fonts-dejavu-core xvfb xauth desktop-file-utils shared-mime-info python3 python3-gi gcc
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
@@ -67,15 +65,37 @@ jobs:
         run: swift format lint --strict -r Sources Tests Package.swift
       # The release scripts' checks, which sign, upload and publish nothing.
       - name: Release scripts
-        run: python3 scripts/test-release.py && python3 scripts/test-android-release.py
+        run: python3 scripts/test-release.py && python3 scripts/test-android-release.py && python3 scripts/test-linux-package.py && python3 scripts/test-linux-deb.py
+      - name: Linux document dialog bridge
+        run: scripts/test-linux-dialogs.sh
+      - name: Linux GPU diagnostics
+        run: swift run driftbox-play --gpu-info
+      - name: Linux window lifecycle
+        run: xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 swift run driftbox-linux-window --self-test
+      - name: Linux desktop
+        run: xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 swift run driftbox-linux --silent --smoke-test
+      - name: Audio targets stay constrained
+        run: scripts/check-constrained.sh
+
       - name: Test
         run: swift test
         # Strict actor isolation, as an app runs with: a closure made on the main actor and called
         # from an audio or MIDI thread traps here, rather than only in the app.
         env:
           SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE: swift6
-      - name: Audio targets stay constrained
-        run: scripts/check-constrained.sh
+
+  linux-gtk:
+    name: Linux GTK lifetime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: GTK and private display test tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc pkg-config libgtk-4-dev xvfb xauth dbus-x11 sway wtype
+      - name: X11 dialogs
+        run: scripts/test-linux-dialogs.sh
+      - name: Native Wayland dialogs
+        run: scripts/test-linux-wayland.sh
 
   # Whether a change can reach the Windows build, since a Windows minute costs twice a Linux one.
   # It can unless every file changed is in something that compiles to nothing there — the Mac app,

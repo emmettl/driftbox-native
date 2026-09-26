@@ -895,3 +895,25 @@ still a finger's size there, and a finger zooms past it. A chip in the header or
 - **The views' logic moves below the views.** Step 2's move of `Player` out of `DriftboxApp`
   goes further: whatever an interface decides that is not drawing goes in a target that iOS,
   Android and the two desktops share.
+
+## Milestone 6 — Linux
+
+The [Linux port plan](docs/LINUX.md) records the external-storage Ubuntu ARM64 VM, build tooling
+and acceptance criteria. The command-line player and shared GTK/GLES desktop now run with
+PipeWire audio. The groovebox and built-in rack render; native Save As/reopen and keyboard
+transport checks pass. GTK file drops feed the shared import paths, with interactive drag/drop
+qualification still pending.
+
+The Linux audio adapter lists outputs, remembers a selected node name, falls back when it is
+removed and reconnects after stream/server loss. Source lifetime and detach behavior are tested
+across recovery. ALSA sequencer now supplies MIDI input, scheduled output, hotplug discovery and a
+virtual source through the shared MIDI ports. Software-port tests cover clock and channel messages,
+ignore/flush, reconnect and shutdown; physical MIDI timing and controller tests remain pending.
+The shell's MainActor integration uses private Swift runtime hooks and needs revalidation with
+toolchain updates. Measured audio latency, remaining input/accessibility work, packaging and
+physical hardware qualification are still required for a viable release.
+Interactive audio and MIDI menu selection now passes through XWayland. The Ubuntu VM's native
+Wayland menu-switching failure also reproduces in a standalone GTK-only probe; XWayland is the
+current interactive workaround pending toolkit/compositor qualification.
+Linux plug-in hosting and a plug-in build remain separate milestones. See the plan for detailed
+validation evidence and limitations.

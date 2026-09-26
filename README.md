@@ -956,3 +956,18 @@ meant to be picked up, and that is the licence that gets least in the way of doi
 Steinberg's VST 3 SDK, in `Sources/VST3SDK` and `Tests/DriftboxVST3Fixture`, is theirs, under
 [its own MIT licence](Sources/VST3SDK/LICENSE-VST3SDK.txt). VST is a trademark of Steinberg Media
 Technologies GmbH.
+
+## Linux development
+
+Linux runs the shared groovebox and rack through a native GTK 4/Pango shell, GLES renderer,
+PipeWire audio and ALSA MIDI adapters. The Ubuntu ARM64 development VM, architecture work,
+validation and remaining release criteria are recorded in [docs/LINUX.md](docs/LINUX.md).
+Inside a Linux checkout, `scripts/linux-build.sh` provides build, test, render, playback and
+`desktop` entry points. The Ubuntu VM currently uses XWayland for a native Wayland menu issue.
+
+`scripts/linux-package.py` packages a release desktop build with its Swift runtime and resources.
+The extracted [Linux preview](linux/README.md) runs without a compiler and supports per-user app-menu
+registration. CI also builds Ubuntu 24.04 ARM64 and x86-64 [`.deb` packages](linux/packaging/README-deb.md)
+with APT dependencies and system app-menu registration; both formats are tested in clean runtime
+containers. This remains a preview: other distributions, physical audio/MIDI hardware and the
+remaining desktop interactions still need qualification.

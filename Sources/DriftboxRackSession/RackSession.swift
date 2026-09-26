@@ -135,6 +135,9 @@ public final class RackSession: MIDIListener {
   public private(set) var loading: Set<String> = []
   /// Why the last file could not be loaded, for the face that asked.
   public private(set) var loadFailure: (module: String, reason: String)?
+  /// Each failed file load, on the main actor, including repeated or simultaneous failures.
+  /// The shell can notify without consuming the error still shown on the module face.
+  @ObservationIgnored public var onLoadFailure: ((String) -> Void)?
   /// The Combinator whose routing is open beside the rack. Where the window is, not what the
   /// patch is, so it is never saved.
   public private(set) var editingRoutes: String?
@@ -1140,7 +1143,7 @@ public final class RackSession: MIDIListener {
     defer { loading.remove(moduleId) }
     switch await decode([url]) {
     case .failure(let error):
-      loadFailure = (moduleId, "\(error)")
+      loadFailed(error, into: moduleId)
     case .success(let decoded):
       let audio = SampleMath.normalise(SampleMath.toMono(decoded[0]))
       guard patch.modules.contains(where: { $0.id == moduleId }), audio.count > 1 else { return }
@@ -1168,8 +1171,20 @@ public final class RackSession: MIDIListener {
     let rate = host.sampleRate
     let decoder = decoder
     return await Task.detached(priority: .userInitiated) {
-      Result { try urls.map { try decoder.decode($0, sampleRate: rate) } }
+      Result {
+        try urls.map { url in
+          do { return try decoder.decode(url, sampleRate: rate) } catch {
+            throw SampleFileFailure(name: url.lastPathComponent, reason: FailureMessage.describe(error))
+          }
+        }
+      }
     }.value
+  }
+
+  private func loadFailed(_ error: any Error, into module: String) {
+    let reason = FailureMessage.describe(error)
+    loadFailure = (module, reason)
+    onLoadFailure?(reason)
   }
 
   /// A set of recordings into a Multisampler, mapped by their names — Piano_C3_pp maps itself —
@@ -1182,7 +1197,7 @@ public final class RackSession: MIDIListener {
     defer { loading.remove(moduleId) }
     switch await decode(urls) {
     case .failure(let error):
-      loadFailure = (moduleId, "\(error)")
+      loadFailed(error, into: moduleId)
     case .success(let decoded):
       guard patch.modules.contains(where: { $0.id == moduleId }) else { return }
       let audio = decoded.map { SampleMath.normalise(SampleMath.toMono($0)) }
@@ -1208,7 +1223,7 @@ public final class RackSession: MIDIListener {
     defer { loading.remove(moduleId) }
     switch await decode([url]) {
     case .failure(let error):
-      loadFailure = (moduleId, "\(error)")
+      loadFailed(error, into: moduleId)
     case .success(let decoded):
       guard patch.modules.contains(where: { $0.id == moduleId }), let channels = decoded.first,
         let left = channels.first

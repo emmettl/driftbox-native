@@ -1,0 +1,43 @@
+name: Linux packages
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Ubuntu 24.04 / ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build archive and deb, then test clean runtimes
+        run: scripts/linux-package-ci.sh
+      # Only upload after the runtime check succeeds. This does not publish a release.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: driftbox-linux-ubuntu24.04-${{ matrix.arch }}
+          path: |
+            dist/linux-ci/*.tar.gz
+            dist/linux-ci/*.deb
+            dist/linux-ci/*.sha256
+          if-no-files-found: error
+          retention-days: 14

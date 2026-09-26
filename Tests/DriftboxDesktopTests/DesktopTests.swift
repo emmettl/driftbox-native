@@ -40,6 +40,39 @@ final class StandInWindow: ShellWindow {
   var asked: [String] = []
   var chosenFile: URL?
   var saveLocation: URL?
+  var defersDialogs = false
+  var pendingQuestion: ((SaveAnswer) -> Void)?
+  var pendingSave: ((URL?) -> Void)?
+  var pendingOpen: ((URL?) -> Void)?
+  var pendingFolder: ((URL?) -> Void)?
+  func chooseFolder(title: String, button: String, completion: @escaping (URL?) -> Void) {
+    if defersDialogs { pendingFolder = completion } else { completion(folder) }
+  }
+  var pendingMultiple: (([URL]) -> Void)?
+  var requestedTypes: [FileType] = []
+  func chooseFiles(ofTypes types: [FileType], completion: @escaping ([URL]) -> Void) {
+    requestedTypes = types
+    if defersDialogs { pendingMultiple = completion } else { completion(chosenFile.map { [$0] } ?? []) }
+  }
+  func chooseFile(ofTypes types: [FileType], completion: @escaping (URL?) -> Void) {
+    requestedTypes = types
+    if defersDialogs { pendingOpen = completion } else { completion(chooseFile(ofTypes: types)) }
+  }
+  func chooseSaveLocation(for type: FileType, name: String, completion: @escaping (URL?) -> Void) {
+    if defersDialogs {
+      pendingSave = completion
+    } else {
+      completion(chooseSaveLocation(for: type, name: name))
+    }
+  }
+  func askToSave(_ name: String, completion: @escaping (SaveAnswer) -> Void) {
+    if defersDialogs {
+      asked.append(name)
+      pendingQuestion = completion
+    } else {
+      completion(askToSave(name))
+    }
+  }
   var folder: URL?
 
   func run(frame: () throws -> Void) throws {}
@@ -886,4 +919,248 @@ func withTemporaryDirectory<T>(_ body: (URL) throws -> T) rethrows -> T {
   try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
   defer { try? FileManager.default.removeItem(at: directory) }
   return try body(directory)
+}
+
+extension DesktopTests {
+  @Test func deferredCloseWaitsForSaveAndDoesNotLoseChangesOnFailure() throws {
+    for device in try Self.devices() {
+      try withTemporaryDirectory { directory in
+        let (desktop, window, surface) = try Self.desktop(on: device)
+        window.choose(DesktopMenus.new)
+        desktop.session.edit("Tempo") { $0.bpm = 135 }
+        window.defersDialogs = true
+        #expect(window.shouldClose?() == false)
+        #expect(window.shouldClose?() == false)
+        #expect(window.asked.count == 1)
+        window.choose(DesktopMenus.new)
+        #expect(desktop.session.song?.bpm == 135)
+        try desktop.drawFrame()
+        #expect(surface.presented == 1, "drawing continues while a native dialog is pending")
+        let question = try #require(window.pendingQuestion)
+        window.pendingQuestion = nil
+        question(.save)
+        let save = try #require(window.pendingSave)
+        window.pendingSave = nil
+        save(directory.appendingPathComponent("missing/failure.driftbox"))
+        #expect(desktop.session.isEdited)
+        #expect(!window.closed)
+        #expect(!desktop.documentRequestPending)
+        #expect(window.shouldClose?() == false)
+        let again = try #require(window.pendingQuestion)
+        window.pendingQuestion = nil
+        again(.save)
+        let successful = try #require(window.pendingSave)
+        window.pendingSave = nil
+        let path = directory.appendingPathComponent("Saved.driftbox")
+        successful(path)
+        #expect(window.closed)
+        #expect(!desktop.session.isEdited)
+        let saved = SongCodec.decode(String(decoding: try Data(contentsOf: path), as: UTF8.self))
+        #expect(saved?.bpm == 135)
+      }
+    }
+  }
+
+  @Test func aPendingDialogStillReleasesThePerformancePad() throws {
+    for device in try Self.devices() {
+      let (desktop, window, _) = try Self.desktop(on: device)
+      window.choose(DesktopMenus.new)
+      desktop.interface.isShowing = false
+      window.onEvent?(.pointer(PointerEvent(phase: .began, location: SIMD2(80, 135))))
+      #expect(desktop.session.padTouch != nil)
+      window.defersDialogs = true
+      window.choose(DesktopMenus.saveAs)
+      #expect(desktop.documentRequestPending)
+      window.onEvent?(.pointer(PointerEvent(phase: .cancelled, location: .zero)))
+      #expect(desktop.session.padTouch == nil)
+      window.onEvent?(.pointer(PointerEvent(phase: .began, location: SIMD2(80, 135))))
+      #expect(desktop.session.padTouch == nil, "new gestures wait for the modal dialog")
+      let cancel = try #require(window.pendingSave)
+      window.pendingSave = nil
+      cancel(nil)
+      #expect(!desktop.documentRequestPending)
+    }
+  }
+
+  @Test func deferredOpenAndCloseCancellationLeaveTheCurrentSongAlone() throws {
+    for device in try Self.devices() {
+      let (desktop, window, _) = try Self.desktop(on: device)
+      window.choose(DesktopMenus.new)
+      desktop.session.edit("Tempo") { $0.bpm = 137 }
+      window.defersDialogs = true
+      window.choose(DesktopMenus.open)
+      #expect(desktop.documentRequestPending)
+      let question = try #require(window.pendingQuestion)
+      window.pendingQuestion = nil
+      question(.discard)
+      let open = try #require(window.pendingOpen)
+      window.pendingOpen = nil
+      open(nil)
+      #expect(desktop.session.song?.bpm == 137)
+      #expect(desktop.session.isEdited)
+      #expect(!desktop.documentRequestPending)
+      #expect(window.shouldClose?() == false)
+      let closing = try #require(window.pendingQuestion)
+      window.pendingQuestion = nil
+      closing(.cancel)
+      #expect(!window.closed)
+      #expect(!desktop.documentRequestPending)
+    }
+  }
+}
+
+extension DesktopTests {
+  @Test func rackAudioMenuTargetsModulesAndCancelsWithoutChangingThePatch() throws {
+    for device in try Self.devices() {
+      let window = StandInWindow()
+      let rack = RackSession()
+      let desktop = try Desktop(
+        session: Session(host: EngineHost(sampleRate: 48000)), window: window, device: device,
+        surface: StandInSurface(device: device, width: 320, height: 180),
+        typesetter: NoTypesetter(), rack: rack)
+      let sampler = try #require(rack.add("sampler"))
+      let second = try #require(rack.add("sampler"))
+      let instrument = try #require(rack.add("multisampler"))
+      let track = try #require(rack.add("audio-track"))
+      let oscillator = try #require(rack.add("vco"))
+      try desktop.drawFrame()
+      let command = DesktopMenus.rackAudioPrefix
+      #expect(window.title(of: command + sampler) == "Sampler 1…")
+      #expect(window.title(of: command + second) == "Sampler 2…")
+      #expect(window.commandIDs.contains(command + instrument))
+      #expect(window.commandIDs.contains(command + track))
+      #expect(!window.commandIDs.contains(command + oscillator))
+      #expect(window.isEnabled?(command + oscillator) == false)
+      #expect(window.isEnabled?(command + "missing") == false)
+      let before = rack.patch
+      window.defersDialogs = true
+      for module in [sampler, track] {
+        window.choose(command + module)
+        #expect(desktop.showsRack && desktop.documentRequestPending)
+        #expect(window.requestedTypes.first?.extensions == ["wav", "wave"])
+        #expect(window.isEnabled?(command + instrument) == false)
+        let cancel = try #require(window.pendingOpen)
+        window.pendingOpen = nil
+        cancel(nil)
+        #expect(!desktop.documentRequestPending)
+        #expect(rack.patch == before)
+      }
+      window.choose(command + instrument)
+      #expect(window.pendingOpen == nil, "an instrument must allow several files")
+      let cancel = try #require(window.pendingMultiple)
+      window.pendingMultiple = nil
+      cancel([])
+      #expect(!desktop.documentRequestPending)
+      #expect(rack.patch == before)
+      window.choose(DesktopMenus.patchPrefix + "acid")
+      try desktop.drawFrame()
+      #expect(!window.commandIDs.contains(command + sampler), "targets follow the current patch")
+      #expect(window.isEnabled?(command + sampler) == false)
+    }
+  }
+}
+
+extension DesktopTests {
+  @Test func exportsWaitForDeferredLocations() async throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Deferred")
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    window.defersDialogs = true
+    for command in [DesktopMenus.exportMix, DesktopMenus.exportStems, DesktopMenus.exportMovie] {
+      window.choose(command)
+      #expect(desktop.documentRequestPending)
+      #expect(window.isEnabled?(DesktopMenus.new) == false)
+      #expect(desktop.exporting == nil && desktop.movie == nil)
+      let cancel = try #require(
+        command == DesktopMenus.exportStems ? window.pendingFolder : window.pendingSave)
+      window.pendingFolder = nil
+      window.pendingSave = nil
+      cancel(nil)
+      #expect(!desktop.documentRequestPending)
+      #expect(desktop.exporting == nil && desktop.movie == nil)
+    }
+    window.choose(DesktopMenus.exportMix)
+    let mix = directory.appendingPathComponent("Mix.wav")
+    let saveMix = try #require(window.pendingSave)
+    saveMix(mix)
+    window.pendingSave = nil
+    #expect(!desktop.documentRequestPending)
+    await desktop.exporting?.value
+    #expect(try Data(contentsOf: mix).prefix(4) == Data("RIFF".utf8))
+    window.choose(DesktopMenus.exportStems)
+    let saveStems = try #require(window.pendingFolder)
+    saveStems(directory)
+    window.pendingFolder = nil
+    await desktop.exporting?.value
+    let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+    #expect(files.contains { $0.hasPrefix("Deferred - ") && $0.hasSuffix(".wav") })
+    desktop.supportsMovies = false
+    #expect(window.isEnabled?(DesktopMenus.exportMovie) == false)
+    #expect(window.isEnabled?(DesktopMenus.record) == false)
+  }
+}
+
+extension DesktopTests {
+  @Test func documentFailuresAreReportedOnceAndCanRecur() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Kept")
+    let before = desktop.session.song
+    let missing = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    window.chosenFile = missing
+    window.choose(DesktopMenus.open)
+    desktop.refresh()
+    #expect(desktop.session.song == before)
+    #expect(window.told.count == 1 && window.told[0].contains(missing.lastPathComponent))
+    #expect(desktop.session.error == nil)
+    desktop.refresh()
+    #expect(window.told.count == 1)
+    window.choose(DesktopMenus.open)
+    desktop.refresh()
+    #expect(window.told.count == 2, "the same failure on a new attempt is reported again")
+  }
+
+  @Test func failedSaveAsIsNotSuccessForAnUneditedSong() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Kept")
+    #expect(!desktop.session.isEdited)
+    window.saveLocation = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString).appendingPathComponent("Missing/Save.driftbox")
+    var saved: Bool?
+    desktop.saveAs { saved = $0 }
+    #expect(saved == false)
+    #expect(desktop.session.fileURL == nil && desktop.session.documentName == "Kept")
+    desktop.refresh()
+    #expect(window.told.count == 1)
+    #expect(window.told.first?.hasPrefix("Could not save Save.driftbox:") == true)
+  }
+
+  @Test func failedSaveBeforeClosingKeepsEditsAndReportsAfterTheDialog() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Kept")
+    desktop.session.edit("Tempo") { $0.bpm = 137 }
+    window.defersDialogs = true
+    #expect(window.shouldClose?() == false)
+    let question = try #require(window.pendingQuestion)
+    window.pendingQuestion = nil
+    question(.save)
+    desktop.refresh()
+    #expect(window.told.isEmpty && desktop.documentRequestPending)
+    let save = try #require(window.pendingSave)
+    window.pendingSave = nil
+    save(
+      FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        .appendingPathComponent("Missing/Save.driftbox"))
+    #expect(!window.closed && !desktop.documentRequestPending)
+    #expect(desktop.session.isEdited && desktop.session.song?.bpm == 137)
+    desktop.refresh()
+    #expect(window.told.count == 1)
+    desktop.refresh()
+    #expect(window.told.count == 1)
+  }
 }
