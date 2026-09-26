@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Driftbox for Windows' folder, as the release workflow uploads it: the program and its plug-in
+     scanner signed, each held to the product's name and this release's version. The Swift and
+     Visual C++ runtime DLLs beside them are left as they are: they are not this project's to sign.
+     SignPath keeps its own copy of this, entered in the project's artifact configuration "driftbox";
+     this one is what that copy should say. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" />
+  </parameters>
+  <zip-file>
+    <pe-file path="Driftbox.exe" product-name="Driftbox" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="DriftboxVST3Scan.exe" product-name="Driftbox" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

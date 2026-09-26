@@ -10,3 +10,4 @@ node_modules/
 dist/
 # Claude Code worktrees, which are checkouts of their own.
 .claude/
+__pycache__/
