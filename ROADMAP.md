@@ -584,6 +584,13 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    was at the next launch. One scene draws it, and the backdrop shows the same frame cropped.
    File ▸ Open Recent lists the ten songs opened or saved lately, however they came, and tells
    Windows of each, for the taskbar's jump list.
+   Screen readers, begun: the shell's `AccessibilityNode` is what is on screen as a tree of roles,
+   names, values and places, which the interface builds for the groovebox and `CAccessibility`
+   hands to UI Automation as a provider, asked on UI Automation's threads and telling screen readers
+   of changes from a thread of its own, so the window's is never held; what a screen reader asks
+   comes back as the window's events and is done as a hand does it. Held to Windows' own UI
+   Automation client from a process of its own, as a screen reader is, and to the real app read and
+   played that way. Next: the rack described, and moving between the controls with the keyboard.
    The rack comes by way of `DriftboxRackSession`, which holds what the Mac's `RackModel` did —
    the patch, its edits and undo, the keys, controllers, samples, song and transport — on every
    platform, with the Mac's audio, plug-ins and file reading behind ports: `AudioRouting`,

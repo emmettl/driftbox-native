@@ -69,6 +69,8 @@ public final class Desktop {
   /// What makes the visuals window's surface: the platform's GPU on it. Nil, and no visuals window,
   /// where there is none.
   let makeVisualsSurface: ((any ShellVisualsWindow) throws -> any GPUSurface)?
+  /// When what is on screen was last told to a screen reader.
+  var describedAt = -Double.infinity
   /// The song file last seen open, to notice another being opened or saved as.
   var lastFile: URL?
   /// The displays there were when last asked, and when.
@@ -159,6 +161,7 @@ public final class Desktop {
     presenter.present(backdrop, into: target, on: device, filling: backdrop !== frame)
     try drawInterface(into: target)
     try surface.present()
+    describe(at: time)
   }
 
   /// The controls, drawn on a page the size of the window in its pixels, in points, and laid over
@@ -237,6 +240,11 @@ public final class Desktop {
       // A name being typed has every key; otherwise the keyboard is an instrument.
       if !interface.key(key) { _ = keys.play(key, on: session) }
       window.takesText = interface.takesText
+    case .accessibility(let action):
+      _ = interface.perform(action)
+    case .describe:
+      describedAt = -.infinity
+      describe(at: HostTime.seconds(from: began, to: HostTime.now()), asked: true)
     }
   }
 

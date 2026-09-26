@@ -54,6 +54,10 @@ final class StandInWindow: ShellWindow {
   var displays: [String] = []
   var recents: [URL] = []
   func addToRecents(_ url: URL) { recents.append(url) }
+  /// Whether a screen reader is reading it, as a test says, and what it was told.
+  var isDescribed = false
+  var described: [AccessibilityNode] = []
+  func describe(_ root: AccessibilityNode) { described.append(root) }
   /// The visuals windows made, the last the one in use.
   var visualsWindows: [StandInVisualsWindow] = []
   func makeVisualsWindow() -> (any ShellVisualsWindow)? {
@@ -324,6 +328,29 @@ struct DesktopTests {
     window.choose(DesktopMenus.exportStems)
     await desktop.exporting?.value
     #expect(try FileManager.default.contentsOfDirectory(atPath: stems.path) == ["Groove - 909.bd.wav"])
+  }
+
+  /// Told a screen reader's there only while one reads the window, and then what the groovebox shows
+  /// — or, with the rack showing, that it is not described yet; and what it asks, done.
+  @Test func aScreenReaderIsToldWhatIsOnScreen() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Groove")
+    try desktop.drawFrame()
+    #expect(window.described.isEmpty, "nobody reading, nothing told")
+
+    window.isDescribed = true
+    try desktop.drawFrame()
+    let told = try #require(window.described.last)
+    #expect(told.node("transport.play")?.isOn == false)
+    try desktop.drawFrame()
+    #expect(window.described.count == 1, "not every frame")
+
+    window.onEvent?(.accessibility(.set("number.tempo", 100)))
+    #expect(desktop.session.song?.bpm == 100)
+    desktop.describedAt = -.infinity
+    try desktop.drawFrame()
+    #expect(window.described.last?.node("number.tempo")?.current == 100)
   }
 
   /// Transport ▸ Clear Loop: whatever is looping, one section or several stretched across, which

@@ -46,6 +46,7 @@ Metal. Next after this is the rack.
 | `Sources/CGLES` | EGL's and OpenGL ES 3.0's headers. Declarations only. |
 | `Sources/DriftboxShell` | What the app asks of a window — input, menus, file panels, a loop — the same on every platform. |
 | `Sources/DriftboxWin32` | That on Windows: the Windows shell. |
+| `Sources/CAccessibility` | The drawn controls for screen readers: a UI Automation provider in C++, fed the tree the app describes and handing back what a screen reader asks. Windows only. |
 | `Sources/DriftboxText` | What the app asks of a platform's type: a line set in a font, and a glyph's coverage. |
 | `Sources/DriftboxTextWindows` | That on DirectWrite: type on Windows. |
 | `Sources/DriftboxTextAndroid` | That on Android's own text stack, through the app's Java: type on Android. |
@@ -390,6 +391,14 @@ choices, its catalogue of patches, and the keys playing it, heard beside the gro
   the window comes back where it was at the next launch.
 - **Audio and MIDI:** the output device, the MIDI inputs heard, and the MIDI clock followed or sent,
   and where. Settings are menu items the menu ticks as it opens.
+
+**Screen readers.** The controls are drawn, not windows of their own, so the app describes them to
+Windows' UI Automation itself, as Narrator and NVDA read it: the transport, the tempo and swing, the
+song's sections and patterns, every lane's steps, each 303 step's note, accent and slide, and the
+knobs showing, each by a name a person would give it and with what it is set to in words. A screen
+reader presses a button, turns a step over or sets a knob, and the app does it as a hand would.
+Nothing is described until something reads the window. The rack says only that it is not described
+yet, and moving from control to control with the keyboard is still to come.
 
 Closing, opening or starting afresh over unsaved work asks first, in Windows' own words. Its
 executable only chooses Windows' parts — WASAPI, WinMM, a Win32 window, Direct3D, DirectWrite — and

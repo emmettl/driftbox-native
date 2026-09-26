@@ -57,6 +57,12 @@ public protocol ShellWindow: AnyObject {
   /// A file opened or saved, told to the platform's own list of recent files, where it keeps one:
   /// Windows' jump list, the Mac's Open Recent.
   func addToRecents(_ url: URL)
+  /// Whether a screen reader, or anything else reading what is on screen, is listening: until one
+  /// is, nothing need be described.
+  var isDescribed: Bool { get }
+  /// What is on screen now, for the platform's accessibility: handed over as often as it changes
+  /// while `isDescribed`. Asked of it, the window answers with `.accessibility` events.
+  func describe(_ root: AccessibilityNode)
   /// The displays attached, by name, the main one first: where a visuals window can go.
   var displays: [String] { get }
   /// A window for the visuals alone, not yet shown; nil where the platform has no second window.
@@ -108,6 +114,10 @@ extension ShellWindow {
 
   /// Nothing, where a platform keeps no list.
   public func addToRecents(_ url: URL) {}
+
+  /// Nobody, where a platform's window has no accessibility of its own yet.
+  public var isDescribed: Bool { false }
+  public func describe(_ root: AccessibilityNode) {}
 
   /// None, where a platform has one screen, or will not say.
   public var displays: [String] { [] }
