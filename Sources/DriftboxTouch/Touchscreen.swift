@@ -1,5 +1,6 @@
 import DriftboxCanvas
 import DriftboxGPU
+import DriftboxHelp
 import DriftboxHost
 import DriftboxInterface
 import DriftboxRackSession
@@ -73,6 +74,8 @@ public final class Touchscreen {
     presenter = try Presenter(device: device)
     interface = Interface(session: session)
     interface.touch = true
+    // The guides as a touchscreen's controls are: fingers, long presses and chips.
+    interface.helpGuide = GrooveboxHelp.guide(for: .android)
     canvas = try Canvas(device: device, typesetter: typesetter)
     chosenScene = scene
     let type = GPUScenes.type(for: scene ?? session.song?.visual)
@@ -154,6 +157,7 @@ public final class Touchscreen {
   public func add(_ rack: RackSession) {
     let shown = RackInterface(rack: rack)
     shown.touch = true
+    shown.helpGuide = RackHelp.guide(for: .android)
     shown.showGroovebox = { [weak self] in self?.show(rack: false) }
     interface.showRack = { [weak self] in self?.show(rack: true) }
     self.rack = shown

@@ -375,8 +375,10 @@ trims, its menus — and nothing of the web's automation desk or performance vie
 not. On Windows, both guides are the drawn app's own: `GrooveboxHelp` and `RackHelp` for
 `.windows` say what its chips, right-click menus, menu bar and Ctrl do, and `HelpSheet` draws a
 guide over the window, a tab a topic — Help ▸ Groovebox Guide and Rack Guide, F1 for the one
-showing — read by a screen reader like the controls. Left: the guides on Android; and the rest of
-what the web app teaches with, and what a Mac does better:
+showing — read by a screen reader like the controls. On Android, `.android` says what a finger
+does — taps, holds, the step keyboard, pinching the rack — and nothing of keys; the song's chip
+offers Groovebox Guide and the rack's patch chip Rack Guide, over the screen as the same sheet.
+Left: the rest of what the web app teaches with, and what a Mac does better:
 
 - **The reference's teaching, ported:** its help dialog, the first-run offer of a tour, the guided
   tour and tutorial coach that walk a patch being built, and each module's guide. The words carry

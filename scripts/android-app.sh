@@ -42,7 +42,7 @@ mkdir -p "$app/classes" "$app/dex" "$app/stage/lib/arm64-v8a" "$app/stage/assets
 # the scene, the touch screen that puts them together, and the app's own module on top. The app
 # checks the GPU contract with the contract tests' own programs.
 extra_DriftboxAndroid=Tests/DriftboxGPUTests/Generated/ShaderPrograms.swift
-# The rack session and the rack's controls are in it, though the phone does not show the rack yet.
+# The rack session and the rack's controls are in it, shown from the song's menu, and the guides.
 modules="DriftboxGPU DriftboxGPUGLES DriftboxText DriftboxTextAndroid DriftboxCanvas DriftboxScenes DriftboxShell \
   DriftboxSession DriftboxHelp DriftboxRackSession DriftboxInterface DriftboxTouch DriftboxAndroid"
 # shellcheck disable=SC2086

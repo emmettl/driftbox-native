@@ -9,13 +9,19 @@ import DriftboxShell
 /// transport's by what it does, a step by its lane and number, a knob by what it turns.
 extension Interface {
   /// What is on screen, as the window hands it to the platform's accessibility.
-  public var accessibility: AccessibilityNode { described().node }
+  public var accessibility: AccessibilityNode { guide?.accessibility ?? described().node }
 
   /// What a screen reader asked, done as a hand would do it; false for a control there is not.
   @discardableResult
   public func perform(_ asked: AccessibilityAction) -> Bool {
     // Where the keyboard is, the window's business, not the controls'.
     if case .focus = asked { return false }
+    // A guide open over the controls is what is read, and what is asked.
+    if let guide {
+      let done = guide.perform(asked)
+      if !guide.isOpen { self.guide = nil }
+      return done
+    }
     guard let handle = described().handlers[asked.control] else { return false }
     handle(asked)
     return true
