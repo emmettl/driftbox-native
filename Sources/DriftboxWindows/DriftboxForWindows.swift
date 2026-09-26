@@ -66,9 +66,11 @@
         session: session, window: window, device: device, surface: surface,
         typesetter: try DirectWriteTypesetter(),
         // The rack, through the same output: heard beside the groovebox, and shown in its place;
-        // its plug-ins VST 3, their editors in front of this window.
+        // its Audio Input modules listening through WASAPI; its plug-ins VST 3, their editors in
+        // front of this window.
         rack: RackSession(
           sampleRate: route.sampleRate, audio: route,
+          input: WASAPIInput(chosen: nil, sampleRate: route.sampleRate, hop: hop),
           plugins: VST3Hosting(
             memory: UserDefaults.standard, owner: { UnsafeMutableRawPointer(window.handle) }),
           memory: UserDefaults.standard),

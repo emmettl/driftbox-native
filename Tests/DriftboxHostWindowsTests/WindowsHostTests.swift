@@ -51,14 +51,16 @@
       let counter = Counter()
       route.attach(counter.source)
       let began = Date()
-      RunLoop.main.run(until: began.addingTimeInterval(0.5))
+      Thread.sleep(forTimeInterval: 0.5)
       let seconds = Date().timeIntervalSince(began)
       let rendered = Double(counter.frames.load(ordering: .relaxed)) / 48000
+      // It did wait: the sleep can end a timer tick early by the wall clock, never much more.
+      #expect(seconds >= 0.45, "waited \(seconds)s")
       // Within a period or two of the time that passed, plus the buffer filled ahead.
       #expect(abs(rendered - seconds) < 0.1, "rendered \(rendered)s in \(seconds)s")
       route.detach(counter.source.context)
       let after = counter.frames.load(ordering: .relaxed)
-      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      Thread.sleep(forTimeInterval: 0.1)
       #expect(counter.frames.load(ordering: .relaxed) == after)
     }
 
@@ -68,6 +70,81 @@
       guard let system = route.systemDefault else { return }
       #expect(route.current == system)
       #expect(route.chosen == "not a device")
+    }
+  }
+
+  /// Against whatever this machine listens to. With no input device at all, as on a CI runner,
+  /// there is nothing to hear, which the input says once it is asked to hear something.
+  @MainActor
+  struct WASAPIInputTests {
+    /// Listed from the start, but not opened until there is somewhere to put what it hears.
+    @Test func theSystemsInputIsListedAndHeardOnlyWhenAsked() {
+      let input = WASAPIInput()
+      guard let system = input.systemDefault else {
+        input.destination = LiveInput()
+        #expect(input.current == nil && input.error != nil)
+        return
+      }
+      #expect(input.devices.contains(system))
+      #expect(input.current == nil && input.error == nil, "not listening yet")
+      input.destination = LiveInput()
+      #expect(input.current == system)
+      #expect(input.error == nil)
+      input.destination = nil
+      #expect(input.current == nil)
+    }
+
+    /// What comes in arrives at the device's pace — about the engine's rate, whatever the device's
+    /// own — and stops arriving once it is let go of. Slept through rather than run through: the
+    /// capture thread writes the ring itself, and needs nothing of the main thread.
+    @Test func whatComesInArrivesInRealTime() {
+      let input = WASAPIInput()
+      let heard = LiveInput()
+      input.destination = heard
+      guard input.current != nil else { return }
+      let began = Date()
+      Thread.sleep(forTimeInterval: 0.5)
+      let seconds = Date().timeIntervalSince(began)
+      let arrived = Double(heard.received) / 48000
+      // Within a period or two of the time that passed: it starts arriving a period in.
+      #expect(seconds >= 0.5)
+      #expect(abs(arrived - seconds) < 0.05, "heard \(arrived)s in \(seconds)s")
+      input.destination = nil
+      let after = heard.received
+      Thread.sleep(forTimeInterval: 0.1)
+      #expect(heard.received == after)
+    }
+
+    /// Choosing a device that is not there listens to the system's, and remembers the choice.
+    @Test func aChoiceThatIsNotThereFallsBackToTheSystems() {
+      let input = WASAPIInput(chosen: "not a device")
+      input.destination = LiveInput()
+      guard let system = input.systemDefault else { return }
+      #expect(input.current == system)
+      #expect(input.chosen == "not a device")
+    }
+
+    /// Every input there is can be opened by name, and heard from within a second: some take a
+    /// while to wake.
+    @Test func everyInputCanBeHeard() {
+      let input = WASAPIInput()
+      for device in input.devices {
+        let heard = LiveInput()
+        input.chosen = device.id
+        input.destination = heard
+        #expect(input.current == device, "\(device.name): \(input.error ?? "")")
+        let began = Date()
+        while heard.received == 0, Date().timeIntervalSince(began) < 1 { Thread.sleep(forTimeInterval: 0.01) }
+        #expect(heard.received > 0, "\(device.name) gave nothing")
+        input.destination = nil
+      }
+    }
+
+    /// The outputs are still the outputs: the route and the input list different devices.
+    @Test func inputsAreNotOutputs() {
+      let input = WASAPIInput()
+      let route = WASAPIRoute()
+      #expect(Set(input.devices).isDisjoint(with: route.devices))
     }
   }
 

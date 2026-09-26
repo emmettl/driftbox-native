@@ -10,7 +10,7 @@ import DriftboxShell
 /// on, which the window asks as a menu opens.
 ///
 /// Every command is an id. The ones about something carry it after a prefix: `song.acid`,
-/// `scene.frost`, `output.<device>`, `input.<source>`, `clock.<port>`.
+/// `scene.frost`, `output.<device>`, `audioInput.<device>`, `input.<source>`, `clock.<port>`.
 public enum DesktopMenus {
   public static let new = "file.new"
   public static let open = "file.open"
@@ -48,6 +48,8 @@ public enum DesktopMenus {
   public static let rackGuide = "help.rack"
   public static let rackBack = "rack.back"
   public static let systemOutput = "audio.system"
+  /// Whatever the system listens to, for the rack's Audio Input module.
+  public static let systemInput = "audio.systemInput"
   public static let listen = "midi.listen"
   public static let followClock = "midi.followClock"
   public static let sendClock = "midi.sendClock"
@@ -65,6 +67,8 @@ public enum DesktopMenus {
   public static let songPrefix = "song."
   public static let scenePrefix = "scene."
   public static let outputPrefix = "output."
+  /// A device for the rack's Audio Input module to listen to. Not `input.`, which is MIDI's.
+  public static let audioInputPrefix = "audioInput."
   public static let inputPrefix = "input."
   public static let clockPrefix = "clock."
   public static let noAudioTargets = "rack.noAudioTargets"
@@ -204,7 +208,8 @@ public enum DesktopMenus {
           Menu(
             "Audio",
             [.command("System Output", id: systemOutput), .separator]
-              + session.outputs.map { .command($0.name, id: outputPrefix + $0.id) } + missingOutput(session)),
+              + session.outputs.map { .command($0.name, id: outputPrefix + $0.id) } + missingOutput(session)
+              + inputMenu(rack)),
           Menu(
             "MIDI",
             [
@@ -271,5 +276,27 @@ extension DesktopMenus {
     }
     if let error = session.outputError { items.append(.command(error, id: audioNote)) }
     return items.isEmpty ? [] : [.separator] + items
+  }
+
+  /// Audio ▸ Input: what the rack's Audio Input module listens to, where the platform can listen,
+  /// chosen as the output is, and saying so as the output does when it is not there or cannot be
+  /// heard.
+  @MainActor
+  static func inputMenu(_ rack: RackSession?) -> [MenuItem] {
+    guard let rack, rack.takesInput else { return [] }
+    var items: [MenuItem] =
+      [.command("System Input", id: systemInput), .separator]
+      + rack.inputs.map { .command($0.name, id: audioInputPrefix + $0.id) }
+    var notes: [MenuItem] = []
+    if let chosen = rack.inputDevice, !rack.inputs.contains(where: { $0.id == chosen }) {
+      notes.append(
+        .command("\(rack.inputDeviceName ?? "A Device") (Not Connected)", id: audioInputPrefix + chosen))
+      if let hearing = rack.hearing {
+        notes.append(.command("Listening to \(hearing.name) Until It Is Back", id: audioNote))
+      }
+    }
+    if let error = rack.inputError { notes.append(.command(error, id: audioNote)) }
+    if !notes.isEmpty { items += [.separator] + notes }
+    return [.separator, .submenu(Menu("Input", items))]
   }
 }

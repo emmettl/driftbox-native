@@ -172,6 +172,9 @@ extension RackHelp {
                 "Audio Track",
                 "One recording started at a bar and a step of the rack's transport, out on cables."),
               HelpTerm(
+                "Audio Input",
+                "What comes in from a microphone or an interface, chosen in Audio ▸ Input. Wear headphones."),
+              HelpTerm(
                 "Plug-in, Plug-in Instrument",
                 "A VST 3 effect or instrument installed on this computer, found in Windows' VST3 folders, with its "
                   + "own window a click away and four macros to map onto its controls."),
@@ -323,7 +326,11 @@ extension RackHelp {
                 "A missing plug-in",
                 "A patch's plug-in this computer has not got says so on its face, and is kept silent in the patch."
               ),
-              HelpTerm("Audio Input", "Hears nothing on Windows yet: live input is still to come."),
+              HelpTerm(
+                "Audio Input",
+                "Listens to the device Audio ▸ Input names, and only while the patch has one. That menu says "
+                  + "why it hears nothing: the device unplugged, or Windows' privacy settings keeping the "
+                  + "microphone from desktop apps."),
             ])),
           HelpPart(
             "Loud, wrong or distorted",
