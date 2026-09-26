@@ -289,7 +289,7 @@ public final class Session {
   /// The web app's keys: notes from 33 (A1) play 303 A across two octaves; below that, the drum
   /// voices the grid shows, from note 21 up. A note's velocity past 0.8 is an accent.
   private func midiNote(_ note: Int, velocity: Double) {
-    // Something else takes what arrives while it wants it — the rack, while its window is in front.
+    // Something else takes what arrives while it wants it — the rack, while it is in front.
     guard listensToMIDI, velocity > 0, midiListener?.takesMIDI != true else { return }
     let accent = velocity >= 0.8
     if note >= 33 {
@@ -305,8 +305,9 @@ public final class Session {
     listener.midi(bytes)
   }
 
-  /// Something else played by the MIDI that arrives, while it wants to be: on the Mac, the rack,
-  /// while its window is in front. It hears every channel message then, and the groovebox none.
+  /// Something else played by the MIDI that arrives, while it wants to be: the rack, while its
+  /// window is in front on the Mac, or while it shows in the window's place on Windows. It hears
+  /// every channel message then, and the groovebox none.
   public weak var midiListener: (any MIDIListener)? {
     didSet { midiListener?.midiSources = midiSources }
   }
@@ -1250,15 +1251,6 @@ extension MIDIDestination {
 /// the calls here are its own, so it needs nothing more than to say so. Not on Android, where it
 /// is the old Foundation and the thirty megabytes of internationalisation that come with it, and
 /// where the app will keep what it remembers the way Android apps do.
-/// Something besides the groovebox that MIDI can play: the rack, on the Mac. While `takesMIDI`, it
-/// hears every channel message the session is sent, and is told the sources as they change.
-@MainActor
-public protocol MIDIListener: AnyObject {
-  var takesMIDI: Bool { get }
-  func midi(_ bytes: [UInt8])
-  var midiSources: [String] { get set }
-}
-
 public protocol SessionMemory: AnyObject {
   func object(forKey key: String) -> Any?
   func string(forKey key: String) -> String?
