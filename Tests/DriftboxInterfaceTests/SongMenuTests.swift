@@ -1,4 +1,6 @@
 import DriftboxDocument
+import DriftboxEngine
+import DriftboxHost
 import DriftboxInterface
 import DriftboxSeq
 import DriftboxSession
@@ -100,5 +102,66 @@ struct SongMenuTests {
     _ = try Self.menu(interface)
     interface.choose("song." + other.id)
     #expect(questions.count == 1 && session.current?.id == other.id)
+  }
+
+  /// A phone with only somewhere to play through, which is the platform's to list.
+  final class Outputs: AudioRouting {
+    var chosen: String?
+    var devices: [AudioDevice]
+    var current: AudioDevice?
+    var systemDefault: AudioDevice? = AudioDevice(id: "system", name: "the phone's output")
+    var error: String?
+    var onChange: (() -> Void)?
+    var sampleRate: Double { 48000 }
+    var latency: Double { 0 }
+    init(_ devices: [AudioDevice]) { self.devices = devices }
+    func attach(_ source: RenderSource) {}
+    func detach(_ context: UnsafeMutableRawPointer) {}
+  }
+
+  /// Where the platform lists its outputs, the menu has them: the system's, ticked until one is
+  /// chosen, and each device; a device chosen and then unplugged still ticked, as not connected.
+  /// Where it lists none, there is nothing to choose and no Output menu.
+  @Test func theOutputIsChosenFromTheMenu() throws {
+    #expect(!Self.ids(try Self.menu(try Self.touch()).items).contains { $0.hasPrefix("output.") })
+
+    let route = Outputs([
+      AudioDevice(id: "speaker::", name: "Speaker"),
+      AudioDevice(id: "usb:Scarlett 2i2:", name: "Scarlett 2i2"),
+    ])
+    let session = Session(host: EngineHost(sampleRate: 48000), audio: route)
+    let url = URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("driftbox-outputs-\(UUID().uuidString).driftbox")
+    try Data(SongCodec.encode(InterfaceTests.song()).utf8).write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    session.open(file: url)
+    let interface = Interface(session: session)
+    interface.touch = true
+    interface.size = SIMD2(372, 828)
+    var menu = try Self.menu(interface)
+    #expect(
+      Self.ids(menu.items).filter { $0.hasPrefix("output.") }
+        == ["output.system", "output.speaker::", "output.usb:Scarlett 2i2:"])
+    #expect(interface.menuIsChecked("output.system"))
+
+    interface.choose("output.usb:Scarlett 2i2:")
+    #expect(session.outputDevice == "usb:Scarlett 2i2:" && route.chosen == "usb:Scarlett 2i2:")
+    menu = try Self.menu(interface)
+    #expect(interface.menuIsChecked("output.usb:Scarlett 2i2:") && !interface.menuIsChecked("output.system"))
+
+    // Unplugged: still the choice, and saying so.
+    route.devices.removeLast()
+    route.onChange?()
+    menu = try Self.menu(interface)
+    let output = try #require(
+      menu.items.compactMap { item -> Menu? in
+        if case .submenu(let sub) = item, sub.title == "Output" { sub } else { nil }
+      }
+      .first)
+    #expect(output.commands.last?.title == "Scarlett 2i2 (Not Connected)")
+    #expect(interface.menuIsChecked("output.missing") && !interface.menuIsEnabled("output.missing"))
+
+    interface.choose("output.system")
+    #expect(session.outputDevice == nil)
   }
 }

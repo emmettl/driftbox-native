@@ -88,7 +88,26 @@
       stage?.stop()
       let typesetter: any Typesetter = android ?? NoTypesetter()
       stage = Stage(song: id, scene: named, density: density, typesetter: typesetter)
+      stage?.update(outputs: audioOutputs)
       return stage == nil ? jboolean(JNI_FALSE) : jboolean(JNI_TRUE)
+    }
+  }
+
+  /// The outputs the phone has, as Java's `AudioManager` last listed them, for a stage made after.
+  @MainActor var audioOutputs: [(id: String, number: Int32, name: String)] = []
+
+  /// The phone's outputs, listed again by Java whenever one comes or goes: a line each, of the
+  /// number AAudio plays it by, its name for good, and what it is called, between tabs.
+  @_cdecl("Java_app_driftbox_Native_audioOutputs")
+  public func nativeAudioOutputs(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ lines: jstring?) {
+    let text = env.string(lines)
+    MainActor.assumeIsolated {
+      audioOutputs = text.split(separator: "\n").compactMap { line in
+        let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+        guard fields.count == 3, let number = Int32(fields[0]) else { return nil }
+        return (id: String(fields[1]), number: number, name: String(fields[2]))
+      }
+      stage?.update(outputs: audioOutputs)
     }
   }
 

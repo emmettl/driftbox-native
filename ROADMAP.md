@@ -701,9 +701,14 @@ each question, and the rest is Android's alone:
    what a callback pays for is the rest of its cluster idling, not its clock and not its waking:
    callbacks four bursts long, a quarter as many, cost the same 53 to 57%, each four times as
    long, so fewer, longer callbacks save nothing. There is room in that, but less than the
-   bench promised, and the rack and the scenes will want some of it. Left: one device until the
-   app can list them from Java's `AudioManager`, and a stream lost to a device going is handled
-   but not yet seen to be, for want of anything to unplug.
+   bench promised, and the rack and the scenes will want some of it. The outputs are Java's
+   `AudioManager`'s to list, and the app lists them to Swift whenever one comes or goes — the
+   speaker, headphones, USB, Bluetooth, HDMI, a line out, the earpiece and a call's Bluetooth
+   left out — each under a name for good made of what it is, its product and its address, since
+   Android's number for it changes when it is plugged back in; the song's menu has them under
+   Output, the system's or one ticked, a chosen one unplugged still ticked and said to be, and the
+   stream opened again on another when where the sound should go changes. Left: a stream lost to a
+   device going is handled but not yet seen to be, for want of anything to unplug.
    Then MIDI, heard. `AMidiInput` and `AMidiOutput` answer the MIDI ports with Android's native
    MIDI, which needs Android 10, so the build moved from API 28 to 29. Input is a thread asking
    each port in turn, framed by `MIDIByteStream` in `DriftboxHost`, which is tested everywhere,

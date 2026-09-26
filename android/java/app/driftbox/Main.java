@@ -47,6 +47,8 @@ import java.nio.charset.StandardCharsets;
 public final class Main extends Activity {
   static final String TAG = "Driftbox";
   private Midi midi;
+  /** The phone's audio outputs, listed for Swift while a song plays. */
+  private Outputs outputs;
   private final Handler handler = new Handler(Looper.getMainLooper());
   private boolean playing;
   private AudioFocusRequest focus;
@@ -125,6 +127,7 @@ public final class Main extends Activity {
   @Override
   protected void onDestroy() {
     handler.removeCallbacksAndMessages(null);
+    if (outputs != null) outputs.stop();
     if (playing) {
       getSystemService(AudioManager.class).abandonAudioFocusRequest(focus);
       stopService(new Intent(this, Playback.class));
@@ -152,6 +155,8 @@ public final class Main extends Activity {
     }
     playing = true;
     current = this;
+    outputs = new Outputs(this);
+    outputs.start();
     Log.i(TAG, "playing " + song);
     // Started now, while the app is in view, which is the only time Android allows it.
     startForegroundService(new Intent(this, Playback.class).putExtra("song", song));

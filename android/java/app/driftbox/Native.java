@@ -42,6 +42,12 @@ final class Native {
   static native boolean start(String song, String scene, float density, String resources);
 
   /**
+   * The phone's audio outputs, listed again whenever one comes or goes: a line each of the number
+   * AAudio plays it by, a name for good, and what it is called, between tabs. See {@link Outputs}.
+   */
+  static native void audioOutputs(String lines);
+
+  /**
    * A frame, drawn now: the {@code Choreographer}'s, once for each refresh of the display. Returns
    * the menu a long press has asked for since the last, as {@link Menus} reads it, or null.
    */

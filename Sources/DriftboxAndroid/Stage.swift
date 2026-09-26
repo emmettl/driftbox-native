@@ -156,6 +156,11 @@
     private var pendingMenu: String?
 
     /// The menu a long press has asked for since the last frame, as lines Java reads, or nil.
+    /// The phone's outputs, as Java lists them, for the song and the rack to play through.
+    func update(outputs: [(id: String, number: Int32, name: String)]) {
+      route.update(outputs: outputs)
+    }
+
     func takeMenu() -> String? {
       defer { pendingMenu = nil }
       return pendingMenu

@@ -84,7 +84,36 @@ extension Interface {
       return .command(entry.name, id: id)
     }
     items.append(.submenu(Menu("Songs", songs)))
+    if let output = outputMenu() { items += [.separator, .submenu(output)] }
     return Menu(session.song == nil ? "Driftbox" : session.documentName, items)
+  }
+
+  /// Where the sound goes, where the platform lists its devices for a touchscreen to choose from:
+  /// wherever the system is sending sound, or one device, ticked. A device chosen and not plugged
+  /// in is still the choice, and says so, as the desktop's Audio Output menu has it.
+  private func outputMenu() -> Menu? {
+    guard !session.outputs.isEmpty else { return nil }
+    let chosen = session.outputDevice
+    var items: [MenuItem] = [
+      item("System Output", "output.system", checked: chosen == nil) { [weak self] in
+        self?.session.outputDevice = nil
+      },
+      .separator,
+    ]
+    for device in session.outputs {
+      items.append(
+        item(device.name, "output." + device.id, checked: chosen == device.id) { [weak self] in
+          self?.session.outputDevice = device.id
+        })
+    }
+    if let chosen, !session.outputs.contains(where: { $0.id == chosen }) {
+      items.append(
+        item(
+          "\(session.outputDeviceName ?? "A Device") (Not Connected)", "output.missing", enabled: false,
+          checked: true
+        ) {})
+    }
+    return Menu("Output", items)
   }
 
   /// `then`, once the platform has said to go on if the song has edits that are not saved.
