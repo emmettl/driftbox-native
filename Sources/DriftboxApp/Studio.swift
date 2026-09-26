@@ -55,9 +55,4 @@
       rack.attach(to: route)
     }
   }
-
-  /// The rack takes the MIDI that arrives while its window is in front.
-  extension RackSession: MIDIListener {
-    public var takesMIDI: Bool { inFront }
-  }
 #endif
