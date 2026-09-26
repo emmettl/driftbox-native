@@ -44,7 +44,7 @@ mkdir -p "$app/classes" "$app/dex" "$app/stage/lib/arm64-v8a" "$app/stage/assets
 extra_DriftboxAndroid=Tests/DriftboxGPUTests/Generated/ShaderPrograms.swift
 # The rack session and the rack's controls are in it, though the phone does not show the rack yet.
 modules="DriftboxGPU DriftboxGPUGLES DriftboxText DriftboxTextAndroid DriftboxCanvas DriftboxScenes DriftboxShell \
-  DriftboxSession DriftboxRackSession DriftboxInterface DriftboxTouch DriftboxAndroid"
+  DriftboxSession DriftboxRackSession DriftboxHelp DriftboxInterface DriftboxTouch DriftboxAndroid"
 # shellcheck disable=SC2086
 compile $core $modules
 objects=""
