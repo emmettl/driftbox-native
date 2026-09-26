@@ -634,7 +634,12 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    installed: the program, its resource bundle, and the runtime DLLs it loads, found from their
    import tables. `scripts/windows-installer.mjs` makes an installer of it with Inno Setup: for the
    person installing unless they choose everyone, a Start menu entry, `.driftbox` made Driftbox's
-   if they want, and all of it taken away on uninstalling. Left: signing, and winget. Songs are already
+   if they want, and all of it taken away on uninstalling. Releases are the release workflow's: a
+   tag builds the programs, the installer and a zip on GitHub's runners and drafts a release with
+   them, signed through the SignPath Foundation, free for open source, once the repository is
+   public and SignPath has taken the project on; both programs and the installer carry the version
+   and product name signing checks. Left: SignPath's approval, which needs a first release, and
+   winget, which needs a signed one. Songs are already
    `.driftbox` — the web app's documents byte for byte, under a name
    Windows can associate without claiming every `.json`. `SongFile` in `DriftboxDocument` holds
    the rule for every platform: saved as `.driftbox`; `.song.json` and the web's `.json` still

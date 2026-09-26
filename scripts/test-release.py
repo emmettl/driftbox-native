@@ -41,6 +41,20 @@ class ReleaseTests(unittest.TestCase):
         # The one the repository has.
         release.read_version((Path(__file__).parent / "version.env").read_text())
 
+    def test_the_windows_programs_carry_the_version(self):
+        """The resources Windows' programs link, which signing holds them to, are the version file's:
+        scripts/windows-resources.mjs writes them, and the release workflow checks it again."""
+        version, build = release.read_version((release.ROOT / "scripts/version.env").read_text())
+        parts = ",".join(version.split(".") + [build])
+        for name in ["Driftbox", "DriftboxVST3Scan"]:
+            with self.subTest(program=name):
+                script = (release.ROOT / "windows" / f"{name}.rc").read_text()
+                self.assertIn(f"FILEVERSION {parts}\n", script)
+                self.assertIn(f"PRODUCTVERSION {parts}\n", script)
+                self.assertIn(f'VALUE "ProductVersion", "{version}"', script)
+                self.assertIn('VALUE "ProductName", "Driftbox"', script)
+                self.assertIn(f'VALUE "OriginalFilename", "{name}.exe"', script)
+
     def test_metadata_rejects_unsafe_names_and_wrong_baseline(self):
         self.assertEqual(release.metadata(INFO)["version"], "0.1.0")
         for key, value in [("CFBundleShortVersionString", "../0.1"), ("CFBundleVersion", "0"),

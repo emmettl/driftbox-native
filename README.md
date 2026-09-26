@@ -386,9 +386,12 @@ hands them to `DriftboxDesktop`, the app every platform with a `ShellWindow` run
 `DesktopTests` hold that app to its menus, commands, title, care over unsaved work and frames, with
 a stand-in window, on WARP.
 
-**Shipping it.** The program carries Driftbox's icon, `windows/Driftbox.res`, which
-`scripts/windows-icon.mjs` draws from the web app's own icon in a Chromium and compiles with the
-SDK's `rc`: the four-pad picture at 16 to 32 pixels, the full one from 48 up. It opens a song it is
+**Shipping it.** The program carries Driftbox's icon, which `scripts/windows-icon.mjs` draws from
+the web app's own icon in a Chromium: the four-pad picture at 16 to 32 pixels, the full one from 48
+up. It and the plug-in scanner carry their version too, as Explorer shows it and signing checks it,
+in `windows/Driftbox.res` and `windows/DriftboxVST3Scan.res`, which `scripts/windows-resources.mjs`
+writes from `scripts/version.env` and compiles with the SDK's `rc`: run it again after changing the
+version. It opens a song it is
 handed, as Explorer hands one over, and `DriftboxWindows.exe --register` makes `.driftbox` files
 open in it and show its icon, for the current user, as an installer would; `--unregister` gives
 them back. After a release build,
@@ -407,11 +410,21 @@ With Inno Setup 6 installed (`winget install JRSoftware.InnoSetup`),
 node scripts/windows-installer.mjs
 ```
 
-packages it and makes `dist/Driftbox-0.1-setup-x64.exe` from `windows/Driftbox.iss`, about 20MB:
+packages it and makes `dist/Driftbox-0.1.0-setup-x64.exe` from `windows/Driftbox.iss`, about 22MB:
 an installer for the person running it, with no administrator needed unless they choose
 everyone, which puts Driftbox in the Start menu, makes `.driftbox` songs open in it if they want
 that, writing the keys `--register` writes, and takes all of it away again on uninstalling.
-`DRIFTBOX_VERSION` sets its version. It is not signed yet, so Windows warns before it runs.
+`scripts/version.env` sets its version. One made here is not signed, so Windows warns before it
+runs.
+
+**Releasing it.** Pushing a tag `v<version>`, the version file's, runs
+[`.github/workflows/release.yml`](.github/workflows/release.yml) on GitHub's Windows runners: it
+builds, packages, makes the installer and drafts a release with it and the zip. Signing is free
+for open source through the SignPath Foundation, as [CODE_SIGNING.md](CODE_SIGNING.md) sets out:
+once the repository has the `SIGNPATH_ORGANIZATION_ID` variable and the `SIGNPATH_API_TOKEN`
+secret, the workflow has the programs signed, builds the installer from them, and has that signed
+too, each request approved by hand in SignPath. `.signpath/artifact-configurations` holds what
+SignPath is to be told to sign.
 
 ### Android
 

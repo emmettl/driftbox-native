@@ -2,17 +2,20 @@
 // windows/Driftbox.iss and the folder windows-package.mjs makes, which it makes first.
 //
 //   swift build -c release --product DriftboxWindows    (from a Visual Studio x64 prompt)
-//   node scripts/windows-installer.mjs
+//   swift build -c release --product DriftboxVST3Scan
+//   node scripts/windows-installer.mjs [--packaged]
 //
-// The version is DRIFTBOX_VERSION, or the Mac app's. Inno Setup's compiler is found from
-// INNO_SETUP, or where its installer puts it, for one person or for everyone.
+// With --packaged, the folder is taken as it is, as the release workflow has it after its programs
+// are signed, rather than made again. The version is scripts/version.env's. Inno Setup's compiler
+// is found from INNO_SETUP, or where its installer puts it, for one person or for everyone.
 import { execFileSync } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { version as versions } from './windows-resources.mjs'
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..')
-const version = process.env.DRIFTBOX_VERSION ?? '0.1'
+const version = versions().string
 
 function compiler() {
   const candidates = [
@@ -30,7 +33,9 @@ if (!iscc) {
   process.exit(1)
 }
 
-execFileSync(process.execPath, [join(root, 'scripts', 'windows-package.mjs')], { stdio: 'inherit' })
+if (!process.argv.includes('--packaged')) {
+  execFileSync(process.execPath, [join(root, 'scripts', 'windows-package.mjs')], { stdio: 'inherit' })
+}
 execFileSync(iscc, ['/Q', `/DAppVersion=${version}`, join(root, 'windows', 'Driftbox.iss')], { stdio: 'inherit' })
 const setup = join(root, 'dist', `Driftbox-${version}-setup-x64.exe`)
 console.log(`dist/Driftbox-${version}-setup-x64.exe  ${(statSync(setup).size / 1048576).toFixed(1)}MB`)

@@ -180,8 +180,9 @@ let package = Package(
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
       ],
-      // Its icon, and whatever else Windows keeps in a program: windows/Driftbox.res, which
-      // scripts/windows-icon.mjs makes. The linker takes a compiled resource file as it takes an object.
+      // What Windows keeps in a program: windows/Driftbox.res, which
+      // scripts/windows-resources.mjs makes: its icon and its version. The linker takes a compiled resource
+      // file as it takes an object.
       linkerSettings: [
         .unsafeFlags([Context.packageDirectory + "/windows/Driftbox.res"], .when(platforms: [.windows]))
       ]),
@@ -393,7 +394,11 @@ package.targets += [
   // What asks a module what it holds, in a process of its own, so a plug-in that crashes as it loads
   // takes this with it rather than the app.
   .executableTarget(
-    name: "DriftboxVST3Scan", dependencies: [.target(name: "CVST3", condition: .when(platforms: [.windows]))]),
+    name: "DriftboxVST3Scan", dependencies: [.target(name: "CVST3", condition: .when(platforms: [.windows]))],
+    // Its version, as Explorer and a code signing service read it: windows/DriftboxVST3Scan.res.
+    linkerSettings: [
+      .unsafeFlags([Context.packageDirectory + "/windows/DriftboxVST3Scan.res"], .when(platforms: [.windows]))
+    ]),
   .testTarget(
     name: "DriftboxVST3Tests",
     dependencies: [
