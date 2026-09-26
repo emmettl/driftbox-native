@@ -57,6 +57,19 @@
       return URL(fileURLWithPath: chosen, isDirectory: true)
     }
 
+    /// The file at `url` in an Explorer window of its folder, picked out, as a program shows what it
+    /// has just written.
+    static func reveal(_ url: URL) {
+      let initialized = CoInitializeEx(nil, DWORD(COINIT_APARTMENTTHREADED.rawValue))
+      defer { if initialized >= 0 { CoUninitialize() } }
+      // The shell's own spelling of the path, which it takes only with backslashes.
+      let path = (url.withUnsafeFileSystemRepresentation { $0.map { String(cString: $0) } } ?? url.path)
+        .replacingOccurrences(of: "/", with: "\\")
+      guard let item = path.withCString(encodedAs: UTF16.self, { ILCreateFromPathW($0) }) else { return }
+      defer { ILFree(item) }
+      _ = SHOpenFolderAndSelectItems(item, 0, nil, 0)
+    }
+
     /// CLSID_FileOpenDialog and IID_IFileOpenDialog, named here rather than linked from uuid.lib.
     static let fileOpenDialog = GUID(
       Data1: 0xDC1C_5A9C, Data2: 0xE88A, Data3: 0x4DDE,

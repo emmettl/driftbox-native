@@ -47,6 +47,10 @@ final class StandInWindow: ShellWindow {
   func chooseFile(ofTypes types: [FileType]) -> URL? { chosenFile }
   func chooseSaveLocation(for type: FileType, name: String) -> URL? { saveLocation }
   func chooseFolder(title: String, button: String) -> URL? { folder }
+  var revealed: [URL] = []
+  func reveal(_ url: URL) { revealed.append(url) }
+  var told: [String] = []
+  func tell(_ message: String) { told.append(message) }
   func askToSave(_ name: String) -> SaveAnswer {
     asked.append(name)
     return saveAnswer

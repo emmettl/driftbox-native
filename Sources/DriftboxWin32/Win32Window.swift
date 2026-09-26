@@ -191,6 +191,17 @@
       Win32Files.folder(owner: handle, title: title, button: button)
     }
 
+    public func reveal(_ url: URL) { Win32Files.reveal(url) }
+
+    /// In Windows' own message box, with the window's title as its caption.
+    public func tell(_ message: String) {
+      _ = message.withCString(encodedAs: UTF16.self) { text in
+        title.withCString(encodedAs: UTF16.self) { caption in
+          MessageBoxW(handle, text, caption, UINT(MB_OK) | UINT(MB_ICONWARNING))
+        }
+      }
+    }
+
     /// Windows' own question, in the words its own programs use: Yes, No or Cancel, with the window's
     /// title as its caption.
     public func askToSave(_ name: String) -> SaveAnswer {

@@ -164,7 +164,7 @@ let package = Package(
       name: "DriftboxDesktop",
       dependencies: [
         "DriftboxCanvas", "DriftboxDocument", "DriftboxEngine", "DriftboxGPU", "DriftboxHost",
-        "DriftboxInterface",
+        "DriftboxInterface", "DriftboxMovie",
         "DriftboxRackSession", "DriftboxScenes", "DriftboxSession", "DriftboxShell", "DriftboxText",
       ]),
     // Driftbox on a touch screen: the scene, the controls over it, the pad, fingers. The same on every
@@ -277,6 +277,7 @@ let package = Package(
         "DriftboxGPU",
         "DriftboxHost", "DriftboxSeq",
         "DriftboxText", "DriftboxDocument", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxGPUGLES",
+        "DriftboxMovie",
       ]),
     .testTarget(
       name: "DriftboxRackSessionTests",
@@ -349,6 +350,29 @@ let package = Package(
   ],
   cxxLanguageStandard: .cxx17
 )
+
+// Movies of a performance and its visuals: `DriftboxMovie` on every platform with the GPU layer, and
+// `CMovieWriter`, the file itself on Windows through Media Foundation, which compiles only there.
+package.products.append(.library(name: "DriftboxMovie", targets: ["DriftboxMovie"]))
+package.targets += [
+  .target(
+    name: "CMovieWriter",
+    linkerSettings: ["mfplat", "mfreadwrite", "mfuuid", "ole32"].map {
+      .linkedLibrary($0, .when(platforms: [.windows]))
+    }),
+  .target(
+    name: "DriftboxMovie",
+    dependencies: [
+      "DriftboxEngine", "DriftboxGPU", "DriftboxHost", "DriftboxScenes", "DriftboxSeq", "DriftboxSession",
+      "DriftboxText", .target(name: "CMovieWriter", condition: .when(platforms: [.windows])),
+    ]),
+  .testTarget(
+    name: "DriftboxMovieTests",
+    dependencies: [
+      "DriftboxEngine", "DriftboxGPU", "DriftboxHost", "DriftboxMovie", "DriftboxSeq", "DriftboxSession",
+      "DriftboxText", .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
+    ]),
+]
 
 // VST 3 plug-ins, on Steinberg's SDK (MIT), vendored at 3.8.1 build 84 as much as is used: `VST3SDK`
 // the SDK, a host's part of it; `CVST3` Driftbox's bridge to it in C, for Swift; `DriftboxHostVST3`
