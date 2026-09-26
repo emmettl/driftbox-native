@@ -8,9 +8,9 @@
   import Observation
 
   /// The app's hardware, and what plays through it: one route to the device the sound goes out of,
-  /// MIDI in and out, the groovebox's `Session` and the rack, and the loop that ticks them. The one
-  /// place that chooses the Mac's adapters, as every platform's app has one; everything else is the
-  /// sessions every platform shares.
+  /// the input the rack's Audio Input modules listen to, MIDI in and out, the groovebox's `Session`
+  /// and the rack, and the loop that ticks them. The one place that chooses the Mac's adapters, as
+  /// every platform's app has one; everything else is the sessions every platform shares.
   @MainActor @Observable
   public final class Studio {
     /// The groovebox: the song, its transport and its editing.
@@ -34,7 +34,8 @@
         memory: memory,
         // Core MIDI calls from a thread of its own; everything the session holds is the main actor's.
         hop: { work in DispatchQueue.main.async(execute: work) })
-      rack = MacRack(sampleRate: route.sampleRate, memory: memory)
+      rack = MacRack(
+        sampleRate: route.sampleRate, input: AudioCapture(sampleRate: route.sampleRate), memory: memory)
       rack.groovebox = session
       session.midiListener = rack.session
       self.route = route

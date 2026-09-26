@@ -29,30 +29,45 @@
     /// Every device the system would itself play through, in CoreAudio's order. That leaves out
     /// devices with no outputs and the private ones CoreAudio makes for its own purposes.
     public static func all() -> [AudioOutput] {
+      deviceIDs().compactMap(output)
+    }
+
+    /// The device the system is playing through right now.
+    public static func systemDefault() -> AudioOutput? {
+      systemDevice(kAudioHardwarePropertyDefaultOutputDevice).flatMap(output)
+    }
+
+    static func output(_ id: AudioDeviceID) -> AudioOutput? {
+      device(id, scope: kAudioObjectPropertyScopeOutput)
+    }
+
+    /// Every device CoreAudio has, whichever way sound goes through it.
+    static func deviceIDs() -> [AudioDeviceID] {
       let system = AudioObjectID(kAudioObjectSystemObject)
       var address = address(kAudioHardwarePropertyDevices)
       var size: UInt32 = 0
       guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr else { return [] }
       var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
       guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &ids) == noErr else { return [] }
-      return ids.compactMap(output)
+      return ids
     }
 
-    /// The device the system is playing through right now.
-    public static func systemDefault() -> AudioOutput? {
-      var address = address(kAudioHardwarePropertyDefaultOutputDevice)
+    /// The device the system object names by `selector`: its default output, or input.
+    static func systemDevice(_ selector: AudioObjectPropertySelector) -> AudioDeviceID? {
+      var address = address(selector)
       var id = AudioDeviceID(0)
       var size = UInt32(MemoryLayout<AudioDeviceID>.size)
       guard
         AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &id)
           == noErr, id != kAudioObjectUnknown
       else { return nil }
-      return output(id)
+      return id
     }
 
-    static func output(_ id: AudioDeviceID) -> AudioOutput? {
-      var canBeDefault = address(
-        kAudioDevicePropertyDeviceCanBeDefaultDevice, scope: kAudioObjectPropertyScopeOutput)
+    /// The device `id`, if the system would itself use it in `scope`: play through it, for the
+    /// output scope, or listen to it, for the input's.
+    static func device(_ id: AudioDeviceID, scope: AudioObjectPropertyScope) -> AudioOutput? {
+      var canBeDefault = address(kAudioDevicePropertyDeviceCanBeDefaultDevice, scope: scope)
       var yes: UInt32 = 0
       var size = UInt32(MemoryLayout<UInt32>.size)
       guard AudioObjectGetPropertyData(id, &canBeDefault, 0, nil, &size, &yes) == noErr, yes != 0,

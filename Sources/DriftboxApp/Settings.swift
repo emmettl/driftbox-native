@@ -1,6 +1,7 @@
 #if canImport(SwiftUI) && canImport(AVFoundation)
   import DriftboxHost
   import DriftboxHostMac
+  import DriftboxRackSession
   import DriftboxSession
   import SwiftUI
 
@@ -75,10 +76,14 @@
     }
   }
 
-  /// The settings window: where the sound goes, the MIDI the app listens to, the clock it sends,
-  /// and whether the visuals run. Everything here is something the engine actually reads.
+  /// The settings window: where the sound goes, what the rack listens to, the MIDI the app listens
+  /// to, the clock it sends, and whether the visuals run. Everything here is something the engine
+  /// actually reads.
   public struct SettingsView: View {
     let player: Session
+    /// The rack, whose input is chosen here. It remembers the choice itself, so there is no
+    /// preference of the app's to mirror.
+    let rack: RackSession
     @AppStorage(Defaults.visuals) private var visuals = true
     @AppStorage(Defaults.listensToMIDI) private var listens = true
     @AppStorage(Defaults.ignoredMIDI) private var ignored = ""
@@ -87,8 +92,9 @@
     @AppStorage(Defaults.audioOutput) private var output = ""
     @AppStorage(Defaults.audioOutputName) private var outputName = ""
 
-    public init(player: Session) {
+    public init(player: Session, rack: RackSession) {
       self.player = player
+      self.rack = rack
     }
 
     public var body: some View {
@@ -105,6 +111,25 @@
           }
           if !output.isEmpty, let playing = player.playingThrough, playing.id != output {
             Text("Playing through \(playing.name) until it is back.").foregroundStyle(.secondary)
+          }
+        }
+        if rack.takesInput {
+          Section("Audio In") {
+            Picker("Listen to", selection: inputDevice) {
+              Text(rack.systemInput.map { "System (\($0.name))" } ?? "System").tag("")
+              ForEach(rack.inputs, id: \.id) { input in Text(input.name).tag(input.id) }
+              if let chosen = rack.inputDevice, !rack.inputs.contains(where: { $0.id == chosen }) {
+                Text("\(rack.inputDeviceName ?? "A device") (not connected)").tag(chosen)
+              }
+            }
+            if let error = rack.inputError {
+              Text(error).foregroundStyle(.secondary)
+            } else if let chosen = rack.inputDevice, let hearing = rack.hearing, hearing.id != chosen {
+              Text("Listening to \(hearing.name) until it is back.").foregroundStyle(.secondary)
+            } else {
+              Text("What the rack's Audio Input modules hear, while a patch has one.")
+                .foregroundStyle(.secondary)
+            }
           }
         }
         Section("MIDI In") {
@@ -143,6 +168,14 @@
           if uid.isEmpty { outputName = "" }
           output = uid
         })
+    }
+
+    /// The input chosen, as a selection with the system's as the empty string. The rack names it
+    /// and writes it down.
+    private var inputDevice: Binding<String> {
+      Binding(
+        get: { rack.inputDevice ?? "" },
+        set: { id in rack.inputDevice = id.isEmpty ? nil : id })
     }
 
     /// Whether `name` is heard, as a switch that writes the stored list of what is not.

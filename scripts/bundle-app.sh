@@ -36,6 +36,10 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <!-- What the Mac says when it asks whether Driftbox may listen: the first time a rack patch with
+       an Audio Input module plays. Without it the system ends the app rather than ask. -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>The rack's Audio Input module plays what comes in from a microphone or an interface.</string>
   <!-- A song is JSON, and claiming every .json file on the machine would be rude, so songs get a
        type of their own under the bundle identifier which conforms to JSON, so that whatever
        could read one still can. Declaring it is what lets a double-click in the Finder and a drop
