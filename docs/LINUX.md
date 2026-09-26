@@ -656,15 +656,60 @@ and closes normally (256 GUI frames). The namespace changes only the test proces
 it does not rename, delete or alter the actual development home. This proves relocation and resource/runtime
 independence on the existing Ubuntu installation, not fresh-machine or cross-distribution support.
 
-The final package `Driftbox-0.1.0-preview-arm64-1ce5b839fb3d` is installed under the guest's
+The first qualified package `Driftbox-0.1.0-preview-arm64-1ce5b839fb3d` was installed under the guest's
 `~/Applications` and registered as **Driftbox Linux Preview** with `--x11`. All 67 manifest file
 hashes match. Live PipeWire capture from that installed bundle verified 280,576 stereo frames at
 48 kHz, finite samples and peaks of 0.67445; the app rendered 282,624 audio frames and 242 GUI frames.
 Ubuntu's app search displays the Driftbox icon and launches the installed app successfully, restoring
 Acieed with playback stopped. Process mappings confirm Swift and ICU are loaded from the installed
-bundle. The running-window dock icon still uses GTK's generic icon; application identity/dock grouping
-needs a follow-up. Logs: `~/driftbox-package-final-isolated.log`,
+bundle. That build used GTK's generic running-window dock icon; the follow-up below resolves it. Logs: `~/driftbox-package-final-isolated.log`,
 `~/driftbox-package-audio-capture.log`, and `~/driftbox-package-build.log`. Remote CI has not run.
+
+### Desktop identity and native Wayland follow-up
+
+The preview now sets `org.driftbox.linux.preview` before GTK opens its display, matching its
+installed desktop-file basename; the desktop entry also declares `StartupWMClass`. GTK searches
+beside the resolved executable for the bundled `Driftbox.png`, so icon lookup does not depend on
+the working directory or a global icon-theme installation. This follows GTK's
+[desktop identity guidance](https://gnome.pages.gitlab.gnome.org/gtk/gtk4/migrating-3to4.html).
+The ARM64 bundle `Driftbox-0.1.0-preview-arm64-fc587bb5b454` is installed under the guest's
+`~/Applications`, registered with `--x11`, with all 67 manifest hashes verified. Packaging checks
+(nine), GTK bridge checks (seven), and the packaged Xvfb smoke (304 GUI frames) pass.
+
+Interactive Ubuntu Files qualification also passes: **Open With Driftbox Linux Preview** launches
+`~/Documents/Driftbox QA/Launch with spaces.driftbox`, a copy of Acieed. Both the window title and
+song header show **Launch with spaces**, the rack/sequence renders and playback advances. The
+running dock now displays the Driftbox icon. Process arguments confirm the installed bundle receives
+the complete path as one argument. Playback was stopped through the Transport menu; the song remains
+unmodified. No default file association was explicitly changed.
+
+UTM input automation can drop long text and modifier-key releases in Ubuntu Files as well as Driftbox.
+For this check, entering paths in short text chunks with a UI observation between chunks worked;
+keyboard menu navigation worked with an observation between actions. Treat dropped VM input separately
+from application failures when qualifying interactive workflows.
+
+Wayland protocol logging confirms `xdg_toplevel.set_app_id("org.driftbox.linux.preview")`.
+However, rapid native chooser creation/destruction in the dialog smoke revealed an additional
+GTK 4.14.5 Wayland failure: SIGSEGV in `gtk_widget_get_display`, reached from GTK's Wayland event
+handling after a text-input enter event. A GTK-only program reproduces the same backtrace without
+Swift, Driftbox callbacks, audio or GLES. It completes on X11. One full Wayland smoke without
+protocol tracing passed (431 GUI frames), so timing matters; do not interpret that pass as resolution.
+
+The standalone reproduction is `scripts/linux-dialog-probe.c`. From the unlocked guest desktop:
+
+```sh
+cc -Wall -Wextra -Werror scripts/linux-dialog-probe.c -o /tmp/driftbox-dialog-probe \
+  $(pkg-config --cflags --libs gtk4)
+GDK_BACKEND=wayland WAYLAND_DEBUG=client GSETTINGS_BACKEND=memory \
+  /tmp/driftbox-dialog-probe
+```
+
+This deliberately opens and immediately destroys native choosers before processing pending events.
+It can crash on the affected stack; it is a diagnostic, not a passing CI check. Retest with newer
+GTK and physical Linux hardware, and qualify normal dialog cancellation/close and input methods
+before enabling native Wayland for release. The installed preview continues to use XWayland.
+Logs: `~/driftbox-identity-{x11,wayland,gdb,gdb-trace}.log` and
+`~/driftbox-gtk-only-dialog-{crash,x11}.log`.
 
 ### Local access
 

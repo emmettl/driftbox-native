@@ -155,7 +155,29 @@ static gboolean dropped(GtkDropTarget *target, const GValue *value, double x, do
 }
 db_desktop *db_desktop_new(void *context, db_draw draw, db_input_callback events,
                           db_command command, db_can_close can_close, db_drop_callback files, char *error, size_t size) {
+    // Match the installed desktop-file basename on Wayland and X11. Do this before
+    // GTK opens the display; setting a window title does not establish app identity.
+    if (!gtk_is_initialized()) {
+        g_set_prgname("org.driftbox.linux.preview");
+        g_set_application_name("Driftbox Linux Preview");
+    }
     if (!gtk_init_check()) { snprintf(error,size,"GTK could not open the desktop display"); return NULL; }
+    static gboolean icon_configured=FALSE;
+    if (!icon_configured) {
+        // An extracted bundle can supply its icon without installing a global theme.
+        // Resolve beside the actual executable, never relative to the caller's cwd.
+        char *executable=g_file_read_link("/proc/self/exe",NULL);
+        if (executable) {
+            char *directory=g_path_get_dirname(executable);
+            char *icon=g_build_filename(directory,"Driftbox.png",NULL);
+            if (g_file_test(icon,G_FILE_TEST_IS_REGULAR)) {
+                gtk_icon_theme_add_search_path(gtk_icon_theme_get_for_display(gdk_display_get_default()),directory);
+                gtk_window_set_default_icon_name("Driftbox");
+            }
+            g_free(icon); g_free(directory); g_free(executable);
+        }
+        icon_configured=TRUE;
+    }
     int (*handle)(void) = dlsym(RTLD_DEFAULT,"_dispatch_get_main_queue_handle_4CF");
     void (*drain)(void *) = dlsym(RTLD_DEFAULT,"_dispatch_main_queue_callback_4CF");
     if (!handle || !drain) { snprintf(error,size,"Swift main-queue integration unavailable"); return NULL; }

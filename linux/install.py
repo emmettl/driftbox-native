@@ -42,6 +42,7 @@ Terminal=false
 Categories=AudioVideo;Audio;Midi;Music;
 MimeType=application/x-driftbox-song;
 StartupNotify=false
+StartupWMClass={APP_ID}
 {MARKER}X-Driftbox-Preview-Root={plain}
 '''
 
