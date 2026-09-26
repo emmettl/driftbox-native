@@ -140,6 +140,7 @@ jobs:
           path: |
             ~/swift
             ~/.swiftpm/swift-sdks
+            ~/.config/swiftpm/swift-sdks
           key: android-${{ env.SWIFT_RELEASE }}
       - name: Swift, and its SDK for Android
         run: |
