@@ -7,6 +7,8 @@ import Testing
 
 #if os(Windows)
   import DriftboxTextWindows
+#elseif os(macOS)
+  import DriftboxTextMac
 #endif
 
 #if canImport(Metal)
@@ -25,6 +27,8 @@ struct GPUSceneTests {
   static func typesetter() throws -> any Typesetter {
     #if os(Windows)
       return try DirectWriteTypesetter()
+    #elseif os(macOS)
+      return CoreTextTypesetter()
     #else
       return NoTypesetter()
     #endif
@@ -147,12 +151,27 @@ struct GPUSceneTests {
   /// fed the same input. The noise some scenes make from `sin` of large numbers is not bit for bit
   /// the same between the two compilations, so a few pixels may differ; the frame as a whole may not.
   struct ScenesAgainstMetalTests {
+    /// A 160 by 90 BGRA frame's channels averaged over each eight-pixel square.
+    static func squares(_ pixels: [UInt8]) -> [Double] {
+      var out: [Double] = []
+      for top in stride(from: 0, to: 88, by: 8) {
+        for left in stride(from: 0, to: 160, by: 8) {
+          for channel in 0..<3 {
+            var sum = 0
+            for y in top..<top + 8 {
+              for x in left..<left + 8 { sum += Int(pixels[(y * 160 + x) * 4 + channel]) }
+            }
+            out.append(Double(sum) / 64)
+          }
+        }
+      }
+      return out
+    }
+
     @Test func theLayersScenesDrawWhatTheMetalOnesDraw() throws {
       guard let metal = MTLCreateSystemDefaultDevice() else { return }
       let device = try MetalDevice(device: metal)
-      // Not Graphic Lab yet: its type is Core Text's in Metal, and the Mac has no typesetter on the
-      // layer until there is a Core Text one, so the two would differ by every letter.
-      for type in GPUSceneTests.moved where type.id != GraphicLabScene.id {
+      for type in GPUSceneTests.moved {
         #expect(Scenes.type(for: type.id).id == type.id, "\(type.id) is a Metal scene too")
         #expect(Scenes.type(for: type.id).name == type.name)
         #expect(Scenes.type(for: type.id).accent == type.accent)
@@ -183,6 +202,20 @@ struct GPUSceneTests {
               raw.baseAddress!, bytesPerRow: 160 * 4, from: MTLRegionMake2D(0, 0, 160, 90), mipmapLevel: 0)
           }
           let mine = try device.readPixels(target)
+          if type.id == GraphicLabScene.id {
+            // Its type is set twice over: by Core Graphics into the Metal scene's sheet, anywhere
+            // to a fraction of a pixel, and from Core Text's glyph coverage on the canvas here,
+            // which puts a glyph on a whole pixel down, as it does on every platform. The same
+            // letters in the same places, then, shifted by up to half a pixel, which at this size
+            // rings every edge: so it is held to the frame as eight-pixel squares see it. The ring
+            // moves a square by 30 of 255 at most; a letter out of place or the wrong colour would
+            // move it by far more.
+            let squares = zip(Self.squares(mine), Self.squares(theirs)).map { abs($0 - $1) }
+            let most = squares.max() ?? 0
+            let mean = squares.reduce(0, +) / Double(squares.count)
+            #expect(most < 48 && mean < 4, "graphic at \(time)s: squares differ by \(mean), at most \(most)")
+            continue
+          }
           let differences = zip(mine, theirs).map { abs(Int($0) - Int($1)) }
           let far = differences.filter { $0 > 2 }.count
           let mean = Double(differences.reduce(0, +)) / Double(differences.count)

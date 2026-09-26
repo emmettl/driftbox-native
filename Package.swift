@@ -26,6 +26,7 @@ let package = Package(
     .library(name: "DriftboxWin32", targets: ["DriftboxWin32"]),
     .library(name: "DriftboxText", targets: ["DriftboxText"]),
     .library(name: "DriftboxTextWindows", targets: ["DriftboxTextWindows"]),
+    .library(name: "DriftboxTextMac", targets: ["DriftboxTextMac"]),
     .library(name: "DriftboxCanvas", targets: ["DriftboxCanvas"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
     .library(name: "DriftboxSession", targets: ["DriftboxSession"]),
@@ -111,6 +112,8 @@ let package = Package(
       dependencies: ["DriftboxText", .target(name: "CDirectWrite", condition: .when(platforms: [.windows]))]),
     // And Android's own text stack answering it on Android, through the app's Java; nothing off it.
     .target(name: "DriftboxTextAndroid", dependencies: ["DriftboxText"]),
+    // And Core Text on the Mac; nothing where there is no Core Text.
+    .target(name: "DriftboxTextMac", dependencies: ["DriftboxText"]),
     // A 2D canvas on the GPU layer, the same on every platform but for the type it is given.
     .target(name: "DriftboxCanvas", dependencies: ["DriftboxGPU", "DriftboxText"]),
     // The GPU layer on OpenGL ES 3.0: Android's, and Linux's, where Mesa draws it in software for CI.
@@ -229,6 +232,7 @@ let package = Package(
       dependencies: [
         "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxGPU", "DriftboxScenes", "DriftboxText",
         .target(name: "DriftboxHostMac", condition: .when(platforms: [.macOS])),
+        .target(name: "DriftboxTextMac", condition: .when(platforms: [.macOS])),
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostAndroid", condition: .when(platforms: [.android])),
@@ -307,6 +311,7 @@ let package = Package(
       name: "DriftboxTextTests",
       dependencies: [
         "DriftboxText", .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxTextMac", condition: .when(platforms: [.macOS])),
       ]),
     .testTarget(
       name: "DriftboxCanvasTests",
@@ -320,6 +325,7 @@ let package = Package(
         "DriftboxScenes", "DriftboxEngine", "DriftboxGPU", "DriftboxGPUD3D11", "DriftboxGPUMetal",
         "DriftboxText",
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxTextMac", condition: .when(platforms: [.macOS])),
       ]),
     .testTarget(
       name: "DriftboxHostTests",

@@ -3,6 +3,8 @@ import Testing
 
 #if os(Windows)
   import DriftboxTextWindows
+#elseif os(macOS)
+  import DriftboxTextMac
 #endif
 
 /// What every platform's typesetter must do the same way, run against whichever this platform has.
@@ -12,6 +14,8 @@ enum Typesetters {
   static func all() throws -> [any Typesetter] {
     #if os(Windows)
       return [try DirectWriteTypesetter()]
+    #elseif os(macOS)
+      return [CoreTextTypesetter()]
     #else
       return []
     #endif
