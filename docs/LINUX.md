@@ -277,7 +277,7 @@ scripts/linux-build.sh window --self-test
 ```
 
 `--seconds N` closes after a bounded run and requires rendering and Swift async completion.
-`--self-test` additionally resizes to 800 × 600, hides the window, confirms frame callbacks stop
+`--self-test` additionally requests an 800 × 500 window, hides it, confirms frame callbacks stop
 while MainActor tasks continue, shows it again and checks that drawing resumes. It exits after
 six seconds with a nonzero result on failure. Use a normal, unmaximized window for this test.
 
@@ -314,11 +314,22 @@ resizing to 1600 × 1200; all lifecycle checks passed. That run used an Xvfb scr
 to accommodate the logical window size. Invalid durations and an unavailable display also failed
 cleanly with exit 1.
 
-These checks establish software-rendered X11 integration, not desktop Wayland/X11 support or
-visual/input correctness. The Wayland run created the virgl/ANGLE GLES context and drew an initial
-frame, but failed the sustained-rendering probe while the VM desktop was locked. Visual orientation,
-interactive input and sustained virtual-GPU presentation still await an unlocked desktop. Guest
-logs are `~/driftbox-window-{build,tests,xvfb,scale,wayland}.log` and `~/driftbox-pango-tests.log`.
+After unlocking GNOME, visual inspection confirmed upright Latin/Arabic text, animated Graphic Lab
+editions and the translucent overlay on the virtual GPU. Both native Wayland and X11 through
+XWayland passed the lifecycle test with strict actor checks: 1,206 and 1,361 frames respectively,
+including resize, stopped rendering while hidden, async completion, resumed drawing and shutdown.
+Both report virgl/ANGLE through the Apple M4 Max. This is VM graphics validation, not physical Linux
+hardware qualification or an Xorg-session test.
+
+The demo now starts at 900 × 600 so it fits the VM desktop without GNOME automatically maximizing
+it. The self-test requests 800 × 500 and accounts for GTK's title bar: Wayland supplies an
+800 × 463 drawing area, while XWayland supplies 800 × 500. The earlier assertion incorrectly
+required the full outer height to be drawable. Interactive pointer/keyboard checks remain pending:
+computer-control input through UTM was not reliably delivered, so a manual check was requested.
+
+Guest logs are `~/driftbox-window-{build,tests,xvfb,scale,wayland-unlocked,xwayland,xvfb-final}.log`
+and `~/driftbox-pango-tests.log`. The original 1×/2× Xvfb runs above used the earlier larger window
+sizes; the revised self-test also passes the Xvfb path.
 
 For a headless development or CI run:
 
@@ -330,7 +341,7 @@ xvfb-run -a env EGL_PLATFORM=x11 GDK_BACKEND=x11 LIBGL_ALWAYS_SOFTWARE=1 \
 ```
 
 CI now includes this lifecycle check; remote CI has not run yet. Remaining shell acceptance covers
-visible orientation/alpha, pointer and key interaction, fractional/multi-monitor scale, compositor
+pointer and key interaction, fractional/multi-monitor scale, compositor
 minimize/restore, context recreation/loss, and sustained frame pacing on real graphics drivers.
 The next implementation step is a GTK `ShellWindow` adapter feeding `Desktop` through callbacks,
 followed by asynchronous document dialogs and the Linux session/audio adapters. The experiment

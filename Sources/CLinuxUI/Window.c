@@ -132,7 +132,7 @@ db_window *db_window_new(void *context, db_draw render, db_event event, db_clean
     window->window = gtk_window_new();
     g_object_ref(window->window);
     gtk_window_set_title(GTK_WINDOW(window->window), "Driftbox · Linux window experiment");
-    gtk_window_set_default_size(GTK_WINDOW(window->window), 1000, 720);
+    gtk_window_set_default_size(GTK_WINDOW(window->window), 900, 600);
     window->area = gtk_gl_area_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
     gtk_gl_area_set_allowed_apis(GTK_GL_AREA(window->area), GDK_GL_API_GLES);

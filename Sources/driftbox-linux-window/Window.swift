@@ -182,9 +182,14 @@
         guard selfTest else { return }
         try await Task.sleep(for: .seconds(1))
         guard let state, let window = state.window else { return }
-        db_window_resize(window, 800, 600)
+        let previousSize = SIMD2(state.logicalWidth, state.logicalHeight)
+        db_window_resize(window, 800, 500)
         try await Task.sleep(for: .seconds(1))
-        let resized = state.logicalWidth == 800 && state.logicalHeight == 600
+        // On Wayland GTK's default size includes its title bar; bare Xvfb has none.
+        // Verify the requested width and a changed, positive content size within the outer height.
+        let resized =
+          state.logicalWidth == 800 && (1...500).contains(state.logicalHeight)
+          && SIMD2(state.logicalWidth, state.logicalHeight) != previousSize
         db_window_visible(window, 0)
         try await Task.sleep(for: .milliseconds(250))
         let hiddenFrames = state.frames
