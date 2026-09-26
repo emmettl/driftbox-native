@@ -34,7 +34,8 @@ class AndroidReleaseTests(unittest.TestCase):
 
     def test_the_apk_says_what_it_is(self):
         self.assertEqual(release.built_version(BADGING),
-                         {"applicationId": "app.driftbox", "build": "1", "version": "0.1.0", "minimumSdk": 29})
+                         {"applicationId": "app.driftbox", "build": "1", "version": "0.1.0", "minimumSdk": 29,
+                          "targetSdk": 37})
         with self.assertRaises(ValueError):
             release.built_version("nothing useful")
 
@@ -53,7 +54,7 @@ class AndroidReleaseTests(unittest.TestCase):
             self.assertEqual(release.tool(folder, "apksigner"), str(folder / "apksigner.bat"))
             self.assertEqual(release.tool(folder, "aapt2"), str(folder / "aapt2.exe"))
 
-    def pipeline(self, badging=BADGING, verify_fails=False):
+    def pipeline(self, badging=BADGING, verify_fails=False, manifest="E: application"):
         built = self.root / "out/app"
         built.mkdir(parents=True)
         (built / "aligned.apk").write_bytes(b"apk")
@@ -68,6 +69,8 @@ class AndroidReleaseTests(unittest.TestCase):
                 return f"  driftbox.apk: ok (1 KB)\nbuilt {built}/driftbox.apk\n"
             if arguments[1:3] == ("dump", "badging"):
                 return badging
+            if arguments[1:3] == ("dump", "xmltree"):
+                return manifest
             if arguments[1] == "sign":
                 Path(arguments[arguments.index("--out") + 1]).write_bytes(b"signed apk")
             if arguments[0] == "jarsigner" and arguments[1] == "-verify":
@@ -103,6 +106,16 @@ class AndroidReleaseTests(unittest.TestCase):
     def test_an_apk_off_the_release_version_is_never_signed(self):
         with self.assertRaisesRegex(ValueError, "version and build"):
             self.pipeline(badging=BADGING.replace("versionCode='1'", "versionCode='2'"))
+        self.assertFalse((self.root / "dist/Driftbox-0.1.0-android.apk").exists())
+
+    def test_an_apk_for_an_old_android_is_never_signed(self):
+        with self.assertRaisesRegex(ValueError, "older than Google Play takes"):
+            self.pipeline(badging=BADGING.replace("targetSdkVersion:'37'", "targetSdkVersion:'35'"))
+        self.assertFalse((self.root / "dist/Driftbox-0.1.0-android.apk").exists())
+
+    def test_an_apk_with_the_checks_is_never_signed(self):
+        with self.assertRaisesRegex(ValueError, "has the checks in it"):
+            self.pipeline(manifest='E: service\n  A: android:name="app.driftbox.LoopbackService"')
         self.assertFalse((self.root / "dist/Driftbox-0.1.0-android.apk").exists())
 
     def test_a_bundle_that_does_not_verify_leaves_no_manifest(self):
