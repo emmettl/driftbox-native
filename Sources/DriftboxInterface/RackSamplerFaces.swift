@@ -12,7 +12,8 @@ extension RackFaces {
   /// length it is taken to be in bars, and the sampler's controls.
   @MainActor
   static func sampler(
-    _ module: PatchModule, _ def: ModuleDef, x: Float, width: Float, top: Float, rack: RackSession
+    _ module: PatchModule, _ def: ModuleDef, x: Float, width: Float, top: Float, rack: RackSession,
+    touch: Bool = false
   ) -> Built {
     let info = rack.samples[module.id]
     let busy = rack.loading.contains(module.id)
@@ -33,8 +34,10 @@ extension RackFaces {
     } else {
       buttons.append(
         RackStage.Button(
-          frame: screen, label: busy ? "Reading sample…" : "Drop audio here", press: busy ? nil : .choose,
-          isOn: false, tint: Theme.nine, style: .prompt(detail: "or choose a WAV file")))
+          frame: screen,
+          label: busy ? "Reading sample…" : touch ? "Tap to choose a sample" : "Drop audio here",
+          press: busy ? nil : .choose, isOn: false, tint: Theme.nine,
+          style: .prompt(detail: touch ? rack.readable : "or choose \(rack.readable)")))
     }
     let rowY = screen.maxY + 6
     buttons.append(
@@ -80,7 +83,8 @@ extension RackFaces {
   /// with the transport.
   @MainActor
   static func audioTrack(
-    _ module: PatchModule, _ def: ModuleDef, x: Float, width: Float, top: Float, rack: RackSession
+    _ module: PatchModule, _ def: ModuleDef, x: Float, width: Float, top: Float, rack: RackSession,
+    touch: Bool = false
   ) -> Built {
     let track = rack.tracks[module.id]
     let busy = rack.loading.contains(module.id)
@@ -90,8 +94,10 @@ extension RackFaces {
     if track == nil {
       buttons.append(
         RackStage.Button(
-          frame: screen, label: busy ? "Reading audio…" : "Drop audio here", press: busy ? nil : .choose,
-          isOn: false, tint: Theme.nine, style: .prompt(detail: "or choose a local recording")))
+          frame: screen,
+          label: busy ? "Reading audio…" : touch ? "Tap to choose a recording" : "Drop audio here",
+          press: busy ? nil : .choose, isOn: false, tint: Theme.nine,
+          style: .prompt(detail: touch ? rack.readable : "or choose a local recording")))
     }
     let rowY = screen.maxY + 6
     let height = Float(RackLayout.cellHeight)

@@ -56,6 +56,10 @@ public enum RoutingPart: Equatable, Sendable {
 public struct RackStage {
   public static let margin: Float = 12
   public static let headerHeight: Float = 44
+  /// The largest the rack is drawn before a finger zooms it: about the reference's size, a little
+  /// larger. Past this the panels stop reading as a rack of modules and start reading as a poster
+  /// of one.
+  static let largest: Float = 1.35
 
   /// A button in the header.
   public struct Chip {
@@ -151,13 +155,21 @@ public struct RackStage {
     case clearLoop
     /// Open the Combinator's routing beside the rack, or close it.
     case routes
+    /// Choose the plug-in a plug-in module hosts, from a menu of those there are.
+    case plugin
+    /// Map a plug-in module's macros onto its plug-in's params, from a menu.
+    case macros
+    /// Open a plug-in module's plug-in's own editor.
+    case open
 
     /// The param it sets, if it sets one.
     public var param: String? {
       switch self {
       case .set(let param, _): param
       case .data(_, _, _, let then, _): then
-      case .page, .learn, .choose, .sampleBars, .editSong, .startSong, .loopSong, .clearLoop, .routes: nil
+      case .page, .learn, .choose, .sampleBars, .editSong, .startSong, .loopSong, .clearLoop, .routes,
+        .plugin, .macros, .open:
+        nil
       case .hold(let param): param
       }
     }
@@ -344,39 +356,54 @@ public struct RackStage {
       }
     }
 
-    // About the reference's size, a little larger when there is room: past this the panels stop
-    // reading as a rack of modules and start reading as a poster of one.
     // A Combinator's routing open beside the rack takes the right of the window, and the rack the rest.
     let combi = rack.editingRoutes.flatMap { id in rack.patch.modules.first { $0.id == id } }
-    let room = combi == nil ? size.x : max(0, size.x - Routing.width)
+    // On a phone the routing is a sheet across the foot, as the groovebox's knobs are, and the rack
+    // keeps the whole width above it; elsewhere it is down the right, and the rack has the rest.
+    let sheet = touch && size.x < Self.compactWidth
+    let room = combi == nil || sheet ? size.x : max(0, size.x - Routing.width)
     let width = Float(RackLayout.width)
-    // The keys, on a touchscreen, take the foot of the screen, and the rack the rest.
-    keyboard = touch && showsKeys ? RackKeys(size: size, margin: margin) : nil
-    let foot = keyboard.map { $0.frame.y - margin } ?? size.y
+    // The keys, on a touchscreen, take the foot of the screen, and the rack the rest; a routing open
+    // has it instead.
+    keyboard = touch && showsKeys && combi == nil ? RackKeys(size: size, margin: margin) : nil
+    var foot = keyboard.map { $0.frame.y - margin } ?? size.y
+    var sheetFrame: Rect?
+    if sheet, let combi {
+      let height = min(size.y * 0.62, Routing.sheetHeight(for: combi, in: rack))
+      let frame = Rect(margin, size.y - margin - height, max(0, size.x - margin * 2), height)
+      sheetFrame = frame
+      foot = frame.y - margin
+    }
     area = Rect(0, header.maxY + margin, room, max(0, foot - header.maxY - margin))
-    if touch, !showsKeys {
+    if touch, !showsKeys, combi == nil {
       keysChip = Chip(
         frame: Rect(area.maxX - margin - 64, area.maxY - margin - 32, 64, 32), label: "KEYS", target: .keys,
         isOn: false)
     }
-    let beside = Rect(room, area.y, max(0, size.x - room - margin), max(0, size.y - area.y - margin))
-    routing = combi.map { Routing(combi: $0, rack: rack, frame: beside) }
+    let beside =
+      sheetFrame ?? Rect(room, area.y, max(0, size.x - room - margin), max(0, size.y - area.y - margin))
+    routing = combi.map {
+      Routing(combi: $0, rack: rack, frame: beside, touch: touch, sheet: sheetFrame != nil)
+    }
     let layout = RackLayout.layout(rack.patch.modules)
     placements = layout.placements
     height = Float(max(layout.height, RackLayout.row))
     if touch {
-      // Fitted to the width, and zoomed from there by the fingers; wider than the window, panned.
+      // Fitted to the width, but no larger than a desktop's, which a tablet on its side would take
+      // it past; and zoomed from there by the fingers. Wider than the window, it is panned; narrower,
+      // centred.
       let across = max(1, room - Self.inset * 2)
-      fitScale = across / width
+      fitScale = min(Self.largest, across / width)
       self.zoom = max(1, min(Self.maxZoom, zoom))
       scale = fitScale * self.zoom
       maxPan = max(0, width * scale - across)
       self.pan = min(max(0, pan), maxPan)
       maxScroll = max(0, (height + 24) * scale - area.height)
       self.scroll = min(max(0, scroll), maxScroll)
-      origin = SIMD2(Self.inset - self.pan, area.y - self.scroll)
+      let spare = max(0, across - width * scale)
+      origin = SIMD2(Self.inset + spare / 2 - self.pan, area.y - self.scroll)
     } else {
-      scale = max(0.5, min(1.35, (room - 48) / width))
+      scale = max(0.5, min(Self.largest, (room - 48) / width))
       fitScale = scale
       maxScroll = max(0, (height + 24) * scale - area.height)
       self.scroll = min(max(0, scroll), maxScroll)
@@ -386,16 +413,18 @@ public struct RackStage {
     let modules = Dictionary(rack.patch.modules.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     faces = layout.placements.compactMap { placement in
       guard let module = modules[placement.id] else { return nil }
-      return Self.face(module, placement, rack: rack, page: pages[module.id] ?? 0)
+      return Self.face(module, placement, rack: rack, page: pages[module.id] ?? 0, touch: touch)
     }
   }
 
   /// A module's front: its panel, inset from its place; its title; and its controls, as its own
   /// hand-built face lays them out, or as the generic face does — a cell for every param a hand
-  /// could set, three across on a half-width module and seven on a full one.
+  /// could set, three across on a half-width module and seven on a full one. `touch` words it for
+  /// a finger.
   @MainActor
   static func face(
-    _ module: PatchModule, _ placement: RackLayout.Placement, rack: RackSession, page: Int = 0
+    _ module: PatchModule, _ placement: RackLayout.Placement, rack: RackSession, page: Int = 0,
+    touch: Bool = false
   ) -> Face {
     let frame = Rect(
       Float(placement.x) + 3, Float(placement.y) + 3, Float(placement.width) - 6, Float(placement.height) - 6)
@@ -406,7 +435,7 @@ public struct RackStage {
       return Face(
         module: module, def: nil, span: placement.span, frame: frame, title: title, words: "", controls: [])
     }
-    if let built = RackFaces.face(module, def, frame: frame, top: top, rack: rack, page: page) {
+    if let built = RackFaces.face(module, def, frame: frame, top: top, rack: rack, page: page, touch: touch) {
       return Face(
         module: module, def: def, span: placement.span, frame: frame, title: title, words: built.words,
         wordsTint: built.wordsTint, wordsFont: built.wordsFont, controls: built.cells.controls,
@@ -451,13 +480,19 @@ public struct RackStage {
   /// What pressing at `point`, on the window, would do.
   public func target(at point: SIMD2<Float>) -> RackTarget? {
     if let part = routing?.part(at: point) { return .routing(part) }
-    if let chip = chips.first(where: { $0.frame.contains(point) }) { return chip.target }
-    if tempo.contains(point) { return .tempo }
+    // On a touchscreen a chip in the header or over the keys is hit anywhere up and down its strip,
+    // which is a finger's height where the chip is not.
+    func hits(_ frame: Rect, along strip: Rect) -> Bool {
+      touch ? Rect(frame.x, strip.y, frame.width, strip.height).contains(point) : frame.contains(point)
+    }
+    if let chip = chips.first(where: { hits($0.frame, along: header) }) { return chip.target }
+    if hits(tempo, along: header) { return .tempo }
     if let keysChip, keysChip.frame.contains(point) { return .keys }
     if let keyboard, keyboard.frame.contains(point) {
-      if keyboard.down.contains(point) { return .octave(by: -1) }
-      if keyboard.up.contains(point) { return .octave(by: 1) }
-      if keyboard.hide.contains(point) { return .keys }
+      let row = Rect(keyboard.frame.x, keyboard.frame.y, keyboard.frame.width, RackKeys.rowHeight)
+      if hits(keyboard.down, along: row) { return .octave(by: -1) }
+      if hits(keyboard.up, along: row) { return .octave(by: 1) }
+      if hits(keyboard.hide, along: row) { return .keys }
       return nil
     }
     guard area.contains(point) else { return nil }

@@ -5,8 +5,10 @@
   import SwiftUI
 
   /// The keyboard as an instrument. The number row strikes the drum voices the song uses, in grid
-  /// order; the home row plays the 303 A the way the web app's keys do, with `z` and `x` shifting
-  /// the octave. Handled at the window, so it works wherever focus is.
+  /// order; the home row plays the 303 whose knobs are showing, or 303 A, the way the web app's
+  /// keys do, accented with Shift, with `z` and `x` shifting the octave. With step entry on, the
+  /// notes are written into the stopped pattern too, Delete writes a rest and Return a tie.
+  /// Handled at the window, so it works wherever focus is.
   struct Keys: ViewModifier {
     let player: Session
     @State private var octave = 0
@@ -19,10 +21,28 @@
 
     func body(content: Content) -> some View {
       content.onKeyPress(phases: .down) { press in
-        guard press.modifiers.isEmpty, let character = press.characters.first else { return .ignored }
+        let accent = press.modifiers == .shift
+        guard press.modifiers.isEmpty || accent, let character = press.characters.lowercased().first else {
+          return .ignored
+        }
         if let semitone = Self.bassKeys[character] {
-          player.playNote(semitone: semitone + octave * 12, accent: false)
+          if player.entryStep != nil {
+            player.enterNote(semitone: semitone + octave * 12, accent: accent)
+          } else {
+            player.playNote(semitone: semitone + octave * 12, accent: accent)
+          }
           return .handled
+        }
+        guard !accent else { return .ignored }
+        if player.entryStep != nil {
+          if press.key == .delete {
+            player.enterRest()
+            return .handled
+          }
+          if press.key == .return {
+            player.enterTie()
+            return .handled
+          }
         }
         if let index = Self.drumKeys.firstIndex(of: character) {
           player.strike(index: index, accent: false)

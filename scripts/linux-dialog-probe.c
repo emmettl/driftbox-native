@@ -4,11 +4,12 @@
 static gboolean finish(gpointer loop) { g_main_loop_quit(loop); return G_SOURCE_REMOVE; }
 int main(void) {
     gtk_init();
-    for (int i=0;i<3;i++) {
+    for (int i=0;i<4;i++) {
         GtkWidget *parent=gtk_window_new();
         g_object_ref(parent);
         gtk_widget_realize(parent);
         GtkFileChooserNative *dialog=gtk_file_chooser_native_new("Probe",GTK_WINDOW(parent),
+            i==3?GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER:
             i==2?GTK_FILE_CHOOSER_ACTION_SAVE:GTK_FILE_CHOOSER_ACTION_OPEN,NULL,NULL);
         gtk_native_dialog_set_modal(GTK_NATIVE_DIALOG(dialog),TRUE);
         gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog),i==1);

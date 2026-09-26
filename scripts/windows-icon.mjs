@@ -1,5 +1,5 @@
-// Driftbox's icon for Windows: windows/Driftbox.ico, and windows/Driftbox.res, which the Windows
-// app links so that Explorer, the taskbar and its own title bar show it.
+// Driftbox's icon for Windows: windows/Driftbox.ico, compiled into windows/Driftbox.res, which the
+// Windows app links so that Explorer, the taskbar and its own title bar show it.
 //
 //   node scripts/windows-icon.mjs
 //
@@ -12,10 +12,10 @@
 //     sixteen pixels the full one's sixteen pads and lead are a smudge;
 //   - the rest, 48 to 256, from scripts/icon.svg, the rounded tile on transparent, as icon-512 is.
 //
-// Each size is a PNG inside the .ico, which Windows has read since Vista. The .res is the .ico
-// compiled by the Windows SDK's rc, found on PATH (a Visual Studio prompt) or in the SDK.
+// Each size is a PNG inside the .ico, which Windows has read since Vista. scripts/windows-resources.mjs
+// then compiles it into the .res, with the version.
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { openReference } from '../conformance/emit/browser.mjs'
@@ -87,26 +87,5 @@ const ico = join(out, 'Driftbox.ico')
 writeFileSync(ico, Buffer.concat([header, ...images.map((image) => image.png)]))
 console.log(`Driftbox.ico  ${images.map((image) => image.size).join(', ')}  ${(offset / 1024).toFixed(1)}kB`)
 
-/** rc.exe: on PATH in a Visual Studio prompt, or the newest x64 one in the Windows 10 and 11 SDK. */
-function findRC() {
-  try {
-    execFileSync('rc', ['/?'], { stdio: 'ignore' })
-    return 'rc'
-  } catch {}
-  const kits = 'C:\\Program Files (x86)\\Windows Kits\\10\\bin'
-  if (!existsSync(kits)) return null
-  const versions = readdirSync(kits).filter((name) => /^10\./.test(name)).sort().reverse()
-  for (const version of versions) {
-    const rc = join(kits, version, 'x64', 'rc.exe')
-    if (existsSync(rc)) return rc
-  }
-  return null
-}
-
-const rc = findRC()
-if (!rc) {
-  console.error('No rc.exe: Driftbox.ico is made, but Driftbox.res is not. Run this from a Visual Studio prompt.')
-  process.exit(1)
-}
-execFileSync(rc, ['/nologo', '/fo', join(out, 'Driftbox.res'), join(out, 'Driftbox.rc')], { stdio: 'inherit' })
-console.log('Driftbox.res')
+// The resources that carry it, compiled with the version.
+execFileSync(process.execPath, [join(root, 'scripts', 'windows-resources.mjs')], { stdio: 'inherit' })

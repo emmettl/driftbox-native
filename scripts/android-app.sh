@@ -9,7 +9,7 @@
 #     scripts/android-app.sh gpu                # or the GPU contract on the phone's GPU
 #     scripts/android-app.sh scenes             # or every scene drawn, checked and timed
 #     scripts/android-app.sh text               # or the typesetter, held to what every platform's is
-#     scripts/android-app.sh rack               # or every patch of the rack's opened and run for a second
+#     scripts/android-app.sh rack               # or every patch of the rack's run, and recordings decoded
 #
 # No Gradle: the SDK's own tools, in the order Gradle would call them. Beyond what
 # `android-env.sh` needs, a JDK (JAVA_HOME; or the newest under Programs/Java on Windows, and the

@@ -118,6 +118,11 @@
         Divider()
       }
 
+      CommandGroup(replacing: .help) {
+        Button("Groovebox Guide") { openWindow(id: "help") }
+          .keyboardShortcut("?", modifiers: .command)
+      }
+
       CommandMenu("Transport") {
         // Space plays and stops at the window, where it has always worked; a key equivalent here
         // as well would be the same key bound twice. This is for finding out that it exists.
@@ -147,6 +152,14 @@
         .disabled(player.song == nil)
         Button("Clear Loop") { player.loop = nil }
           .disabled(player.loop == nil)
+        Divider()
+        Toggle(
+          "Record Automation",
+          isOn: Binding(get: { player.recordsAutomation }, set: { player.recordsAutomation = $0 })
+        )
+        .disabled(player.song == nil)
+        Button("Clear Automation") { player.clearAutomation() }
+          .disabled(player.song?.automation.isEmpty != false)
         Divider()
         Toggle(
           "Follow MIDI Clock",

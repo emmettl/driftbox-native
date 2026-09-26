@@ -2,7 +2,9 @@
 // two ways a plug-in is made:
 //
 // - Driftbox Test Gain, an effect whose processor and controller are separate classes, as most
-//   plug-ins' are: one param, its gain, which it keeps as its state, and 32 samples of latency.
+//   plug-ins' are: one param, its gain, which it keeps as its state, and 32 samples of latency; and
+//   an editor, a window in the host's, which a test tells to move the gain as a hand would, or to
+//   ask the host for more room.
 // - Driftbox Test Synth, an instrument that is one component: a sine for each note held, at its
 //   velocity, and a level, which it takes pitch bend on.
 //
@@ -13,17 +15,23 @@
 #pragma clang diagnostic ignored "-Wpragma-pack"
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
+// Windows' own, for the editor's window: without its min and max, which the C++ library has.
+#define NOMINMAX
+#include <windows.h>
+
 #include "base/source/fstreamer.h"
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstevents.h"
 #include "pluginterfaces/vst/ivstmidicontrollers.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
+#include "public.sdk/source/common/pluginview.h"
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 
 #include <cmath>
+#include <cstring>
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -105,9 +113,83 @@ private:
   double gain = 0.5;
 };
 
+/// What a test sends the editor's window: move the gain to 0.3, as a hand on it would; or ask the
+/// host for a view of 300 by 150.
+constexpr UINT moveGain = WM_USER + 1;
+constexpr UINT growView = WM_USER + 2;
+
+/// The gain's editor: a window of its own inside the one the host gives it, 200 by 100.
+class GainView : public CPluginView {
+public:
+  explicit GainView(EditController *controller) : controller(controller) { rect = ViewRect(0, 0, 200, 100); }
+
+  tresult PLUGIN_API isPlatformTypeSupported(FIDString type) override {
+    return std::strcmp(type, kPlatformTypeHWND) == 0 ? kResultTrue : kResultFalse;
+  }
+
+  /// Its window's class, registered to this module while it is attached and let go of after:
+  /// the module may be unloaded and loaded again, and a class left behind would call into code
+  /// that is gone.
+  void attachedToParent() override {
+    WNDCLASSEXW windowClass {};
+    windowClass.cbSize = sizeof(windowClass);
+    windowClass.lpfnWndProc = procedure;
+    windowClass.hInstance = module();
+    windowClass.lpszClassName = className;
+    RegisterClassExW(&windowClass);
+    window = CreateWindowExW(
+      0, className, L"", WS_CHILD | WS_VISIBLE, 0, 0, rect.getWidth(), rect.getHeight(),
+      static_cast<HWND>(systemWindow), nullptr, module(), this);
+  }
+
+  void removedFromParent() override {
+    if (window) DestroyWindow(window);
+    window = nullptr;
+    UnregisterClassW(className, module());
+  }
+
+  /// This module, the DLL, rather than the program that loaded it.
+  static HINSTANCE module() {
+    HMODULE module = nullptr;
+    GetModuleHandleExW(
+      GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+      reinterpret_cast<LPCWSTR>(&procedure), &module);
+    return module;
+  }
+
+private:
+  static constexpr const wchar_t *className = L"DriftboxTestEditor";
+  EditController *controller;
+  HWND window = nullptr;
+
+  static LRESULT CALLBACK procedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_NCCREATE) {
+      SetWindowLongPtrW(
+        window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(reinterpret_cast<CREATESTRUCTW *>(lParam)->lpCreateParams));
+    }
+    auto view = reinterpret_cast<GainView *>(GetWindowLongPtrW(window, GWLP_USERDATA));
+    if (view && message == moveGain) {
+      view->controller->beginEdit(gainID);
+      view->controller->setParamNormalized(gainID, 0.3);
+      view->controller->performEdit(gainID, 0.3);
+      view->controller->endEdit(gainID);
+      return 0;
+    }
+    if (view && message == growView && view->plugFrame) {
+      ViewRect larger {0, 0, 300, 150};
+      return view->plugFrame->resizeView(view, &larger);
+    }
+    return DefWindowProcW(window, message, wParam, lParam);
+  }
+};
+
 class GainController : public EditController {
 public:
   static FUnknown *create(void *) { return static_cast<IEditController *>(new GainController); }
+
+  IPlugView *PLUGIN_API createView(FIDString name) override {
+    return name && std::strcmp(name, ViewType::kEditor) == 0 ? new GainView(this) : nullptr;
+  }
 
   tresult PLUGIN_API initialize(FUnknown *context) override {
     tresult result = EditController::initialize(context);

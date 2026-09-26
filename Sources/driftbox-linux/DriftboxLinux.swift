@@ -63,6 +63,8 @@
       var desktop: Desktop? = try Desktop(
         session: session, window: window, device: window.device,
         surface: window.surface, typesetter: PangoTypesetter(), rack: rack)
+      desktop?.memory = memory
+      desktop?.supportsMovies = false
       defer {
         window.makeCurrent()
         desktop = nil

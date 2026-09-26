@@ -37,9 +37,11 @@ let package = Package(
     .library(name: "DriftboxWin32", targets: ["DriftboxWin32"]),
     .library(name: "DriftboxText", targets: ["DriftboxText"]),
     .library(name: "DriftboxTextWindows", targets: ["DriftboxTextWindows"]),
+    .library(name: "DriftboxTextMac", targets: ["DriftboxTextMac"]),
     .library(name: "DriftboxCanvas", targets: ["DriftboxCanvas"]),
     .library(name: "DriftboxScenes", targets: ["DriftboxScenes"]),
     .library(name: "DriftboxSession", targets: ["DriftboxSession"]),
+    .library(name: "DriftboxHelp", targets: ["DriftboxHelp"]),
     .library(name: "DriftboxRackSession", targets: ["DriftboxRackSession"]),
     .library(name: "DriftboxInterface", targets: ["DriftboxInterface"]),
     .library(name: "DriftboxDesktop", targets: ["DriftboxDesktop"]),
@@ -73,6 +75,7 @@ let package = Package(
     .systemLibrary(name: "CAAudio"),
     .systemLibrary(name: "CAMidi"),
     .systemLibrary(name: "CLooper"),
+    .systemLibrary(name: "CMedia"),
     .target(
       name: "DriftboxHostAndroid",
       dependencies: [
@@ -128,6 +131,7 @@ let package = Package(
         "DriftboxGPU", "DriftboxGPUGLES", "DriftboxScenes", "DriftboxText", "DriftboxTextAndroid",
         .target(name: "CAMidi", condition: .when(platforms: [.android])),
         .target(name: "CGLES", condition: .when(platforms: [.android])),
+        .target(name: "CMedia", condition: .when(platforms: [.android])),
       ]),
     // What the scenes ask of a GPU, and the backends that answer it. The shaders are GLSL in
     // `shaders/`, made into every backend's language by `scripts/shaders.mjs` and checked in.
@@ -143,7 +147,13 @@ let package = Package(
     // What a window gives the app — input, menus, a loop to draw in, file panels — in terms that are
     // the same on every platform, and the Windows shell that answers it with Win32.
     .target(name: "DriftboxShell"),
-    .target(name: "DriftboxWin32", dependencies: ["DriftboxShell"]),
+    .systemLibrary(name: "CShellDialogs"),
+    .target(
+      name: "DriftboxWin32",
+      dependencies: [
+        "DriftboxShell", .target(name: "CShellDialogs", condition: .when(platforms: [.windows])),
+        .target(name: "CAccessibility", condition: .when(platforms: [.windows])),
+      ]),
     // Type: a line set in a font and a glyph's coverage, which is all that is asked of a platform,
     // and DirectWrite answering it on Windows. DirectWrite's headers are C++ only, so the C target
     // declares the part of it that is called; every call is made from Swift.
@@ -154,6 +164,8 @@ let package = Package(
       dependencies: ["DriftboxText", .target(name: "CDirectWrite", condition: .when(platforms: [.windows]))]),
     // And Android's own text stack answering it on Android, through the app's Java; nothing off it.
     .target(name: "DriftboxTextAndroid", dependencies: ["DriftboxText"]),
+    // And Core Text on the Mac; nothing where there is no Core Text.
+    .target(name: "DriftboxTextMac", dependencies: ["DriftboxText"]),
     // A 2D canvas on the GPU layer, the same on every platform but for the type it is given.
     .target(name: "DriftboxCanvas", dependencies: ["DriftboxGPU", "DriftboxText"]),
     // The GPU layer on OpenGL ES 3.0: Android's, and Linux's, where Mesa draws it in software for CI.
@@ -182,6 +194,10 @@ let package = Package(
       dependencies: ["DriftboxDocument", "DriftboxEngine", "DriftboxHost", "DriftboxScenes", "DriftboxSeq"],
       resources: [.copy("Resources/Songs"), .copy("Resources/catalogue.json")]),
 
+    // What the apps say to teach themselves, in words any platform lays out: the reference's guides,
+    // saying what each platform's own controls do.
+    .target(name: "DriftboxHelp"),
+
     // The rack as an app holds it, on every platform: the patch and its edits and undo, the keys and
     // the controllers, the samples, the song it carries, the transport; with the catalogue of patches.
     // Where it sounds, which plug-ins it can host and which files it can read are the platform's ports.
@@ -206,7 +222,8 @@ let package = Package(
     .target(
       name: "DriftboxDesktop",
       dependencies: [
-        "DriftboxCanvas", "DriftboxDocument", "DriftboxGPU", "DriftboxHost", "DriftboxInterface",
+        "DriftboxCanvas", "DriftboxDocument", "DriftboxEngine", "DriftboxGPU", "DriftboxHost",
+        "DriftboxInterface", "DriftboxMovie",
         "DriftboxRack", "DriftboxRackSession", "DriftboxScenes", "DriftboxSession", "DriftboxShell",
         "DriftboxText",
       ]),
@@ -229,8 +246,9 @@ let package = Package(
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxWin32", condition: .when(platforms: [.windows])),
       ],
-      // Its icon, and whatever else Windows keeps in a program: windows/Driftbox.res, which
-      // scripts/windows-icon.mjs makes. The linker takes a compiled resource file as it takes an object.
+      // What Windows keeps in a program: windows/Driftbox.res, which
+      // scripts/windows-resources.mjs makes: its icon and its version. The linker takes a compiled resource
+      // file as it takes an object.
       linkerSettings: [
         .unsafeFlags([Context.packageDirectory + "/windows/Driftbox.res"], .when(platforms: [.windows]))
       ]),
@@ -244,7 +262,7 @@ let package = Package(
       name: "DriftboxApp",
       dependencies: [
         "DriftboxHost", "DriftboxHostMac", "DriftboxEngine", "DriftboxDocument", "DriftboxSeq",
-        "DriftboxScenes", "DriftboxRack", "DriftboxSession", "DriftboxRackSession",
+        "DriftboxScenes", "DriftboxRack", "DriftboxSession", "DriftboxRackSession", "DriftboxHelp",
       ],
       // The rack's patches and module cards are `DriftboxRackSession`'s, as every platform ships them.
       resources: [.copy("Resources/AppIcon.icns")]),
@@ -271,6 +289,7 @@ let package = Package(
       dependencies: [
         "DriftboxHost", "DriftboxEngine", "DriftboxDocument", "DriftboxGPU", "DriftboxScenes", "DriftboxText",
         .target(name: "DriftboxHostMac", condition: .when(platforms: [.macOS])),
+        .target(name: "DriftboxTextMac", condition: .when(platforms: [.macOS])),
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostWindows", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxHostAndroid", condition: .when(platforms: [.android])),
@@ -325,6 +344,7 @@ let package = Package(
         "DriftboxGPU",
         "DriftboxHost", "DriftboxSeq",
         "DriftboxText", "DriftboxDocument", "DriftboxGPUD3D11", "DriftboxGPUMetal", "DriftboxGPUGLES",
+        "DriftboxMovie",
       ]),
     .testTarget(
       name: "DriftboxRackSessionTests",
@@ -350,10 +370,12 @@ let package = Package(
         .target(name: "DriftboxGPUMetal", condition: .when(platforms: [.macOS, .iOS])),
         .target(name: "DriftboxGPUGLES", condition: .when(platforms: [.linux])),
       ]),
+    .testTarget(name: "DriftboxHelpTests", dependencies: ["DriftboxHelp"]),
     .testTarget(
       name: "DriftboxTextTests",
       dependencies: [
         "DriftboxText", .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxTextMac", condition: .when(platforms: [.macOS])),
       ]),
     .testTarget(
       name: "DriftboxCanvasTests",
@@ -367,6 +389,7 @@ let package = Package(
         "DriftboxScenes", "DriftboxEngine", "DriftboxGPU", "DriftboxGPUD3D11", "DriftboxGPUMetal",
         "DriftboxText",
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxTextMac", condition: .when(platforms: [.macOS])),
       ]),
     .testTarget(
       name: "DriftboxHostTests",
@@ -398,6 +421,51 @@ let package = Package(
   cxxLanguageStandard: .cxx17
 )
 
+// The app's drawn controls for screen readers on Windows: a UI Automation provider in C++, with a C
+// face for Swift, compiled only there.
+package.targets += [
+  .target(
+    name: "CAccessibility",
+    linkerSettings: ["uiautomationcore", "oleaut32", "ole32"].map {
+      .linkedLibrary($0, .when(platforms: [.windows]))
+    }),
+  // Windows' own UI Automation client, reading and acting on the app's controls as a screen reader
+  // does, for the tests.
+  .target(
+    name: "DriftboxAXClient", path: "Tests/DriftboxAXClient",
+    linkerSettings: ["uiautomationcore", "oleaut32", "ole32"].map {
+      .linkedLibrary($0, .when(platforms: [.windows]))
+    }),
+  // That client as a process of its own, as a screen reader is, for the tests to run beside a window.
+  .executableTarget(
+    name: "DriftboxAXProbe",
+    dependencies: [.target(name: "DriftboxAXClient", condition: .when(platforms: [.windows]))],
+    path: "Tests/DriftboxAXProbe"),
+]
+
+// Movies of a performance and its visuals: `DriftboxMovie` on every platform with the GPU layer, and
+// `CMovieWriter`, the file itself on Windows through Media Foundation, which compiles only there.
+package.products.append(.library(name: "DriftboxMovie", targets: ["DriftboxMovie"]))
+package.targets += [
+  .target(
+    name: "CMovieWriter",
+    linkerSettings: ["mfplat", "mfreadwrite", "mfuuid", "ole32"].map {
+      .linkedLibrary($0, .when(platforms: [.windows]))
+    }),
+  .target(
+    name: "DriftboxMovie",
+    dependencies: [
+      "DriftboxEngine", "DriftboxGPU", "DriftboxHost", "DriftboxScenes", "DriftboxSeq", "DriftboxSession",
+      "DriftboxText", .target(name: "CMovieWriter", condition: .when(platforms: [.windows])),
+    ]),
+  .testTarget(
+    name: "DriftboxMovieTests",
+    dependencies: [
+      "DriftboxEngine", "DriftboxGPU", "DriftboxHost", "DriftboxMovie", "DriftboxSeq", "DriftboxSession",
+      "DriftboxText", .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
+    ]),
+]
+
 // VST 3 plug-ins, on Steinberg's SDK (MIT), vendored at 3.8.1 build 84 as much as is used: `VST3SDK`
 // the SDK, a host's part of it; `CVST3` Driftbox's bridge to it in C, for Swift; `DriftboxHostVST3`
 // the rack's plug-ins on it; and `DriftboxVST3Fixture`, a plug-in built from it for the tests to
@@ -407,7 +475,9 @@ let package = Package(
 // the rest, which the manifest's type checker cannot take in one go.
 package.products += [
   .library(name: "DriftboxHostVST3", targets: ["DriftboxHostVST3"]),
+  .executable(name: "DriftboxVST3Scan", targets: ["DriftboxVST3Scan"]),
   .library(name: "DriftboxVST3Fixture", type: .dynamic, targets: ["DriftboxVST3Fixture"]),
+  .library(name: "DriftboxVST3Crash", type: .dynamic, targets: ["DriftboxVST3Crash"]),
 ]
 package.targets += [
   .target(
@@ -438,6 +508,18 @@ package.targets += [
     dependencies: [
       "DriftboxHost", "DriftboxRack", "DriftboxRackSession",
       .target(name: "CVST3", condition: .when(platforms: [.windows])),
+    ]),
+  // A module that crashes as it loads, for the scanner's tests.
+  .target(
+    name: "DriftboxVST3Crash", path: "Tests/DriftboxVST3Crash",
+    linkerSettings: [.linkedLibrary("swiftCore", .when(platforms: [.windows]))]),
+  // What asks a module what it holds, in a process of its own, so a plug-in that crashes as it loads
+  // takes this with it rather than the app.
+  .executableTarget(
+    name: "DriftboxVST3Scan", dependencies: [.target(name: "CVST3", condition: .when(platforms: [.windows]))],
+    // Its version, as Explorer and a code signing service read it: windows/DriftboxVST3Scan.res.
+    linkerSettings: [
+      .unsafeFlags([Context.packageDirectory + "/windows/DriftboxVST3Scan.res"], .when(platforms: [.windows]))
     ]),
   .testTarget(
     name: "DriftboxVST3Tests",

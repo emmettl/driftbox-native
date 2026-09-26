@@ -5,7 +5,7 @@
   /// Run as part of --smoke-test, on the executable's main thread. Swift Testing already owns
   /// the dispatch main loop, so GTK's eventfd integration cannot be initialized in that runner.
   @MainActor func checkNativeDialogCallbacks() throws {
-    for request in ["question", "open", "multiple", "save"] {
+    for request in ["question", "open", "multiple", "save", "folder"] {
       let window = try GTKWindow()
       defer { window.dispose() }
       let shell: any ShellWindow = window
@@ -28,6 +28,11 @@
           responses += 1
           cancelled = urls.isEmpty
         }
+      case "folder":
+        shell.chooseFolder(title: "Export Stems", button: "Export Here") { url in
+          responses += 1
+          cancelled = url == nil
+        }
       default:
         shell.chooseSaveLocation(for: type, name: "Unsaved") { url in
           responses += 1
@@ -37,6 +42,15 @@
       guard responses == 0 else {
         throw DialogCheckFailure("\(request) returned synchronously instead of waiting for GTK")
       }
+      // Let GTK present and finish its initial file-model requests before closing. Immediate
+      // show/destroy without dispatching events is a separate GTK lifetime stress diagnostic
+      // (scripts/linux-dialog-probe.c), which crashes inside GTK 4.14.5 on this VM.
+      let close = Task { @MainActor in
+        try await Task.sleep(for: .milliseconds(250))
+        window.close()
+      }
+      defer { close.cancel() }
+      try window.run(frame: {})
       window.dispose()
       guard responses == 1, cancelled else {
         throw DialogCheckFailure("\(request) did not cancel exactly once on disposal")
@@ -46,7 +60,7 @@
         throw DialogCheckFailure("\(request) completed again on repeated disposal")
       }
     }
-    print("Native dialogs: four deferred requests cancelled exactly once")
+    print("Native dialogs: five deferred requests cancelled exactly once")
   }
 
   private struct DialogCheckFailure: Error, CustomStringConvertible {

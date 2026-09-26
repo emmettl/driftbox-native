@@ -198,8 +198,67 @@ struct RackInterfaceTests {
     #expect(!request.menu.items.isEmpty)
     #expect(
       !request.menu.commands.contains { $0.id == "add.plugin" }, "no plug-ins with nothing to make them")
+    #expect(Self.submenu(request.menu, "Effect Plug-ins") == nil, "nor a menu of them")
     face.choose("add.noise")
     #expect(face.rack.patch.modules.contains { $0.type == "noise" })
+  }
+
+  /// Plug-ins to offer, and none to make: what the Add menu lists.
+  final class Offered: RackPluginHosting {
+    let choices: [RackPluginChoice]
+    init(_ choices: [RackPluginChoice]) { self.choices = choices }
+    func make(_ reference: PluginReference, sampleRate: Double) async throws -> any RackPluginUnit {
+      throw RackPluginFailure.missing
+    }
+    func available() async -> [RackPluginChoice] { choices }
+  }
+
+  static func choice(_ name: String, _ vendor: String, instrument: Bool = false) -> RackPluginChoice {
+    RackPluginChoice(
+      reference: PluginReference(format: "vst3", id: name.uppercased(), name: name, vendor: vendor),
+      instrument: instrument)
+  }
+
+  /// The submenu of `menu` titled `title`.
+  static func submenu(_ menu: Menu, _ title: String) -> Menu? {
+    for case .submenu(let inner) in menu.items where inner.title == title { return inner }
+    return nil
+  }
+
+  /// The Add menu's plug-ins, where the platform makes them: said to be being found until they
+  /// are; then effects and instruments apart, by maker, in order, each added with its module in one
+  /// step; and where there are none of a kind, said so.
+  @Test func theAddMenuOffersThePlugInsInstalled() async throws {
+    let rack = RackSession(
+      plugins: Offered([
+        Self.choice("Verb", "Zeta"), Self.choice("Echo", "Acme"), Self.choice("Chorus", "Acme"),
+      ]))
+    rack.open(Self.patch(), name: "Test")
+    let face = RackInterface(rack: rack)
+    face.size = SIMD2(1000, 700)
+    let add = try #require(face.stage.chips.first { $0.target == .add })
+
+    Self.press(face, Self.centre(add.frame))
+    var menu = try #require(face.takeMenuRequest()).menu
+    let finding = try #require(Self.submenu(menu, "Effect Plug-ins"))
+    #expect(finding.commands.map(\.title) == ["Finding Plug-ins…"] && !face.menuIsEnabled("plugins.finding"))
+
+    await rack.pluginsFound()
+    Self.press(face, Self.centre(add.frame))
+    menu = try #require(face.takeMenuRequest()).menu
+    let effects = try #require(Self.submenu(menu, "Effect Plug-ins"))
+    let vendors = effects.items.compactMap { if case .submenu(let vendor) = $0 { vendor.title } else { nil } }
+    #expect(vendors == ["Acme", "Zeta"])
+    #expect(effects.commands.map(\.title) == ["Chorus", "Echo", "Verb"])
+    let instruments = try #require(Self.submenu(menu, "Instrument Plug-ins"))
+    #expect(instruments.commands.map(\.title) == ["No Instruments Installed"])
+
+    face.choose("plugin.vst3.ECHO")
+    let added = try #require(rack.patch.modules.last)
+    #expect(added.type == "plugin" && added.plugin?.name == "Echo" && added.plugin?.vendor == "Acme")
+    #expect(rack.undoTitle == "Undo Add Echo")
+    rack.undo()
+    #expect(!rack.patch.modules.contains { $0.type == "plugin" }, "one step")
   }
 
   /// The rack turned round, with its jacks where the layout puts them.
@@ -610,6 +669,8 @@ struct RackInterfaceTests {
     #expect(face.name == "Slice Lab" && face.words == "empty" && face.light == false)
     let prompt = try #require(face.buttons.first { if case .prompt = $0.style { true } else { false } })
     #expect(prompt.frame == face.screen)
+    // What the rack's decoder reads, which here is the WAV reader every platform has.
+    #expect(prompt.style == .prompt(detail: "or choose a WAV file"))
     Self.press(rack, Self.window(stage, Self.centre(prompt.frame)))
     #expect(rack.takeFileRequest() == "m" && rack.takeFileRequest() == nil)
     #expect(!rack.takesSeveral("m"))

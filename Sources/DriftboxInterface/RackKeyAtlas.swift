@@ -10,7 +10,8 @@ extension RackFaces {
 
   @MainActor
   static func keyAtlas(
-    _ module: PatchModule, _ def: ModuleDef, x: Float, width: Float, top: Float, rack: RackSession, page: Int
+    _ module: PatchModule, _ def: ModuleDef, x: Float, width: Float, top: Float, rack: RackSession, page: Int,
+    touch: Bool = false
   ) -> Built {
     let recordings = rack.recordings[module.id] ?? []
     let busy = rack.loading.contains(module.id)
@@ -21,7 +22,9 @@ extension RackFaces {
     if zones.isEmpty {
       buttons.append(
         RackStage.Button(
-          frame: screen, label: busy ? "Mapping recordings…" : "Drop an instrument set",
+          frame: screen,
+          label: busy
+            ? "Mapping recordings…" : touch ? "Tap to choose an instrument set" : "Drop an instrument set",
           press: busy ? nil : .choose, isOn: false, tint: Theme.nine,
           style: .prompt(detail: "names such as Piano_C3_pp.wav map themselves")))
     }

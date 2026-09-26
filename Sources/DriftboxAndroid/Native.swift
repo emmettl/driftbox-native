@@ -72,12 +72,16 @@
     _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ song: jstring?, _ scene: jstring?,
     _ density: jfloat, _ resources: jstring?
   ) -> jboolean {
-    let id = env.string(song)
+    let id = song == nil ? nil : env.string(song)
     let named = scene == nil ? nil : env.string(scene)
     // Where Java unpacked the catalogue and the rack's, which Swift reads as files: this app is
     // built without SwiftPM, so there is no resource bundle to find them in.
-    Catalogue.resources = URL(filePath: env.string(resources), directoryHint: .isDirectory)
-    RackCatalogue.resources = Catalogue.resources
+    let unpacked = URL(filePath: env.string(resources), directoryHint: .isDirectory)
+    Catalogue.resources = unpacked
+    RackCatalogue.resources = unpacked
+    // And what the app remembers, beside them in its own files, which Android keeps until the app
+    // is uninstalled or its data cleared.
+    let remembered = unpacked.deletingLastPathComponent().appending(path: "settings.json")
     // Android 12 and the app's Java are what the typesetter needs; without them, scenes set no type.
     // Made here, since `env` is Java's and does not cross into the main actor.
     let android = AndroidTypesetter(env: env)
@@ -87,7 +91,9 @@
     return MainActor.assumeIsolated {
       stage?.stop()
       let typesetter: any Typesetter = android ?? NoTypesetter()
-      stage = Stage(song: id, scene: named, density: density, typesetter: typesetter)
+      stage = Stage(
+        song: id, scene: named, density: density, typesetter: typesetter,
+        memory: FileMemory(url: remembered))
       return stage == nil ? jboolean(JNI_FALSE) : jboolean(JNI_TRUE)
     }
   }
@@ -191,6 +197,12 @@
     _ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ id: jint, _ phase: jint, _ x: jfloat, _ y: jfloat
   ) {
     MainActor.assumeIsolated { stage?.touch(id: Int(id), phase: Int(phase), x: x, y: y) }
+  }
+
+  @_cdecl("Java_app_driftbox_Native_outputs")
+  public func nativeOutputs(_ env: UnsafeMutablePointer<JNIEnv?>, _ type: jclass?, _ lines: jstring?) {
+    let text = env.string(lines)
+    MainActor.assumeIsolated { stage?.listOutputs(text) }
   }
 
   @_cdecl("Java_app_driftbox_Native_tick")

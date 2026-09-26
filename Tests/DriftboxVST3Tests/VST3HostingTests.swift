@@ -4,6 +4,7 @@
   @testable import DriftboxRackSession
   import Foundation
   import Testing
+  import WinSDK
 
   /// The rack's VST 3 plug-ins: found where they are installed, and made, played, turned and kept
   /// by a real rack, on the test plug-in.
@@ -61,7 +62,7 @@
     static func effectRack(_ reference: PluginReference) -> RackSession {
       var effect = PatchModule(id: "fx", type: "plugin")
       effect.plugin = reference
-      let rack = RackSession(plugins: VST3Hosting(folders: [folder]))
+      let rack = RackSession(plugins: VST3Hosting(folders: [folder], showsEditors: false))
       rack.open(
         Patch(
           modules: [PatchModule(id: "osc", type: "vco"), effect, PatchModule(id: "out", type: "out")],
@@ -105,6 +106,8 @@
       rack.mapMacro("fx", 1, to: "0")
       #expect(rack.patch.modules[1].plugin?.controls == [PluginControl(macro: 1, key: "0", name: "Gain")])
       #expect(rack.patch.modules[1].params["macro1"] == 0.5)
+      let said = try #require(rack.units["fx"]?.display("0", at: 0.25))
+      #expect(said.hasPrefix("0.25") && said.hasSuffix(" x"), "in its own words, and its units")
       #expect(abs(Self.loudness(rack) - half) < 0.01, "nothing jumps")
       rack.turn("fx", "macro1", to: 1)
       #expect(abs(Self.loudness(rack) - 2 * half) < 0.02)
@@ -112,14 +115,52 @@
       #expect(Self.loudness(rack) == 0)
       rack.endTurn()
       // Said to have changed, the unit's state is saved once things are still for a moment.
+      // Waited for, not timed: with the whole suite running, a moment can be a long one.
       rack.unitChanged("fx")
-      try await Task.sleep(for: .milliseconds(600))
+      for _ in 0..<100 where rack.patch.modules[1].plugin?.state == nil {
+        try await Task.sleep(for: .milliseconds(50))
+      }
       let saved = try #require(rack.patch.modules[1].plugin)
       #expect(saved.state != nil)
       let again = Self.effectRack(saved)
       again.listen()
       await again.pluginsReady()
       #expect(again.units["fx"]?.parameters["0"]?.fraction == 0, "its gain as it was left")
+    }
+
+    /// A macro learns the param a hand moves in the plug-in's own editor, starting where it was
+    /// moved to; closed by hand, the editor leaves the plug-in's state in the patch; and a plug-in
+    /// that goes takes its editor with it.
+    @Test func aMacroIsLearntFromTheEditor() async throws {
+      let rack = Self.effectRack(Self.reference(VST3BridgeTests.gainID))
+      await rack.pluginsReady()
+      rack.learnMacro("fx", 2)
+      rack.showInterface("fx")
+      let unit = try #require(rack.units["fx"] as? VST3Plugin)
+      let window = try #require(unit.hosted.editorWindow?.assumingMemoryBound(to: HWND__.self))
+      var title = [WCHAR](repeating: 0, count: 64)
+      GetWindowTextW(window, &title, 64)
+      #expect(String(decoding: title.prefix { $0 != 0 }, as: UTF16.self) == "Test — fx")
+
+      let view: HWND? = GetWindow(window, UINT(GW_CHILD))
+      #expect(view != nil)
+      SendMessageW(view, UINT(WM_USER + 1), 0, 0)
+      for _ in 0..<100 where rack.learning != nil { try await Task.sleep(for: .milliseconds(20)) }
+      #expect(rack.learning == nil)
+      #expect(rack.patch.modules[1].plugin?.controls == [PluginControl(macro: 2, key: "0", name: "Gain")])
+      #expect(rack.patch.modules[1].params["macro2"] == 0.3)
+
+      SendMessageW(window, UINT(WM_CLOSE), 0, 0)
+      #expect(unit.hosted.editorWindow == nil)
+      for _ in 0..<100 where rack.patch.modules[1].plugin?.state == nil {
+        try await Task.sleep(for: .milliseconds(50))
+      }
+      #expect(rack.patch.modules[1].plugin?.state != nil)
+
+      rack.showInterface("fx")
+      #expect(unit.hosted.editorWindow != nil)
+      rack.remove("fx")
+      #expect(unit.hosted.editorWindow == nil)
     }
 
     /// A plug-in that is not installed, or an Audio Unit from a Mac, is missing, and silent.
@@ -134,12 +175,26 @@
       }
     }
 
+    /// What there is to choose: the effect for a `plugin` module, the instrument for a
+    /// `plugin-instrument` one.
+    @Test func theInstalledAreOffered() async {
+      let rack = RackSession(plugins: VST3Hosting(folders: [Self.folder], showsEditors: false))
+      rack.findPlugins()
+      await rack.pluginsFound()
+      guard case .found(let choices) = rack.pluginChoices else {
+        Issue.record("not found")
+        return
+      }
+      #expect(choices.map(\.reference.name) == ["Driftbox Test Gain", "Driftbox Test Synth"])
+      #expect(choices.map(\.moduleType) == ["plugin", "plugin-instrument"])
+    }
+
     /// An instrument module plays the test synth from the rack's keys, at the level a pitch bend at
     /// rest puts it.
     @Test func anInstrumentPlaysTheKeys() async {
       var synth = PatchModule(id: "synth", type: "plugin-instrument")
       synth.plugin = Self.reference(VST3BridgeTests.synthID)
-      let rack = RackSession(plugins: VST3Hosting(folders: [Self.folder]))
+      let rack = RackSession(plugins: VST3Hosting(folders: [Self.folder], showsEditors: false))
       rack.open(
         Patch(
           modules: [PatchModule(id: "keys", type: "midi"), synth, PatchModule(id: "out", type: "out")],

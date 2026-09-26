@@ -1,0 +1,31 @@
+// DriftboxVST3Scan's resources, written by scripts/windows-resources.mjs from scripts/version.env and
+// compiled to the .res it links. Written, not edited: change the version there and run it again.
+
+1 VERSIONINFO
+FILEVERSION 0,1,0,1
+PRODUCTVERSION 0,1,0,1
+FILEFLAGSMASK 0x3F
+FILEFLAGS 0x0
+FILEOS 0x40004
+FILETYPE 0x1
+FILESUBTYPE 0x0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "Driftbox"
+      VALUE "FileDescription", "Driftbox plug-in scanner"
+      VALUE "FileVersion", "0.1.0"
+      VALUE "InternalName", "DriftboxVST3Scan"
+      VALUE "LegalCopyright", "Copyright (c) 2026 Louis Emmett"
+      VALUE "OriginalFilename", "DriftboxVST3Scan.exe"
+      VALUE "ProductName", "Driftbox"
+      VALUE "ProductVersion", "0.1.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

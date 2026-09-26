@@ -35,9 +35,10 @@ final class Native {
   static native String rackCheck(String resources);
 
   /**
-   * Play the catalogue's song {@code song}, and draw a scene from it, with the controls over it, in
-   * whatever window it is given: the scene called {@code scene}, or the one the song names when that
-   * is null. {@code resources} is the directory {@link Main} unpacked the catalogue and its songs into.
+   * Play the catalogue's song {@code song}, or when that is null the song open last, and draw a
+   * scene from it, with the controls over it, in whatever window it is given: the scene called
+   * {@code scene}, or the one the song names when that is null. {@code resources} is the directory
+   * {@link Main} unpacked the catalogue and its songs into; what the app remembers is kept beside it.
    */
   static native boolean start(String song, String scene, float density, String resources);
 
@@ -79,6 +80,9 @@ final class Native {
    * 0 down, 1 moved, 2 lifted, 3 taken away.
    */
   static native void touch(int id, int phase, float x, float y);
+
+  /** The devices sound can go out of, as {@link Outputs} describes them, on the main thread. */
+  static native void outputs(String lines);
 
   /** Once a second, on the main thread: housekeeping, and a line for the log. */
   static native String tick();

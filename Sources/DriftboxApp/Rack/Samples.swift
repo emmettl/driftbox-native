@@ -6,6 +6,8 @@
   /// ALAC — converted to the rack's rate, every channel. The rack's own WAV reader is what a platform
   /// without it falls back on; this is what a file dropped on a sampler is read with here.
   struct AudioFileDecoder: SampleDecoding {
+    var readable: String { "a WAV, AIFF, MP3 or FLAC" }
+
     func decode(_ url: URL, sampleRate: Double) throws -> [[Float]] {
       let file = try AVAudioFile(forReading: url)
       let channels = max(1, Int(file.processingFormat.channelCount))

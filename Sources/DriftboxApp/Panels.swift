@@ -55,6 +55,7 @@
 
   /// Knobs three to a row, as on the web's panels.
   struct KnobRack: View {
+    let player: Session
     let specs: [KnobSpec]
     let indices: [Int]
     let values: (Int) -> Double
@@ -62,17 +63,18 @@
     let tint: Color
     var columns = 3
     var diameter: CGFloat = 40
-    let commit: (Int, Double) -> Void
+    /// What each knob turns in the song.
+    let turns: (Int) -> FaceKnob
 
     var body: some View {
       LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: columns), spacing: 10) {
         ForEach(indices, id: \.self) { knob in
+          // Heard as it turns, and recorded as it turns while automation is armed: the song takes
+          // each move, and undo the whole turn once it is let go.
           RotaryKnob(
-            spec: specs[knob], value: values(knob), tint: tint, rest: rests(knob), diameter: diameter
-          ) {
-            value in
-            commit(knob, value)
-          }
+            spec: specs[knob], value: values(knob), tint: tint, rest: rests(knob), diameter: diameter,
+            live: { player.turn(turns(knob), to: $0) }, ended: { player.endTurn() }
+          ) { player.set(turns(knob), to: $0) }
         }
       }
     }
@@ -91,14 +93,8 @@
         ForEach(Array(KnobSpec.sends.enumerated()), id: \.offset) { knob, spec in
           RotaryKnob(
             spec: spec, value: sends[knob], tint: tint.opacity(0.8), rest: SendLevels.defaults[knob],
-            diameter: 32
-          ) { value in
-            player.edit("Set \(spec.label) Send") { song in
-              var edited = song.kit.sends[voiceId] ?? SendLevels()
-              edited[knob] = value
-              song.kit.sends[voiceId] = edited
-            }
-          }
+            diameter: 32, live: { player.turn(.send(voiceId, knob), to: $0) }, ended: { player.endTurn() }
+          ) { player.set(.send(voiceId, knob), to: $0) }
         }
         // The voice's swing, as an offset from the song's: in the middle it swings as the song
         // does, and says so with a dot before the number it comes to.
@@ -106,10 +102,9 @@
         let effective = Int((VoicePanel.swing(song: player.song, voiceId: voiceId) * 100).rounded())
         RotaryKnob(
           spec: KnobSpec(label: "Swing", format: { _ in offset == 0.5 ? "· \(effective)" : "\(effective)" }),
-          value: offset, tint: tint.opacity(0.8), rest: 0.5, diameter: 32
-        ) { value in
-          player.edit("Set Voice Swing") { song in song.kit.swing[voiceId] = value }
-        }
+          value: offset, tint: tint.opacity(0.8), rest: 0.5, diameter: 32,
+          live: { player.turn(.swing(voiceId), to: $0) }, ended: { player.endTurn() }
+        ) { player.set(.swing(voiceId), to: $0) }
         Spacer()
       }
       .padding(.top, 8)
@@ -147,15 +142,10 @@
           }
         }
         KnobRack(
-          specs: KnobSpec.voice, indices: Array(KnobSpec.voice.indices), values: { params[$0] },
+          player: player, specs: KnobSpec.voice, indices: Array(KnobSpec.voice.indices),
+          values: { params[$0] },
           rests: { VoiceParams.defaults[$0] }, tint: tint
-        ) { knob, value in
-          player.edit("Set \(KnobSpec.voice[knob].label)") { song in
-            var edited = song.kit.params[voice.id] ?? VoiceParams()
-            edited[knob] = value
-            song.kit.params[voice.id] = edited
-          }
-        }
+        ) { .voice(voice.id, $0) }
         SendsRow(player: player, voiceId: voice.id, sends: sends, tint: tint)
       }
       .padding(14)
@@ -182,21 +172,52 @@
             CloseButton { player.selectedVoice = nil }
           }
         }
+        StepEntry(player: player)
         KnobRack(
-          specs: KnobSpec.bass, indices: Array(KnobSpec.bass.indices), values: { params[$0] },
+          player: player, specs: KnobSpec.bass, indices: Array(KnobSpec.bass.indices), values: { params[$0] },
           rests: { BassParams.defaults[$0] }, tint: Theme.three
-        ) { knob, value in
-          player.edit("Set \(KnobSpec.bass[knob].label)") { song in
-            var edited = song.kit.bass[voiceId] ?? BassParams()
-            edited[knob] = value
-            song.kit.bass[voiceId] = edited
-          }
-        }
+        ) { .bass(voiceId, $0) }
         SendsRow(player: player, voiceId: voiceId, sends: sends, tint: Theme.three)
       }
       .padding(14)
       .panel()
       .transition(.scale(scale: 0.97, anchor: .top).combined(with: .opacity))
+    }
+  }
+
+  /// Step entry's switch, and while it is on, its cursor, the buttons that move it, and what the
+  /// keys do: a row of its own under the 303's head, which has no room for it.
+  struct StepEntry: View {
+    let player: Session
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 5) {
+        HStack(spacing: 4) {
+          Button("step entry") { player.toggleStepEntry() }
+            .buttonStyle(.chip(on: player.entryStep != nil, tint: Theme.three, size: 10))
+            .help("Write the notes typed on the keys into the stopped pattern, a step at a time")
+          if let step = player.entryStep {
+            Button("‹") { player.moveEntry(to: step - 1) }
+              .buttonStyle(.chip(on: false, tint: Theme.three, size: 10))
+              .help("Previous entry step")
+            Text("\(step + 1)")
+              .font(Theme.mono(10, .semibold).monospacedDigit()).foregroundStyle(Theme.three)
+              .frame(minWidth: 16)
+            Button("›") { player.moveEntry(to: step + 1) }
+              .buttonStyle(.chip(on: false, tint: Theme.three, size: 10))
+              .help("Next entry step")
+          } else {
+            Spacer(minLength: 6)
+            Text("type notes into the pattern").font(Theme.mono(8.5)).foregroundStyle(Theme.dim).lineLimit(1)
+          }
+        }
+        if player.entryStep != nil {
+          Text(
+            player.isPlaying ? "Stop the song to write into it" : "Shift accents · Delete rests · Return ties"
+          )
+          .font(Theme.mono(8.5)).foregroundStyle(Theme.dim).lineLimit(1)
+        }
+      }
     }
   }
 
@@ -229,12 +250,10 @@
           VStack(alignment: .leading, spacing: 6) {
             FieldLabel(group.name)
             KnobRack(
-              specs: KnobSpec.fx, indices: group.knobs, values: { fx[$0] }, rests: { FxParams.defaults[$0] },
-              tint: Theme.violet, columns: group.knobs.count > 3 ? 5 : 3,
+              player: player, specs: KnobSpec.fx, indices: group.knobs, values: { fx[$0] },
+              rests: { FxParams.defaults[$0] }, tint: Theme.violet, columns: group.knobs.count > 3 ? 5 : 3,
               diameter: group.knobs.count > 3 ? 34 : 40
-            ) { knob, value in
-              player.edit("Set \(KnobSpec.fx[knob].label)") { song in song.fx[knob] = value }
-            }
+            ) { .fx($0) }
           }
         }
       }

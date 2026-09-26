@@ -85,6 +85,10 @@ struct ShellTests {
       #expect(Win32Menus.label(for: commands[0]) == "Open…\tCtrl+O")
       #expect(Win32Menus.label(for: commands[3]) == "About")
       #expect(Win32Menus.mnemonic("File") == "&File")
+      #expect(
+        Win32Menus.label(for: MenuItem.Command("Rock & Roll.driftbox", id: "recent.0"))
+          == "Rock && Roll.driftbox",
+        "an ampersand in a title is one")
     }
 
     @Test func aPanelIsOfferedEveryEndingOfAType() {
@@ -93,6 +97,79 @@ struct ShellTests {
       ])
       let expected = "Driftbox Song (*.driftbox;*.song.json)\0*.driftbox;*.song.json\0\0"
       #expect(String(decoding: filter, as: UTF16.self) == expected)
+    }
+
+    /// The displays attached are named, each once, the main one first.
+    @Test func theDisplaysAreNamed() {
+      let displays = Win32Displays.all()
+      #expect(!displays.isEmpty)
+      #expect(displays.first?.isMain == true)
+      #expect(Set(displays.map(\.name)).count == displays.count, "\(displays.map(\.name))")
+      #expect(displays.allSatisfy { !$0.name.isEmpty && $0.bounds.right > $0.bounds.left })
+    }
+
+    /// A visuals window, never shown: full screen, it covers the whole of the display it was sent
+    /// to, frame and all; out of it, it has its frame again; each is somewhere to remember; and
+    /// closed by the app, it says nothing of being closed.
+    @Test func theVisualsGoFullScreenOnADisplay() throws {
+      let visuals = try Win32VisualsWindow(visible: false)
+      var heard: [VisualsEvent] = []
+      visuals.onEvent = { heard.append($0) }
+      let display = try #require(Win32Displays.all().first)
+      visuals.show(on: display.name, fullScreen: true)
+      #expect(visuals.isFullScreen && visuals.display == display.name)
+      var frame = RECT()
+      GetWindowRect(visuals.handle, &frame)
+      #expect(
+        frame.left == display.bounds.left && frame.top == display.bounds.top
+          && frame.right == display.bounds.right && frame.bottom == display.bounds.bottom)
+      #expect(GetWindowLongPtrW(visuals.handle, GWL_STYLE) & LONG_PTR(WS_CAPTION) == 0, "no frame")
+      #expect(heard.contains(.moved))
+
+      visuals.setFullScreen(false)
+      #expect(!visuals.isFullScreen)
+      #expect(GetWindowLongPtrW(visuals.handle, GWL_STYLE) & LONG_PTR(WS_CAPTION) != 0, "its frame again")
+      visuals.close()
+      #expect(!visuals.isOpen && !heard.contains(.closed))
+    }
+
+    /// What a thread closing a panel found: whether it was the one titled as asked.
+    final class Closed: @unchecked Sendable {
+      var byTitle = false
+    }
+
+    /// The folder panel opens, titled as asked, and one closed without a choice chooses nothing.
+    /// Another thread closes it once it shows, since the panel runs its own loop on this one: by its
+    /// title if it has it, or else whatever dialog this thread has open, so a panel titled wrongly
+    /// fails the test rather than waiting for ever.
+    @Test func aFolderPanelClosedChoosesNothing() {
+      let title = "Driftbox test \(UUID().uuidString)"
+      let thread = GetCurrentThreadId()
+      let closed = Closed()
+      let closer = Thread {
+        for attempt in 0..<1000 {
+          let named = title.withCString(encodedAs: UTF16.self) { FindWindowW(nil, $0) }
+          if let named {
+            closed.byTitle = true
+            PostMessageW(named, UINT(WM_CLOSE), 0, 0)
+            return
+          }
+          if attempt > 500 {
+            var dialog = "#32770".withCString(encodedAs: UTF16.self) { FindWindowExW(nil, nil, $0, nil) }
+            while let found = dialog {
+              if GetWindowThreadProcessId(found, nil) == thread {
+                PostMessageW(found, UINT(WM_CLOSE), 0, 0)
+                return
+              }
+              dialog = "#32770".withCString(encodedAs: UTF16.self) { FindWindowExW(nil, found, $0, nil) }
+            }
+          }
+          Thread.sleep(forTimeInterval: 0.01)
+        }
+      }
+      closer.start()
+      #expect(Win32Files.folder(owner: nil, title: title, button: "Choose") == nil)
+      #expect(closed.byTitle)
     }
 
     /// A mouse press, drag and release is one pointer, in points, from the window's top left.

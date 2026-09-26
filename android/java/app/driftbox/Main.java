@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.media.AudioAttributes;
+import android.media.AudioDeviceCallback;
+import android.media.AudioDeviceInfo;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.os.Build;
@@ -80,7 +82,8 @@ public final class Main extends Activity {
       test(run);
     } else {
       String song = getIntent().getStringExtra("song");
-      play(song == null ? "acid" : song, getIntent().getStringExtra("scene"));
+      // None named: the one open last, which Swift remembers, or acid.
+      play(song, getIntent().getStringExtra("scene"));
     }
   }
 
@@ -127,11 +130,31 @@ public final class Main extends Activity {
     handler.removeCallbacksAndMessages(null);
     if (playing) {
       getSystemService(AudioManager.class).abandonAudioFocusRequest(focus);
+      getSystemService(AudioManager.class).unregisterAudioDeviceCallback(outputs);
       stopService(new Intent(this, Playback.class));
       Native.stop();
       current = null;
     }
     super.onDestroy();
+  }
+
+  /** Every device sound can go out of, to Swift, whenever one comes or goes. */
+  private final AudioDeviceCallback outputs =
+      new AudioDeviceCallback() {
+        @Override
+        public void onAudioDevicesAdded(AudioDeviceInfo[] added) {
+          sendOutputs();
+        }
+
+        @Override
+        public void onAudioDevicesRemoved(AudioDeviceInfo[] removed) {
+          sendOutputs();
+        }
+      };
+
+  private void sendOutputs() {
+    AudioDeviceInfo[] all = getSystemService(AudioManager.class).getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+    Native.outputs(Outputs.describe(all));
   }
 
   // MARK: - Playing
@@ -146,13 +169,13 @@ public final class Main extends Activity {
       return;
     }
     if (!Native.start(song, scene, getResources().getDisplayMetrics().density, resources.getPath())) {
-      Log.e(TAG, "no song called " + song + " in the catalogue");
+      Log.e(TAG, song == null ? "no song to play" : "no song called " + song + " in the catalogue");
       finish();
       return;
     }
     playing = true;
     current = this;
-    Log.i(TAG, "playing " + song);
+    Log.i(TAG, song == null ? "playing the song open last" : "playing " + song);
     // Started now, while the app is in view, which is the only time Android allows it.
     startForegroundService(new Intent(this, Playback.class).putExtra("song", song));
     if (Build.VERSION.SDK_INT >= 33
@@ -175,6 +198,9 @@ public final class Main extends Activity {
         }, handler)
         .build();
     getSystemService(AudioManager.class).requestAudioFocus(focus);
+    // The devices there are, to choose between, now and as they come and go: registering says
+    // what is there at once.
+    getSystemService(AudioManager.class).registerAudioDeviceCallback(outputs, handler);
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     SurfaceView view = new SurfaceView(this);
     view.getHolder().addCallback(

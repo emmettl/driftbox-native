@@ -29,6 +29,8 @@ public enum RackFaces {
     "audio-track": ["start", "level"],
     "multisampler": Set(atlasKnobs),
     "groovebox": Set(machines.flatMap { ["\($0.1)-level", "\($0.1)-pan", "\($0.1)-mute"] }),
+    "plugin": Set((1...4).map { "macro\($0)" }),
+    "plugin-instrument": Set((1...4).map { "macro\($0)" }),
   ]
 
   static let shapes = ["Saw", "Pulse", "Tri"]
@@ -113,10 +115,12 @@ public enum RackFaces {
   }
 
   /// The face `def`'s module has of its own, on its panel `frame` from `top` down, showing bar `page`
-  /// where it has more than one; nil for the generic.
+  /// where it has more than one; nil for the generic. On a touchscreen, `touch`, a face that asks
+  /// for a file asks a finger to tap rather than a hand to drop.
   @MainActor
   static func face(
-    _ module: PatchModule, _ def: ModuleDef, frame: Rect, top: Float, rack: RackSession, page: Int = 0
+    _ module: PatchModule, _ def: ModuleDef, frame: Rect, top: Float, rack: RackSession, page: Int = 0,
+    touch: Bool = false
   ) -> Built? {
     // Inside the panel's padding, as the Mac's faces sit in theirs.
     let x = frame.x + 12
@@ -226,13 +230,15 @@ public enum RackFaces {
     case "combi":
       return combinator(module, def, x: x, width: width, top: top, bottom: bottom, rack: rack)
     case "sampler":
-      return sampler(module, def, x: x, width: width, top: top, rack: rack)
+      return sampler(module, def, x: x, width: width, top: top, rack: rack, touch: touch)
     case "audio-track":
-      return audioTrack(module, def, x: x, width: width, top: top, rack: rack)
+      return audioTrack(module, def, x: x, width: width, top: top, rack: rack, touch: touch)
     case "multisampler":
-      return keyAtlas(module, def, x: x, width: width, top: top, rack: rack, page: page)
+      return keyAtlas(module, def, x: x, width: width, top: top, rack: rack, page: page, touch: touch)
     case "groovebox":
       return groovebox(module, def, x: x, width: width, top: top, bottom: bottom, rack: rack)
+    case "plugin", "plugin-instrument":
+      return plugin(module, def, x: x, width: width, top: top, rack: rack)
     default:
       return nil
     }

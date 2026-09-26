@@ -3,8 +3,9 @@
 ; administrator needed, unless they choose everyone; makes .driftbox songs open in Driftbox, as
 ; `Driftbox.exe --register` does, if they want that; and gives it all back when uninstalled.
 ;
-; The installer is not signed until there is a certificate to sign it with: Windows will say so
-; before it runs.
+; The release workflow has it signed, and the program in it, through SignPath; one built here is not
+; signed, and Windows says so before it runs. Its uninstaller is not signed either way: Inno Setup
+; signs that only as it compiles, with a certificate on this machine, and SignPath's never is.
 
 #ifndef AppVersion
   #define AppVersion "0.1"
@@ -24,6 +25,11 @@ AppVersion={#AppVersion}
 AppVerName=Driftbox {#AppVersion}
 AppPublisher=Driftbox
 VersionInfoVersion={#AppVersion}
+; What the installer says it is, as the programs in it do, and as signing checks.
+VersionInfoProductName=Driftbox
+VersionInfoProductVersion={#AppVersion}
+VersionInfoProductTextVersion={#AppVersion}
+VersionInfoDescription=Driftbox Setup
 DefaultDirName={autopf}\Driftbox
 DefaultGroupName=Driftbox
 DisableProgramGroupPage=yes

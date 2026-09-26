@@ -46,13 +46,17 @@ Metal. Next after this is the rack.
 | `Sources/CGLES` | EGL's and OpenGL ES 3.0's headers. Declarations only. |
 | `Sources/DriftboxShell` | What the app asks of a window — input, menus, file panels, a loop — the same on every platform. |
 | `Sources/DriftboxWin32` | That on Windows: the Windows shell. |
+| `Sources/CAccessibility` | The drawn controls for screen readers: a UI Automation provider in C++, fed the tree the app describes and handing back what a screen reader asks. Windows only. |
 | `Sources/DriftboxText` | What the app asks of a platform's type: a line set in a font, and a glyph's coverage. |
 | `Sources/DriftboxTextWindows` | That on DirectWrite: type on Windows. |
 | `Sources/DriftboxTextAndroid` | That on Android's own text stack, through the app's Java: type on Android. |
+| `Sources/DriftboxMovie` | A performance and its visuals as a movie, on every platform with the GPU layer: the take played again on an engine of its own, each frame drawn offscreen and read back, and handed with its sound to the platform's writer — Media Foundation on Windows. |
+| `Sources/CMovieWriter` | That writer: an H.264 and AAC MPEG-4 file through Media Foundation's sink writer, and a movie read back through its source reader, for the tests. Windows only. |
 | `Sources/CDirectWrite` | The part of DirectWrite that is called, declared in C, since its own headers are C++. Declarations only. |
 | `Sources/VST3SDK` | Steinberg's VST 3 SDK, as much of it as a host uses, vendored at 3.8.1 under its own MIT licence. Compiled on Windows alone for now. |
-| `Sources/CVST3` | Driftbox's bridge to VST 3 plug-ins, in C for Swift: a plug-in found, made, played, its params set and its state kept. Windows only for now; `Tests/DriftboxVST3Fixture` is a plug-in of the project's own to hold it to. |
+| `Sources/CVST3` | Driftbox's bridge to VST 3 plug-ins, in C for Swift: a plug-in found, made, played, its params set, its state kept, and its own editor opened in a window. Windows only for now; `Tests/DriftboxVST3Fixture` is a plug-in of the project's own to hold it to. |
 | `Sources/DriftboxHostVST3` | The rack's plug-ins on that bridge: the VST 3 plug-ins installed, found, and each a `plugin` module's unit, played, its macros and its state. Windows only for now. |
+| `Sources/DriftboxVST3Scan` | Asks a VST 3 module what it holds, in a process of its own, so a plug-in that crashes as it loads takes this with it rather than the app. |
 | `Sources/DriftboxCanvas` | A 2D canvas on the GPU layer: Canvas2D's shapes, state, type and blends, the same on every platform. |
 | `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
 | `Sources/DriftboxInterface` | The controls, drawn on the canvas in points over the scene: the transport bar and the step grid, laid out and hit from one layout, on `Session`. |
@@ -372,12 +376,36 @@ pad, and menus for the rest. Tab hides the controls, to perform. The keyboard is
 as on the Mac: the number row strikes the drums, the home row plays 303 A, `z` and `x` its octave.
 The rack is there too, from Rack ▸ Show Rack (Ctrl+R): the patch's modules with their knobs and
 choices, its catalogue of patches, and the keys playing it, heard beside the groovebox.
-- **File:** New, Open…, the catalogue, Save and Save As… as `.driftbox`.
+- **File:** New, Open…, Open Recent — the ten songs opened or saved lately, which the taskbar's jump
+  list shows too — the catalogue, Save and Save As… as `.driftbox`; Export Mix… as one WAV, and
+  Export Stems… as a WAV for each voice the song uses, in a folder chosen in Windows' own panel;
+  Export Movie…, the song and its visuals as an H.264 and AAC `.mp4`, and Record Performance, what
+  is played written as one, each written while the app carries on, how far in the title, then
+  shown in Explorer.
 - **Edit:** Undo and Redo, named for the edit.
-- **Transport:** play and stop, sections, the loop, the metronome and the count-in.
-- **View:** the controls shown or hidden, and the song's scene or any other.
+- **Transport:** play and stop, sections, the loop set to a section or cleared whatever it spans, the
+  metronome and the count-in.
+- **View:** the controls shown or hidden, and the song's scene or any other; and the visuals in a
+  window of their own (Ctrl+2), or full screen on a display chosen by name, for a projector: Escape,
+  F11 or a double-click leave full screen, Space plays and stops, the pointer hides when still, and
+  the window comes back where it was at the next launch.
 - **Audio and MIDI:** the output device, the MIDI inputs heard, and the MIDI clock followed or sent,
   and where. Settings are menu items the menu ticks as it opens.
+
+**Screen readers.** The controls are drawn, not windows of their own, so the app describes them to
+Windows' UI Automation itself, as Narrator and NVDA read it: the transport, the tempo and swing, the
+song's sections and patterns, every lane's steps, each 303 step's note, accent and slide, and the
+knobs showing, each by a name a person would give it and with what it is set to in words. A screen
+reader presses a button, turns a step over or sets a knob, and the app does it as a hand would.
+The rack is described too: its transport, tempo and Add; each module a group of its knobs, choices,
+buttons and numbers, named as its face names them with its abbreviations said whole, a mute or a
+gate said as on or off, and each module's menu a button; and, turned round, its cables from what to
+what. Nothing is described until something reads the window. While a screen reader runs, as
+Windows says one is, the keyboard moves between the controls as in any Windows program: Tab and
+Shift+Tab to the next and the one before, Enter to press it, and the arrows to turn a knob or a
+number a notch; the screen reader hears where it is, and a ring shows it. Space still plays and
+stops, and Show Controls and Show Back stay in the View menu, without Tab. Patching cables with a
+screen reader is still to come.
 
 Closing, opening or starting afresh over unsaved work asks first, in Windows' own words. Its
 executable only chooses Windows' parts — WASAPI, WinMM, a Win32 window, Direct3D, DirectWrite — and
@@ -385,9 +413,12 @@ hands them to `DriftboxDesktop`, the app every platform with a `ShellWindow` run
 `DesktopTests` hold that app to its menus, commands, title, care over unsaved work and frames, with
 a stand-in window, on WARP.
 
-**Shipping it.** The program carries Driftbox's icon, `windows/Driftbox.res`, which
-`scripts/windows-icon.mjs` draws from the web app's own icon in a Chromium and compiles with the
-SDK's `rc`: the four-pad picture at 16 to 32 pixels, the full one from 48 up. It opens a song it is
+**Shipping it.** The program carries Driftbox's icon, which `scripts/windows-icon.mjs` draws from
+the web app's own icon in a Chromium: the four-pad picture at 16 to 32 pixels, the full one from 48
+up. It and the plug-in scanner carry their version too, as Explorer shows it and signing checks it,
+in `windows/Driftbox.res` and `windows/DriftboxVST3Scan.res`, which `scripts/windows-resources.mjs`
+writes from `scripts/version.env` and compiles with the SDK's `rc`: run it again after changing the
+version. It opens a song it is
 handed, as Explorer hands one over, and `DriftboxWindows.exe --register` makes `.driftbox` files
 open in it and show its icon, for the current user, as an installer would; `--unregister` gives
 them back. After a release build,
@@ -397,8 +428,8 @@ node scripts/windows-package.mjs
 ```
 
 makes `dist/Driftbox`, which runs on a machine with no Swift on it, and a zip of it: the program,
-the catalogue's resource bundle, and the Swift and Visual C++ runtime DLLs it loads, found by
-reading their import tables — 18 of them, about 70MB, 26MB zipped.
+the plug-in scanner beside it, the catalogue's resource bundle, and the Swift and Visual C++ runtime DLLs it loads, found by
+reading their import tables — 18 of them, about 86MB, 30MB zipped.
 
 With Inno Setup 6 installed (`winget install JRSoftware.InnoSetup`),
 
@@ -406,11 +437,21 @@ With Inno Setup 6 installed (`winget install JRSoftware.InnoSetup`),
 node scripts/windows-installer.mjs
 ```
 
-packages it and makes `dist/Driftbox-0.1-setup-x64.exe` from `windows/Driftbox.iss`, about 20MB:
+packages it and makes `dist/Driftbox-0.1.0-setup-x64.exe` from `windows/Driftbox.iss`, about 22MB:
 an installer for the person running it, with no administrator needed unless they choose
 everyone, which puts Driftbox in the Start menu, makes `.driftbox` songs open in it if they want
 that, writing the keys `--register` writes, and takes all of it away again on uninstalling.
-`DRIFTBOX_VERSION` sets its version. It is not signed yet, so Windows warns before it runs.
+`scripts/version.env` sets its version. One made here is not signed, so Windows warns before it
+runs.
+
+**Releasing it.** Pushing a tag `v<version>`, the version file's, runs
+[`.github/workflows/release.yml`](.github/workflows/release.yml) on GitHub's Windows runners: it
+builds, packages, makes the installer and drafts a release with it and the zip. Signing is free
+for open source through the SignPath Foundation, as [CODE_SIGNING.md](CODE_SIGNING.md) sets out:
+once the repository has the `SIGNPATH_ORGANIZATION_ID` variable and the `SIGNPATH_API_TOKEN`
+secret, the workflow has the programs signed, builds the installer from them, and has that signed
+too, each request approved by hand in SignPath. `.signpath/artifact-configurations` holds what
+SignPath is to be told to sign.
 
 ### Android
 
@@ -434,13 +475,26 @@ standard library has no SIMD types and whose arm64 runtime cannot link Foundatio
 the SDK up the first time, as its own script would, and `android-env.sh` says how.
 
 Audio is AAudio: low-latency mode, exclusive if the device will give it, float stereo at 48 kHz.
-The buffer starts at three bursts, 6ms, and grows a burst at a time if the stream underruns: one, the
+The buffer starts at two bursts, 4ms, and grows a burst at a time if the stream underruns: one, the
 least a stream can have, crackled once the app drew its controls, though AAudio counted no
-underruns, and its slowest callbacks took up to 3.6ms of a 2ms burst; with two, 4.1ms of 4. AAudio makes
+underruns, and its slowest callbacks took up to 3.6ms of a 2ms burst; with two, 4.1ms of 4. Every
+callback timed showed what those were: one in eleven, every 1,024 frames, took twice the rest,
+because the reverb's tail did a whole block's work in the callback its block ended in. It spreads
+that work over the next block now (`SpreadConvolver`), and the slowest callback of a second is 2.1
+to 2.6ms, with the heaviest scene drawn, on any of five songs: room in two bursts, where it had
+been three, 6ms, to hide them. AAudio makes
 the render thread; Driftbox keeps it to the big cores, since left to the scheduler it underran a
 hundred times a second, and reports each callback's work to a performance hint session. A stream
-whose device goes away ends and asks to be replaced, as on Windows. There is one device, the
-system's, until the app can list them: that is Java's `AudioManager`.
+whose device goes away ends and asks to be replaced, as on Windows. AAudio plays through a device
+by number but cannot list them, so the app's Java lists them from `AudioManager`, as they come and
+go, each with an ID that stays the same when it is plugged in again; the song's menu offers them
+under Output, beside Automatic, which is wherever Android sends the sound. A device chosen and
+unplugged is kept, and Automatic played through until it is back.
+
+What the app remembers between launches — the song open last, which it plays when started without
+one, the click and the other settings, the output chosen, and the rack's patch and the controllers
+learnt onto it — is in `settings.json` among its own files, written by `FileMemory`, since
+`UserDefaults` is the old Foundation's there.
 
 MIDI is Android's native MIDI, which needs Android 10, so Driftbox builds for API 29. It can play
 through a device but not find or open one: that is Java's `MidiManager`. So the app opens every
@@ -825,7 +879,7 @@ swift run -c release driftbox-play conformance/fixtures/documents/acid.song.json
 The engine as an Audio Unit in an `AVAudioEngine`, through the speakers, printing what reaches
 the output once a second. `--bench` runs the same engine with no device, as fast as it goes:
 **3.3% of real time** on this machine, of which the reverb — now in two stages, the tail in
-partitions eight blocks long — is about a third. Live, the render callback reports a fifth of
+partitions eight blocks long, its work on each spread over the block after — is about a third. Live, the render callback reports a fifth of
 the audio's time on its own clock, and the difference is the platform, not the code: `--bench`
 also runs the same calls paced as a device paces them, one every 10.7ms with a sleep between,
 and they cost **16%** that way — five times the loop — because a core woken every ten
@@ -844,8 +898,10 @@ longest call 9.7ms of a 10.7ms period. That number is the phone, not the code: w
 the cluster kept busy, the same paced run costs **17.7%** and its longest call 2.5ms. It is not the
 clock, either, though that was the first guess. Played through AAudio, in 2ms bursts, the render
 costs about **60%** of each burst whether a performance hint holds the cluster at 2.2 GHz or lets
-it fall to 0.6; with the other big cores kept busy it costs **15 to 18%**. What a callback pays
-for is its core waking cold from idle. It is still in time: the heaviest song played for thirty
+it fall to 0.6; with the other big cores kept busy it costs **15 to 18%**. Nor is it the waking:
+asked for callbacks four bursts long, a quarter as many, it costs the same **53 to 57%**, each call
+four times as long. A call runs slowly the whole way through while the rest of its cluster idles,
+not only as its core wakes. It is still in time: the heaviest song played for thirty
 seconds without an underrun, its longest call 3.4ms, the speaker 4.8ms behind the render.
 
 ### Listening

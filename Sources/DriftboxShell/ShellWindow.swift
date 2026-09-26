@@ -48,6 +48,32 @@ public protocol ShellWindow: AnyObject {
   func chooseFiles(ofTypes types: [FileType]) -> [URL]
   /// Where to save a file of `type`, starting from `name`. Nil when cancelled.
   func chooseSaveLocation(for type: FileType, name: String) -> URL?
+  /// A folder to put files in, from the platform's own panel, titled `title` and chosen with a
+  /// button that says `button`. Nil when cancelled.
+  func chooseFolder(title: String, button: String) -> URL?
+  /// The file at `url` shown where the platform keeps files, picked out: Explorer, the Finder.
+  func reveal(_ url: URL)
+  /// Something the person should know, in the platform's own box, which waits to be put away.
+  func tell(_ message: String)
+  /// A file opened or saved, told to the platform's own list of recent files, where it keeps one:
+  /// Windows' jump list, the Mac's Open Recent.
+  func addToRecents(_ url: URL)
+  /// Whether a screen reader, or anything else reading what is on screen, is listening: until one
+  /// is, nothing need be described.
+  var isDescribed: Bool { get }
+  /// What is on screen now, for the platform's accessibility: handed over as often as it changes
+  /// while `isDescribed`. Asked of it, the window answers with `.accessibility` events.
+  func describe(_ root: AccessibilityNode)
+  /// The control the keyboard is on, by its id in what was described, or nil for none: screen
+  /// readers are told when it moves.
+  func focus(_ id: String?)
+  /// Whether the person has a screen reader running, as the platform says: the keyboard then moves
+  /// between the controls rather than playing.
+  var screenReaderIsOn: Bool { get }
+  /// The displays attached, by name, the main one first: where a visuals window can go.
+  var displays: [String] { get }
+  /// A window for the visuals alone, not yet shown; nil where the platform has no second window.
+  func makeVisualsWindow() -> (any ShellVisualsWindow)?
   /// The platform's own question before work is lost: save the changes to `name`, throw them
   /// away, or think again.
   func askToSave(_ name: String) -> SaveAnswer
@@ -63,6 +89,7 @@ public protocol ShellWindow: AnyObject {
   func chooseFile(ofTypes types: [FileType], completion: @escaping (URL?) -> Void)
   func chooseFiles(ofTypes types: [FileType], completion: @escaping ([URL]) -> Void)
   func chooseSaveLocation(for type: FileType, name: String, completion: @escaping (URL?) -> Void)
+  func chooseFolder(title: String, button: String, completion: @escaping (URL?) -> Void)
   func askToSave(_ name: String, completion: @escaping (SaveAnswer) -> Void)
   func popUp(
     _ menu: Menu, at point: SIMD2<Float>, isEnabled: @escaping (String) -> Bool,
@@ -94,6 +121,30 @@ extension ShellWindow {
   public func chooseFiles(ofTypes types: [FileType]) -> [URL] {
     chooseFile(ofTypes: types).map { [$0] } ?? []
   }
+
+  /// None, where a window has no panel for folders.
+  public func chooseFolder(title: String, button: String) -> URL? { nil }
+
+  /// Nowhere, where a platform has nothing to show files in.
+  public func reveal(_ url: URL) {}
+
+  /// Nothing said, where a window has no box to say it in.
+  public func tell(_ message: String) {}
+
+  /// Nothing, where a platform keeps no list.
+  public func addToRecents(_ url: URL) {}
+
+  /// Nobody, where a platform's window has no accessibility of its own yet.
+  public var isDescribed: Bool { false }
+  public func describe(_ root: AccessibilityNode) {}
+  public func focus(_ id: String?) {}
+  public var screenReaderIsOn: Bool { false }
+
+  /// None, where a platform has one screen, or will not say.
+  public var displays: [String] { [] }
+
+  /// None, where a platform has room for one window only.
+  public func makeVisualsWindow() -> (any ShellVisualsWindow)? { nil }
 }
 
 extension ShellWindow {
@@ -105,6 +156,9 @@ extension ShellWindow {
   }
   public func chooseSaveLocation(for type: FileType, name: String, completion: @escaping (URL?) -> Void) {
     completion(chooseSaveLocation(for: type, name: name))
+  }
+  public func chooseFolder(title: String, button: String, completion: @escaping (URL?) -> Void) {
+    completion(chooseFolder(title: title, button: button))
   }
   public func askToSave(_ name: String, completion: @escaping (SaveAnswer) -> Void) {
     completion(askToSave(name))

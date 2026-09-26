@@ -1,3 +1,33 @@
-// Driftbox for Windows' resources, compiled to Driftbox.res by scripts/windows-icon.mjs and linked
-// into the app. Resource 1 is the icon the window class and Explorer use.
+// Driftbox's resources, written by scripts/windows-resources.mjs from scripts/version.env and
+// compiled to the .res it links. Written, not edited: change the version there and run it again.
+// Resource 1 is the icon the window class and Explorer use.
 1 ICON "Driftbox.ico"
+
+1 VERSIONINFO
+FILEVERSION 0,1,0,1
+PRODUCTVERSION 0,1,0,1
+FILEFLAGSMASK 0x3F
+FILEFLAGS 0x0
+FILEOS 0x40004
+FILETYPE 0x1
+FILESUBTYPE 0x0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "Driftbox"
+      VALUE "FileDescription", "Driftbox"
+      VALUE "FileVersion", "0.1.0"
+      VALUE "InternalName", "Driftbox"
+      VALUE "LegalCopyright", "Copyright (c) 2026 Louis Emmett"
+      VALUE "OriginalFilename", "Driftbox.exe"
+      VALUE "ProductName", "Driftbox"
+      VALUE "ProductVersion", "0.1.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

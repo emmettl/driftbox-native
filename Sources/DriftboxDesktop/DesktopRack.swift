@@ -13,6 +13,8 @@ extension Desktop {
     guard shows != showsRack, rack != nil else { return }
     if shows {
       session.padRelease()
+      // The plug-ins installed, found while the rack is looked at, for its Add menu.
+      rack?.findPlugins()
     } else {
       rackInterface?.releaseKeys()
     }
@@ -32,13 +34,12 @@ extension Desktop {
       return true
     case .pointer(let pointer):
       rackInterface.pointer(pointer)
-      if let request = rackInterface.takeMenuRequest() {
-        pop(request.menu, at: request.at, for: rackInterface)
-      }
-      if rackInterface.takeSongRequest() { editRackSong() }
-      if let module = rackInterface.takeFileRequest() {
-        chooseRackAudio(into: module)
-      }
+      takeRequests(from: rackInterface)
+      return true
+    case .accessibility(let action):
+      // A screen reader's press, as a click: what it asks for asked of the window as a click's is.
+      rackInterface.perform(action)
+      takeRequests(from: rackInterface)
       return true
     case .dropped(let urls, let at):
       // Onto a module that holds recordings; anything else is the window's, as a song is.
@@ -73,6 +74,18 @@ extension Desktop {
   func canLoadRackAudio(into module: String) -> Bool {
     guard let rack, let target = rack.patch.modules.first(where: { $0.id == module }) else { return false }
     return DesktopMenus.audioModuleTypes.contains(target.type) && !rack.loading.contains(module)
+  }
+
+  /// What a press on the rack asked the window for: a menu, the song edited in the groovebox, or
+  /// files to load into a module.
+  private func takeRequests(from rackInterface: RackInterface) {
+    if let request = rackInterface.takeMenuRequest() {
+      pop(request.menu, at: request.at, for: rackInterface)
+    }
+    if rackInterface.takeSongRequest() { editRackSong() }
+    if let module = rackInterface.takeFileRequest() {
+      chooseRackAudio(into: module)
+    }
   }
 
   /// The rack's song opened in the groovebox, linked, and the groovebox shown in the rack's place:

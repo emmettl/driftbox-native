@@ -737,16 +737,76 @@ public final class Session {
     send(.strike(hit))
   }
 
-  /// Play a note on 303 A, now, with the song's panel for it.
+  /// The 303 the keys play and step entry writes into: the one whose knobs are showing, or 303 A.
+  public var keysBass: String {
+    if let selectedVoice, selectedVoice.hasPrefix("303.") { return selectedVoice }
+    return "303.a"
+  }
+
+  /// Play a note on the keys' 303, now, with the song's panel for it: `semitone` above the lower
+  /// of the line's two octaves' C, as the typing keys count.
   public func playNote(semitone: Int, accent: Bool) {
     guard let song else { return }
-    let params = song.kit.bass["303.a"] ?? BassParams()
-    let step = BassStep(note: Double(max(0, min(24, semitone + 12))), accent: accent)
+    let voiceId = keysBass
+    let params = song.kit.bass[voiceId] ?? BassParams()
+    let step = BassStep(note: Double(Self.entryPitch(semitone)), accent: accent)
     guard
       let note = bassNote(
         params: params, step: step, previous: .rest, stepSeconds: secondsPerStep(bpm: song.bpm))
     else { return }
-    send(.note(line: 0, note))
+    send(.note(line: voiceId == "303.b" ? 1 : 0, note))
+  }
+
+  /// A key's semitone as a 303 line holds it: 0 to 24, the keys' middle octave its middle.
+  static func entryPitch(_ semitone: Int) -> Int { max(0, min(24, semitone + 12)) }
+
+  // MARK: - Step entry
+
+  /// While step entry is on, the step of the shown pattern's 303 line that the next note typed is
+  /// written into; nil while it is off. The reference's `bassEntryStep`: a note, a rest or a tie
+  /// entered moves it on a step, round to the start again.
+  public private(set) var entryStep: Int?
+
+  /// Step entry on at the pattern's first step, or off.
+  public func toggleStepEntry() {
+    entryStep = entryStep == nil && shownPattern != nil ? 0 : nil
+  }
+
+  /// The cursor moved to `step`, round the pattern either way.
+  public func moveEntry(to step: Int) {
+    guard entryStep != nil, let length = shownPattern?.length, length > 0 else { return }
+    entryStep = (step % length + length) % length
+  }
+
+  /// A note typed at the cursor, `semitone` as `playNote` counts it, and the cursor moved on: heard
+  /// either way, and written only while stopped, as the reference's is, where it is one step of
+  /// undo.
+  public func enterNote(semitone: Int, accent: Bool) {
+    playNote(semitone: semitone, accent: accent)
+    enter("Enter Note") {
+      $0.enteringBassNote($1, at: $2, note: Double(Self.entryPitch(semitone)), accent: accent)
+    }
+  }
+
+  /// The cursor's step paused, keeping its pitch, and the cursor moved on.
+  public func enterRest() {
+    enter("Enter Rest") { $0.enteringBassRest($1, at: $2) }
+  }
+
+  /// The previous step's pitch held through the cursor's, and the cursor moved on; nothing where
+  /// the previous step is silent.
+  public func enterTie() {
+    enter("Enter Tie") { $0.enteringBassTie($1, at: $2) }
+  }
+
+  private func enter(
+    _ name: String, _ entry: (DriftboxSeq.Pattern, String, Int) -> BassEntry
+  ) {
+    guard let step = entryStep, !isPlaying, let pattern = shownPattern else { return }
+    let entered = entry(pattern, keysBass, step)
+    guard entered.written else { return }
+    editPattern(pattern.id, name) { _ in entered.pattern }
+    entryStep = entered.nextStep
   }
 
   /// The performance filter's pad, touched at `x`, `y`, 0...1 from the bottom left.
@@ -833,6 +893,8 @@ public final class Session {
   /// next launch opens on the pattern that was being worked on rather than the first one.
   public var editing: String? {
     didSet {
+      // Another pattern, and step entry starts again at its beginning.
+      if editing != oldValue, entryStep != nil { entryStep = 0 }
       guard editing != oldValue, let memory else { return }
       if let editing {
         memory.set(editing, forKey: SessionDefaults.lastPattern)

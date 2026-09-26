@@ -64,5 +64,6 @@ void db_desktop_menu(db_desktop *, db_menu *);
 void db_desktop_action(db_desktop *, int, int enabled, int checked);
 void db_desktop_files(db_desktop *, int save, int multiple, const char *extensions,
                       const char *name, void *, db_reply);
+void db_desktop_folder(db_desktop *, const char *title, const char *button, void *, db_reply);
 void db_desktop_save_question(db_desktop *, const char *name, void *, db_reply);
 void db_desktop_popup(db_desktop *, db_menu *, double x, double y, void *, db_reply);

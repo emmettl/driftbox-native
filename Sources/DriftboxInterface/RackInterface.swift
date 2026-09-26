@@ -55,7 +55,7 @@ public final class RackInterface {
   /// The knob being turned turns in whole numbers.
   private var turningWhole = false
   /// The keys held with the press: Shift makes a learn chip forget.
-  private var pressModifiers: Modifiers = []
+  var pressModifiers: Modifiers = []
 
   public init(rack: RackSession) {
     self.rack = rack
@@ -375,6 +375,10 @@ public final class RackInterface {
         else { break }
         rack.turn(module, param, to: 1)
         holding = (event.id, module, param)
+      case .routing(.min(let index)), .routing(.max(let index)):
+        // On a touchscreen, where there are no keys to type an end with, it is dragged instead.
+        guard touch, let (from, _) = routeEnd(index, isMax: target == .routing(.max(index))) else { break }
+        turning = (event.id, target!, event.location.y, from, from)
       case .module(let id):
         rack.select(id, adding: event.modifiers.contains(.control))
       case nil:
@@ -402,6 +406,17 @@ public final class RackInterface {
         if turningWhole { turn.value = RackDisplay.jsRound(turn.value) }
         // Heard as it turns, as the Mac's knobs are: the first move is what undo goes back to.
         rack.turn(module, param, to: turn.value)
+      case .routing(.min(let index)), .routing(.max(let index)):
+        let isMax = turn.target == .routing(.max(index))
+        guard let (_, def) = routeEnd(index, isMax: isMax) else { return }
+        let span = def.max - def.min
+        let moved = rise / Double(Self.travel) * span * (fine ? 0.25 : 1)
+        var value = max(def.min, min(def.max, turn.from + moved))
+        if def.stepped { value = value.rounded() }
+        turn.value = value
+        rack.turnRoute(index) { route in
+          if isMax { route.max = value } else { route.min = value }
+        }
       case .cell(let module, let index):
         let stage = stage
         guard let cell = cell(module, index, in: stage) else { return }
@@ -412,22 +427,8 @@ public final class RackInterface {
           cell.range.lowerBound,
           min(
             cell.range.upperBound, Int(turn.from) + Int(RackDisplay.jsRound(Double(travel / cell.step)))))
-        if next != cell.value {
-          if let writes = cell.writes {
-            // As it turns: written, and the whole drag one step of undo.
-            switch writes(next) {
-            case .data(let slot, let values, let name, _, _):
-              rack.setData(module, slot, to: values, name: name)
-            case .set(let param, let value): rack.turn(module, param, to: value)
-            default: break
-            }
-          } else if let (id, offset, scale) = cell.param {
-            rack.turn(module, id, to: offset + scale * Double(next))
-          } else {
-            let data = rack.patch.modules.first { $0.id == module }?.data[cell.slot] ?? []
-            rack.setData(module, cell.slot, to: cell.written(next, in: data), name: cell.name)
-          }
-        }
+        // As it turns: written, and the whole drag one step of undo.
+        if next != cell.value { write(cell, next, on: module) }
         turn.value = Double(next)
       default:
         return
@@ -492,9 +493,40 @@ public final class RackInterface {
       // Not dragged: a click, which does what the number does when clicked, if it does anything.
       if !cellMoved, let press = cell(module, index, in: stage)?.click { self.press(press, on: module) }
       cellMoved = false
+    case .routing:
+      rack.endTurn()
     default:
       break
     }
+  }
+
+  /// A number on `module`'s face written as `next`, where it writes: a step of undo that goes on
+  /// until the turn ends.
+  func write(_ cell: RackStage.Cell, _ next: Int, on module: String) {
+    if let writes = cell.writes {
+      switch writes(next) {
+      case .data(let slot, let values, let name, _, _):
+        rack.setData(module, slot, to: values, name: name)
+      case .set(let param, let value): rack.turn(module, param, to: value)
+      default: break
+      }
+    } else if let (id, offset, scale) = cell.param {
+      rack.turn(module, id, to: offset + scale * Double(next))
+    } else {
+      let data = rack.patch.modules.first { $0.id == module }?.data[cell.slot] ?? []
+      rack.setData(module, cell.slot, to: cell.written(next, in: data), name: cell.name)
+    }
+  }
+
+  /// One end of routing `index`, as it is, or its target's own limit where it has none; and the
+  /// target's param, whose range it is dragged across.
+  private func routeEnd(_ index: Int, isMax: Bool) -> (Double, ParamDef)? {
+    guard rack.patch.modulation.indices.contains(index) else { return nil }
+    let route = rack.patch.modulation[index]
+    guard let type = rack.patch.modules.first(where: { $0.id == route.to.module })?.type,
+      let def = RackSession.routable(type).first(where: { $0.id == route.to.port })
+    else { return nil }
+    return ((isMax ? route.max : route.min) ?? (isMax ? def.max : def.min), def)
   }
 
   /// The number `index` on `module`'s face.
@@ -504,8 +536,9 @@ public final class RackInterface {
     return face.cells[index]
   }
 
-  /// What one of a face's buttons or numbers does, on `module`.
-  private func press(_ press: RackStage.Press, on module: String) {
+  /// What a press on a face's button or number does; a menu it asks for opens under `frame`.
+  func press(_ press: RackStage.Press, on module: String, from frame: Rect? = nil) {
+    let under = frame.map { SIMD2($0.x, $0.maxY) } ?? .zero
     switch press {
     case .set(let param, let value):
       rack.set(module, param, to: value)
@@ -535,6 +568,12 @@ public final class RackInterface {
       rack.clearSongLoop()
     case .routes:
       rack.editRoutes(rack.editingRoutes == module ? nil : module)
+    case .plugin:
+      menuRequest = (pluginMenu(module), under)
+    case .macros:
+      menuRequest = (macroMenu(module), under)
+    case .open:
+      rack.showInterface(module)
     case .learn(let param):
       if pressModifiers.contains(.shift) {
         rack.clearCcBinding(module, param)
@@ -546,7 +585,7 @@ public final class RackInterface {
     }
   }
 
-  private func perform(_ target: RackTarget, at point: SIMD2<Float>) {
+  func perform(_ target: RackTarget, at point: SIMD2<Float>) {
     switch target {
     case .run: rack.toggleRunning()
     case .flip: rack.flip()
@@ -568,7 +607,7 @@ public final class RackInterface {
       guard let face = stage.faces.first(where: { $0.module.id == module }),
         face.buttons.indices.contains(index), let press = face.buttons[index].press
       else { return }
-      self.press(press, on: module)
+      self.press(press, on: module, from: face.buttons[index].frame)
     case .routing(let part):
       perform(part, at: point)
     default:
@@ -765,16 +804,17 @@ public final class RackInterface {
       if types[group] == nil { groups.append(group) }
       types[group, default: []].append(card.type)
     }
-    return Menu(
-      "Add",
-      groups.map { group in
-        .submenu(
-          Menu(
-            group,
-            (types[group] ?? []).map { type in
-              item(RackModules.registry[type]?.name ?? type, "add.\(type)") { self.rack.add(type) }
-            }))
-      })
+    let modules: [MenuItem] = groups.map { group in
+      .submenu(
+        Menu(
+          group,
+          (types[group] ?? []).map { type in
+            item(RackModules.registry[type]?.name ?? type, "add.\(type)") { self.rack.add(type) }
+          }))
+    }
+    guard rack.hostsPlugins else { return Menu("Add", modules) }
+    rack.findPlugins()
+    return Menu("Add", modules + [.separator] + pluginMenus())
   }
 
   public func menuIsEnabled(_ id: String) -> Bool { !menuDisabled.contains(id) }
@@ -797,12 +837,12 @@ public final class RackInterface {
 
   // MARK: - Reading the patch
 
-  private func def(_ module: String, _ param: String) -> ParamDef? {
+  func def(_ module: String, _ param: String) -> ParamDef? {
     guard let type = rack.patch.modules.first(where: { $0.id == module })?.type else { return nil }
     return RackModules.registry[type]?.params.first { $0.id == param }
   }
 
-  private func value(_ module: String, _ param: String) -> Double? {
+  func value(_ module: String, _ param: String) -> Double? {
     guard let found = rack.patch.modules.first(where: { $0.id == module }), let def = def(module, param)
     else {
       return nil

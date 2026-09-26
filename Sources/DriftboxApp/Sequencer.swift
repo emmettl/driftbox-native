@@ -61,7 +61,8 @@
               ForEach(["303.a", "303.b"].filter { pattern.bass[$0] != nil }, id: \.self) { voiceId in
                 BassGrid(
                   player: player, pattern: pattern, voiceId: voiceId, metrics: metrics, playhead: playhead,
-                  selected: player.selectedVoice == voiceId
+                  selected: player.selectedVoice == voiceId,
+                  entry: voiceId == player.keysBass ? player.entryStep : nil
                 )
                 .padding(.top, 10)
               }

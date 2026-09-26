@@ -3,6 +3,7 @@ import DriftboxDocument
 import DriftboxGPU
 import DriftboxHost
 import DriftboxInterface
+import DriftboxMovie
 import DriftboxRackSession
 import DriftboxScenes
 import DriftboxSession
@@ -35,8 +36,11 @@ public final class Desktop {
   var documentRequestPending = false
   var resized: (width: Int, height: Int)?
 
-  /// The scene chosen from the View menu, or nil to show the song's own.
-  public private(set) var chosenScene: String?
+  /// The scene chosen from the View menu, or nil to show the song's own. A performance being
+  /// recorded sees the switch too.
+  public private(set) var chosenScene: String? {
+    didSet { if chosenScene != oldValue { session.noteScene(chosenScene) } }
+  }
   /// The scene being drawn, and which it is.
   var scene: any GPUScene
   public private(set) var sceneID: String
@@ -50,12 +54,48 @@ public final class Desktop {
   public let rack: RackSession?
   public let rackInterface: RackInterface?
   public internal(set) var showsRack = false
+  /// The audio being written by the last export, rendered off the main thread.
+  var exporting: Task<Void, Never>?
+  /// The movie being written, and how far it has got from 0 to 1; nil while none is.
+  var movie: Task<Void, Never>?
+  public internal(set) var movieProgress: Double?
+  var movieStopped = false
+  /// The size and rates movies are written in; smaller in a test.
+  public var movieFormat = MovieFormat()
+  /// Hosts without a movie encoder disable the movie and performance-recording commands.
+  public var supportsMovies = true
+  /// The visuals window, while it is open, and what draws into it.
+  var visuals: (any ShellVisualsWindow)?
+  var visualsSurface: (any GPUSurface)?
+  var visualsFrame: (any GPUTarget)?
+  var visualsResized: (width: Int, height: Int)?
+  /// What makes the visuals window's surface: the platform's GPU on it. Nil, and no visuals window,
+  /// where there is none.
+  let makeVisualsSurface: ((any ShellVisualsWindow) throws -> any GPUSurface)?
+  /// When what is on screen was last told to a screen reader.
+  var describedAt = -Double.infinity
+  /// The control the keyboard is on, while a screen reader runs, by its id; and where it was when
+  /// last told, to ring it.
+  var focused: String?
+  var focusFrame: SIMD4<Float>?
+  /// The song file last seen open, to notice another being opened or saved as.
+  var lastFile: URL?
+  /// The displays there were when last asked, and when.
+  var displays: [String] = []
+  var displaysAsked = -Double.infinity
+  /// Where what is worth keeping between launches is kept — where the visuals window was — or
+  /// nil for a desktop that keeps nothing, as a test's.
+  public var memory: UserDefaults?
+  /// What writes a movie's file: the platform's, unless a test says otherwise.
+  var makeMovieWriter: @MainActor (URL, MovieFormat) throws -> any MovieWriter = Desktop.movieWriter
 
   public init(
     session: Session, window: any ShellWindow, device: any GPUDevice, surface: any GPUSurface,
-    typesetter: any Typesetter, rack: RackSession? = nil
+    typesetter: any Typesetter, rack: RackSession? = nil,
+    visualsSurface: ((any ShellVisualsWindow) throws -> any GPUSurface)? = nil
   ) throws {
     self.session = session
+    makeVisualsSurface = visualsSurface
     self.rack = rack
     rackInterface = rack.map(RackInterface.init)
     // The rack lets go of a song it had linked here, as when another patch is opened in it.
@@ -86,6 +126,8 @@ public final class Desktop {
     defer {
       session.close()
       rack?.close()
+      // Preserve the remembered open state while releasing the visuals window.
+      dropVisuals()
     }
     try window.run { try drawFrame() }
   }
@@ -107,19 +149,28 @@ public final class Desktop {
     }
     showScene()
     let time = HostTime.seconds(from: began, to: HostTime.now())
+    // The visuals window, if one is open, draws the scene at its own shape; the backdrop shows its
+    // frame, cropped to fill.
+    let shown = try drawVisuals(time: time)
+    var backdrop = frame
     // The rack covers the window while it shows: the scene waits. Behind the controls it runs if
     // the visuals are to run, and while the controls are away always: performing is what it is for.
     if !showsRack {
       if session.showsVisuals || !interface.isShowing {
-        scene.draw(session.sceneInput(time: time, pixelRatio: window.scale), into: frame, on: device)
+        if let shown {
+          backdrop = shown
+        } else {
+          scene.draw(session.sceneInput(time: time, pixelRatio: window.scale), into: frame, on: device)
+        }
       } else {
         device.render(into: frame, clear: .colour(Self.ground)) { _ in }
       }
     }
     let target = try surface.target()
-    presenter.present(frame, into: target, on: device)
+    presenter.present(backdrop, into: target, on: device, filling: backdrop !== frame)
     try drawInterface(into: target)
     try surface.present()
+    describe(at: time)
   }
 
   /// The controls, drawn on a page the size of the window in its pixels, in points, and laid over
@@ -132,6 +183,7 @@ public final class Desktop {
       try canvas.begin(width: target.width, height: target.height)
       canvas.scale(window.scale, window.scale)
       rackInterface.draw(on: canvas)
+      drawFocus(on: canvas)
       presenter.overlay(canvas.finish(), into: target, on: device)
       return
     }
@@ -139,6 +191,7 @@ public final class Desktop {
     try canvas.begin(width: target.width, height: target.height)
     canvas.scale(window.scale, window.scale)
     interface.draw(on: canvas)
+    drawFocus(on: canvas)
     presenter.overlay(canvas.finish(), into: target, on: device)
   }
 
@@ -155,12 +208,18 @@ public final class Desktop {
   /// The window's title and menus as the session now is. Each is handed over only when it differs
   /// from what the window has, which the window checks itself for the menus.
   func refresh() {
+    noteOpenFile()
     // Typing is the rack's while it shows, as a routing's end is typed, and the controls' otherwise.
     let takesText = showsRack ? rackInterface?.takesText ?? false : interface.takesText
     if window.takesText != takesText { window.takesText = takesText }
-    let title = showsRack ? rack.map(Self.title(for:)) ?? "Driftbox" : Self.title(for: session)
+    var title = showsRack ? rack.map(Self.title(for:)) ?? "Driftbox" : Self.title(for: session)
+    if let activity { title = "\(activity) - \(title)" }
     if window.title != title { window.title = title }
-    window.menuBar = DesktopMenus.bar(for: session, rack: rack, showsRack: showsRack)
+    window.menuBar = DesktopMenus.bar(
+      for: session, rack: rack, showsRack: showsRack, screenReader: keyboardNavigates,
+      writingMovie: movieProgress != nil,
+      displays: makeVisualsSurface == nil ? [] : displaysNow, visualsWindow: makeVisualsSurface != nil,
+      recent: memory == nil ? nil : recentTitles)
   }
 
   /// As Windows' own programs title a document's window: its name, marked while it has changes
@@ -180,6 +239,14 @@ public final class Desktop {
       case .pointer(let pointer) where pointer.phase == .cancelled || pointer.phase == .ended: break
       default: return
       }
+    }
+    // With a screen reader, the keyboard moves between the controls first, and where a screen reader
+    // moves it is the window's to keep.
+    if case .key(let key) = event, navigate(key) { return }
+    if case .accessibility(.focus(let id)) = event {
+      focused = id
+      describeNow()
+      return
     }
     if showsRack, handleRack(event) { return }
     switch event {
@@ -201,6 +268,10 @@ public final class Desktop {
       // A name being typed has every key; otherwise the keyboard is an instrument.
       if !interface.key(key) { _ = keys.play(key, on: session) }
       window.takesText = interface.takesText
+    case .accessibility(let action):
+      _ = interface.perform(action)
+    case .describe:
+      describeNow()
     }
   }
 
@@ -259,11 +330,23 @@ public final class Desktop {
       documentRequest { done in self.save { _ in done() } }
     case DesktopMenus.saveAs:
       documentRequest { done in self.saveAs { _ in done() } }
+    case DesktopMenus.exportMix:
+      exportMix()
+    case DesktopMenus.exportStems:
+      exportStems()
+    case DesktopMenus.exportMovie:
+      exportMovie()
+    case DesktopMenus.stopMovie:
+      stopMovie()
+    case DesktopMenus.record:
+      toggleRecording()
     case DesktopMenus.exit:
       if requestClose() { window.close() }
     case DesktopMenus.undo: if showsRack, let rack { rack.undo() } else { session.undo() }
     case DesktopMenus.redo: if showsRack, let rack { rack.redo() } else { session.redo() }
     case DesktopMenus.toggle: if showsRack, let rack { rack.toggleRunning() } else { session.toggle() }
+    case DesktopMenus.visualsWindow: if visualsOpen { closeVisuals() } else { showVisuals() }
+    case DesktopMenus.clearRecent: clearRecent()
     case DesktopMenus.showRack: setShowsRack(!showsRack)
     case DesktopMenus.rackSongFromGroovebox:
       guard let song = session.song else { return }
@@ -278,6 +361,7 @@ public final class Desktop {
     case DesktopMenus.clearAutomation: session.clearAutomation()
     case DesktopMenus.countIn: session.countsIn.toggle()
     case DesktopMenus.loop: session.loopSection()
+    case DesktopMenus.clearLoop: session.loop = nil
     case DesktopMenus.nextScene: stepScene(by: 1)
     case DesktopMenus.previousScene: stepScene(by: -1)
     case DesktopMenus.songsScene: chosenScene = nil
@@ -315,6 +399,10 @@ public final class Desktop {
       replacingDocument { self.session.open(entry) }
     } else if let sceneID = DesktopMenus.value(id, after: DesktopMenus.scenePrefix) {
       chosenScene = sceneID
+    } else if let display = DesktopMenus.value(id, after: DesktopMenus.visualsOnPrefix) {
+      showVisuals(on: display, fullScreen: true)
+    } else if let index = DesktopMenus.value(id, after: DesktopMenus.recentPrefix).flatMap({ Int($0) }) {
+      openRecent(index)
     } else if let device = DesktopMenus.value(id, after: DesktopMenus.outputPrefix) {
       session.outputDevice = device
     } else if let source = DesktopMenus.value(id, after: DesktopMenus.inputPrefix) {
@@ -345,12 +433,19 @@ public final class Desktop {
     case DesktopMenus.redo: showsRack ? rack?.canRedo ?? false : session.canRedo
     case DesktopMenus.toggle: showsRack || session.song != nil
     case DesktopMenus.showRack: rack != nil
-    case DesktopMenus.save, DesktopMenus.saveAs, DesktopMenus.start,
+    case DesktopMenus.save, DesktopMenus.saveAs, DesktopMenus.exportMix, DesktopMenus.exportStems,
+      DesktopMenus.start,
       DesktopMenus.previousSection, DesktopMenus.nextSection, DesktopMenus.loop:
       session.song != nil
     case DesktopMenus.recordAutomation: session.song != nil
+    case DesktopMenus.clearLoop: session.loop != nil
+    case DesktopMenus.exportMovie: supportsMovies && session.song != nil && movieProgress == nil
+    case DesktopMenus.stopMovie: movieProgress != nil
+    case DesktopMenus.record:
+      supportsMovies && session.song != nil && (session.isRecording || movieProgress == nil)
     case DesktopMenus.clearAutomation: session.song?.automation.isEmpty == false
-    case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote, DesktopMenus.noAudioTargets:
+    case DesktopMenus.noInputs, DesktopMenus.noOutputs, DesktopMenus.audioNote, DesktopMenus.noAudioTargets,
+      DesktopMenus.noRecent:
       false
     default: true
     }
@@ -368,12 +463,16 @@ public final class Desktop {
     case DesktopMenus.rackBack: return rack?.flipped == true
     case DesktopMenus.systemOutput: return session.outputDevice == nil
     case DesktopMenus.visuals: return session.showsVisuals
+    case DesktopMenus.visualsWindow: return visualsOpen
     case DesktopMenus.listen: return session.listensToMIDI
     case DesktopMenus.followClock: return session.followsClock
     case DesktopMenus.sendClock: return session.sendsClock
     default: break
     }
     if let scene = DesktopMenus.value(id, after: DesktopMenus.scenePrefix) { return chosenScene == scene }
+    if let display = DesktopMenus.value(id, after: DesktopMenus.visualsOnPrefix) {
+      return visuals?.isFullScreen == true && visuals?.display == display
+    }
     if let device = DesktopMenus.value(id, after: DesktopMenus.outputPrefix) {
       return session.outputDevice == device
     }

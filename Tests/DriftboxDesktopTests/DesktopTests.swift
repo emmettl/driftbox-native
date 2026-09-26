@@ -43,6 +43,10 @@ final class StandInWindow: ShellWindow {
   var pendingQuestion: ((SaveAnswer) -> Void)?
   var pendingSave: ((URL?) -> Void)?
   var pendingOpen: ((URL?) -> Void)?
+  var pendingFolder: ((URL?) -> Void)?
+  func chooseFolder(title: String, button: String, completion: @escaping (URL?) -> Void) {
+    if defersDialogs { pendingFolder = completion } else { completion(folder) }
+  }
   var pendingMultiple: (([URL]) -> Void)?
   var requestedTypes: [FileType] = []
   func chooseFiles(ofTypes types: [FileType], completion: @escaping ([URL]) -> Void) {
@@ -68,12 +72,36 @@ final class StandInWindow: ShellWindow {
       completion(askToSave(name))
     }
   }
+  var folder: URL?
 
   func run(frame: () throws -> Void) throws {}
   func close() { closed = true }
   nonisolated func post(_ work: @escaping @Sendable () -> Void) {}
   func chooseFile(ofTypes types: [FileType]) -> URL? { chosenFile }
   func chooseSaveLocation(for type: FileType, name: String) -> URL? { saveLocation }
+  func chooseFolder(title: String, button: String) -> URL? { folder }
+  var revealed: [URL] = []
+  func reveal(_ url: URL) { revealed.append(url) }
+  var told: [String] = []
+  func tell(_ message: String) { told.append(message) }
+  var displays: [String] = []
+  var recents: [URL] = []
+  func addToRecents(_ url: URL) { recents.append(url) }
+  /// Whether a screen reader is reading it, as a test says, and what it was told.
+  var isDescribed = false
+  var described: [AccessibilityNode] = []
+  func describe(_ root: AccessibilityNode) { described.append(root) }
+  var screenReaderIsOn = false
+  /// Where the keyboard was said to be, each time it was.
+  var focusedIds: [String?] = []
+  func focus(_ id: String?) { focusedIds.append(id) }
+  /// The visuals windows made, the last the one in use.
+  var visualsWindows: [StandInVisualsWindow] = []
+  func makeVisualsWindow() -> (any ShellVisualsWindow)? {
+    let made = StandInVisualsWindow()
+    visualsWindows.append(made)
+    return made
+  }
   func askToSave(_ name: String) -> SaveAnswer {
     asked.append(name)
     return saveAnswer
@@ -101,6 +129,23 @@ final class StandInWindow: ShellWindow {
   /// Every command in the menus, by id.
   var commandIDs: [String] { menuBar?.commands.map(\.id) ?? [] }
   func title(of id: String) -> String? { menuBar?.commands.first { $0.id == id }?.title }
+}
+
+/// A visuals window that keeps where it was sent, and is told what a person does to it.
+@MainActor
+final class StandInVisualsWindow: ShellVisualsWindow {
+  var width = 640
+  var height = 360
+  var scale: Float = 1
+  var isFullScreen = false
+  var display: String?
+  var onEvent: ((VisualsEvent) -> Void)?
+  var closed = false
+  func show(on display: String?, fullScreen: Bool) {
+    if let display { self.display = display }
+    isFullScreen = fullScreen
+  }
+  func close() { closed = true }
 }
 
 /// A surface that is only a target the size it was last told.
@@ -287,6 +332,160 @@ struct DesktopTests {
 
   /// A new song has nowhere to be saved, so saving it asks where; and not saving anywhere is not
   /// having saved.
+  /// The song as audio, from the File menu: the mix as one WAV where it is asked to go, and each
+  /// voice it uses as a WAV of its own in the folder chosen; nothing with no song, or no place.
+  @Test func theSongIsExportedAsAudio() async throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    #expect(window.isEnabled?(DesktopMenus.exportMix) == false, "no song, nothing to export")
+    let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("driftbox-export-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let song = directory.appendingPathComponent("Groove.driftbox")
+    try Data(SongCodec.encode(Self.song()).utf8).write(to: song)
+    window.chosenFile = song
+    window.choose(DesktopMenus.open)
+    #expect(
+      window.commandIDs.contains(DesktopMenus.exportMix)
+        && window.commandIDs.contains(DesktopMenus.exportStems))
+
+    window.choose(DesktopMenus.exportMix)
+    #expect(desktop.exporting == nil, "no place chosen")
+    let mix = directory.appendingPathComponent("Groove.wav")
+    window.saveLocation = mix
+    window.choose(DesktopMenus.exportMix)
+    await desktop.exporting?.value
+    let wav = try Data(contentsOf: mix)
+    #expect(wav.prefix(4) == Data("RIFF".utf8) && wav.count > 44 + 48000)
+
+    let stems = directory.appendingPathComponent("Stems")
+    try FileManager.default.createDirectory(at: stems, withIntermediateDirectories: true)
+    window.folder = stems
+    window.choose(DesktopMenus.exportStems)
+    await desktop.exporting?.value
+    #expect(try FileManager.default.contentsOfDirectory(atPath: stems.path) == ["Groove - 909.bd.wav"])
+  }
+
+  /// Told a screen reader's there only while one reads the window, and then what the groovebox shows;
+  /// and what it asks, done.
+  @Test func aScreenReaderIsToldWhatIsOnScreen() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Groove")
+    try desktop.drawFrame()
+    #expect(window.described.isEmpty, "nobody reading, nothing told")
+
+    window.isDescribed = true
+    try desktop.drawFrame()
+    let told = try #require(window.described.last)
+    #expect(told.node("transport.play")?.isOn == false)
+    try desktop.drawFrame()
+    #expect(window.described.count == 1, "not every frame")
+
+    window.onEvent?(.accessibility(.set("number.tempo", 100)))
+    #expect(desktop.session.song?.bpm == 100)
+    desktop.describedAt = -.infinity
+    try desktop.drawFrame()
+    #expect(window.described.last?.node("number.tempo")?.current == 100)
+  }
+
+  /// With the rack showing, the rack is what a screen reader is told, and what it asks of it is done
+  /// there: a press that asks for a menu is shown the menu, as a click's is.
+  @Test func aScreenReaderIsToldOfTheRack() throws {
+    let device = try #require(try Self.devices().first)
+    let window = StandInWindow()
+    let surface = StandInSurface(device: device, width: 320, height: 180)
+    let desktop = try Desktop(
+      session: Session(host: EngineHost(sampleRate: 48000)), window: window, device: device, surface: surface,
+      typesetter: NoTypesetter(), rack: RackSession())
+    let rack = try #require(desktop.rack)
+    window.isDescribed = true
+    window.choose(DesktopMenus.showRack)
+    try desktop.drawFrame()
+    let told = try #require(window.described.last)
+    #expect(told.node("rack.run")?.isOn == false)
+    #expect(told.node("transport.play") == nil, "not the groovebox")
+
+    window.onEvent?(.accessibility(.press("rack.run")))
+    #expect(rack.running)
+    window.onEvent?(.accessibility(.press("rack.add")))
+    #expect(window.popped.last?.title == "Add")
+    #expect(!desktop.session.isPlaying, "the groovebox's own untouched")
+  }
+
+  /// With a screen reader running, Tab and Shift+Tab move the keyboard between the controls, which
+  /// the screen reader is told at once; Enter presses the one it is on, and the arrows turn a
+  /// slider. Without one, Tab is the shortcut it always was, and the keys are the instrument's.
+  @Test func theKeyboardMovesBetweenTheControls() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Groove")
+    window.isDescribed = true
+    func press(_ key: Key, _ modifiers: Modifiers = []) {
+      window.onEvent?(.key(KeyEvent(key: key, modifiers: modifiers)))
+    }
+    func tab() -> Shortcut? {
+      window.menuBar?.commands.first { $0.id == DesktopMenus.controls }?.shortcut
+    }
+
+    press(.tab)
+    #expect(window.focusedIds.compactMap { $0 }.isEmpty, "no screen reader, nowhere to move")
+    #expect(tab() == Shortcut(.tab, []))
+
+    window.screenReaderIsOn = true
+    try desktop.drawFrame()
+    #expect(tab() == nil, "Tab is the screen reader's now")
+    press(.tab)
+    let first = try #require(window.focusedIds.last ?? nil)
+    let controls = desktop.described.flattened.filter { Desktop.focusable($0.role) }
+    #expect(first == controls.first?.id, "the first control")
+    press(.tab, .shift)
+    #expect(window.focusedIds.last == controls.last?.id, "and back round to the last")
+    press(.tab)
+    #expect(window.focusedIds.last == first)
+
+    // Pressed where it is: the metronome clicks, and stops.
+    window.onEvent?(.accessibility(.focus("transport.metronome")))
+    press(.return)
+    #expect(desktop.session.metronome)
+    press(.return)
+    #expect(!desktop.session.metronome)
+
+    // A screen reader moves it too, and the arrows turn what it is on.
+    window.onEvent?(.accessibility(.focus("number.tempo")))
+    #expect(window.focusedIds.last == "number.tempo")
+    press(.up)
+    #expect(desktop.session.song?.bpm == 121)
+    press(.left)
+    press(.left)
+    #expect(desktop.session.song?.bpm == 119)
+    try desktop.drawFrame()
+    #expect(desktop.focusFrame != nil, "ringed")
+
+    // Put away, there is nothing to be on; and Tab brings the controls back.
+    desktop.interface.isShowing = false
+    desktop.describeNow()
+    #expect(window.focusedIds.last == .some(nil))
+    press(.tab)
+    #expect(desktop.interface.isShowing)
+  }
+
+  /// Transport ▸ Clear Loop: whatever is looping, one section or several stretched across, which
+  /// Loop This Section would only replace; and nothing to clear while nothing loops.
+  @Test func aLoopIsCleared() throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Groove")
+    #expect(window.isEnabled?(DesktopMenus.clearLoop) == false)
+    desktop.session.toggleLoop(start: 0, bars: 1)
+    desktop.session.extendLoop(toStart: 1, bars: 1)
+    #expect(desktop.session.loop?.bars == 2)
+    #expect(window.isEnabled?(DesktopMenus.clearLoop) == true)
+    window.choose(DesktopMenus.clearLoop)
+    #expect(desktop.session.loop == nil)
+  }
+
   @Test func aNewSongIsSavedWhereItIsAskedTo() throws {
     for device in try Self.devices() {
       try withTemporaryDirectory { directory in
@@ -685,5 +884,48 @@ extension DesktopTests {
       #expect(!window.commandIDs.contains(command + sampler), "targets follow the current patch")
       #expect(window.isEnabled?(command + sampler) == false)
     }
+  }
+}
+
+extension DesktopTests {
+  @Test func exportsWaitForDeferredLocations() async throws {
+    let device = try #require(try Self.devices().first)
+    let (desktop, window, _) = try Self.desktop(on: device)
+    desktop.session.open(Self.song(), named: "Deferred")
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    window.defersDialogs = true
+    for command in [DesktopMenus.exportMix, DesktopMenus.exportStems, DesktopMenus.exportMovie] {
+      window.choose(command)
+      #expect(desktop.documentRequestPending)
+      #expect(window.isEnabled?(DesktopMenus.new) == false)
+      #expect(desktop.exporting == nil && desktop.movie == nil)
+      let cancel = try #require(
+        command == DesktopMenus.exportStems ? window.pendingFolder : window.pendingSave)
+      window.pendingFolder = nil
+      window.pendingSave = nil
+      cancel(nil)
+      #expect(!desktop.documentRequestPending)
+      #expect(desktop.exporting == nil && desktop.movie == nil)
+    }
+    window.choose(DesktopMenus.exportMix)
+    let mix = directory.appendingPathComponent("Mix.wav")
+    let saveMix = try #require(window.pendingSave)
+    saveMix(mix)
+    window.pendingSave = nil
+    #expect(!desktop.documentRequestPending)
+    await desktop.exporting?.value
+    #expect(try Data(contentsOf: mix).prefix(4) == Data("RIFF".utf8))
+    window.choose(DesktopMenus.exportStems)
+    let saveStems = try #require(window.pendingFolder)
+    saveStems(directory)
+    window.pendingFolder = nil
+    await desktop.exporting?.value
+    let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+    #expect(files.contains { $0.hasPrefix("Deferred - ") && $0.hasSuffix(".wav") })
+    desktop.supportsMovies = false
+    #expect(window.isEnabled?(DesktopMenus.exportMovie) == false)
+    #expect(window.isEnabled?(DesktopMenus.record) == false)
   }
 }

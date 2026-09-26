@@ -14,18 +14,36 @@ public struct ModuleFace: Decodable, Equatable, Sendable {
     }
   }
 
+  /// What a module's guide says that its definition does not: how it thinks, a first patch to
+  /// try, and what to watch for. Written for the modules whose faces cannot explain themselves.
+  public struct Guide: Decodable, Equatable, Sendable {
+    public struct Concept: Decodable, Equatable, Sendable {
+      public var title: String
+      public var body: String
+    }
+
+    public var overview: String
+    public var concepts: [Concept]
+    public var firstPatch: [String]
+    public var watchFor: [String]?
+  }
+
   public var type: String
   public var group: String?
   public var blurb: String?
   public var logo: Logo?
   public var labels: [String: [String]]
+  public var guide: Guide?
 
-  public init(type: String, group: String?, blurb: String?, logo: Logo?, labels: [String: [String]]) {
+  public init(
+    type: String, group: String?, blurb: String?, logo: Logo?, labels: [String: [String]], guide: Guide? = nil
+  ) {
     self.type = type
     self.group = group
     self.blurb = blurb
     self.logo = logo
     self.labels = labels
+    self.guide = guide
   }
 
   public static let all: [ModuleFace] = {

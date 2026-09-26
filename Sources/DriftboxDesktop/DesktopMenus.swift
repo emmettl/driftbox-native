@@ -16,6 +16,15 @@ public enum DesktopMenus {
   public static let open = "file.open"
   public static let save = "file.save"
   public static let saveAs = "file.saveAs"
+  public static let exportMix = "file.exportMix"
+  /// A recent song, by its place in the list; the list cleared; and what an empty list says.
+  public static let recentPrefix = "recent."
+  public static let clearRecent = "file.clearRecent"
+  public static let noRecent = "file.noRecent"
+  public static let exportStems = "file.exportStems"
+  public static let exportMovie = "file.exportMovie"
+  public static let stopMovie = "file.stopMovie"
+  public static let record = "file.record"
   public static let exit = "file.exit"
   public static let undo = "edit.undo"
   public static let redo = "edit.redo"
@@ -24,6 +33,7 @@ public enum DesktopMenus {
   public static let previousSection = "transport.previousSection"
   public static let nextSection = "transport.nextSection"
   public static let loop = "transport.loop"
+  public static let clearLoop = "transport.clearLoop"
   public static let metronome = "transport.metronome"
   public static let recordAutomation = "transport.recordAutomation"
   public static let clearAutomation = "transport.clearAutomation"
@@ -43,6 +53,9 @@ public enum DesktopMenus {
   public static let noOutputs = "midi.noOutputs"
   /// Whether the scene runs behind the controls; it always does while they are away.
   public static let visuals = "view.visuals"
+  /// The visuals in a window of their own; and that window full screen on a display, by its name.
+  public static let visualsWindow = "view.visualsWindow"
+  public static let visualsOnPrefix = "visualsOn."
   /// What the Audio menu says of where the sound is going, which is not a choice.
   public static let audioNote = "audio.note"
 
@@ -59,15 +72,39 @@ public enum DesktopMenus {
   public static let rackSongPrefix = "rackSong."
   public static let rackSongFromGroovebox = "rack.songFromGroovebox"
 
+  /// File ▸ Open Recent: the songs, by the menu's names for them, or word that there are none.
+  static func recentMenu(_ titles: [String]) -> Menu {
+    guard !titles.isEmpty else { return Menu("Open Recent", [.command("No Recent Songs", id: noRecent)]) }
+    let songs: [MenuItem] = titles.enumerated().map {
+      .command($0.element, id: recentPrefix + String($0.offset))
+    }
+    return Menu("Open Recent", songs + [.separator, .command("Clear Menu", id: clearRecent)])
+  }
+
   /// What a command is about, if it is one of `prefix`'s.
   public static func value(_ id: String, after prefix: String) -> String? {
     id.hasPrefix(prefix) ? String(id.dropFirst(prefix.count)) : nil
   }
 
   /// The menus for `session`, and for `rack` when there is one: the Edit menu undoes in whichever
-  /// shows.
+  /// shows. While a movie is being written, the File menu stops it. With a `screenReader` running,
+  /// Tab moves between the controls, and is no shortcut.
   @MainActor
-  public static func bar(for session: Session, rack: RackSession? = nil, showsRack: Bool = false) -> MenuBar {
+  public static func bar(
+    for session: Session, rack: RackSession? = nil, showsRack: Bool = false, screenReader: Bool = false,
+    writingMovie: Bool = false,
+    displays: [String] = [], visualsWindow: Bool = false, recent: [String]? = nil
+  ) -> MenuBar {
+    // The songs opened lately, where the app keeps them.
+    let recentItems = recent.map { [MenuItem.submenu(recentMenu($0))] } ?? []
+    // The visuals in a window of their own, where the platform has a second window, and that window
+    // full screen on each display there is.
+    let visualsItems: [MenuItem] =
+      visualsWindow
+      ? [
+        .command("Visuals Window", id: DesktopMenus.visualsWindow, shortcut: Shortcut("2")),
+        .submenu(Menu("Visuals Full Screen On", displays.map { .command($0, id: visualsOnPrefix + $0) })),
+      ] : []
     let undoTitle = showsRack ? rack?.undoTitle ?? "Undo" : session.undoTitle
     let redoTitle = showsRack ? rack?.redoTitle ?? "Redo" : session.redoTitle
     return MenuBar(
@@ -77,11 +114,21 @@ public enum DesktopMenus {
           [
             .command("New", id: new, shortcut: Shortcut("n")),
             .command("Open…", id: open, shortcut: Shortcut("o")),
+          ] + recentItems + [
             .submenu(
               Menu("Open Catalogue Song", session.entries.map { .command($0.name, id: songPrefix + $0.id) })),
             .separator,
             .command("Save", id: save, shortcut: Shortcut("s")),
             .command("Save As…", id: saveAs, shortcut: Shortcut("s", [.primary, .shift])),
+            .separator,
+            .command("Export Mix…", id: exportMix, shortcut: Shortcut("e")),
+            .command("Export Stems…", id: exportStems, shortcut: Shortcut("e", [.primary, .shift])),
+            writingMovie
+              ? .command("Stop Writing Movie", id: stopMovie, shortcut: Shortcut("m", [.primary, .shift]))
+              : .command("Export Movie…", id: exportMovie, shortcut: Shortcut("m", [.primary, .shift])),
+            .command(
+              session.isRecording ? "Stop Recording…" : "Record Performance", id: record,
+              shortcut: Shortcut("r", [.primary, .shift])),
             .separator,
             .command("Exit", id: exit, shortcut: Shortcut("q")),
           ]),
@@ -100,6 +147,8 @@ public enum DesktopMenus {
             .command("Next Section", id: nextSection, shortcut: Shortcut(.pageDown, [])),
             .separator,
             .command("Loop This Section", id: loop, shortcut: Shortcut("l")),
+            // Whatever is looping, one section or several stretched across.
+            .command("Clear Loop", id: clearLoop, shortcut: Shortcut("l", [.primary, .shift])),
             .command("Metronome", id: metronome, shortcut: Shortcut("m")),
             .separator,
             .command("Record Automation", id: recordAutomation),
@@ -112,10 +161,11 @@ public enum DesktopMenus {
             // Tab turns the rack round while it shows, as it does on the Mac; the controls are the
             // groovebox's.
             showsRack
-              ? .command("Show Back", id: rackBack, shortcut: Shortcut(.tab, []))
-              : .command("Show Controls", id: controls, shortcut: Shortcut(.tab, [])),
+              ? .command("Show Back", id: rackBack, shortcut: screenReader ? nil : Shortcut(.tab, []))
+              : .command("Show Controls", id: controls, shortcut: screenReader ? nil : Shortcut(.tab, [])),
             .separator,
             .command("Run the Visuals", id: visuals),
+          ] + visualsItems + [
             .separator,
             .command("Next Scene", id: nextScene, shortcut: Shortcut(.right)),
             .command("Previous Scene", id: previousScene, shortcut: Shortcut(.left)),

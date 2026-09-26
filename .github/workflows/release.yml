@@ -1,0 +1,165 @@
+name: Release
+
+# Driftbox for Windows, built, signed and attached to a draft release: from a tag `v<version>`,
+# which must be scripts/version.env's, or by hand, which leaves its files as the run's artifacts.
+#
+# Signing is SignPath's, free for open source through the SignPath Foundation: the programs in
+# the folder first, then the installer made from them. It happens once the repository has the
+# SIGNPATH_ORGANIZATION_ID variable and the SIGNPATH_API_TOKEN secret; until then everything is
+# built unsigned, and Windows says so before it runs. CODE_SIGNING.md says who signs what.
+#
+# Every job before a signing request runs on GitHub's own runners, as SignPath asks of open source.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    env:
+      SIGNS: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # As ci.yml's Windows job sets Swift up, and for the same reason: compnerd/gha-setup-swift#58.
+      - uses: compnerd/gha-setup-swift@bbae8ce86bac5a3449f3992b3d88bc4ca25f2057  # v0.5.0, pinned
+        id: swift
+        continue-on-error: true
+        with:
+          swift-version: swift-6.4.0-release
+          swift-build: 6.4.0-RELEASE
+      - name: Find the toolchain if the installer left it off PATH
+        if: steps.swift.outcome == 'failure'
+        shell: pwsh
+        run: |
+          if (Get-Command swift -ErrorAction SilentlyContinue) { exit 0 }
+          if (-not $env:SDKROOT -or $env:SDKROOT -notmatch '\\Platforms\\') {
+            Write-Host "::error::Swift is not on PATH and SDKROOT does not say where it was installed"
+            exit 1
+          }
+          $root = $env:SDKROOT.Substring(0, $env:SDKROOT.IndexOf('\Platforms\'))
+          $found = @(Get-ChildItem -Path "$root\Toolchains\*\usr\bin\swift.exe" -ErrorAction SilentlyContinue)
+          if ($found.Count -ne 1) {
+            Write-Host "::error::Expected one Swift toolchain under $root\Toolchains, found $($found.Count)"
+            exit 1
+          }
+          Write-Host "::warning::The Swift installer left its toolchain off PATH; adding $($found[0].DirectoryName)"
+          $found[0].DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Swift is installed
+        run: swift --version
+
+      - name: The version, and the tag's
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path scripts/version.env -Pattern '^DRIFTBOX_VERSION=(.+)$').Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            Write-Host "::error::The tag is $env:GITHUB_REF_NAME, but scripts/version.env says $version"
+            exit 1
+          }
+          "DRIFTBOX_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      # The programs carry the version, and signing holds them to it: the resources committed must be
+      # the ones scripts/version.env makes.
+      - name: The resources are the version's
+        run: |
+          node scripts/windows-resources.mjs
+          git diff --exit-code -- windows
+      - name: Build
+        run: |
+          swift build -c release --build-system native --product DriftboxWindows
+          swift build -c release --build-system native --product DriftboxVST3Scan
+      - name: Package
+        run: node scripts/windows-package.mjs
+
+      - name: Upload the programs to sign
+        id: programs
+        if: env.SIGNS == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Driftbox-unsigned
+          path: dist/Driftbox
+      - name: Sign the programs
+        if: env.SIGNS == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'driftbox-native' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+          artifact-configuration-slug: driftbox
+          github-artifact-id: ${{ steps.programs.outputs.artifact-id }}
+          parameters: |
+            version: ${{ toJSON(env.DRIFTBOX_VERSION) }}
+          # Each request waits for a person to approve it in SignPath.
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signed
+      - name: Take the signed programs
+        if: env.SIGNS == 'true'
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force dist/Driftbox
+          Move-Item dist/signed dist/Driftbox
+
+      - name: Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Installer
+        run: node scripts/windows-installer.mjs --packaged
+      - name: Upload the installer to sign
+        id: installer
+        if: env.SIGNS == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Driftbox-setup-unsigned
+          path: dist/Driftbox-${{ env.DRIFTBOX_VERSION }}-setup-x64.exe
+      - name: Sign the installer
+        if: env.SIGNS == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'driftbox-native' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.installer.outputs.artifact-id }}
+          parameters: |
+            version: ${{ toJSON(env.DRIFTBOX_VERSION) }}
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signed-setup
+      - name: Take the signed installer
+        if: env.SIGNS == 'true'
+        shell: pwsh
+        run: Move-Item -Force "dist/signed-setup/Driftbox-$env:DRIFTBOX_VERSION-setup-x64.exe" dist/
+
+      # The zip of the folder, made again now its programs are what was signed.
+      - name: Zip
+        shell: pwsh
+        run: |
+          Remove-Item -Force -ErrorAction SilentlyContinue dist/Driftbox-windows-x64.zip
+          & "$env:SystemRoot\System32\tar.exe" -a -c -f dist/Driftbox-windows-x64.zip -C dist Driftbox
+      - name: The files
+        uses: actions/upload-artifact@v7
+        with:
+          name: Driftbox-${{ env.DRIFTBOX_VERSION }}-windows
+          path: |
+            dist/Driftbox-${{ env.DRIFTBOX_VERSION }}-setup-x64.exe
+            dist/Driftbox-windows-x64.zip
+      - name: Draft the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $signed = if ($env:SIGNS -eq 'true') { 'Signed through SignPath.' } else { 'Not signed yet: Windows will say so before it runs.' }
+          gh release create $env:GITHUB_REF_NAME --draft --title "Driftbox $env:DRIFTBOX_VERSION" `
+            --notes "Driftbox $env:DRIFTBOX_VERSION for Windows 10 and 11, 64-bit. $signed" `
+            "dist/Driftbox-$env:DRIFTBOX_VERSION-setup-x64.exe" dist/Driftbox-windows-x64.zip

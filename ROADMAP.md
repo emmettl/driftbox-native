@@ -206,9 +206,16 @@ gone native at all.
    the scene can be chosen at last, from View ▸ Scene or by cycling through them, where before
    the app only ever showed the one the song named.
 
-   Left: the 303's step entry from the keyboard; automation recording, which `Session` now does —
-   `turn` and `endTurn`, and `recordsAutomation` armed, as the Windows app's AUTO arms it — for the
-   Mac's knobs to use; and more
+   Automation recording on the Mac's knobs, as on Windows and Android: every knob of the face and
+   the tempo and swing are turned through `Session.turn` (`FaceKnob` says what each one turns, in
+   the lanes an app's automation moves too), heard as they turn, and one step of undo let go of;
+   Transport ▸ Record Automation, or the header's `● auto`, arms it, and Clear Automation empties
+   it. And the 303's step entry from the keyboard, as the reference's keys have it: `Session` keeps
+   its cursor (`entryStep`) and writes a note, a rest or a tie there in the 303 whose knobs are
+   showing, only while stopped, each one step of undo; on the Mac it is switched on from the 303's
+   panel, which moves its cursor too, and drawn on the line's grid, and the typing keys write into
+   it — Shift accents, Delete rests, Return ties. The keys play the 303 whose knobs are showing
+   now, not always 303 A. Left: more
    than one song open at once, which is deliberately not done. It is not a scene change: the
    player owns the audio engine, the MIDI ports and the clock, and two of them would be two
    engines fighting over one output and two sources both called Driftbox Clock. The honest
@@ -350,8 +357,18 @@ parity point.
 
 ## Help and tutorials
 
-Not yet: worth doing once the app is complete enough that the help would not be rewritten with
-every milestone. Then, everything the web app teaches with, and what a Mac does better:
+Begun, now that the app is complete enough that the help would not be rewritten with every
+milestone. Each module's guide first: the reference's export carries the guides written for
+sixteen modules into `modules.json`, and `RackGuide` assembles every module's as the reference's
+`ModuleGuide` does — what it does, its signal flow, how it works and what to try first where a
+guide was written, every control and its range, and what to watch for — in words any platform
+lays out. On the Mac it is Guide, first in a module's menu, as a sheet over the rack. Then the
+groovebox's guide: `DriftboxHelp` holds help as words any platform lays out — topics of parts,
+each paragraphs, terms, steps or keys — and `GrooveboxHelp` the reference's guide topic for topic,
+saying what each platform's own controls do and leaving out what only the web has. On the Mac it
+is Help ▸ Groovebox Guide (⌘?), a window of its own beside the editor. Left: the drawn apps'
+module guides and help, on Windows and Android; and the rest of what the web app teaches with,
+and what a Mac does better:
 
 - **The reference's teaching, ported:** its help dialog, the first-run offer of a tour, the guided
   tour and tutorial coach that walk a patch being built, and each module's guide. The words carry
@@ -525,13 +542,14 @@ each step stand on the last. The README's "Platforms" says how it is divided.
      kept its tubes' far walls), and `GPUDepth.test` for three's `depthWrite={false}`, which
      Convoy's dust and Machine's sparks use. Both are in the contract tests.
 
-   Left:
-   - A Core Text typesetter for the Mac, so that Graphic Lab sets its type there too. Graphic Lab is
-     on the layer now, printed on `DriftboxCanvas` with DirectWrite's type on Windows and Android's
-     own on Android. Only glyphs are a platform's; the canvas is drawn on the layer, where the
-     Windows app's interface will draw too.
-   - `--window` on the Mac showing the song's scene rather than Pulse, and the Metal `Scene`
-     gone at the end.
+   Graphic Lab sets its type on the Mac too, through `CoreTextTypesetter` (`DriftboxTextMac`), held
+   by `TypesetterTests` to what DirectWrite and Android's are; so every scene on the layer is held
+   to its Metal scene frame by frame, Graphic Lab included, as eight-pixel squares see it, since the
+   canvas puts a glyph on a whole pixel down where Core Graphics puts it anywhere. `--window` on
+   the Mac shows the song's scene, with Core Text's type, rather than Pulse.
+
+   Left: the Mac app onto the layer — its visuals, its movie export and the visuals window drawn by
+   `GPUScenes` on the Metal backend — and the Metal `Scene` gone with it.
 4. **The window, drawn.** ← *here.* The shell first: `DriftboxShell` says what the app asks of a
    window in platform-neutral terms — pointers, keys and scrolling as events in points, a menu bar
    as data with shortcuts on the platform's own modifier, file panels, a loop that keeps drawing
@@ -564,7 +582,29 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    The settings are the Mac's Settings window as menus, remembered under the Mac's keys: the
    Audio menu's device — one chosen and unplugged named, and what plays until it is back — the
    MIDI menu's listening, sources and clock, and View's Run the Visuals, the scene stopped behind
-   the controls and running still while they are away.
+   the controls and running still while they are away. The File menu exports the song as the
+   Mac's does: the mix as one WAV, and a WAV for each voice it uses, in a folder chosen in the
+   shell's own panel; and movies, as the Mac's does, the song from the top and a performance as it
+   was played, written as H.264 and AAC through Media Foundation while the app carries on. The
+   performance played again and drawn frame by frame is `DriftboxMovie`'s, on the GPU layer, for any
+   platform to write; the Mac's `MovieExport` does the same through AVFoundation and Metal, and can
+   move onto it. The visuals have a window of their own, as the Mac's do, for a projector: sent
+   from the View menu to a display by the name its monitor gives, full screen there as Windows'
+   players are, the pointer hidden when still and the display kept awake, and put back where it
+   was at the next launch. One scene draws it, and the backdrop shows the same frame cropped.
+   File ▸ Open Recent lists the ten songs opened or saved lately, however they came, and tells
+   Windows of each, for the taskbar's jump list.
+   Screen readers, begun: the shell's `AccessibilityNode` is what is on screen as a tree of roles,
+   names, values and places, which the interface builds for the groovebox and `CAccessibility`
+   hands to UI Automation as a provider, asked on UI Automation's threads and telling screen readers
+   of changes from a thread of its own, so the window's is never held; what a screen reader asks
+   comes back as the window's events and is done as a hand does it. Held to Windows' own UI
+   Automation client from a process of its own, as a screen reader is, and to the real app read and
+   played that way. The rack is described as well: the header, every module's controls as its
+   face names them, and the cables on its back as words. And while a screen reader runs, the
+   keyboard moves between the controls — Tab, Enter, the arrows — with UI Automation told where it
+   is. Next: patching the back and a Combinator's routings from a screen reader, and trying it all
+   with Narrator and NVDA themselves.
    The rack comes by way of `DriftboxRackSession`, which holds what the Mac's `RackModel` did —
    the patch, its edits and undo, the keys, controllers, samples, song and transport — on every
    platform, with the Mac's audio, plug-ins and file reading behind ports: `AudioRouting`,
@@ -614,16 +654,32 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    one and loaded to be asked where not; a `plugin` or `plugin-instrument` module that names one
    plays it, stereo, from the rack's notes — the mod wheel, sustain and pitch bend reaching the
    params the plug-in takes them on — with its macros turning its params and its state kept in the
-   patch. All of it compiles on Windows alone for now. Next: the plug-ins installed in the Add
-   menu, their faces, and their own editors in windows of their own; and a module that crashes
-   while it is scanned takes the app with it, so scanning out of process, later.
+   patch. The rack's Add menu lists them, found while the rack is first shown: effects and
+   instruments apart, each by who made it, one chosen added with its module in one step of undo.
+   A plug-in module's face is the Mac's: the plug-in and who made it, how late it is or why it is
+   silent, another of its kind chosen from its menu, and its four macros mapped from theirs, each
+   named for its param and reading its value in the plug-in's own words; an instrument's lights
+   the notes it is playing on two octaves of keys. Open shows the plug-in's own editor in a window
+   of its own, in front of the app's: sized to it, resized when it asks or by hand where it may be,
+   scaled with its monitor, and following the macros; the app's shortcuts stay in the app's
+   window. A macro learns the next param a hand moves there, and closing it keeps the plug-in's
+   state in the patch. A module that does not describe itself is asked what it holds by
+   `DriftboxVST3Scan`, in a process of its own with thirty seconds to answer, so one that crashes
+   as it loads, or hangs, holds nothing rather than taking the app with it; what each held is
+   remembered, by its binary's size and time, until it changes. All of it compiles on Windows
+   alone for now.
 5. **Shipping.** Begun. The program has its icon, drawn from the web app's and linked in as a
    resource; it opens a song it is handed, and `--register` makes `.driftbox` files open in it for
    the current user. `scripts/windows-package.mjs` makes a folder that runs without Swift
    installed: the program, its resource bundle, and the runtime DLLs it loads, found from their
    import tables. `scripts/windows-installer.mjs` makes an installer of it with Inno Setup: for the
    person installing unless they choose everyone, a Start menu entry, `.driftbox` made Driftbox's
-   if they want, and all of it taken away on uninstalling. Left: signing, and winget. Songs are already
+   if they want, and all of it taken away on uninstalling. Releases are the release workflow's: a
+   tag builds the programs, the installer and a zip on GitHub's runners and drafts a release with
+   them, signed through the SignPath Foundation, free for open source, once the repository is
+   public and SignPath has taken the project on; both programs and the installer carry the version
+   and product name signing checks. Left: SignPath's approval, which needs a first release, and
+   winget, which needs a signed one. Songs are already
    `.driftbox` — the web app's documents byte for byte, under a name
    Windows can associate without claiming every `.json`. `SongFile` in `DriftboxDocument` holds
    the rule for every platform: saved as `.driftbox`; `.song.json` and the web's `.json` still
@@ -649,10 +705,18 @@ each question, and the rest is Android's alone:
    up at all. Paced like a device, the big core costs 67%, but only because its core goes idle
    between calls; with the cluster kept busy, the paced cost is 17.7%. (This said the governor's
    clock at first. Step 2 found the clock makes no difference.) Making the engine and loading a
-   song there takes about four seconds before the first render, which an app switching songs
-   would feel; where that goes is not yet looked at. The rack's load is not measured yet.
+   song took about four seconds before the first render then; now, timed step by step in the
+   app, the song reaches the render thread 0.18 to 0.2s after Swift starts: the engine made in
+   98ms, the session in 45, the song decoded and compiled in 38 to 54, which is all a song
+   switched to costs. The rack, made after, takes 100ms more, and Android says the screen is up
+   470ms after the app was started. `driftbox-play --bench` spends about a quarter of a second of
+   its own time before it renders. The rack's load, live beside the groovebox: every catalogue
+   patch running with a note held, the groovebox playing, each source timed in the mixer, costs
+   the phone 4 to 30% of the audio's time, One Finger and First Light the most; with the
+   groovebox's, 58 to 67%, the slowest callback of both 2.6ms, and never an underrun. A rack
+   nobody had opened cost 10%, rendering silence, until it was made asleep until first shown.
 2. **Audio and MIDI behind the ports.** ← *here.* Audio is done. `DriftboxHostAndroid` answers
-   `AudioRouting` with AAudio: low-latency, exclusive, a buffer that starts at three bursts and grows
+   `AudioRouting` with AAudio: low-latency, exclusive, a buffer that starts at two bursts and grows
    a burst at a time on underruns, and a stream that asks to be replaced when its device goes.
    `Mixer` moved into `DriftboxHost` for it, so Windows and Android sum their sources the same
    way, tested everywhere. `scripts/android-play.sh` plays a song through the phone. The render
@@ -661,10 +725,13 @@ each question, and the rest is Android's alone:
    without one, 4.8ms from render to speaker. It also reports to a performance hint session.
    That was meant to hold the clock up, and it does when its target is tight. But the render
    costs 60% of each 2ms burst at any clock, against 15 to 18% when the other big cores are busy:
-   what a callback pays for is its core waking cold. There is room in that, but less than the
-   bench promised, and the rack and the scenes will want some of it. Left: one device until the
-   app can list them from Java's `AudioManager`, and a stream lost to a device going is handled
-   but not yet seen to be, for want of anything to unplug.
+   what a callback pays for is the rest of its cluster idling, not its clock and not its waking:
+   callbacks four bursts long, a quarter as many, cost the same 53 to 57%, each four times as
+   long, so fewer, longer callbacks save nothing. There is room in that, but less than the
+   bench promised, and the rack and the scenes will want some of it. The devices are listed from
+   Java's `AudioManager` and chosen from the song's menu, and a choice moves the stream: chosen
+   on the Fairphone, its speaker is AAudio's device 3, exclusive as before. Left: a stream lost to
+   a device going is handled but not yet seen to be, for want of anything to unplug.
    Then MIDI, heard. `AMidiInput` and `AMidiOutput` answer the MIDI ports with Android's native
    MIDI, which needs Android 10, so the build moved from API 28 to 29. Input is a thread asking
    each port in turn, framed by `MIDIByteStream` in `DriftboxHost`, which is tested everywhere,
@@ -717,7 +784,8 @@ each question, and the rest is Android's alone:
    heads the strip, and a tap on it is the song's menu — Open…, Save, Save As… and the catalogue's
    songs — with Android's own pickers; a document is read and written whole by Java, and known to
    the session by its URI, so Save goes back to where it came from, and Android asks before
-   unsaved edits are lost. The build leaves out Foundation's internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
+   unsaved edits are lost. What the desktops keep in their preferences, it keeps in a file of its
+   own, `FileMemory`: the song open last, its settings, the output, and the rack's patch. The build leaves out Foundation's internationalisation, which is 30MB of ICU data per ABI that nothing here uses:
    `DriftboxDocument` takes Foundation only to write a WAV. The Play Store, or F-Droid, when
    Driftbox is public.
 
@@ -781,13 +849,24 @@ keys on a phone, and as many as fit on a tablet; a finger a note, so a hand play
 key to key, and a key struck lower down struck harder; the octave moved from their row, and the
 keys put away, or shown from a chip in the rack's corner. They show of themselves for a patch with
 a MIDI module to play. A module that holds recordings — a Slice Lab's sample, a Key Atlas's set, an
-Audio Track's take — asks for them with Android's own picker, one or several, offering WAV files,
-which is what the rack reads there; Java copies what is chosen into the app's files, and Swift
-loads it. That found the main actor's own work never running on Android: its queue is
+Audio Track's take — asks for them with Android's own picker, one or several, offering any audio;
+Java copies what is chosen into the app's files, and Swift loads it: WAV with the rack's own
+reader, as everywhere, and anything else — MP3, AAC, FLAC, Ogg — with the NDK's media extractor
+and codecs, as the Mac reads through Core Audio. The phone's rack check holds them to it: a WAV
+read through the codecs is the WAV reader's sample for sample, and two tones the phone's own
+encoder makes AAC of come back at their pitch. That found the main actor's own work never running on Android: its queue is
 libdispatch's main queue, which nothing on Java's main thread drained, so a `Task` on it — a sample
 loading — waited for ever. Its file descriptor is given to the main thread's looper now, which
-drains it between Java's own messages. Left: the Combinator's routing, which is 300 points beside
-the rack; compressed recordings, through Android's own media codecs; and a tablet, seen.
+drains it between Java's own messages. The Combinator's routing, 300 points beside the rack on a
+desktop, is a sheet across the foot of a phone, over where the keys were, the rack above it; its
+pickers and buttons are 32 points tall, and a route's MIN and MAX are dragged up and down across
+the target's range, as a knob is, rather than typed. A tablet keeps it beside the rack. A face
+waiting for recordings asks a finger to tap it — "Tap to choose a sample" — where a desktop's asks
+for them to be dropped. Seen on a tablet — the check emulator given a 10-inch tablet's screen,
+upright and on its side — the rack is drawn no larger than a desktop draws it, 1.35 times the
+reference, centred, where fitted to the width it had been a poster of a module or two; a knob is
+still a finger's size there, and a finger zooms past it. A chip in the header or over the keys,
+28 points tall, takes a finger anywhere up and down its strip. The rack by touch is done.
 
 ### What Milestone 5 asks of Milestone 4
 

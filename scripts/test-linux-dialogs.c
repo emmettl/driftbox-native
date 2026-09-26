@@ -164,6 +164,24 @@ static void accepted_files_and_folder(void) {
     g_assert_cmpint(unlink(path),==,0); g_assert_cmpint(rmdir(directory),==,0);
     g_free(uri); g_object_unref(file); g_object_unref(folder); g_free(path); g_free(directory);
 }
+static void folder_selection(void) {
+    db_desktop *w=fixture(); FileResult result={0};
+    char *directory=g_dir_make_tmp("driftbox-folder-XXXXXX",NULL);
+    GFile *folder=g_file_new_for_path(directory); char *uri=g_file_get_uri(folder);
+    db_desktop_folder(w,"Export Stems","Export Here",&result,file_received);
+    GtkFileChooser *chooser=GTK_FILE_CHOOSER(w->dialog);
+    g_assert_cmpint(gtk_file_chooser_get_action(chooser),==,GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+    g_assert_true(gtk_file_chooser_set_file(chooser,folder,NULL));
+    wait_for_file(chooser,folder,FALSE);
+    g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_ACCEPT);
+    g_assert_cmpint(result.calls,==,1); g_assert_cmpstr(result.uris,==,uri); empty(w);
+    g_free(result.uris); result=(FileResult){0};
+    db_desktop_folder(w,"Export Stems","Export Here",&result,file_received);
+    g_signal_emit_by_name(w->dialog,"response",GTK_RESPONSE_CANCEL);
+    g_assert_cmpint(result.calls,==,1); g_assert_cmpint(result.answer,==,0); empty(w);
+    g_free(result.uris); db_desktop_free(w);
+    g_assert_cmpint(rmdir(directory),==,0); g_free(directory); g_free(uri); g_object_unref(folder);
+}
 int main(int argc,char **argv) {
     g_test_init(&argc,&argv,NULL);
     // A minimal CI container may lack a session bus; critical GTK errors still fail.
@@ -176,5 +194,6 @@ int main(int argc,char **argv) {
     g_test_add_func("/dialogs/menu-to-question",menu_to_question);
     g_test_add_func("/dialogs/teardown-cancels",teardown_cancels);
     g_test_add_func("/dialogs/accepted-files-and-folder",accepted_files_and_folder);
+    g_test_add_func("/dialogs/folder-selection",folder_selection);
     return g_test_run();
 }

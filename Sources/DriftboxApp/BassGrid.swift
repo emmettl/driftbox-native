@@ -17,6 +17,8 @@
     var metrics = GridMetrics(steps: 16, width: 0)
     let playhead: Int
     var selected = false
+    /// Where step entry writes next, when it writes into this line.
+    var entry: Int?
 
     static let notes = Array((0...24).reversed())
     static let noteHeight = 7.0
@@ -104,6 +106,15 @@
         context.fill(Path(roundedRect: column, cornerRadius: 3), with: .color(Theme.live.opacity(0.09)))
         context.stroke(
           Path(roundedRect: column, cornerRadius: 3), with: .color(Theme.live.opacity(0.3)), lineWidth: 1)
+      }
+      if let entry, entry < pattern.length {
+        // Step entry's cursor: the column the next note typed goes into, notes and flags both.
+        // Inside the canvas, which clips anything past its edges.
+        let column = CGRect(x: x(ofStep: entry), y: 0, width: cell, height: Self.height)
+          .insetBy(dx: 0.75, dy: 0.75)
+        context.fill(Path(roundedRect: column, cornerRadius: 3), with: .color(Theme.three.opacity(0.14)))
+        context.stroke(
+          Path(roundedRect: column, cornerRadius: 3), with: .color(Theme.three.opacity(0.9)), lineWidth: 1.5)
       }
       var lit: [(CGRect, Bool)] = []
       for index in 0..<pattern.length {

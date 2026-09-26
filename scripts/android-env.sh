@@ -41,11 +41,15 @@ elif [ "$(uname)" = Darwin ]; then
   android_sdk="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 else
   host=linux exe= bat=
+  # Where `swift sdk install` puts them, which depends on SwiftPM's version: under ~/.swiftpm, or
+  # under the XDG configuration directory.
   swift_sdks="$HOME/.swiftpm/swift-sdks"
+  [ -d "$swift_sdks" ] || swift_sdks="${XDG_CONFIG_HOME:-$HOME/.config}/swiftpm/swift-sdks"
   android_sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
 fi
 
 bundle="${DRIFTBOX_ANDROID_SWIFT_SDK:-$(newest "$swift_sdks"/swift-*_android.artifactbundle/swift-android)}"
+[ -n "$bundle" ] || { echo "not found: swift.org's Swift SDK for Android, in $swift_sdks" >&2; exit 1; }
 # The toolchain the SDK was made for: its version is in the bundle's name.
 release="$(basename "$(dirname "$bundle")" | sed 's/_android.artifactbundle$//')"
 case $host in
@@ -55,6 +59,8 @@ case $host in
 esac
 ndk="${ANDROID_NDK_HOME:-$(newest "$android_sdk"/ndk/*)}"
 adb="${ADB:-$(command -v adb || echo "$android_sdk/platform-tools/adb$exe")}"
+[ -n "$swiftc" ] || { echo "not found: swiftc, on the PATH" >&2; exit 1; }
+[ -n "$ndk" ] || { echo "not found: the Android NDK, under $android_sdk/ndk" >&2; exit 1; }
 for need in "$swiftc" "$bundle" "$ndk"; do
   [ -e "$need" ] || { echo "not found: $need" >&2; exit 1; }
 done
@@ -117,8 +123,8 @@ echo "using $("$swiftc" --version 2>&1 | head -1), $(basename "$(dirname "$bundl
 
 # Everything below the app and the player, in the order they depend on each other.
 core="DriftboxDSP DriftboxSeq DriftboxEngine DriftboxRack DriftboxDocument DriftboxHost DriftboxHostAndroid"
-# Sources/CAAudio, CAMidi and CGLES are where the NDK module maps are found.
-common="-target $target -resource-dir $resources/swift-aarch64 -sdk $sdk -I Sources/CAAudio -I Sources/CAMidi -I Sources/CGLES -I Sources/CLooper"
+# Sources/CAAudio, CAMidi, CGLES, CLooper and CMedia are where the NDK module maps are found.
+common="-target $target -resource-dir $resources/swift-aarch64 -sdk $sdk -I Sources/CAAudio -I Sources/CAMidi -I Sources/CGLES -I Sources/CLooper -I Sources/CMedia"
 # `import Foundation` is the old Foundation on Android, over FoundationEssentials, and a module that
 # imports it links it and its internationalisation: 48MB, most of it ICU's data. Nothing here uses
 # either — what Driftbox takes from Foundation is FoundationEssentials' — but a library linked is a
@@ -161,14 +167,18 @@ link() {
   for module in $core; do objects="$objects $out/$module.o"; done
   rm -f "$product"
   # shellcheck disable=SC2086
+  # With LLVM's own linker, which the toolchain and the NDK both have: left to choose, Linux's
+  # swiftc takes the system's ld.gold, which cannot link for Android.
   "$swiftc" -target $target -sdk "$sdk" -resource-dir "$resources/swift_static-aarch64" -static-stdlib \
-    -L "$(newest "$llvm"/lib/clang/*/lib/linux/aarch64)" $runtime \
+    -use-ld=lld -L "$(newest "$llvm"/lib/clang/*/lib/linux/aarch64)" $runtime \
     $objects "$@" -lswiftSynchronization -lswiftDispatch -ldispatch -lBlocksRuntime -lswift_RegexParser \
     -lCoreFoundation -l_FoundationCollections -l_FoundationCShims -l_FoundationICU \
     -o "$product"
   # A shared library links with symbols it cannot find, and the phone only refuses it when it
-  # loads: so a use of the old Foundation is looked for here instead.
-  old="$("$llvm/bin/llvm-nm$exe" -D -u "$product" | grep -E '\$s10Foundation|\$s31FoundationInternationalization' || true)"
+  # loads: so a use of the old Foundation is looked for here instead. Anywhere in the name, which
+  # is where its extensions of the standard library's types put it: `$sSy10FoundationE…` is
+  # StringProtocol's localizedCaseInsensitiveCompare.
+  old="$("$llvm/bin/llvm-nm$exe" -D -u "$product" | grep -E '\$s.*(10Foundation|31FoundationInternationalization)' || true)"
   if [ -n "$old" ]; then
     echo "$old" >&2
     echo "$(basename "$product") uses the old Foundation, which is not linked" >&2

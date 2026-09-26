@@ -317,7 +317,7 @@ static void file_response(GtkNativeDialog *dialog,int response,gpointer context)
 void db_desktop_files(db_desktop *w,int save,int multiple,const char *extensions,const char *name,void *context,db_reply callback) {
     if (w->reply) { callback(context,0,""); return; }
     w->reply=callback; w->reply_context=context;
-    GtkFileChooserNative *dialog=gtk_file_chooser_native_new(save?"Save song":"Open file",GTK_WINDOW(w->window),
+    GtkFileChooserNative *dialog=gtk_file_chooser_native_new(save?"Save file":"Open file",GTK_WINDOW(w->window),
         save?GTK_FILE_CHOOSER_ACTION_SAVE:GTK_FILE_CHOOSER_ACTION_OPEN,save?"Save":"Open","Cancel");
     w->dialog=G_OBJECT(dialog);
     gtk_native_dialog_set_modal(GTK_NATIVE_DIALOG(dialog),TRUE);
@@ -328,6 +328,16 @@ void db_desktop_files(db_desktop *w,int save,int multiple,const char *extensions
     char **parts=g_strsplit(extensions,";",-1);
     for (int i=0;parts[i];i++) { char *pattern=g_strconcat("*.",parts[i],NULL); gtk_file_filter_add_pattern(filter,pattern); g_free(pattern); }
     g_strfreev(parts); gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog),filter); g_object_unref(filter);
+    g_signal_connect(dialog,"response",G_CALLBACK(file_response),w); gtk_native_dialog_show(GTK_NATIVE_DIALOG(dialog));
+}
+void db_desktop_folder(db_desktop *w,const char *title,const char *button,void *context,db_reply callback) {
+    if (w->reply) { callback(context,0,""); return; }
+    w->reply=callback; w->reply_context=context;
+    GtkFileChooserNative *dialog=gtk_file_chooser_native_new(title,GTK_WINDOW(w->window),
+        GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,button,"Cancel");
+    w->dialog=G_OBJECT(dialog);
+    gtk_native_dialog_set_modal(GTK_NATIVE_DIALOG(dialog),TRUE);
+    if (w->folder) gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog),w->folder,NULL);
     g_signal_connect(dialog,"response",G_CALLBACK(file_response),w); gtk_native_dialog_show(GTK_NATIVE_DIALOG(dialog));
 }
 static void question_response(GtkDialog *dialog,int response,gpointer context) {

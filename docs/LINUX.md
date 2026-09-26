@@ -48,11 +48,10 @@ A small experiment must prove actor isolation and background-to-main completion 
 
 ### Allow toolkit-owned graphics contexts
 
-`GLESDevice` creates an EGL display/context and offscreen pbuffer. Linux requests only pbuffer
-support so Mesa's surfaceless configurations work; Android also requests window support. `GLESSurface` is
-Android-only and assumes framebuffer zero for the window. GTK's GLArea supplies its own current
-context and framebuffer. Add an explicit context/surface ownership boundary if GTK is retained;
-keep the existing headless EGL path for tests. Verify orientation, alpha, resize, context loss,
+`GLESDevice` creates an EGL display/context and offscreen pbuffer. It first requests window and
+pbuffer support, then falls back to pbuffer-only for Mesa's surfaceless configurations. `GLESSurface`
+is Android-only and assumes framebuffer zero for the window. GTK's GLArea supplies its own current
+context and framebuffer through the borrowed-context path; the headless EGL path remains for tests. Verify orientation, alpha, resize, context loss,
 resource lifetime, frame pacing and fractional display scale. No new shader language is needed.
 
 ### Make document interactions asynchronous
@@ -68,9 +67,10 @@ qualification. Validate desktop file portals for the eventual distribution packa
 
 `KeyEvent` currently serves both shortcuts/instrument keys and text. Add committed text and
 composition where editing needs them, and focus-loss handling that releases held notes and
-pointer gestures. Retain point-based input and explicit pixel scale. Accessibility for the
-canvas controls needs its own semantic adapter; a GTK window alone does not make those controls
-accessible. Identify the intended first-release accessibility scope explicitly.
+pointer gestures. Retain point-based input and explicit pixel scale. Main now supplies shared
+semantic descriptions, actions and focus navigation for canvas controls.
+GTK still needs an adapter that exposes those controls to Linux assistive technology; a GTK window
+alone does not make the canvas accessible. Identify the first-release accessibility scope explicitly.
 
 ### Keep audio and MIDI adaptation local
 
@@ -740,6 +740,48 @@ mutation, pending-dialog command gating and targets following patch changes. Exi
 `thaw_updates`/transient-parent diagnostics still appear during the rapid dialog smoke; they are
 not resolved by this change. Remote CI and Windows/macOS builds of this follow-up have not run.
 Guest logs: `~/driftbox-audio-menu-{tests,build,package,smoke}.log`.
+
+### Keeping the Linux branch current
+
+The 2026-09-26 integration merges `origin/main` at `ea78956` (69 upstream commits since the
+previous common base). Preserve the shared desktop's accessibility actions and focus, exports,
+recent files, plug-in faces and visuals-window lifecycle alongside Linux's deferred dialogs.
+The EGL chooser now uses main's window-plus-pbuffer selection with a pbuffer-only fallback;
+the GTK borrowed-context path remains intact.
+
+New mix, stem and movie export requests use completion-based choosers, with a native GTK folder
+chooser for stems. Recent-file opening waits for the unsaved-document question, and Linux keeps
+case-distinct paths separate. The Linux launcher supplies the desktop's persistent file memory.
+Movie export and performance recording are disabled on Linux until a movie writer is implemented.
+Shared accessibility semantics still need a GTK assistive-technology adapter; separate visuals
+windows still need a GTK window/surface implementation. Neither is claimed as completed by the merge.
+
+Validation: the default Linux shared suite succeeds (583 reported tests, with generated-reference
+fixtures and opt-in live audio/MIDI checks skipped). All 36 desktop tests pass after adding the
+deferred export, unsaved-recent and case-sensitive-path regressions. All eight GTK bridge checks,
+nine Linux packaging checks and strict project-wide Swift formatting pass. On the Mac host,
+`scripts/check-constrained.sh` passes both Embedded Swift compilation and the release build's
+allocation checks; the release-script checks pass (11 desktop, seven Android). Windows builds
+and remote CI have not run for this merge.
+
+The final Linux release package is `dist/linux-main-sync/Driftbox-0.1.0-preview-arm64-cd0c0d896c8d`
+in the guest checkout, with 15 runtime libraries, 67 verified manifest hashes and a 29.7 MiB archive.
+Its Xvfb smoke passes: 286 GUI frames and all five deferred dialog types cancelled exactly once.
+This is a silent graphics/lifecycle check, not physical audio qualification. The existing desktop
+installation remains the previously qualified bundle; this package has not been registered over it.
+
+Adding the folder chooser to the immediate show/destroy stress case exposed a GTK 4.14.5 crash
+on X11 too: an asynchronous file-model callback faults inside GTK/GIO after the chooser is gone.
+The extended `scripts/linux-dialog-probe.c` reproduces it without Swift, Driftbox or GLES. The app
+smoke now runs GTK's main loop for 250 ms per chooser before closing its parent and testing disposal;
+normal presentation/disposal passes, but this does not fix or qualify the immediate teardown race.
+Retain the standalone stress probe and retest with a newer GTK before release. Logs in the guest:
+`~/driftbox-main-sync-{tests,desktop,build,dialogs,package,smoke,smoke-gdb,gtk-only}.log`.
+
+Before each Linux implementation milestone, fetch `origin/main`, inspect the divergence, and merge
+new shared changes into `codex/linux-port`. Check new shell requests for synchronous assumptions,
+platform-only capabilities and resource ownership, then run the affected tests in Ubuntu. Keep
+integration commits explicit so Linux adaptation work can be reviewed separately from upstream.
 
 ### Local access
 

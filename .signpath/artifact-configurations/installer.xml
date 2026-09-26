@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Driftbox for Windows' installer, as the release workflow uploads it once the programs in it are
+     signed: held to the product's name and this release's version. SignPath keeps its own copy of
+     this, entered in the project's artifact configuration "installer"; this one is what that copy
+     should say. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" />
+  </parameters>
+  <zip-file>
+    <pe-file path="Driftbox-${version}-setup-x64.exe" product-name="Driftbox" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

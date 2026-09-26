@@ -42,7 +42,7 @@
 
       // SPIRV-Cross names an attribute at location n `TEXCOORDn`, whatever it was called.
       var elements: [D3D11_INPUT_ELEMENT_DESC] = []
-      let semantic = strdup("TEXCOORD")
+      let semantic = _strdup("TEXCOORD")
       defer { free(semantic) }
       for (slot, layout) in descriptor.vertexBuffers.enumerated() {
         for attribute in layout.attributes

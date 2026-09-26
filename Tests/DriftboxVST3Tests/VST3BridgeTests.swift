@@ -2,6 +2,7 @@
   import CVST3
   import Foundation
   import Testing
+  import WinSDK
 
   /// The bridge to VST 3 plug-ins, held to the test plug-in the package builds beside the tests,
   /// laid out as an installed plug-in is: found, made, played, set, and kept.
@@ -226,6 +227,62 @@
       #expect(abs((bent.map(abs).max() ?? 0) - 8192.0 / 16383) < 0.01)
       let off = Self.render(plugin, 5, events: [Self.midi(0, 0xB0, 123, 0)])
       #expect(off.allSatisfy { $0 == 0 })
+    }
+
+    /// What a plug-in and its editor said: the params it set, and how often a person closed it.
+    final class Heard {
+      var ids: [Int64] = []
+      var closes = 0
+
+      static let listener: DBVST3Listener = { context, id in
+        Unmanaged<Heard>.fromOpaque(context!).takeUnretainedValue().ids.append(id)
+      }
+      static let closed: DBVST3EditorClosed = { context in
+        Unmanaged<Heard>.fromOpaque(context!).takeUnretainedValue().closes += 1
+      }
+    }
+
+    /// A window's inside, as its width and height.
+    static func client(_ window: HWND) -> (Int32, Int32) {
+      var rect = RECT()
+      GetClientRect(window, &rect)
+      return (rect.right, rect.bottom)
+    }
+
+    /// Its own editor, in a window of its own at the view's size: a hand moving the gain there
+    /// reaches the processor and whoever listens; a view that asks for more room gets it; asked
+    /// again, it is the same window; closed by a person, whoever asked is told, and by the host,
+    /// nobody. A plug-in with no editor opens none.
+    @Test func itsEditorOpens() throws {
+      let plugin = try Self.open(Self.gainID)
+      defer { dbvst3_close(plugin) }
+      let heard = Heard()
+      let context = Unmanaged.passUnretained(heard).toOpaque()
+      dbvst3_listen(plugin, Heard.listener, context)
+      #expect(dbvst3_editor_open(plugin, "Test", nil, false, Heard.closed, context))
+      let window = try #require(dbvst3_editor_window(plugin)?.assumingMemoryBound(to: HWND__.self))
+      #expect(Self.client(window) == (200, 100))
+      let view: HWND? = GetWindow(window, UINT(GW_CHILD))
+      #expect(view != nil, "the view's own window, inside")
+
+      SendMessageW(view, UINT(WM_USER + 1), 0, 0)
+      #expect(heard.ids == [0])
+      #expect(dbvst3_get_parameter(plugin, 0) == 0.3)
+      #expect(abs(Self.process(plugin, 1)[0][0] - 0.3) < 1e-6)
+      #expect(SendMessageW(view, UINT(WM_USER + 2), 0, 0) == 0, "kResultOk")
+      #expect(Self.client(window) == (300, 150))
+
+      #expect(dbvst3_editor_open(plugin, "Test", nil, false, Heard.closed, context))
+      #expect(dbvst3_editor_window(plugin) == UnsafeMutableRawPointer(window))
+      SendMessageW(window, UINT(WM_CLOSE), 0, 0)
+      #expect(heard.closes == 1 && dbvst3_editor_window(plugin) == nil)
+      #expect(dbvst3_editor_open(plugin, "Test", nil, false, Heard.closed, context))
+      dbvst3_editor_close(plugin)
+      #expect(heard.closes == 1 && dbvst3_editor_window(plugin) == nil)
+
+      let synth = try Self.open(Self.synthID)
+      defer { dbvst3_close(synth) }
+      #expect(!dbvst3_editor_open(synth, "Test", nil, false, nil, nil))
     }
 
     /// One that is not in the module, or not a plug-in at all, is not made, and says why.

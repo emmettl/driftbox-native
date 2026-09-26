@@ -274,6 +274,14 @@
       let filename = type.extensions.first.map { name.hasSuffix(".\($0)") ? name : "\(name).\($0)" } ?? name
       files([type], save: true, multiple: false, name: filename) { completion($0.first) }
     }
+    public func chooseFolder(title: String, button: String, completion: @escaping (URL?) -> Void) {
+      guard let handle else {
+        completion(nil)
+        return
+      }
+      let reply = Reply { answer, value in completion(answer == 0 ? nil : Self.localFiles(value).first) }
+      db_desktop_folder(handle, title, button, Unmanaged.passRetained(reply).toOpaque(), replyGTK)
+    }
     public func askToSave(_ name: String, completion: @escaping (SaveAnswer) -> Void) {
       guard let handle else {
         completion(.cancel)
