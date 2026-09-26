@@ -82,7 +82,8 @@ public final class Main extends Activity {
       test(run);
     } else {
       String song = getIntent().getStringExtra("song");
-      play(song == null ? "acid" : song, getIntent().getStringExtra("scene"));
+      // None named: the one open last, which Swift remembers, or acid.
+      play(song, getIntent().getStringExtra("scene"));
     }
   }
 
@@ -168,13 +169,13 @@ public final class Main extends Activity {
       return;
     }
     if (!Native.start(song, scene, getResources().getDisplayMetrics().density, resources.getPath())) {
-      Log.e(TAG, "no song called " + song + " in the catalogue");
+      Log.e(TAG, song == null ? "no song to play" : "no song called " + song + " in the catalogue");
       finish();
       return;
     }
     playing = true;
     current = this;
-    Log.i(TAG, "playing " + song);
+    Log.i(TAG, song == null ? "playing the song open last" : "playing " + song);
     // Started now, while the app is in view, which is the only time Android allows it.
     startForegroundService(new Intent(this, Playback.class).putExtra("song", song));
     if (Build.VERSION.SDK_INT >= 33
