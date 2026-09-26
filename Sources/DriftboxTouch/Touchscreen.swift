@@ -165,6 +165,9 @@ public final class Touchscreen {
     // The rack lets go of a song it had linked here, as when another patch is opened in it.
     rack.onUnlinkSong = { [weak session] in session?.unlinkRack() }
     self.rack = shown
+    // The MIDI that arrives is the rack's while it shows, and the groovebox's otherwise.
+    session.midiListener = rack
+    rack.inFront = showsRack
   }
 
   /// The rack's song opened in the groovebox, linked, and the groovebox shown in the rack's place:
@@ -183,7 +186,7 @@ public final class Touchscreen {
   }
 
   /// The rack in the groovebox's place, or back. Whatever a finger was doing on the one leaving is
-  /// let go of, and the pad lifted.
+  /// let go of, and the pad lifted. The one showing is played by a MIDI keyboard.
   public func show(rack showing: Bool) {
     guard showing != showsRack, rack != nil || !showing else { return }
     if let finger = padFinger {
@@ -192,6 +195,7 @@ public final class Touchscreen {
     otherFingers = []
     resting = nil
     showsRack = showing
+    rack?.rack.inFront = showing
     // Heard from the first time it is seen, if it was made asleep; and after, whichever shows.
     if showing { rack?.rack.wake() }
   }

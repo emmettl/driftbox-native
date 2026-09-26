@@ -368,7 +368,7 @@ let package = Package(
       name: "DriftboxTouchTests",
       dependencies: [
         "DriftboxGPU", "DriftboxHost", "DriftboxInterface", "DriftboxRack", "DriftboxRackSession",
-        "DriftboxSession", "DriftboxShell", "DriftboxText", "DriftboxTouch",
+        "DriftboxSeq", "DriftboxSession", "DriftboxShell", "DriftboxText", "DriftboxTouch",
         .target(name: "DriftboxGPUD3D11", condition: .when(platforms: [.windows])),
         .target(name: "DriftboxGPUMetal", condition: .when(platforms: [.macOS, .iOS])),
         .target(name: "DriftboxGPUGLES", condition: .when(platforms: [.linux])),
