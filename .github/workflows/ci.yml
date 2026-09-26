@@ -65,7 +65,7 @@ jobs:
         run: swift format lint --strict -r Sources Tests Package.swift
       # The release scripts' checks, which sign, upload and publish nothing.
       - name: Release scripts
-        run: python3 scripts/test-release.py && python3 scripts/test-android-release.py && python3 scripts/test-linux-package.py
+        run: python3 scripts/test-release.py && python3 scripts/test-android-release.py && python3 scripts/test-linux-package.py && python3 scripts/test-linux-deb.py
       - name: Linux document dialog bridge
         run: scripts/test-linux-dialogs.sh
       - name: Linux GPU diagnostics

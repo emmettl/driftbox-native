@@ -6,7 +6,13 @@ universal Linux binary. Ubuntu 24.04 ARM64 is the first tested environment. GTK 
 Mesa/EGL/GLES, PipeWire, ALSA and their system dependencies must be installed. The manifest lists
 resolved system library names. No Swift compiler is needed to run it.
 
-On Ubuntu 24.04, install the runtime and registration dependencies with:
+CI also produces an architecture-specific `.deb` beside this archive. For that package,
+use `sudo apt install ./driftbox-linux-preview_VERSION_ARCH.deb`; APT installs dependencies
+and registers the system app-menu entry. Remove any previous per-user archive registration
+with its `install.py --uninstall` first, since per-user entries override system entries.
+The `.deb` includes its own instructions in `/usr/share/doc/driftbox-linux-preview/README.md`.
+
+For this **archive**, install the runtime and registration dependencies on Ubuntu 24.04 with:
 
 ```sh
 sudo apt-get install libgtk-4-1 libegl1 libgles2 libegl-mesa0 libgl1-mesa-dri \

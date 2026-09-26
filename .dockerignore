@@ -12,6 +12,7 @@
 !windows/Driftbox.ico
 !scripts/
 !scripts/linux-package.py
+!scripts/linux-deb.py
 !scripts/version.env
 !scripts/test-linux-runtime.py
 **/__pycache__/**

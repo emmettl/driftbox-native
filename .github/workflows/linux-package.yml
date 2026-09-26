@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
-      - name: Build release archive and test in a clean runtime
+      - name: Build archive and deb, then test clean runtimes
         run: scripts/linux-package-ci.sh
       # Only upload after the runtime check succeeds. This does not publish a release.
       - uses: actions/upload-artifact@v7
@@ -37,6 +37,7 @@ jobs:
           name: driftbox-linux-ubuntu24.04-${{ matrix.arch }}
           path: |
             dist/linux-ci/*.tar.gz
+            dist/linux-ci/*.deb
             dist/linux-ci/*.sha256
           if-no-files-found: error
           retention-days: 14

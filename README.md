@@ -967,5 +967,7 @@ Inside a Linux checkout, `scripts/linux-build.sh` provides build, test, render, 
 
 `scripts/linux-package.py` packages a release desktop build with its Swift runtime and resources.
 The extracted [Linux preview](linux/README.md) runs without a compiler and supports per-user app-menu
-registration. ARM64 Ubuntu is qualified as a development preview; other distributions, x86-64,
-physical audio/MIDI hardware and the remaining desktop interactions still need validation.
+registration. CI also builds Ubuntu 24.04 ARM64 and x86-64 [`.deb` packages](linux/packaging/README-deb.md)
+with APT dependencies and system app-menu registration; both formats are tested in clean runtime
+containers. This remains a preview: other distributions, physical audio/MIDI hardware and the
+remaining desktop interactions still need qualification.

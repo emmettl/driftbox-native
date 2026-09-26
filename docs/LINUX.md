@@ -997,3 +997,47 @@ The new test retains the failure case rather than adding a delay to hide it. Inv
 `~/driftbox-gtk-bookworm-repro.log` and `~/driftbox-gtk-bookworm-fixed.log` (the latter records the
 rejected partial workaround). Existing native Wayland menus and already-loading chooser
 limitations still apply.
+
+
+### Ubuntu .deb packaging
+
+`scripts/linux-deb.py` builds `driftbox-linux-preview` from the verified archive bundle on a
+native Ubuntu 24.04 builder. CI emits `amd64` and `arm64` packages plus SHA-256 sidecars, alongside
+the archive. Install with `sudo apt install ./driftbox-linux-preview_VERSION_ARCH.deb`; complete
+user instructions are in `linux/packaging/README-deb.md` and installed under `/usr/share/doc`.
+
+The payload lives at `/usr/lib/driftbox-linux-preview`, with a forwarding command in `/usr/bin`.
+It retains the bundle manifest and all private Swift libraries. `dpkg-shlibdeps` scans the
+executable and every bundled library, failing on missing public-library metadata; runtime data,
+Mesa, XWayland and a GTK 4.14 minimum are explicit dependencies. Dependency generation follows
+[dpkg-shlibdeps](https://manpages.debian.org/bookworm/dpkg-dev/dpkg-shlibdeps.1.en.html). Existing
+Ubuntu file triggers update the desktop/MIME/icon databases. There are no package maintainer
+scripts, services, global library-path changes, or root operations on user homes.
+
+The preview version is `VERSION~preview.BUILD+gitEPOCH.COMMIT`, with `.dirty` for modified input.
+`SOURCE_DATE_EPOCH` is the source commit timestamp; the shared build number and timestamp order
+preview upgrades, and a release of the same version sorts after its previews. Revisions created
+within the same second sort by their commit suffix; explicit local package installation remains
+available. This is a development package, not a signed repository or automatic updater.
+
+Both archive and system package use the same desktop application ID. A previously registered
+archive's per-user entry takes precedence; its owner must run that archive's user uninstaller
+before switching. The package deliberately leaves per-user handlers/defaults, songs and
+preferences alone. Its desktop entry uses X11/XWayland while native Wayland menus remain
+unqualified. Command-line users can still choose GTK's normal display selection.
+
+`linux/packaging/DebRuntime.Dockerfile` starts separately from Ubuntu with test tools but no GTK
+or Swift. It downloads dependencies without installing them. The runtime test then runs with
+networking disabled and verifies APT dependency installation, launch as a non-root user,
+manifest/library integrity, registration triggers, upgrade from a lower-version test fixture,
+removal of an obsolete owned file, remove/purge, and preservation of user data and overrides.
+The lower-version fixture is constructed only inside the disposable test container and is
+never uploaded. Real hardware audio/MIDI qualification remains a separate milestone.
+
+Local ARM64 qualification passed through `scripts/linux-package-ci.sh`, covering both archive
+and `.deb` runtime containers. All six focused `.deb` tests also pass in the VM (five run on
+macOS; the dpkg ordering test runs on Linux). Evidence is in
+`~/driftbox-deb-qualification-2.log`. The test image explicitly retains this package's docs,
+which Ubuntu's minimized container normally filters out; this allows dpkg payload verification
+and the obsolete-document upgrade regression. No package code disables that system policy.
+The branch includes main through `40f1981` before this packaging milestone.
