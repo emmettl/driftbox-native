@@ -570,7 +570,10 @@ each step stand on the last. The README's "Platforms" says how it is divided.
    was played, written as H.264 and AAC through Media Foundation while the app carries on. The
    performance played again and drawn frame by frame is `DriftboxMovie`'s, on the GPU layer, for any
    platform to write; the Mac's `MovieExport` does the same through AVFoundation and Metal, and can
-   move onto it.
+   move onto it. The visuals have a window of their own, as the Mac's do, for a projector: sent
+   from the View menu to a display by the name its monitor gives, full screen there as Windows'
+   players are, the pointer hidden when still and the display kept awake, and put back where it
+   was at the next launch. One scene draws it, and the backdrop shows the same frame cropped.
    The rack comes by way of `DriftboxRackSession`, which holds what the Mac's `RackModel` did —
    the patch, its edits and undo, the keys, controllers, samples, song and transport — on every
    platform, with the Mac's audio, plug-ins and file reading behind ports: `AudioRouting`,

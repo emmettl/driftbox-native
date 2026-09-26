@@ -61,14 +61,30 @@ public final class Desktop {
   var movieStopped = false
   /// The size and rates movies are written in; smaller in a test.
   public var movieFormat = MovieFormat()
+  /// The visuals window, while it is open, and what draws into it.
+  var visuals: (any ShellVisualsWindow)?
+  var visualsSurface: (any GPUSurface)?
+  var visualsFrame: (any GPUTarget)?
+  var visualsResized: (width: Int, height: Int)?
+  /// What makes the visuals window's surface: the platform's GPU on it. Nil, and no visuals window,
+  /// where there is none.
+  let makeVisualsSurface: ((any ShellVisualsWindow) throws -> any GPUSurface)?
+  /// The displays there were when last asked, and when.
+  var displays: [String] = []
+  var displaysAsked = -Double.infinity
+  /// Where what is worth keeping between launches is kept — where the visuals window was — or
+  /// nil for a desktop that keeps nothing, as a test's.
+  public var memory: UserDefaults?
   /// What writes a movie's file: the platform's, unless a test says otherwise.
   var makeMovieWriter: @MainActor (URL, MovieFormat) throws -> any MovieWriter = Desktop.movieWriter
 
   public init(
     session: Session, window: any ShellWindow, device: any GPUDevice, surface: any GPUSurface,
-    typesetter: any Typesetter, rack: RackSession? = nil
+    typesetter: any Typesetter, rack: RackSession? = nil,
+    visualsSurface: ((any ShellVisualsWindow) throws -> any GPUSurface)? = nil
   ) throws {
     self.session = session
+    makeVisualsSurface = visualsSurface
     self.rack = rack
     rackInterface = rack.map(RackInterface.init)
     // The rack lets go of a song it had linked here, as when another patch is opened in it.
@@ -99,6 +115,8 @@ public final class Desktop {
     try window.run { try drawFrame() }
     session.close()
     rack?.close()
+    // Quitting with the visuals window open leaves it remembered as open.
+    dropVisuals()
   }
 
   // MARK: - A frame
@@ -118,17 +136,25 @@ public final class Desktop {
     }
     showScene()
     let time = HostTime.seconds(from: began, to: HostTime.now())
+    // The visuals window, if one is open, draws the scene at its own shape; the backdrop shows its
+    // frame, cropped to fill.
+    let shown = try drawVisuals(time: time)
+    var backdrop = frame
     // The rack covers the window while it shows: the scene waits. Behind the controls it runs if
     // the visuals are to run, and while the controls are away always: performing is what it is for.
     if !showsRack {
       if session.showsVisuals || !interface.isShowing {
-        scene.draw(session.sceneInput(time: time, pixelRatio: window.scale), into: frame, on: device)
+        if let shown {
+          backdrop = shown
+        } else {
+          scene.draw(session.sceneInput(time: time, pixelRatio: window.scale), into: frame, on: device)
+        }
       } else {
         device.render(into: frame, clear: .colour(Self.ground)) { _ in }
       }
     }
     let target = try surface.target()
-    presenter.present(frame, into: target, on: device)
+    presenter.present(backdrop, into: target, on: device, filling: backdrop !== frame)
     try drawInterface(into: target)
     try surface.present()
   }
@@ -173,7 +199,8 @@ public final class Desktop {
     if let activity { title = "\(activity) - \(title)" }
     if window.title != title { window.title = title }
     window.menuBar = DesktopMenus.bar(
-      for: session, rack: rack, showsRack: showsRack, writingMovie: movieProgress != nil)
+      for: session, rack: rack, showsRack: showsRack, writingMovie: movieProgress != nil,
+      displays: makeVisualsSurface == nil ? [] : displaysNow, visualsWindow: makeVisualsSurface != nil)
   }
 
   /// As Windows' own programs title a document's window: its name, marked while it has changes
@@ -268,6 +295,7 @@ public final class Desktop {
     case DesktopMenus.undo: if showsRack, let rack { rack.undo() } else { session.undo() }
     case DesktopMenus.redo: if showsRack, let rack { rack.redo() } else { session.redo() }
     case DesktopMenus.toggle: if showsRack, let rack { rack.toggleRunning() } else { session.toggle() }
+    case DesktopMenus.visualsWindow: if visualsOpen { closeVisuals() } else { showVisuals() }
     case DesktopMenus.showRack: setShowsRack(!showsRack)
     case DesktopMenus.rackSongFromGroovebox:
       guard let song = session.song else { return }
@@ -315,6 +343,8 @@ public final class Desktop {
       session.open(entry)
     } else if let sceneID = DesktopMenus.value(id, after: DesktopMenus.scenePrefix) {
       chosenScene = sceneID
+    } else if let display = DesktopMenus.value(id, after: DesktopMenus.visualsOnPrefix) {
+      showVisuals(on: display, fullScreen: true)
     } else if let device = DesktopMenus.value(id, after: DesktopMenus.outputPrefix) {
       session.outputDevice = device
     } else if let source = DesktopMenus.value(id, after: DesktopMenus.inputPrefix) {
@@ -367,12 +397,16 @@ public final class Desktop {
     case DesktopMenus.rackBack: return rack?.flipped == true
     case DesktopMenus.systemOutput: return session.outputDevice == nil
     case DesktopMenus.visuals: return session.showsVisuals
+    case DesktopMenus.visualsWindow: return visualsOpen
     case DesktopMenus.listen: return session.listensToMIDI
     case DesktopMenus.followClock: return session.followsClock
     case DesktopMenus.sendClock: return session.sendsClock
     default: break
     }
     if let scene = DesktopMenus.value(id, after: DesktopMenus.scenePrefix) { return chosenScene == scene }
+    if let display = DesktopMenus.value(id, after: DesktopMenus.visualsOnPrefix) {
+      return visuals?.isFullScreen == true && visuals?.display == display
+    }
     if let device = DesktopMenus.value(id, after: DesktopMenus.outputPrefix) {
       return session.outputDevice == device
     }

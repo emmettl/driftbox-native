@@ -95,6 +95,40 @@ struct ShellTests {
       #expect(String(decoding: filter, as: UTF16.self) == expected)
     }
 
+    /// The displays attached are named, each once, the main one first.
+    @Test func theDisplaysAreNamed() {
+      let displays = Win32Displays.all()
+      #expect(!displays.isEmpty)
+      #expect(displays.first?.isMain == true)
+      #expect(Set(displays.map(\.name)).count == displays.count, "\(displays.map(\.name))")
+      #expect(displays.allSatisfy { !$0.name.isEmpty && $0.bounds.right > $0.bounds.left })
+    }
+
+    /// A visuals window, never shown: full screen, it covers the whole of the display it was sent
+    /// to, frame and all; out of it, it has its frame again; each is somewhere to remember; and
+    /// closed by the app, it says nothing of being closed.
+    @Test func theVisualsGoFullScreenOnADisplay() throws {
+      let visuals = try Win32VisualsWindow(visible: false)
+      var heard: [VisualsEvent] = []
+      visuals.onEvent = { heard.append($0) }
+      let display = try #require(Win32Displays.all().first)
+      visuals.show(on: display.name, fullScreen: true)
+      #expect(visuals.isFullScreen && visuals.display == display.name)
+      var frame = RECT()
+      GetWindowRect(visuals.handle, &frame)
+      #expect(
+        frame.left == display.bounds.left && frame.top == display.bounds.top
+          && frame.right == display.bounds.right && frame.bottom == display.bounds.bottom)
+      #expect(GetWindowLongPtrW(visuals.handle, GWL_STYLE) & LONG_PTR(WS_CAPTION) == 0, "no frame")
+      #expect(heard.contains(.moved))
+
+      visuals.setFullScreen(false)
+      #expect(!visuals.isFullScreen)
+      #expect(GetWindowLongPtrW(visuals.handle, GWL_STYLE) & LONG_PTR(WS_CAPTION) != 0, "its frame again")
+      visuals.close()
+      #expect(!visuals.isOpen && !heard.contains(.closed))
+    }
+
     /// What a thread closing a panel found: whether it was the one titled as asked.
     final class Closed: @unchecked Sendable {
       var byTitle = false

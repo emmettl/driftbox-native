@@ -71,7 +71,15 @@
           sampleRate: route.sampleRate, audio: route,
           plugins: VST3Hosting(
             memory: UserDefaults.standard, owner: { UnsafeMutableRawPointer(window.handle) }),
-          memory: UserDefaults.standard))
+          memory: UserDefaults.standard),
+        // The visuals in a window of their own, drawn by the same GPU.
+        visualsSurface: { visuals in
+          guard let visuals = visuals as? Win32VisualsWindow else { throw Win32Error("not a Windows window") }
+          return try device.makeSurface(window: visuals.handle, width: visuals.width, height: visuals.height)
+        })
+      desktop.memory = UserDefaults.standard
+      // The visuals window back where it was, if it was open when the app last quit.
+      desktop.restoreVisuals()
       try desktop.run()
     }
 

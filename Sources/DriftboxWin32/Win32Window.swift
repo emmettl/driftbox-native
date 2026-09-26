@@ -193,6 +193,10 @@
 
     public func reveal(_ url: URL) { Win32Files.reveal(url) }
 
+    public var displays: [String] { Win32Displays.all().map(\.name) }
+
+    public func makeVisualsWindow() -> (any ShellVisualsWindow)? { try? Win32VisualsWindow() }
+
     /// In Windows' own message box, with the window's title as its caption.
     public func tell(_ message: String) {
       _ = message.withCString(encodedAs: UTF16.self) { text in

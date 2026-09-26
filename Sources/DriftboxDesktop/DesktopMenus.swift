@@ -47,6 +47,9 @@ public enum DesktopMenus {
   public static let noOutputs = "midi.noOutputs"
   /// Whether the scene runs behind the controls; it always does while they are away.
   public static let visuals = "view.visuals"
+  /// The visuals in a window of their own; and that window full screen on a display, by its name.
+  public static let visualsWindow = "view.visualsWindow"
+  public static let visualsOnPrefix = "visualsOn."
   /// What the Audio menu says of where the sound is going, which is not a choice.
   public static let audioNote = "audio.note"
 
@@ -69,8 +72,17 @@ public enum DesktopMenus {
   /// shows. While a movie is being written, the File menu stops it.
   @MainActor
   public static func bar(
-    for session: Session, rack: RackSession? = nil, showsRack: Bool = false, writingMovie: Bool = false
+    for session: Session, rack: RackSession? = nil, showsRack: Bool = false, writingMovie: Bool = false,
+    displays: [String] = [], visualsWindow: Bool = false
   ) -> MenuBar {
+    // The visuals in a window of their own, where the platform has a second window, and that window
+    // full screen on each display there is.
+    let visualsItems: [MenuItem] =
+      visualsWindow
+      ? [
+        .command("Visuals Window", id: DesktopMenus.visualsWindow, shortcut: Shortcut("2")),
+        .submenu(Menu("Visuals Full Screen On", displays.map { .command($0, id: visualsOnPrefix + $0) })),
+      ] : []
     let undoTitle = showsRack ? rack?.undoTitle ?? "Undo" : session.undoTitle
     let redoTitle = showsRack ? rack?.redoTitle ?? "Redo" : session.redoTitle
     return MenuBar(
@@ -128,6 +140,7 @@ public enum DesktopMenus {
               : .command("Show Controls", id: controls, shortcut: Shortcut(.tab, [])),
             .separator,
             .command("Run the Visuals", id: visuals),
+          ] + visualsItems + [
             .separator,
             .command("Next Scene", id: nextScene, shortcut: Shortcut(.right)),
             .command("Previous Scene", id: previousScene, shortcut: Shortcut(.left)),
