@@ -153,7 +153,9 @@ let package = Package(
     // Where it sounds, which plug-ins it can host and which files it can read are the platform's ports.
     .target(
       name: "DriftboxRackSession",
-      dependencies: ["DriftboxDocument", "DriftboxEngine", "DriftboxHost", "DriftboxRack", "DriftboxSeq"],
+      dependencies: [
+        "DriftboxDocument", "DriftboxEngine", "DriftboxHelp", "DriftboxHost", "DriftboxRack", "DriftboxSeq",
+      ],
       resources: [
         .copy("Resources/Patches"), .copy("Resources/patches.json"), .copy("Resources/modules.json"),
       ]),
@@ -163,7 +165,7 @@ let package = Package(
     .target(
       name: "DriftboxInterface",
       dependencies: [
-        "DriftboxCanvas", "DriftboxEngine", "DriftboxRack", "DriftboxRackSession",
+        "DriftboxCanvas", "DriftboxEngine", "DriftboxHelp", "DriftboxRack", "DriftboxRackSession",
         "DriftboxSeq", "DriftboxSession", "DriftboxShell", "DriftboxText",
       ]),
 
@@ -301,8 +303,9 @@ let package = Package(
         "DriftboxInterface", "DriftboxRack", "DriftboxRackSession", "DriftboxCanvas", "DriftboxEngine",
         "DriftboxGPU", "DriftboxHost", "DriftboxSeq",
         "DriftboxSession", "DriftboxShell", "DriftboxText", "DriftboxGPUD3D11", "DriftboxGPUMetal",
-        "DriftboxGPUGLES",
+        "DriftboxGPUGLES", "DriftboxHelp",
         .target(name: "DriftboxTextWindows", condition: .when(platforms: [.windows])),
+        .target(name: "DriftboxTextMac", condition: .when(platforms: [.macOS])),
       ]),
     .testTarget(
       name: "DriftboxTouchTests",

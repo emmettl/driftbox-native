@@ -183,7 +183,7 @@ struct RackInterfaceTests {
     let menu = try #require(face.menu(at: at))
     #expect(
       menu.commands.map(\.id) == [
-        "module.up", "module.down", "module.bypass", "module.duplicate", "module.remove",
+        "module.guide", "module.up", "module.down", "module.bypass", "module.duplicate", "module.remove",
       ])
     face.choose("module.bypass")
     #expect(face.rack.patch.modules[1].bypassed)

@@ -1,3 +1,4 @@
+import DriftboxHelp
 import DriftboxRack
 
 /// A module's guide, as the reference's `ModuleGuide` assembles it: what it does, where its signal
@@ -89,5 +90,31 @@ public struct RackGuide: Equatable, Sendable {
   static func number(_ value: Double) -> String {
     if value.rounded() == value, abs(value) < 1e21 { return String(Int64(value)) }
     return "\(value)"
+  }
+}
+
+extension RackGuide {
+  /// The guide as help's parts, for a platform that lays out all its help one way: the signal flow
+  /// as two terms, and the rest as it is.
+  public var help: [HelpPart] {
+    parts.map { part in
+      switch part.body {
+      case .prose(let text):
+        return HelpPart(part.heading, .prose([text]))
+      case .flow(let ins, let outs, let noIns, let noOuts):
+        return HelpPart(
+          part.heading,
+          .terms([
+            HelpTerm("In", ins.isEmpty ? noIns : ins.joined(separator: ", ")),
+            HelpTerm("Out", outs.isEmpty ? noOuts : outs.joined(separator: ", ")),
+          ]))
+      case .definitions(let terms):
+        return HelpPart(part.heading, .terms(terms.map { HelpTerm($0.term, $0.meaning) }))
+      case .steps(let steps):
+        return HelpPart(part.heading, .steps(steps.map { HelpStep("", $0) }))
+      case .notes(let notes):
+        return HelpPart(part.heading, .notes(notes))
+      }
+    }
   }
 }
