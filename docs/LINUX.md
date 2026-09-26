@@ -418,10 +418,17 @@ All four route tests passed on Ubuntu ARM64 with strict actor checks; the origin
 integration tests also passed after the bridge change. The C bridge passes `-Wall -Wextra -Werror`,
 and the release desktop builds. The updated Xvfb/llvmpipe live capture drew 349 GUI frames and
 rendered 279,552 audio frames; its recording contained 277,504 finite stereo frames at 48 kHz,
-with channel peaks of 0.69902 and 0.70040. Interactive checking of the updated Audio menu remains
-pending because GNOME was locked. The earlier preview process has not been replaced yet.
+with channel peaks of 0.69902 and 0.70040. After unlocking GNOME, the older preview was closed
+and replaced with this release build in the real Wayland session. Play/stop responded, and
+`pw-dump` confirmed both stereo links active to Built-in Audio Analog Stereo. The preview was
+left running with playback stopped. Interactive output selection remains unverified: automated
+UTM input could focus menu labels and open File, but subsequent navigation dismissed popovers.
+This observation does not establish whether the cause is input automation or GTK focus handling.
+The remaining manual check is Audio → Built-in Audio Analog Stereo, verify its checkmark, then
+Audio → System Output and verify that checkmark returns.
 Logs: `~/driftbox-audio-private-tests.log`, `~/driftbox-audio-route-release.log`,
-`~/driftbox-audio-route-capture.log` and `~/driftbox-audio-route-tests.log`.
+`~/driftbox-audio-route-capture.log`, `~/driftbox-audio-route-tests.log` and
+`~/driftbox-audio-route-preview.log`.
 
 These are ARM64 VM tests using virtual sinks. Physical USB/Bluetooth hotplug, hardware rate/profile
 changes, suspend/resume and latency/glitch measurements remain release qualification work. Sink
