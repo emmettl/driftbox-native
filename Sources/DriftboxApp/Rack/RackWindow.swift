@@ -88,7 +88,7 @@
         case .down:
           let note = RackKeyboard.root + semitone + octave * 12
           held[character] = note
-          model.noteDown(note)
+          model.keyDown(note)
         case .up:
           if let note = held.removeValue(forKey: character) { model.noteUp(note) }
         default:
