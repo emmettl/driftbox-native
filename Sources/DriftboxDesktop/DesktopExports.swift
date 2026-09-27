@@ -19,7 +19,7 @@ extension Desktop {
         exporting = Task.detached { [weak self] in
           let audio = SongRenderer.render(song, options: .init(sampleRate: sampleRate))
           do {
-            try WAV.data(audio, sampleRate: sampleRate).write(to: url, options: .atomic)
+            try await ExportFile.write(WAV.data(audio, sampleRate: sampleRate), to: url)
           } catch {
             await self?.reportAudioExportFailure(
               "Could not export \(url.lastPathComponent): \(FailureMessage.describe(error))")
@@ -46,7 +46,7 @@ extension Desktop {
             let audio = SongRenderer.render(song, options: options)
             let file = folder.appendingPathComponent("\(name) - \(voiceId).wav")
             do {
-              try WAV.data(audio, sampleRate: sampleRate).write(to: file, options: .atomic)
+              try await ExportFile.write(WAV.data(audio, sampleRate: sampleRate), to: file)
               written += 1
             } catch {
               let partial =
