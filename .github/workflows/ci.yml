@@ -66,6 +66,8 @@ jobs:
       # The release scripts' checks, which sign, upload and publish nothing.
       - name: Release scripts
         run: python3 scripts/test-release.py && python3 scripts/test-android-release.py && python3 scripts/test-linux-package.py && python3 scripts/test-linux-deb.py
+      - name: Test summary script
+        run: python3 scripts/test-summarise-tests.py
       - name: Linux document dialog bridge
         run: scripts/test-linux-dialogs.sh
       - name: Linux GPU diagnostics
@@ -78,11 +80,17 @@ jobs:
         run: scripts/check-constrained.sh
 
       - name: Test
-        run: swift test
+        id: test
+        run: swift test --xunit-output .build/tests.xml
         # Strict actor isolation, as an app runs with: a closure made on the main actor and called
         # from an audio or MIDI thread traps here, rather than only in the app.
         env:
           SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE: swift6
+      # What passed and what failed, and why, in the run's summary, so a red check says why without
+      # opening its log. Whenever the tests ran, passing or not.
+      - name: Summarise the tests
+        if: always() && steps.test.outcome != 'skipped'
+        run: python3 scripts/summarise-tests.py --title "Linux tests" .build/tests.xml
 
   linux-gtk:
     name: Linux GTK lifetime
@@ -235,10 +243,14 @@ jobs:
       - name: Build
         run: swift build -c release --build-tests --build-system native -Xswiftc -enable-testing
       - name: Test
-        run: swift test -c release --skip-build --build-system native --skip MIDISchedulerTests
+        id: test
+        run: swift test -c release --skip-build --build-system native --skip MIDISchedulerTests --xunit-output .build/tests.xml
       # The MIDI scheduler is held to a few milliseconds, and alongside the rest of the suite —
       # Direct3D on the software rasteriser, the DSP — a runner's few cores are busy enough that the
       # whole process is sometimes not scheduled for 40ms or more, at any thread priority. So it runs
       # on its own, afterwards, where the only thing it can be late for is itself.
       - name: Test the MIDI scheduler on its own
-        run: swift test -c release --skip-build --build-system native --filter MIDISchedulerTests
+        run: swift test -c release --skip-build --build-system native --filter MIDISchedulerTests --xunit-output .build/midi.xml
+      - name: Summarise the tests
+        if: always() && steps.test.outcome != 'skipped'
+        run: python scripts/summarise-tests.py --title "Windows tests" .build/tests.xml .build/midi.xml
