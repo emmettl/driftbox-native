@@ -20,7 +20,7 @@ public final class RackInterface {
   /// The window's size in points.
   public var size: SIMD2<Float> = .zero
   public private(set) var scroll: Float = 0
-  public private(set) var hover: SIMD2<Float>?
+  public internal(set) var hover: SIMD2<Float>?
   /// A press the rack has, and what it was pressed on.
   public private(set) var pressed: (pointer: Int, target: RackTarget?)?
   /// A knob or the tempo being dragged: from where, what it was and is, in its own units.
@@ -347,6 +347,8 @@ public final class RackInterface {
       if !guide.isOpen { self.guide = nil }
       return
     }
+    // A tour's panel over the rack takes the presses on it.
+    if tourPointer(event) { return }
     if touch, event.kind != .mouse {
       finger(event)
     } else {
@@ -694,6 +696,17 @@ public final class RackInterface {
   /// The guide open over the rack, if one is.
   public internal(set) var guide: HelpSheet?
 
+  /// The guided tours, in the platform's words; none, and none is offered.
+  public var tours: [RackTour] = []
+  /// The tour's panel folded to its head.
+  public internal(set) var tourFolded = false
+  /// The tour being ended before its steps were, by its id: the choice of patch it ends on.
+  var tourEnding: String?
+  /// A press on the tour's panel, and the button it went down on.
+  var tourPress: (pointer: Int, button: TourButton?)?
+  /// The panel as last laid out, and for what (see `tourPanel`).
+  var tourLaid: (key: String, measured: Bool, panel: TourPanel)?
+
   /// `type`'s guide, over the rack, as the Mac's opens from a module's menu.
   public func showGuide(_ type: String) {
     guard let written = RackGuide.guide(for: type) else { return }
@@ -787,7 +800,7 @@ public final class RackInterface {
     menuActions = [:]
     menuDisabled = []
     menuChecked = []
-    guard guide == nil, let face = stage.face(at: point) else { return nil }
+    guard guide == nil, !onTourPanel(point), let face = stage.face(at: point) else { return nil }
     let id = face.module.id
     let index = rack.patch.modules.firstIndex { $0.id == id } ?? 0
     return Menu(
@@ -851,6 +864,18 @@ public final class RackInterface {
           self?.guide = sheet
         },
       ]
+    }
+    if !tours.isEmpty {
+      let finished = rack.finishedTours
+      items.append(
+        .submenu(
+          Menu(
+            "Rack Tours",
+            tours.map { tour in
+              item(tour.name, "tour." + tour.id, checked: finished.contains(tour.id)) { [weak self] in
+                self?.take(tour)
+              }
+            })))
     }
     return Menu(rack.name, items)
   }
@@ -970,6 +995,8 @@ public final class RackInterface {
       )
     }
     if let keys = stage.keyboard { drawKeys(keys, on: canvas) }
+    drawTourSpot(stage, on: canvas)
+    drawTour(stage, on: canvas)
     if let guide {
       guide.size = size
       guide.draw(on: canvas)
@@ -1028,8 +1055,17 @@ public final class RackInterface {
     canvas.restore()
     for chip in stage.chips {
       let down = pressed?.target == chip.target && hover.map(chip.frame.contains) == true
+      // The patch's name, on a touchscreen, cut to its chip rather than spilling out of it.
+      let label =
+        chip.target == .patches
+        ? Self.fitted(
+          chip.label, Theme.mono(11), width: chip.frame.width - 16,
+          measure: { text, font in
+            canvas.font = font
+            return canvas.measure(text)
+          }) : chip.label
       Draw.chip(
-        chip.frame, label: chip.label, isOn: chip.isOn, hovered: hover.map(chip.frame.contains) ?? false,
+        chip.frame, label: label, isOn: chip.isOn, hovered: hover.map(chip.frame.contains) ?? false,
         down: down, on: canvas)
     }
     // The tempo, as a number dragged.

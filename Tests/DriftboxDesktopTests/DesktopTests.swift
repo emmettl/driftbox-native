@@ -561,6 +561,28 @@ struct DesktopTests {
     #expect(desktop.help == nil)
   }
 
+  /// Help ▸ Rack Tours: every tour, in Windows' words; one chosen shows the rack and takes it, with
+  /// any guide over the window put away.
+  @Test func aTourIsTakenFromTheHelpMenu() throws {
+    let device = try #require(try Self.devices().first)
+    let window = StandInWindow()
+    let surface = StandInSurface(device: device, width: 320, height: 180)
+    let desktop = try Desktop(
+      session: Session(host: EngineHost(sampleRate: 48000)), window: window, device: device, surface: surface,
+      typesetter: NoTypesetter(), rack: RackSession())
+    desktop.session.open(Self.song(), named: "Groove")
+    let tours = (window.menuBar?.commands ?? []).filter { $0.id.hasPrefix(DesktopMenus.tourPrefix) }
+    #expect(tours.map(\.title).first == "A sound of your own" && tours.count == 5)
+
+    window.choose(DesktopMenus.grooveboxGuide)
+    window.choose(DesktopMenus.tourPrefix + "first-sound")
+    #expect(desktop.help == nil)
+    #expect(desktop.showsRack)
+    let run = try #require(desktop.rack?.tourRun)
+    #expect(run.tour.steps.map(\.title)[2] == "Press Tab to turn the rack round.")
+    #expect(window.isChecked?(DesktopMenus.tourPrefix + "first-sound") == false)
+  }
+
   /// Transport ▸ Clear Loop: whatever is looping, one section or several stretched across, which
   /// Loop This Section would only replace; and nothing to clear while nothing loops.
   @Test func aLoopIsCleared() throws {

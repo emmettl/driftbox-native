@@ -101,6 +101,8 @@ extension RackInterface {
     children.append(
       AccessibilityNode(
         id: "header", role: .group, name: "Rack", frame: frame(stage.header), children: header))
+    // A guided tour's panel, over the rack.
+    if let tour = tourNode(stage, handlers: &handlers) { children.append(tour) }
 
     if rack.flipped {
       children.append(back(stage, placed: placed, handlers: &handlers))
