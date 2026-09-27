@@ -66,11 +66,56 @@ struct DesktopAudioFailureTests {
     let first = directory.appendingPathComponent("Stems - \(voices[0]).wav")
     #expect(try Data(contentsOf: first).prefix(4) == Data("RIFF".utf8))
     #expect(try Data(contentsOf: marker) == Data("keep".utf8))
+    let left = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+    #expect(!left.contains { $0.hasSuffix(".partial") }, "nothing half-written is left behind")
     #expect(
       !FileManager.default.fileExists(
         atPath:
           directory.appendingPathComponent("Stems - \(voices[2]).wav").path))
     #expect(desktop.session.song == song)
+  }
+
+  /// An export over one already there replaces it whole, and leaves nothing else beside it.
+  @Test func anExportReplacesTheFileThere() async throws {
+    let directory = try Self.directory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("Mix.wav")
+    try await ExportFile.write(Data("first".utf8), to: url)
+    try await ExportFile.write(Data("second".utf8), to: url)
+    #expect(try Data(contentsOf: url) == Data("second".utf8))
+    #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["Mix.wav"])
+  }
+
+  /// A file something else holds for a moment, as a virus scanner holds one just written, is waited
+  /// for; one that stays held, or fails another way, fails once the waiting is done.
+  @Test func aMomentaryFailureIsWaitedOut() async throws {
+    struct Held: Error {}
+    struct Broken: Error {}
+    let pauses: [Duration] = [.zero, .zero]
+    let held: (any Error) -> Bool = { $0 is Held }
+    var tries = 0
+    let result = try await ExportFile.retrying(pauses, while: held) {
+      tries += 1
+      if tries < 3 { throw Held() }
+      return tries
+    }
+    #expect(result == 3)
+    tries = 0
+    await #expect(throws: Held.self) {
+      try await ExportFile.retrying(pauses, while: held) { () throws -> Void in
+        tries += 1
+        throw Held()
+      }
+    }
+    #expect(tries == 3, "tried once, then after each pause")
+    tries = 0
+    await #expect(throws: Broken.self) {
+      try await ExportFile.retrying(pauses, while: held) { () throws -> Void in
+        tries += 1
+        throw Broken()
+      }
+    }
+    #expect(tries == 1, "a failure that will not pass is not waited for")
   }
 
   @Test func failedImportsNotifyWithoutReplacingTheExistingAudio() async throws {

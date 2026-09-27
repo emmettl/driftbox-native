@@ -404,6 +404,7 @@ struct DesktopTests {
     window.saveLocation = mix
     window.choose(DesktopMenus.exportMix)
     await desktop.exporting?.value
+    #expect(window.told == [], "the mix was written")
     let wav = try Data(contentsOf: mix)
     #expect(wav.prefix(4) == Data("RIFF".utf8) && wav.count > 44 + 48000)
 
@@ -412,6 +413,7 @@ struct DesktopTests {
     window.folder = stems
     window.choose(DesktopMenus.exportStems)
     await desktop.exporting?.value
+    #expect(window.told == [], "the stems were written")
     #expect(try FileManager.default.contentsOfDirectory(atPath: stems.path) == ["Groove - 909.bd.wav"])
   }
 
