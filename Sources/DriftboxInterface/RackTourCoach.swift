@@ -232,7 +232,9 @@ extension RackInterface {
     guard measure(text, font) > width else { return text }
     var cut = Substring(text)
     while !cut.isEmpty, measure(String(cut) + "…", font) > width { cut = cut.dropLast() }
-    return cut.trimmingCharacters(in: .whitespaces) + "…"
+    // Plain Swift rather than Foundation's trimming, which Android's app does not link.
+    while cut.last == " " { cut = cut.dropLast() }
+    return cut + "…"
   }
 
   // MARK: - What it hears
