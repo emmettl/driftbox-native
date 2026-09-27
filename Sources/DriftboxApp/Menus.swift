@@ -21,10 +21,14 @@
     @FocusedValue(\.rack) private var rack
     @Environment(\.openWindow) private var openWindow
 
-    public init(player: Session, files: SongFiles, stage: Stage) {
+    /// The rack beside the groovebox, whose tours the Help menu starts.
+    let racks: RackSession?
+
+    public init(player: Session, files: SongFiles, stage: Stage, rack: RackSession? = nil) {
       self.player = player
       self.files = files
       self.stage = stage
+      racks = rack
     }
 
     public var body: some Commands {
@@ -123,6 +127,16 @@
           .keyboardShortcut("?", modifiers: .command)
         Button("Rack Guide") { openWindow(id: "rack-help") }
           .keyboardShortcut("?", modifiers: [.command, .option])
+        if let racks {
+          Menu("Rack Tours") {
+            ForEach(RackTour.all(for: .mac)) { tour in
+              Button(racks.finishedTours.contains(tour.id) ? "\(tour.name) ✓" : tour.name) {
+                openWindow(id: "rack")
+                racks.startTour(tour)
+              }
+            }
+          }
+        }
       }
 
       CommandMenu("Transport") {

@@ -43,7 +43,9 @@
       // is already here. Left to itself the group answers an open by making a second window, and
       // two windows on one player are two views of the same song pretending to be documents.
       .handlesExternalEvents(matching: [])
-      .commands { AppMenus(player: player, files: SongFiles(player: player), stage: stage) }
+      .commands {
+        AppMenus(player: player, files: SongFiles(player: player), stage: stage, rack: studio.rack.session)
+      }
 
       // The rack is an instrument beside the groovebox, in a window of its own, playing through
       // the same device.
