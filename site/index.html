@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Driftbox</title>
+  <meta name="description" content="An 808, a 909 and two 303s, synthesised from scratch, with a modular rack to patch them into and visuals that play along. Native on Mac, Windows, Android and Linux.">
+  <meta property="og:title" content="Driftbox">
+  <meta property="og:description" content="An 808, a 909 and two 303s, a modular rack, and visuals that play along. Native on Mac, Windows, Android and Linux.">
+  <meta property="og:image" content="https://emmettl.github.io/driftbox-native/media/share.jpg">
+  <meta name="theme-color" content="#08070d">
+  <link rel="icon" href="favicon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="#top"><img src="media/icon.png" alt="" width="28" height="28">Driftbox</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#listen">Listen</a>
+      <a href="#visuals">Visuals</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/emmettl/driftbox-native">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-words">
+        <p class="kicker">Groovebox · Modular rack · Visuals</p>
+        <h1>Four machines, one song, and a rack to patch them into.</h1>
+        <p class="lede">Driftbox is a TR-808, a TR-909 and a pair of TB-303s, synthesised from scratch, with a
+          modular rack beside them and visuals that play along. It started in the browser; this is the
+          native app, for Mac, Windows, Android and Linux.</p>
+        <div class="actions">
+          <a class="button primary" href="#download" id="hero-download">Download</a>
+          <a class="button" href="https://driftbox.app">Try it in your browser</a>
+        </div>
+      </div>
+      <figure class="hero-clip">
+        <div class="player" data-player>
+          <video src="media/cubik.mp4" poster="media/poster-cubik.webp" autoplay muted loop playsinline preload="metadata"></video>
+          <button class="sound" type="button" data-sound aria-pressed="false">Sound on</button>
+        </div>
+        <figcaption><strong>Cübik Olympic</strong>: Manchester rave at 124 bpm, with its own scene. Recorded by Driftbox's own movie export.</figcaption>
+      </figure>
+    </section>
+
+    <section class="shot">
+      <img src="media/windows-groovebox.webp" width="1600" height="1000" loading="lazy"
+        alt="The groovebox playing Acieed: the song's sections across the top, the pattern's drum lanes and the 303's notes below, the 303's knobs at the right, over the Web scene">
+      <p class="caption">The groovebox: the song across the top, the pattern playing underneath, and the 303's knobs at the side, over the song's scene.</p>
+    </section>
+
+    <section id="features" class="features">
+      <h2>What's in it</h2>
+      <div class="grid">
+        <article>
+          <h3><span class="dot nine"></span>The groovebox</h3>
+          <p>Twenty-two drum voices across the 808 and the 909, and two 303s with accent and slide. Patterns
+            of up to 64 steps, strung together into a song; flams, a pattern-controlled filter, swing per voice,
+            and knob moves recorded as automation while it plays.</p>
+        </article>
+        <article>
+          <h3><span class="dot three"></span>The rack</h3>
+          <p>More than forty modules: oscillators, filters, envelopes, sequencers, samplers, effects and a
+            Combinator whose four knobs play the whole patch. Turn the rack round to patch cables on the back.
+            Host Audio Units on the Mac and VST 3 plug-ins on Windows.</p>
+        </article>
+        <article>
+          <h3><span class="dot pink"></span>Visuals that play along</h3>
+          <p>Twenty-seven scenes, each listening to the drums and the bass as they play. Put them on a second
+            screen or a projector, give the whole window to them, or play the filter with a finger on top.</p>
+        </article>
+        <article>
+          <h3><span class="dot nine"></span>Out into the world</h3>
+          <p>Export the mix, a stem per voice, or a movie with its visuals; record a performance as you play it.
+            On the Mac, the groovebox and the rack load as Audio Units in Logic and other hosts.</p>
+        </article>
+        <article>
+          <h3><span class="dot three"></span>MIDI</h3>
+          <p>Play the 303 and the drums from a keyboard, follow a MIDI clock or send one, and learn any rack knob
+            to a controller.</p>
+        </article>
+        <article>
+          <h3><span class="dot pink"></span>Learn it as you go</h3>
+          <p>A guide to the groovebox and the rack, a page for every module, and guided tours that watch you
+            build a patch and tick each step as you do it.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="pair">
+      <figure>
+        <img src="media/windows-rack.webp" width="1600" height="1000" loading="lazy"
+          alt="The rack's front: a Transport, a step sequencer and a Voice, each with its knobs and switches">
+        <figcaption>The rack's front: every module's knobs and switches.</figcaption>
+      </figure>
+      <figure>
+        <img src="media/windows-rack-back.webp" width="1600" height="1000" loading="lazy"
+          alt="The rack turned round: cables from the Transport's 1/16 into the sequencer's clock, and from the sequencer's pitch and gate into the Voice">
+        <figcaption>Turned round: the cables, patched jack to jack.</figcaption>
+      </figure>
+    </section>
+
+    <section class="phones">
+      <div class="phones-words">
+        <h2>On a phone, too</h2>
+        <p>The same groovebox and rack on Android, laid out for fingers: pages of eight steps, a
+          keyboard along the foot of the rack, and a pinch to zoom in on a module.</p>
+        <p class="quiet">The songs are the same everywhere. A <code>.driftbox</code> file opens on every
+          platform, and so does a song made in the browser.</p>
+      </div>
+      <div class="phone-shots">
+        <img src="media/android-groovebox.webp" width="585" height="1266" loading="lazy"
+          alt="The groovebox on a phone, playing Last Bus: drum lanes in pages of eight steps, and the 303's notes underneath">
+        <img src="media/android-rack.webp" width="585" height="1266" loading="lazy"
+          alt="The rack on a phone: a sequencer and a Voice with their knobs, and a keyboard along the foot">
+      </div>
+    </section>
+
+    <section id="listen" class="listen">
+      <h2>Listen</h2>
+      <p class="section-lede">A few of the songs Driftbox comes with, each seen through its own scene. The sound and the
+        picture come from one pass of the engine, so neither can drift from the other.</p>
+      <div class="clips">
+        <figure>
+          <div class="player" data-player>
+            <video src="media/acid.mp4" poster="media/poster-acid.webp" controls playsinline preload="none"></video>
+          </div>
+          <figcaption><strong>Acieed</strong>: acid house at 126 bpm, the 303 doing its thing, seen through the Web.</figcaption>
+        </figure>
+        <figure>
+          <div class="player" data-player>
+            <video src="media/garage.mp4" poster="media/poster-garage.webp" controls playsinline preload="none"></video>
+          </div>
+          <figcaption><strong>Last Bus</strong>: UK garage, two-step drums, swung hats and a sub in the gaps.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="visuals" class="visuals">
+      <h2>A scene for every song</h2>
+      <p class="section-lede">Each song Driftbox comes with has a scene of its own, and any song can be seen through any
+        of them. Each still here is a moment of its own song playing.</p>
+      <ul class="gallery" data-gallery></ul>
+    </section>
+
+    <section id="download" class="download">
+      <h2>Download</h2>
+      <p class="section-lede" data-release-status>Driftbox hasn't had its first release yet. Downloads will appear here as each
+        platform's build is published; until then it builds from source.</p>
+      <div class="platforms">
+        <article class="platform" data-platform="mac">
+          <h3>Mac</h3>
+          <p class="needs">macOS 26 on Apple silicon</p>
+          <div class="links" data-links></div>
+        </article>
+        <article class="platform" data-platform="windows">
+          <h3>Windows</h3>
+          <p class="needs">Windows 10 or 11, 64-bit</p>
+          <div class="links" data-links></div>
+        </article>
+        <article class="platform" data-platform="android">
+          <h3>Android</h3>
+          <p class="needs">Android 10 or later, 64-bit Arm</p>
+          <div class="links" data-links></div>
+        </article>
+        <article class="platform" data-platform="linux">
+          <h3>Linux</h3>
+          <p class="needs">Ubuntu 24.04, x86-64 or Arm</p>
+          <div class="links" data-links></div>
+        </article>
+      </div>
+      <p class="quiet center">Every release is on <a href="https://github.com/emmettl/driftbox-native/releases">GitHub</a>.
+        To build it yourself, start with the <a href="https://github.com/emmettl/driftbox-native#readme">README</a>.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p><img src="media/icon.png" alt="" width="20" height="20"> Driftbox is open source, under the
+      <a href="https://github.com/emmettl/driftbox-native/blob/main/LICENSE">MIT licence</a>.</p>
+    <p><a href="https://github.com/emmettl/driftbox-native">Source</a> ·
+      <a href="https://github.com/emmettl/driftbox-native/blob/main/ROADMAP.md">Roadmap</a> ·
+      <a href="https://driftbox.app">The web app</a></p>
+  </footer>
+
+  <script src="site.js"></script>
+</body>
+</html>
