@@ -14,8 +14,8 @@ TypeScript and writes fixtures, and the Swift is held to them:
 - Documents, song plans, the pattern edits, the MIDI clock follower and the 22 drum voices'
   descriptions match exactly.
 - Every voice, the 303, the sends, the master inserts (the browser's compressor included) and the
-  performance filter render close to Chromium, mostly within -80 to -140dB of the peak. The
-  README's tables give each figure and the few exceptions.
+  performance filter render close to Chromium, mostly within -80 to -140dB of the peak.
+  [docs/conformance.md](docs/conformance.md) gives each figure and the few exceptions.
 - Whole mixes: four of eight catalogue songs match to -80 to -98dB. The other four agree in level
   to 0.3dB and differ in a few stretches, because of a channel-count effect inside Chromium's delay
   loop that is not yet understood. Chromium on x64 and on arm64 disagree on those four too.
