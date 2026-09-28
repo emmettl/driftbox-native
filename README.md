@@ -1,952 +1,114 @@
 # Driftbox, native
 
-A native port of [Driftbox](https://github.com/emmettl/driftbox) — a TR-808, a TR-909 and a pair
-of TB-303s, synthesised from scratch — for the Mac first, then iOS. Swift throughout.
+A native port of [Driftbox](https://github.com/emmettl/driftbox): a groovebox of a TR-808, a
+TR-909 and a pair of TB-303s, synthesised from scratch, and a modular rack to patch them into.
+Swift throughout, with no dependencies in the audio. The Mac comes first; Windows, Android and
+Linux build from the same sources.
 
 The web app is the reference implementation and is treated as finished. It is here as a pinned
-submodule in `driftbox/`, and nothing in this repository changes it.
+submodule in `driftbox/`, and nothing in this repository changes it. The native engine is held to
+it by measurement: songs decode, plan and sound as the browser's do, within bounds set out in
+[docs/conformance.md](docs/conformance.md).
 
-**Where this is:** phase 7 of [ROADMAP.md](ROADMAP.md), making the Mac app a proper Mac app. The
-groovebox is there: a harness that holds Swift to the web engine's behaviour, and behind it a song
-model, a codec that reads and writes the web app's documents to the byte, a sequencer that plans
-every catalogue song exactly as the reference does, all 22 drum voices — as data, exactly, and as
-sound, within -100dB of the browser's — and the 303 (looser where there are square waves, drive or
-a resonant ladder, for reasons given below); a real-time engine hosted as an Audio Unit; an editor
-for everything a song is; MIDI in and clock out; and all twenty-seven of the web's scenes in
-Metal. Next after this is the rack.
+The project's website is at <https://emmettl.github.io/driftbox-native/>.
+
+## Where it stands
+
+- **Mac.** The groovebox and its editor; the rack in a window of its own; all twenty-seven of the
+  web's scenes, in a pane or full screen on another display; MIDI in and clock out; Audio Units
+  hosted in the rack, and the rack and the groovebox as AUv3 instruments for other apps; movie
+  export and performance recording; and the guides and guided tours. Releases are signed and
+  notarised locally. See [docs/mac.md](docs/mac.md).
+- **Windows.** The same app, drawn on the GPU layer: groovebox, rack, visuals, guides and tours,
+  VST 3 plug-ins in the rack, movies, and screen reader support through UI Automation. A zip and
+  an installer, built by the release workflow on a tag; code signing through the SignPath
+  Foundation is wired in and awaits their approval. See [docs/windows.md](docs/windows.md).
+- **Android.** A touch app on the same sessions: the groovebox, the rack, the scenes, guides and
+  tours, MIDI, and songs through Android's own pickers. The APK and App Bundle are ready for a
+  store, and not yet published. See [docs/android.md](docs/android.md).
+- **Linux.** A preview: the shared desktop app on GTK 4, OpenGL ES, Pango, PipeWire and ALSA MIDI.
+  CI builds a tarball and `.deb` packages for Ubuntu 24.04 on ARM64 and x86-64; it is not yet
+  qualified for release. See [docs/LINUX.md](docs/LINUX.md) and [linux/README.md](linux/README.md).
+- **iOS** waits until the Mac app is done.
+
+[ROADMAP.md](ROADMAP.md) has what is left, milestone by milestone.
+
+## Building on the Mac
+
+Swift 6.4 and macOS 26. The fixtures are checked in; regenerating them needs the submodule
+checked out, Node 24 or later, and a Chromium.
+
+```bash
+scripts/bundle-app.sh && open .build-release/Driftbox.app       # the app, with its AUv3 extension
+swift run -c release driftbox-play conformance/fixtures/documents/acid.song.json
+swift run -c release driftbox-render conformance/fixtures/documents/smallhours.song.json out.wav
+```
+
+`driftbox-play` plays a song through the speakers (`--window` shows its scene, `--bench` measures
+the render), and `driftbox-render` writes one to a WAV file; see
+[docs/performance.md](docs/performance.md).
+
+| Platform | How to build it |
+|---|---|
+| Windows | [docs/windows.md](docs/windows.md) |
+| Android | [docs/android.md](docs/android.md) |
+| Linux | [docs/LINUX.md](docs/LINUX.md), and `scripts/linux-build.sh` |
+| Releases | [docs/RELEASING.md](docs/RELEASING.md) (Mac and Android), [CODE_SIGNING.md](CODE_SIGNING.md) (Windows) |
 
 ## Layout
 
 | | |
 |---|---|
-| `driftbox/` | The web repository, pinned. The reference for everything below. |
-| `conformance/emit/` | Runs the reference TypeScript as it stands and writes fixtures from it. |
-| `conformance/fixtures/` | What the Swift tests are held to. Checked in. |
-| `Sources/DriftboxDSP` | Filters, oscillators, envelopes, noise. **Constrained.** |
-| `Sources/DriftboxSeq` | What a song is and what it decides to play. **Constrained.** |
-| `Sources/DriftboxEngine` | The instruments, mixer and effects behind one `render`. **Constrained.** |
-| `Sources/DriftboxRack` | The modular rack: the patch compiler, the graph, the modules. **Constrained.** |
-| `Sources/DriftboxDocument` | The song codec, migrations, shareable URLs, the catalogue. |
-| `Sources/DriftboxHost` | The engine and rack hosts, the rings to and from the render thread, the ports every platform's audio and MIDI sits behind, and the mixer every platform's output renders through. |
-| `Sources/DriftboxExtensions` | The rack and the groovebox inside another app: a `RackSession` and a `Session` behind their Audio Units, made at the app's rate, with their presets, their state, their MIDI, the app's clock and their parameters — the groovebox's knobs, the rack's eight learnt macros — carried in, and their faces — the rack window, and the groovebox's editor — on the same sessions. |
-| `Sources/DriftboxAudioUnits` | The AUv3 app extension's executable, whose entry point is `NSExtensionMain`, and its view controller: the factory for the rack's and the groovebox's units, and their faces. `scripts/bundle-app.sh` makes the `.appex` around it inside the app. |
-| `Sources/DriftboxHostMac` | Core Audio and Core MIDI behind those ports, and Audio Units: the engine as a unit for `driftbox-play`, the rack and the groovebox as the extension's instruments, and units hosted in the rack. The host on the Mac. |
-| `Sources/DriftboxHostWindows` | WASAPI and WinMM behind those ports: the host on Windows. |
-| `Sources/CWASAPI` | The Windows audio headers Swift's WinSDK module leaves out. Declarations only. |
-| `Sources/DriftboxHostAndroid` | AAudio and native MIDI behind the same ports: the host on Android. |
-| `Sources/CAAudio`, `Sources/CAMidi` | AAudio's and native MIDI's headers, which the Swift SDK's Android module leaves out. Declarations only. |
-| `android/` | The Android app's Java, manifest and resources: so far a harness, and the MIDI devices Java can open. |
-| `Sources/DriftboxAndroid` | The Android app's native library: what its Java calls, and the tests it runs on a phone. |
-| `Sources/DriftboxSession` | What an app holds, on every platform: the song, the transport, editing and undo, the MIDI clock both ways, what is remembered, and the catalogue. |
-| `Sources/DriftboxScenes` | The visuals: the analyser, the surface and geometry layers, the scenes. |
-| `Sources/DriftboxGPU` | What the scenes ask of a GPU, as a protocol every backend answers the same way. |
-| `Sources/DriftboxGPUD3D11` | That protocol on Direct3D 11: the GPU on Windows. |
-| `Sources/DriftboxGPUMetal` | That protocol on Metal: the GPU on the Mac and iOS. |
-| `Sources/DriftboxGPUGLES` | That protocol on OpenGL ES 3.0: the GPU on Android, and on Linux for CI. |
-| `Sources/CGLES` | EGL's and OpenGL ES 3.0's headers. Declarations only. |
-| `Sources/DriftboxShell` | What the app asks of a window — input, menus, file panels, a loop — the same on every platform. |
-| `Sources/DriftboxWin32` | That on Windows: the Windows shell. |
-| `Sources/CAccessibility` | The drawn controls for screen readers: a UI Automation provider in C++, fed the tree the app describes and handing back what a screen reader asks. Windows only. |
-| `Sources/DriftboxText` | What the app asks of a platform's type: a line set in a font, and a glyph's coverage. |
-| `Sources/DriftboxTextWindows` | That on DirectWrite: type on Windows. |
-| `Sources/DriftboxTextAndroid` | That on Android's own text stack, through the app's Java: type on Android. |
-| `Sources/DriftboxMovie` | A performance and its visuals as a movie, on every platform with the GPU layer: the take played again on an engine of its own, each frame drawn offscreen and read back, and handed with its sound to the platform's writer — Media Foundation on Windows. |
-| `Sources/CMovieWriter` | That writer: an H.264 and AAC MPEG-4 file through Media Foundation's sink writer, and a movie read back through its source reader, for the tests. Windows only. |
-| `Sources/CDirectWrite` | The part of DirectWrite that is called, declared in C, since its own headers are C++. Declarations only. |
-| `Sources/VST3SDK` | Steinberg's VST 3 SDK, as much of it as a host uses, vendored at 3.8.1 under its own MIT licence. Compiled on Windows alone for now. |
-| `Sources/CVST3` | Driftbox's bridge to VST 3 plug-ins, in C for Swift: a plug-in found, made, played, its params set, its state kept, and its own editor opened in a window. Windows only for now; `Tests/DriftboxVST3Fixture` is a plug-in of the project's own to hold it to. |
-| `Sources/DriftboxHostVST3` | The rack's plug-ins on that bridge: the VST 3 plug-ins installed, found, and each a `plugin` module's unit, played, its macros and its state. Windows only for now. |
-| `Sources/DriftboxVST3Scan` | Asks a VST 3 module what it holds, in a process of its own, so a plug-in that crashes as it loads takes this with it rather than the app. |
-| `Sources/DriftboxCanvas` | A 2D canvas on the GPU layer: Canvas2D's shapes, state, type and blends, the same on every platform. |
-| `shaders/` | The GLSL every shader is written in, once. `scripts/shaders.mjs` makes each backend's language from it. |
-| `Sources/DriftboxInterface` | The controls, drawn on the canvas in points over the scene: the transport bar and the step grid, laid out and hit from one layout, on `Session`. |
-| `Sources/DriftboxRackSession` | The rack as an app holds it, on every platform: the patch, its edits and undo, the keys, controllers, samples, song and transport, and the catalogue of patches; audio, plug-ins and file reading behind ports. |
-| `Sources/DriftboxDesktop` | Driftbox on a desktop with a `ShellWindow`: menus, the scene, the controls over it, the pad, on `Session`. |
-| `Sources/DriftboxTouch` | Driftbox on a touch screen: the scene, the controls over it, the pad, and what each finger is, on `Session`. Android's app uses it, and iOS's can. |
-| `Sources/DriftboxWindows` | The Windows app: Windows' parts, chosen and handed to `DriftboxDesktop`. |
-| `Sources/DriftboxApp` | The Mac app's logic and views, as a library so it can be tested. |
-| `Sources/Driftbox` | The executable, which is nothing but `@main`. |
+| `driftbox/` | The web repository, pinned: the reference. |
+| `conformance/` | The emitter that runs the reference and the fixtures it writes. |
+| `Sources/DriftboxDSP`, `DriftboxSeq`, `DriftboxEngine`, `DriftboxRack` | The audio core: filters and oscillators, songs and what they play, the instruments and effects, the modular rack. **Constrained**: no Foundation, no platform, no allocation on the render path. |
+| `Sources/DriftboxDocument` | The song codec, byte for byte with the web's documents, and the catalogue. |
+| `Sources/DriftboxHost` | The engine and rack hosts, and the ports each platform's audio and MIDI sits behind. |
+| `Sources/DriftboxHostMac`, `…Windows`, `…Android`, `…Linux` | Each platform's audio and MIDI behind those ports. |
+| `Sources/DriftboxSession`, `DriftboxRackSession` | The groovebox and the rack as an app holds them, on every platform. |
+| `Sources/DriftboxScenes`, `DriftboxGPU*`, `DriftboxCanvas`, `DriftboxText*` | The visuals, the GPU layer and its backends, a 2D canvas, and type. |
+| `Sources/DriftboxInterface`, `DriftboxDesktop`, `DriftboxTouch` | The drawn interface, on a desktop window and on a touch screen. |
+| `Sources/DriftboxApp`, `Driftbox`, `DriftboxAudioUnits` | The Mac app, its executable, and its AUv3 extension. |
+| `Sources/DriftboxWindows`, `DriftboxAndroid`, `driftbox-linux` | The Windows, Android and Linux apps. |
+| `shaders/` | Every shader, written once in GLSL. |
 
-## The constrained targets
+[docs/architecture.md](docs/architecture.md) has every target, the layers, the ports and the shared
+sessions.
 
-The three audio targets take nothing from outside themselves: no Foundation, no platform, no
-dependencies. They do not allocate, lock, or touch a class or an existential on the render path.
-That is what makes them safe on a real-time thread and what makes a render a function of the
-song and nothing else.
-
-The compiler checks it, in two halves, because neither half is enough alone:
+## Testing
 
 ```bash
-scripts/check-constrained.sh
-```
-
-1. They compile as **Embedded Swift** for a bare WebAssembly target. That rules out Foundation,
-   reflection and the platform. It does *not* rule out existentials — Embedded Swift accepts
-   `any P` as of 6.3, which was measured rather than assumed.
-2. Every function on the render path is marked **`@_noAllocation`**, and an optimised build
-   turns an allocation, an existential or a class instance inside one into an error.
-
-The Embedded half needs a swift.org toolchain, since Xcode's ships no Embedded standard library.
-The script finds `~/Library/Developer/Toolchains/swift-latest.xctoolchain`, or takes
-`DRIFTBOX_EMBEDDED_SWIFTC`.
-
-The one thing the DSP takes from outside is `exp` and `tanh` from the C library
-(`Sources/DriftboxDSP/Math.swift`). See "Exactness" below.
-
-## Platforms
-
-The Mac is the first platform, not the only one. What the rest of Driftbox asks of a platform is
-written down once, in `DriftboxHost`, and each platform answers it in a target of its own:
-
-```
-the app            views, and the one place that picks a platform's adapters
-adapters           DriftboxHostWindows: WASAPI, WinMM      DriftboxHostAndroid: AAudio, AMidi
-                   DriftboxHostMac: AVAudioEngine, CoreMIDI, Audio Units
-ports              DriftboxHost: AudioRouting, MIDIInputPort, MIDIOutputPort, HostTime, RenderSource
-hosts              DriftboxHost: EngineHost, RackHost, the rings, the Mixer
-constrained core   DSP, Seq, Engine, Rack
-```
-
-Dependencies point down and never across: nothing platform-neutral imports a platform, and no
-adapter knows another exists. `Package.swift` says so too — `DriftboxHostWindows` depends on its
-C headers only when building for Windows, and its sources compile to nothing anywhere else.
-
-**The ports** are small on purpose, and nothing crosses them that is not the same on every
-platform. A device is an ID and a name — CoreAudio's UID, Windows' endpoint ID — because that is
-what a choice of one is remembered by. A MIDI port is a name for the same reason. A time is a
-`HostTime`, the machine's monotonic clock, which is what each platform's MIDI stamps against. What
-is *not* in them is as deliberate: no sample rate setting (the engine runs at 48 kHz and the
-output converts, on both platforms), and no virtual MIDI source that a platform cannot publish
-(Windows cannot, so `offersVirtualSource` says so rather than pretending).
-
-**The render thread** crosses the one boundary where the constrained targets' rule has to be kept
-by hand. A device renders a `RenderSource` — a C function and a context pointer — rather than a
-protocol or a closure, so that a platform's audio callback calls into Driftbox without retaining,
-releasing or dispatching through a witness table. `EngineHost` and `RackHost` each hand one out.
-On every platform the sources are summed by `DriftboxHost`'s `Mixer`, through a table swapped
-whole behind one atomic pointer, and the old table is freed only once the render thread has
-finished a buffer since. On the Mac the sum plays through one source node into the engine's mixer,
-beside any Audio Units attached to the engine directly.
-
-**Where it stands.** `DriftboxHostWindows` is built on the ports and tested against them, and so
-is `DriftboxHostAndroid`'s audio, played through a phone. `DriftboxHostMac` is too: `AudioRoute`
-is the Mac's `AudioRouting`, `MIDIInput` and `MIDIOutput` its MIDI ports, and the clock is
-`HostTime`'s. The Mac app plays the groovebox's engine and the rack as sources on one route, as
-every platform does; `driftbox-play` can now be one program on every platform rather than branches.
-
-**What an app holds** is `DriftboxSession`'s `Session`: the groovebox without any platform in it.
-It holds the song and the transport, the loop, the metronome and the count-in, editing and undo, a
-MIDI clock followed and one sent, and what is remembered between launches. It also ships the
-catalogue of songs.
-- **The platform arrives through the ports:** `AudioRouting`, `MIDIInputPort` and `MIDIOutputPort`,
-  given by the app. A session made without them is the whole of it and none of the hardware, which
-  is how its tests make one.
-- **Nothing in it keeps time.** The app calls `tick` from its own loop, which on Windows is the
-  window's.
-- **Undo is its own.** Foundation's `UndoManager` is not there on Windows, and every edit is a song
-  before and a song after, so `UndoHistory` is a stack of those with their names.
-- **Settings persist under the Mac app's own keys,** so that its preferences came with it.
-- **Something else can take the MIDI** that arrives, through `MIDIListener`: on the Mac, the rack
-  while its window is in front.
-
-The Mac app is built on it: a `Studio` makes the Mac's adapters, hands them to a `Session` and to the
-rack's `RackSession`, and ticks both. The Windows app is to be built the same way.
-
-### The GPU
-
-The scenes' GPU is a port of the same kind: `DriftboxGPU` says what they may ask of one, and a
-backend answers it on each platform — Direct3D 11 on Windows, Metal on the Mac, OpenGL ES 3.0 on
-Android.
-What it offers is what all three do the same way, and nothing more: buffers, textures, pipelines
-under three.js's three blends, its depth tests with or without writes and its culling, per-draw
-uniforms, and vertex attributes stepping per vertex or per instance. There are no sized points, since Direct3D cannot size one, so a sprite is
-an instanced quad everywhere; and no storage buffers, since OpenGL ES 3.0 has none. The
-conventions every backend keeps: clip space y up with depth 0...1, a target's first row its top,
-and a triangle's front counter-clockwise as it appears there, which is three's.
-
-`GPUContractTests` holds a backend to those conventions — which way up a target reads back,
-depth written and only tested, which faces are culled, the blends to the byte, instanced sprites,
-textures, buffers written again — and runs against every backend the platform has. Direct3D runs it on WARP, Windows' software rasteriser,
-so the pixels are the same on every machine and CI needs no graphics card; Metal runs it on the
-Mac's own GPU; OpenGL ES runs it on Linux, on Mesa's software rasteriser, surfaceless, for WARP's
-reasons. A phone cannot run Swift Testing from here, so `scripts/android-app.sh gpu` runs the same
-checks, with the same programs, on the phone's own GPU. A test that the platform's backend is among
-those tested stops a platform passing the contract by testing nothing.
-
-OpenGL's framebuffers start at the bottom, where the layer's targets start at the top. So the
-OpenGL ES backend draws every target upside down, turning each vertex shader's y over as it
-compiles it: a target's first row in memory is then its top, read back in order, sampled from the
-top left, with `gl_FragCoord` counting down from the top as it does in Metal and Direct3D. Drawing
-upside down turns every triangle over too, so the backend calls the layer's front clockwise. A window
-is the one thing that is not a target, and is turned over on the way to it. OpenGL ES 3.0 has no
-BGRA texture, so a BGRA texture is stored as given and read through a swizzle that swaps red and
-blue, and a target is swapped as it is read back; and its GLSL cannot bind a uniform block or a
-sampler in the shader, so each is bound by name when the program links.
-
-Metal has one table of buffers where the other two have uniform blocks and vertex buffers apart:
-the shaders read block `n` at `buffer(n)`, so the Metal backend binds vertex buffer slot `n` at
-`buffer(16 + n)`. It writes buffers and textures again with a blit on its one queue, so a draw
-already asked for reads what was there and the next reads what was written — what Direct3D's
-`UpdateSubresource` does, and what writing their memory from the CPU would not.
-
-**The shaders are written once, in GLSL**, the language the web's scenes were written in, so a scene
-still reads like the one it came from. They live in `shaders/<Target>/<program>.vert` and `.frag`.
-
-```bash
-node scripts/shaders.mjs           # make every backend's language from the GLSL
-node scripts/shaders.mjs --check   # fail if what is checked in is stale
-```
-
-glslang compiles the GLSL to SPIR-V, and SPIRV-Cross writes that out as Metal, HLSL and GLSL ES.
-Both come with the Vulkan SDK, which only whoever edits a shader needs. What comes out is checked
-in as Swift, in each target's `Generated/ShaderPrograms.swift`: the programs in every language, and a
-Swift struct for every uniform block, written from SPIRV-Cross's reflection member by member at the
-offsets the shaders read. Swift and std140 disagree in two places — a scalar after a `vec3`, and an
-array of anything smaller than a `vec4` — and a block that falls into either is refused by the
-generator with the reason, rather than drawn from the wrong bytes. A test holds every generated
-struct to its block besides.
-
-Without the SDK, `--check` compares each generated file's hashes, of its GLSL and of itself, which
-is what CI does rather than download 330MB to check a few files; with it, `--check` makes
-everything again and compares it whole.
-
-Apple's `simd` exists only on Apple's platforms, so `DriftboxGPU` has a `Matrix4` of its own, the
-same memory as `simd_float4x4`.
-
-**On screen**, a `GPUSurface` is a window's swap chain: the frame's target, a resize, and a present
-that waits for the display. A backend makes one from its own platform's kind of window; drawing
-into it and showing it are the same everywhere. `Presenter` shows a finished frame in one, fitted
-or cropped. On Windows the surface is a flip-model swap chain, tested on a real one for a window
-that is never shown. On the Mac it is a `CAMetalLayer`'s drawables, not framebuffer-only so that a
-frame can be sampled and read back as Direct3D's can, tested on a layer in no window.
-
-**The window itself** is a port as well. `DriftboxShell` says what the app asks of one, in terms that
-are the same on every platform: input as `ShellEvent`s — a pointer for a mouse, a finger and a pen
-alike, in points from the top left; keys known by what they type; scrolling — a `MenuBar` as data,
-whose commands arrive by id whether chosen or reached by their shortcut; the file panels; a loop to
-draw in; and `post`, for word from another thread. A shortcut is written with `.primary`, which is
-Command on the Mac and Control elsewhere, so one menu reads ⌘S on the one and Ctrl+S on the other.
-The Mac has AppKit and SwiftUI for all of this and needs none of it; it is for Windows and Android.
-
-`DriftboxWin32` answers it. While a window is dragged or resized Windows runs a loop of its own and
-the app's stops, so the window draws a frame from a timer and on every change of size until the
-drag ends, and the picture follows the edge instead of freezing. Its loop is the only one on its
-thread — Foundation's run loop, turned as well, took the window's key messages before its shortcuts
-could, which is how Space came to play nothing — so work from other threads, such as an audio
-device's change, comes through `post`, onto the window's own queue.
-
-**Type is a port too, and a small one.** Drawing text is mostly the same everywhere: packing glyphs
-into a texture, placing them through a transform, colouring them. So that part will live on the GPU
-layer, where the Windows app's interface will draw, and only two things are asked of a platform.
-`DriftboxText`'s `Typesetter` is asked for a font the way the web's canvas asks, as families in
-order of preference with a weight and a size in pixels. It must then:
-- set a line: shaped, so kerned as the font says, and returned as glyphs placed on the baseline
-  with the width `measureText` would give;
-- give one glyph's coverage: grey, antialiased, and at a fraction of a pixel along.
-
-`DriftboxTextWindows` answers it with DirectWrite. Its text layout does the shaping, drawn through a
-text renderer written in Swift that collects the glyphs, and a glyph run analysis rasterises each
-glyph. DirectWrite's headers are C++ only, so `CDirectWrite` declares the part of it that is called,
-transcribed in vtable order. COM never changes that order, and a slot in the wrong place fails the
-first test that reaches it.
-
-`DriftboxTextAndroid` answers it with Android's own text stack, through the app's Java, since the
-NDK can find a font but has nothing to shape or draw one with. `TextRunShaper` sets the line, with
-Minikin and HarfBuzz underneath, and `Canvas.drawGlyphs` draws a glyph into an alpha bitmap. Both
-need Android 12. A family is looked up in the names `fonts.xml` gives, which include the web's
-usual ones as aliases: Arial and Helvetica are Roboto. Two details of drawing a glyph as it was set:
-- **Weight.** The font a shaped run hands back is the file and not how it was used. Roboto is
-  variable, so its `wght` axis is set again to the weight Minikin gave it, and a face with nothing
-  that heavy is emboldened again.
-- **Threads.** Swift calls in from any thread. The render thread is attached to Java on its first
-  call and let go of as it ends.
-
-On a Fairphone 6, a line costs 35µs and 4µs a glyph when Minikin has laid its text out before,
-and about 170µs when it has not; a glyph's coverage costs 90µs.
-
-`TypesetterTests` holds a typesetter to how type behaves rather than to one font's numbers: it falls
-back through its families, scales exactly, kerns AV, measures trailing spaces, stands an I on its
-baseline, and draws a heavier weight with more ink. Swift Testing does not run on a phone, so
-`scripts/android-app.sh text` runs the same checks there, on a thread of Swift's own.
-
-`DriftboxCanvas` is the rest of drawing type, and of drawing in two dimensions: the part of Canvas2D
-that Driftbox draws with, on the GPU layer.
-- **What it keeps:** Canvas2D's state and its `save` and `restore`. That is a transform, a clip, a
-  fill and a stroke, a line width, a blend (normal or multiply), a font and an alignment.
-- **What it draws:** rectangles, ellipses, stroked lines, `fillText` with `measureText`, and the page
-  drawn onto itself, moved, as `drawImage` of a canvas onto itself does.
-- **How:** every mark is an instanced quad of one program, placed by its own transform.
-  - Rectangles and ellipses are antialiased analytically, glyphs come from an atlas the typesetter
-    fills, and a copy of the page comes from the other of two targets.
-  - The clip is a rectangle each mark carries and the fragment shader honours, so the layer needs no
-    scissor.
-  - The layer gained `GPUBlend.multiply` for it: what is there times the colour drawn.
-
-`CanvasTests` holds it to what Canvas2D draws: coverage at a half-pixel edge, the transform, the
-clip and `restore`, multiply, a round ellipse, a line's width, a page copied onto itself twice, and
-type landing where it is aligned.
-
-**The scenes move across one at a time.** `GPUScene` is a scene on the layer, and Pulse is the
-first: `PulseScene`, its shader the Metal one's GLSL line for line, held on WARP to what the Metal
-one's test holds it to. On the Mac, where both can be drawn, it is held to the Metal `Pulse` itself,
-pixel for pixel at five moments, within two in a channel.
-
-The web's nine material studies came next, since each is one fragment shader and sometimes a
-layer of instanced cards: Orrery, Switchback, Daydream, Small Hours, Paper Cities, Weave, Frost,
-Hothouse and Night Bus. `GPUSurfaceScene` keeps their clocks, bands, touch and hits as the Metal
-`SurfaceScene` does, and their shaders are the Metal ones' MSL back in GLSL over a shared
-`surface.glsl`. Frost's crystals and Hothouse's leaves are cards, each placed by a matrix that steps
-per instance.
-
-Then the web's seventeen three.js scenes, on `GPUGeometryScene`: Wireframe, Sunset, Web, Saturn,
-Lifeforms, Cubik, Stillwater, Cycles, Clouds, Longhand, Defcon, Dancers, Convoy, Machine, Jumpman,
-Trench and Graphic Lab. So every scene is on the layer.
-- **Camera and geometry.** The camera, the model matrices and the shapes they build (`Space.swift`)
-  now use `Matrix4` and the standard library's vectors rather than Apple's `simd`. The Metal scenes
-  reach the same code through a small bridge, so there is one copy of the arithmetic.
-- **Sprites.** A point with a size, which Direct3D cannot draw, is an instanced quad. `sprite.glsl`
-  sizes it in pixels against the viewport the base binds, and gives the fragment Metal's
-  `point_coord`.
-- **Per-point data.** Buffers the Metal shaders read by vertex id became vertex attributes. Small
-  tables became uniform arrays.
-- **Graphic Lab prints on `DriftboxCanvas`.** Its three editions draw on the canvas with the
-  platform's typesetter, and the page is laid over the frame, as the web hands its canvas to WebGL.
-  A scene is made with the platform's `Typesetter` for this: DirectWrite on Windows, Android's own
-  text stack on Android. The Mac gives a `NoTypesetter`, which sets nothing, until it has a Core
-  Text typesetter, which is why the Mac's comparison with the Metal scenes leaves Graphic Lab out
-  for now.
-
-Every scene on the layer plays the same six seconds as the Metal scenes' own test: kicks, hats,
-and a finger circling through the middle two seconds. On WARP each is held to drawing something
-that is not black and to moving. On the Mac each is held to its Metal scene frame by frame. With
-`DRIFTBOX_SCENE_SHOTS` set, the test writes each scene's frames out to look at.
-
-`GPUScenes` finds a song's scene by its `visual`, falling back to Pulse for one not yet across.
-They are on screen:
-
-```bash
-driftbox-play conformance/fixtures/documents/saturn.song.json --window
-```
-
-The song plays through WASAPI on Windows, with its scene drawn through Direct3D. On the Mac it
-plays through the engine's Audio Unit, with Pulse drawn through Metal. Either way a frame is drawn
-once per refresh, from the events the engine reports playing and the mix it has made. On Windows
-the window is the shell's:
-
-- File ▸ Open… (Ctrl+O) opens another song, and its scene with it.
-- Space plays and stops; Ctrl+Enter goes back to the start.
-- View has the next and previous scene (Ctrl+Right, Ctrl+Left) and each scene by name.
-- The whole window is a pad for the performance filter, as vibes mode is on the Mac, and the
-  scene feels the finger.
-
-With `DRIFTBOX_SCENE_SHOTS` set to a directory, as for the scene tests, each second's frame is
-written there as it was presented: a BMP on Windows, a PNG on the Mac.
-
-### Windows
-
-Swift 6.4 from swift.org, and the Visual Studio Build Tools with the C++ compiler and a Windows
-SDK. Build in a shell that has run `vcvars64.bat`, with `SDKROOT` pointing at the toolchain's
-`Windows.sdk`.
-
-```bash
-swift build -c release --build-tests --build-system native -Xswiftc -enable-testing
-swift test -c release --skip-build --build-system native
-swift build -c release --product driftbox-play
-swift build -c release --product DriftboxWindows
-```
-
-In release, because a debug build does not link there yet: the specialisations `@_noAllocation`
-makes even at `-Onone` collide with the same ones `swiftSwiftOnoneSupport.dll` exports.
-
-Audio is WASAPI in shared mode, event driven, float stereo at 48 kHz converted to the device's
-format by Windows. Everything WASAPI is made, used and released on the stream's own thread at
-Pro Audio priority, so the interface's thread keeps whichever COM apartment it needs. The route
-follows devices through `IMMNotificationClient` — a COM object built by hand in Swift, as nothing
-builds one — and a stream whose device goes away ends and asks to be replaced.
-
-MIDI is WinMM, which sends at once and says nothing when devices change. So clock out goes through
-a scheduler of its own that holds each message to its stamp on a high-resolution timer, to within
-a millisecond, and devices are read again every two seconds and known by name. A clock for another
-program on the same machine goes through a loopback port made in Windows MIDI Services.
-
-**The app** is `DriftboxWindows`: a window with the song's scene filling it, the controls over it
-— the transport bar, the song as a strip of sections to play from, the step grid and its
-patterns, and the selected voice's knobs or the song's effects — the rest of it the performance filter's
-pad, and menus for the rest. Tab hides the controls, to perform. The keyboard is an instrument,
-as on the Mac: the number row strikes the drums, the home row plays 303 A, `z` and `x` its octave.
-The rack is there too, from Rack ▸ Show Rack (Ctrl+R): the patch's modules with their knobs and
-choices, its catalogue of patches, and the keys playing it, heard beside the groovebox.
-- **File:** New, Open…, Open Recent — the ten songs opened or saved lately, which the taskbar's jump
-  list shows too — the catalogue, Save and Save As… as `.driftbox`; Export Mix… as one WAV, and
-  Export Stems… as a WAV for each voice the song uses, in a folder chosen in Windows' own panel;
-  Export Movie…, the song and its visuals as an H.264 and AAC `.mp4`, and Record Performance, what
-  is played written as one, each written while the app carries on, how far in the title, then
-  shown in Explorer.
-- **Edit:** Undo and Redo, named for the edit.
-- **Transport:** play and stop, sections, the loop set to a section or cleared whatever it spans, the
-  metronome and the count-in.
-- **View:** the controls shown or hidden, and the song's scene or any other; and the visuals in a
-  window of their own (Ctrl+2), or full screen on a display chosen by name, for a projector: Escape,
-  F11 or a double-click leave full screen, Space plays and stops, the pointer hides when still, and
-  the window comes back where it was at the next launch.
-- **Audio and MIDI:** the output device, the MIDI inputs heard, and the MIDI clock followed or sent,
-  and where. Settings are menu items the menu ticks as it opens.
-
-**Help.** Help ▸ Groovebox Guide and Rack Guide, and F1 for the one showing, draw the guide over
-the window: `DriftboxHelp`'s words for Windows, saying what the drawn app's own chips, right-click
-menus, menu bar and keys do, a tab for each topic, scrolled by the wheel and the keys and put away
-with Esc. A screen reader reads it as it reads the controls. `HelpSheet` lays it out on the canvas,
-so Android can show the same pages.
-
-**Screen readers.** The controls are drawn, not windows of their own, so the app describes them to
-Windows' UI Automation itself, as Narrator and NVDA read it: the transport, the tempo and swing, the
-song's sections and patterns, every lane's steps, each 303 step's note, accent and slide, and the
-knobs showing, each by a name a person would give it and with what it is set to in words. A screen
-reader presses a button, turns a step over or sets a knob, and the app does it as a hand would.
-The rack is described too: its transport, tempo and Add; each module a group of its knobs, choices,
-buttons and numbers, named as its face names them with its abbreviations said whole, a mute or a
-gate said as on or off, and each module's menu a button. Turned round, each module's jacks say what
-they are patched to, and a screen reader patches as a hand does: press a jack to take a cable from
-it and one of the other kind to plug it in, pull a cable out of an inlet, and turn an inlet's trim.
-A Combinator's routing is described and edited too: each routing's source, module and knob offer
-the menus a click does, and its two ends are sliders. Nothing is described until something reads the window. While a screen reader runs, as
-Windows says one is, the keyboard moves between the controls as in any Windows program: Tab and
-Shift+Tab to the next and the one before, Enter to press it, and the arrows to turn a knob or a
-number a notch; the screen reader hears where it is, and a ring shows it. Space still plays and
-stops, and Show Controls and Show Back stay in the View menu, without Tab.
-
-Closing, opening or starting afresh over unsaved work asks first, in Windows' own words. Its
-executable only chooses Windows' parts — WASAPI, WinMM, a Win32 window, Direct3D, DirectWrite — and
-hands them to `DriftboxDesktop`, the app every platform with a `ShellWindow` runs, on `Session`.
-`DesktopTests` hold that app to its menus, commands, title, care over unsaved work and frames, with
-a stand-in window, on WARP.
-
-**Shipping it.** The program carries Driftbox's icon, which `scripts/windows-icon.mjs` draws from
-the web app's own icon in a Chromium: the four-pad picture at 16 to 32 pixels, the full one from 48
-up. It and the plug-in scanner carry their version too, as Explorer shows it and signing checks it,
-in `windows/Driftbox.res` and `windows/DriftboxVST3Scan.res`, which `scripts/windows-resources.mjs`
-writes from `scripts/version.env` and compiles with the SDK's `rc`: run it again after changing the
-version. It opens a song it is
-handed, as Explorer hands one over, and `DriftboxWindows.exe --register` makes `.driftbox` files
-open in it and show its icon, for the current user, as an installer would; `--unregister` gives
-them back. After a release build,
-
-```bash
-node scripts/windows-package.mjs
-```
-
-makes `dist/Driftbox`, which runs on a machine with no Swift on it, and a zip of it: the program,
-the plug-in scanner beside it, the catalogue's resource bundle, and the Swift and Visual C++ runtime DLLs it loads, found by
-reading their import tables — 18 of them, about 86MB, 30MB zipped.
-
-With Inno Setup 6 installed (`winget install JRSoftware.InnoSetup`),
-
-```bash
-node scripts/windows-installer.mjs
-```
-
-packages it and makes `dist/Driftbox-0.1.0-setup-x64.exe` from `windows/Driftbox.iss`, about 22MB:
-an installer for the person running it, with no administrator needed unless they choose
-everyone, which puts Driftbox in the Start menu, makes `.driftbox` songs open in it if they want
-that, writing the keys `--register` writes, and takes all of it away again on uninstalling.
-`scripts/version.env` sets its version. One made here is not signed, so Windows warns before it
-runs.
-
-**Releasing it.** Pushing a tag `v<version>`, the version file's, runs
-[`.github/workflows/release.yml`](.github/workflows/release.yml) on GitHub's Windows runners: it
-builds, packages, makes the installer and drafts a release with it and the zip. Signing is free
-for open source through the SignPath Foundation, as [CODE_SIGNING.md](CODE_SIGNING.md) sets out:
-once the repository has the `SIGNPATH_ORGANIZATION_ID` variable and the `SIGNPATH_API_TOKEN`
-secret, the workflow has the programs signed, builds the installer from them, and has that signed
-too, each request approved by hand in SignPath. `.signpath/artifact-configurations` holds what
-SignPath is to be told to sign.
-
-### Android
-
-The engine plays through a phone, and times itself there. It is built with a swift.org toolchain
-and swift.org's Swift SDK for Android of the same version, and the NDK that SDK names — Swift 6.4.0
-and NDK r30 — on Windows from Git Bash, on a Mac, or on Linux, which CI builds it on. On a Mac the
-toolchain is swift.org's, in `~/Library/Developer/Toolchains`, not Xcode's own Swift, which the SDK
-is not built for; `swift sdk install` puts the SDK where the scripts look, and Android Studio the
-NDK. `android-env.sh` says where each is looked for on each, and how to point at another:
-
-```bash
-scripts/android-play.sh                    # acid through the phone's speaker, for twenty seconds
-scripts/android-play.sh song.json --seconds 60
-scripts/android-bench.sh                   # --bench, once on each kind of core the phone has
-```
-
-Each builds `driftbox-play` for arm64 Android with `android-build.sh` and pushes it to
-`/data/local/tmp`. There is no app and no install: Android runs a plain executable. It is linked
-statically. swift.org's SDK rather than the Android platform the Windows installer brings, whose
-standard library has no SIMD types and whose arm64 runtime cannot link Foundation; the build sets
-the SDK up the first time, as its own script would, and `android-env.sh` says how.
-
-Audio is AAudio: low-latency mode, exclusive if the device will give it, float stereo at 48 kHz.
-The buffer starts at two bursts, 4ms, and grows a burst at a time if the stream underruns: one, the
-least a stream can have, crackled once the app drew its controls, though AAudio counted no
-underruns, and its slowest callbacks took up to 3.6ms of a 2ms burst; with two, 4.1ms of 4. Every
-callback timed showed what those were: one in eleven, every 1,024 frames, took twice the rest,
-because the reverb's tail did a whole block's work in the callback its block ended in. It spreads
-that work over the next block now (`SpreadConvolver`), and the slowest callback of a second is 2.1
-to 2.6ms, with the heaviest scene drawn, on any of five songs: room in two bursts, where it had
-been three, 6ms, to hide them. AAudio makes
-the render thread; Driftbox keeps it to the big cores, since left to the scheduler it underran a
-hundred times a second, and reports each callback's work to a performance hint session. A stream
-whose device goes away ends and asks to be replaced, as on Windows. AAudio plays through a device
-by number but cannot list them, so the app's Java lists them from `AudioManager`, as they come and
-go, each with an ID that stays the same when it is plugged in again; the song's menu offers them
-under Output, beside Automatic, which is wherever Android sends the sound. A device chosen and
-unplugged is kept, and Automatic played through until it is back.
-
-What the app remembers between launches — the song open last, which it plays when started without
-one, the click and the other settings, the output chosen, and the rack's patch and the controllers
-learnt onto it — is in `settings.json` among its own files, written by `FileMemory`, since
-`UserDefaults` is the old Foundation's there.
-
-MIDI is Android's native MIDI, which needs Android 10, so Driftbox builds for API 29. It can play
-through a device but not find or open one: that is Java's `MidiManager`. So the app opens every
-device and hands each to `AMidiDevices`, and `AMidiInput` and `AMidiOutput` open their ports from
-there. Input is read by a thread that asks every port in turn, since there is no callback, and a
-`MIDIByteStream` per port makes Android's packets back into messages: running status, clock in
-the middle of a note, system exclusive skipped. Output is stamped, and what a stamp means is the
-device's business: Android's USB driver holds a message until then, by its source, but a device
-that is another app is handed it at once. So for every device but USB, `AMidiOutput` holds each
-message in a scheduler of its own until it is due, and sends it stamped, as WinMM's scheduler
-does on Windows; the two share `MIDIQueue` in `DriftboxHost`, and each waits in its own way.
-
-The app is built without Gradle, by the SDK's own tools. Opened, it plays a song from the
-catalogue with the scene the song names drawn from it over the whole screen, and the screen is
-the performance filter's pad, as the window is on Windows; two fingers tapped step on to the next
-scene. A scene is drawn at no more than two pixels to a point, a Mac's Retina display's, and
-scaled up to the screen: on a Fairphone 6, which has three, every scene but Frost then keeps the
-display's 120 frames a second, and Frost 98. Graphic Lab, which sets its type there with Android's
-own text stack, takes 5.6ms a frame drawn, and more over its first frames at a size, while the
-glyphs it sets go into its atlas. Given a test's name, the app runs that instead and says what
-happened; a release has no tests in it, nor the MIDI loopback they test against, which every
-other app on the phone would list. Its icon is an adaptive one, drawn as vectors, the Mac's and the
-web's picture placed as the web's maskable icon places it: `scripts/android-icon.mjs` writes it.
-
-```bash
-scripts/android-app.sh                  # build and install; open it for Pulse, playing acid
-scripts/android-app.sh build            # build only, with no phone
-scripts/android-app.sh release          # build it as it is released, without the tests: what CI does
-scripts/android-app.sh bundle           # and an App Bundle beside it, for Google Play
-adb shell am start -n app.driftbox/.Main --es song smallhours --es scene hothouse
-scripts/android-app.sh midi-loopback    # test the MIDI ports against the app's own loopback
-scripts/android-app.sh gpu              # or the GPU contract on the phone's GPU
-scripts/android-app.sh scenes           # or every scene drawn, checked and timed there
-scripts/android-app.sh text             # or the typesetter, held to what every platform's is
-scripts/android-app.sh rack             # or every patch of the rack's opened and run until it sounds
-```
-
-The app is `Session` and the controls on a touch screen: `DriftboxTouch`'s `Touchscreen`, which is
-`Desktop`'s counterpart for a screen with no window to ask things of, and which iOS can use as it
-is. It draws the scene at no more than two pixels to a point, lays the controls over it at every
-pixel, and decides what each finger is: the controls' if it lands on them, the pad's if it is the
-first anywhere else, and a second finger tapped steps on to the next scene. Everything but the
-audio is on Java's main thread, as a desktop's is on its window's: Java's `Choreographer` asks for
-each frame and hands over each finger between them, and a window is let go of before Java's
-`surfaceDestroyed` returns, as Android wants. It lays the controls out for fingers: a phone's
-narrower than 600 points, kept upright, and a tablet's, a roomier phone's, wider, turned either way.
-
-The session finds its songs as files, where the app unpacks them from its package, rather than
-through `Bundle`: on Android that, `String(format:)` and `UserDefaults` are the old Foundation, and
-it brings 48MB of internationalisation with it. The build tells the compiler not to link the old
-Foundation at all, and fails a library that still asks for any of it, which the phone would
-otherwise refuse only as it loaded; the package is 17MB.
-
-The rack is in it too, though the phone does not show it yet. The rack session finds its patches
-beside the songs; keeps what it remembers in a `RackMemory`, which `UserDefaults` is elsewhere; reads
-its learnt controllers with `JSONDecoder` rather than `JSONSerialization`, sample names with the
-standard library's `Regex`, and writes numbers without `%f`; and on Android has its own `CGPoint`
-and `CGRect`, which the old Foundation gives Windows. `scripts/android-app.sh rack` opens every
-patch in the catalogue on the phone and runs it until it sounds: all eleven do, each in its first
-second but Pressure System, a song that comes in in its seventh, as it does on Windows, and a
-second of any costs the phone 9 to 127ms.
-
-Out of view, or with the screen off, the song plays on and nothing is drawn: a media
-playback service, with a notification to stop it from, keeps the process on the big cores, which
-Android otherwise takes away from an app out of view. There the render thread costs half as much
-again as in view, with no drawing to keep the cores awake, so the stream's buffer goes to sixteen
-bursts at once, 32ms, and back to one in view. On a Fairphone 6, twenty seconds with the screen
-off underran once, as it went off. A call, or another app's playing, pauses it, as media does.
-
-Songs open and save as `.driftbox` through Android's own pickers, from the song's menu: its name,
-at the head of the strip, tapped. Java reads and writes the document whole and hands Swift its
-text and its URI (`FileLines` in `Sources/DriftboxAndroid` says what passes between them), and the
-session keeps the URI as the song's id, so Save writes back to the document it came from.
-
-It needs a JDK and the SDK's build-tools and a platform beside the NDK. Driftbox Loopback is a
-MIDI device the app publishes that sends back what it is sent, so the ports are tested with
-nothing plugged in, as on Windows. Notes and clock come back whole and in order, stamps exact. A
-clock sent ahead goes out when it is due: a beat of it, tick by tick, 0.1 to 2ms after each tick
-was due, and a flush drops what has not gone. Without the scheduler it came back a tenth of a
-second early, the moment it was sent, and a flush dropped nothing.
-
-The NDK has to be the one the SDK names, not only a recent one: the Swift runtime is built against
-that NDK's C++ library, and linked with an older one it links and is then refused by the phone for
-want of a function (6.4.0's wants `std::__hash_memory`, which r30's libc++ has and r29's has not).
-`android-app.sh` looks for every such function in the libc++ it packs, and stops if one is
-missing. An arm64 emulator runs the app's checks as a phone does, from a Mac with no phone to
-hand; drawing in software, the scenes want `DRIFTBOX_ANDROID_WAIT=300` rather than the thirty
-seconds a phone takes.
-
-## Conformance
-
-```bash
-node conformance/emit/emit.mjs          # rewrite the checked-in fixtures
-node conformance/emit/emit.mjs --full   # also whole-song plans, into conformance/generated
-node conformance/emit/emit-audio.mjs    # everything rendered in Chromium, into conformance/generated
-scripts/check-fixtures.sh               # fail if the fixtures are stale against the submodule (emit --check)
 SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 swift test
+swift format lint --strict -r Sources Tests Package.swift
+scripts/check-constrained.sh     # the audio core compiles as Embedded Swift, with no allocation
+scripts/check-fixtures.sh        # the fixtures are not stale against the submodule
 ```
 
-The variable makes a test run check actor isolation as strictly as the app does. Without it the
-test runner is lenient, and a closure made on the main actor but called from an audio or MIDI thread
-traps in the app while every test passes.
+- **Conformance.** The reference's own TypeScript writes fixtures (documents, event plans, edits,
+  MIDI clock, voice descriptions, rack graphs and panels, and audio rendered in Chromium), and the
+  Swift is held to them: exactly where the data is data, and within -75 to -100dB of the browser
+  where it is sound. [docs/conformance.md](docs/conformance.md) has the levels, the commands, and
+  what was learned by measuring.
+- **Strict isolation.** The variable makes `swift test` check actor isolation as strictly as the app
+  does. Without it, a closure made on the main actor and called from an audio or MIDI thread traps
+  in the app while every test passes.
+- **Every platform.** CI runs the suite on Linux and on Windows, builds the Android app, and builds
+  and checks the Linux packages. The Mac's suite runs locally, and before every release. Checks
+  that need a phone run on one, or an arm64 emulator, through `scripts/android-app.sh`.
 
-Needs Node 24 or later and, for the audio, a Chromium — and nothing else. Node strips the types
-itself, and `conformance/emit/ts-resolve.mjs` points the reference's `./x.js` imports at the
-`./x.ts` files that exist. The submodule is never built or installed.
+## Documentation
 
-The audio step drives a real browser because only a real `OfflineAudioContext` renders the
-reference's Web Audio graph. `conformance/emit/browser.mjs` does it in two small pieces: an HTTP
-server that serves the submodule's TypeScript with its types stripped on the way out, and the
-DevTools protocol over Node's built-in WebSocket. It finds `DRIFTBOX_CHROMIUM`, then a Playwright
-cache, then an installed Chrome.
-
-What lands in `conformance/generated` is not checked in: it is tens of megabytes, and Chromium does
-not render one graph to the same bits twice. Tests that need it skip when it is absent — except
-under `DRIFTBOX_REQUIRE_GENERATED`, which CI sets after generating it, so that there a missing
-fixture is a failure.
-
-Three levels, in rising cost:
-
-| Level | Fixture | Compared |
-|---|---|---|
-| Documents | every catalogue song as the web app saves it; 19 damaged and legacy documents with what the reference makes of each | exactly |
-| Events | `planSong` for every song — each hit, its time, its resolved knobs and sends; three deliberately awkward songs; the PRNG as raw bits | exactly |
-| Edits | every transform in `pattern.ts`, applied by the reference to a catalogue song: 28 results | exactly |
-| MIDI clock | a synthetic clock stream — jitter, a tempo change, a lost tick, stop, position, continue, a stall — through the reference's follower: what each of 464 messages made of it | exactly |
-| Voices | what each of the 22 voices *describes* — its `VoiceSpec` — over nine panels and both velocities | exactly |
-| Rack panels | every module's size; every factory and song patch's placements, jacks and drop targets; every cable's sag, seed, period, swing through two seconds both ways, and curve | exactly; the curve to the tenth it is written to |
-| Audio | each voice rendered in Chromium, over four panels, and again panned in stereo; nine probes of one node type each; the waveshaper alone | within -100dB of the peak; -90dB through drive; -75dB with square or sawtooth oscillators |
-
-**Documents** go both ways: a catalogue song decodes and encodes back to the same bytes, which
-needs object keys kept in document order and numbers printed as JavaScript prints them —
-`Sources/DriftboxDocument/JSONValue.swift` exists for those two things. The damaged documents pin
-down the repairs: a v1 chain, halves that round the way `Math.round` does, a bad step costing the
-step and not the track.
-
-**Events** check in the first four bars of each song. `--full` writes whole songs, and the same
-test walks them start to finish when they are there. The catalogue uses no machine clips, short
-drum lanes, flams or filter strikes, so `events/synthetic.json` holds songs written to be awkward:
-all of those at once, bars of three different lengths, tempo and swing under automation, a voice
-no machine owns, and clips launched over the top.
-
-The first two are what keep two implementations *agreeing*. The third keeps them sounding alike.
-Only the ladder has an audio fixture so far; the ones that need a browser to render the reference
-(anything built from Web Audio nodes) come with phase 2.
-
-**Songs are data.** `conformance/fixtures/documents` is also the catalogue the app will ship, so
-a song added on the web arrives here by bumping the submodule and re-running the emitter. The
-diff is the list of what changed, and the tests say what it broke.
-
-**Voices** are split the way the reference splits them. A voice is a function from its panel to a
-description of a sound, and the description is data, so all 396 compare exactly. With that pinned,
-any difference in the *sound* belongs to the one renderer and not to 22 voices.
-
-**Audio** is that renderer against the browser. Measured, relative to each voice's peak:
-
-| | |
-|---|---|
-| noise through filters, resampled or not | -120 to -142dB — a step or two of a 32-bit float |
-| sines and triangles | -104 to -125dB |
-| squares and sawtooths | -78 to -116dB |
-| through drive (the 909 kick, snare and clap) | -98 to -131dB |
-| 303 lines from the catalogue: slides, accents, ties | -94 and -116dB sawtooth, -85dB square |
-| the delay send: settled, gliding, and retimed mid-tail | -139 to -142dB |
-| the reverb send, three rooms | -112 to -131dB |
-| the browser's compressor alone, three settings | -125 to -138dB |
-| the master inserts whole: drive, struck filter, compressor | -94 to -136dB; -63dB after one kind of strike |
-| the performance filter: idle, and through three gestures | -141dB idle; -78 to -98dB moving |
-| every voice struck between sample frames, at four times | as on a frame; the 909's cymbals -71 to -83dB |
-| **whole mixes**: a window of eight catalogue songs | four at **-80 to -98dB**; four in level to 0.3dB, differing in a few stretches |
-| the oversampler alone, against its measured impulse response | under 1e-6 |
-| Chromium against itself | up to 5e-7 between two renders of one graph |
-
-`probes.json` holds one kind of node at a time, outside any voice — a bare square, a swept filter —
-so that when a voice differs there is somewhere smaller to look. Most of what follows was found
-there. Things learned by measuring rather than reading:
-
-- **A source starts when it is told to, not on the next frame.** A clap's retriggers fall between
-  sample frames, and the browser begins each one a fraction of a frame in, interpolating the noise.
-  Rounding them to a frame is a whole sample out, and two copies of one noise a sample apart is a
-  comb filter: -11dB, not -140.
-- **The browser's parameters are single precision, and it matters twice.** An oscillator's phase
-  step is a 32-bit product; matching that took the cowbell from -85dB to -106dB. A buffer's
-  playback rate is a 32-bit float; matching that took the 909 crash — two seconds of resampled
-  noise — from -61dB to -131dB. Neither is audible as pitch. Both are the same few parts in a
-  hundred million *in the same direction*, and drift is what a subtraction hears.
-- **Oscillators are wavetables, and the tables are the sound.** `WaveTable` follows Chromium's
-  `PeriodicWave` step for step — table size, three ranges to the octave, how many partials each
-  keeps, normalised by the peak of the fullest table, Gibbs overshoot and all. Triangles match to
-  -109dB and better. Squares stop at about -80dB: what is left is a timing difference of a
-  hundred-thousandth of a sample in where the table is read, which a waveform with edges spreads
-  evenly over every harmonic. That is the browser's arithmetic, a nanosecond, and not chased
-  further.
-- **Cancelling a ramp snaps back; it does not hold.** Every 303 note cancels what was scheduled
-  before it, and a filter sweep still under way is a ramp due in the future, so it goes. In the
-  browser the parameter then jumps back to where the ramp *started* — the last thing the timeline
-  still knows — rather than holding where it had got to. `ParamTimeline.cancel` does the same, and
-  takes the moment the call is made, because what had already played stays played. The reference's
-  mix schedules each note from the start of its render quantum, so its filter snaps open for up to
-  127 frames before a note; a sequencer that schedules to the sample, as this one will, has no
-  such window. (Scheduled all up front, as the reference's *stem* export does, every overlapped
-  sweep is cancelled before it plays at all — a bug there, reported.)
-- **The reference started every oscillator at the wrong pitch, and no longer does.** A hit almost
-  never starts on the first frame of a render quantum, and when it does not, Chromium — for the
-  rest of that quantum — reads the oscillator's pitch from the *start of the quantum* instead of
-  from where the oscillator started. The reference only scheduled a pitch, so what got read was
-  the node's default: a hit 36 frames into a quantum played 36 frames of 440Hz, and the 909's
-  cymbals began at the wrong speed. Measured on a bare sine at six start times, and exact; it is
-  what the reference's notes had recorded, unexplained, as a closed hat's peak moving between 0.67
-  and 3.97 "purely with where the hit falls inside a quantum". Found here, fixed there in
-  driftbox#299 by setting the node's value as well. What is left is small: a pitch *envelope* is
-  still read early for that one quantum, so a kick's drop arrives up to 2.6ms ahead. The engine
-  does not do that either — it differs on every hit, and no two plays agree — and
-  `emulatesBrowserSourceStart` turns it on for the comparisons.
-- **Two single-precision details in how noise is read.** An oscillator starts at the top of its
-  cycle on its first frame however late that frame is, where a buffer starts a fraction of a frame
-  in. And a buffer's start offset goes through single precision before it is rounded to a frame:
-  one kick in one song has an offset of 48374.4995 frames, which is 48374.502 as a float, rounds
-  the other way, and came out with its click inverted.
-- **Four whole mixes are not understood yet.** Four of eight songs match the reference whole at
-  -80 to -98dB — every voice, both 303s, the sends, the compressor, the idle pad. The other four
-  agree in level to 0.3dB throughout and differ in a few tenths of a second each. Bisected in the
-  browser: give a song a voice that is both panned and sending to the delay, and the *reference's
-  own* render of the 303 changes, before that voice has played a note, for the length of one bass
-  note after the first thing scheduled from a suspend — and then goes back. This renderer gives the
-  same 303 either way. It is a channel-count effect inside Chromium's delay loop, and it is not
-  stable there either: those four are the songs on which an x64 and an arm64 Chrome disagree with
-  *each other* most, by -30 to -37dB, where they agree on the other four to -56 to -81dB. The test
-  holds the four to level and coverage until it is pinned down.
-- **An idle filter is not an absent one.** The performance pad is a low-pass into a high-pass,
-  both "wide open" when nobody is touching it, and the reference calls that a true bypass. Sample
-  for sample its output differs from its input by nearly the whole signal: a 20Hz high-pass turns
-  the phase of the bass, and a 20kHz low-pass shaves the top. Nobody hears it, and every mix the
-  reference has ever rendered went through it — so `Kaoss` is in the chain here too, idle, and
-  matches an arm64 Chrome at -141dB. (An x64 Chrome differs from the arm64 one by -76dB on the same
-  idle pad: a high-pass at 20Hz has its poles almost on top of each other, and the two builds do
-  that arithmetic differently. So -76dB is about as closely as *any* whole mix can be held to the
-  reference across processors.)
-- **A glide arrives at ten time constants, not after them.** `setTargetAtTime` never finishes on its
-  own, so the browser declares it finished — and a glide of 0.02s begun on a render quantum is ten
-  time constants old on another one exactly. "After" is a quantum late, which on a resonant filter
-  was the difference between -56 and -78dB.
-- **The compressor has no specification, only an implementation.** The standard names the
-  `DynamicsCompressorNode`'s knobs and says nothing of how it behaves, so "the compressor" in the
-  reference is Chromium's, inherited from WebKit, and the songs were mixed through it. `Compressor`
-  follows it move for move: six milliseconds of look-ahead, a soft knee whose steepness is found by
-  bisection, makeup gain that is automatic (quiet signals come out 1.7 times louder), a detector
-  that follows attenuation rather than level, gain that moves in 32-frame steps with a release
-  that is faster the harder it was compressing, and a sine on the way out to round the corners. It
-  also starts with its detector at zero, so the first fifty milliseconds of any render duck and
-  recover. Written from the algorithm and then measured: -125 to -138dB on the first run.
-- **Turning the drive up from zero moves the mix 2.7ms later.** At zero the master waveshaper has
-  no curve, and passes the signal straight through: the chain is then bit-identical to the
-  compressor alone. With any drive it oversamples, and brings its 128 frames of delay.
-- **One thing here is not understood.** A filter strike that arrives while the sweep before it is
-  still running matches the browser to -63dB for a quarter of a second, where a strike that finds
-  the filter at rest matches to -120dB. Snapping back to the cancelled sweep's peak is certainly
-  most of what the browser does — holding is 18dB worse, snapping elsewhere 44dB worse — and the
-  rest is unexplained. No catalogue song strikes the filter.
-- **A delay in a loop is 128 frames longer than it says, every time round.** The browser computes
-  a feedback loop a render quantum at a time, and the way it breaks the cycle hands the filter the
-  delay's output from the quantum before. So the second repeat of the reference's delay lands 128
-  frames late, the third 256: a dotted-eighth echo drifts 2.7ms further off the grid with each
-  repeat, and always has. Kept.
-- **A delay line is read in single precision, which is coarse.** The read position is a 32-bit
-  float of magnitude a hundred thousand or so, which resolves to a sixty-fourth of a frame. A delay
-  of 17142.857 frames is read at 17142.859, and an impulse comes back as exactly 9/64 and 55/64 of
-  itself. Doing the arithmetic properly, in double precision, matched to -53dB; doing it the
-  browser's way, -142dB. (For a while this looked like the delay time being read once per quantum,
-  because two neighbouring frames kept rounding to the same fraction. It is read every frame.)
-- **The reference does not agree with itself across processors, and that sets the bounds.** An
-  x64 Chrome and an arm64 Chrome render most of this to within -100dB of each other — but x64
-  steps `setTargetAtTime` four frames at a time with differently rounded arithmetic, so while a
-  delay time is gliding the two browsers differ by **-19dB** on a click through the delay. This
-  renderer matches the arm64 one to -140dB. Nothing can be held to a reference more tightly than
-  the reference holds to itself, so those cases carry the browsers' own disagreement as their
-  bound, and a second check — the level of every stretch of the tail, which both browsers agree
-  on to 0.3dB — holds the shape of the glide instead.
-- **`setTargetAtTime` is stepped, not solved.** A single-precision value moved towards its target
-  once per frame, which after seventeen thousand steps is a sixteenth of a sample from the closed
-  form — and that is where the echo lands while a delay time is gliding.
-- **The waveshaper delays by 128 frames, and that is kept.** The browser oversamples drive with
-  two windowed-sinc filters, and they are audible: they ring a little either side of a transient
-  and they hold the signal back 2.7ms. A 909 kick in the reference has always landed that far
-  behind an 808 kick on the same step. `WaveShaper` has the same filters, checked against the
-  browser's impulse response measured through a curve that does nothing.
-- **A voice gets quieter the moment its pan knob leaves centre.** The reference builds a panner only
-  when the pan is not exactly centre, so a centred voice goes to both sides at full level where a
-  panner at centre would put it 3dB down. The songs were mixed that way, so it is kept.
-- **The reference clicked, and no longer does.** At some knob settings a source is due a sliver of
-  a frame after a frame boundary; Chromium starts it on that frame, and the gain envelope's first
-  event was still in the future, so the `GainNode` sat at its default of 1 for one frame. It was
-  found here on the 808 clap at one setting — and then on the 909 clap at its *default* panel, all
-  four retriggers. Fixed in driftbox#297; this renderer never reproduced it, and the case that
-  found it is now an ordinary one that matches at -141dB.
-
-### Offline forms and real-time forms
-
-Everything that makes sound exists twice, on purpose. The **offline form** is where a thing is
-understood: it allocates what it likes, reads like the reference, and is held to the browser. The
-**real-time form** is where it is played: fixed storage, no allocation, no locks, no classes, every
-function on the render path marked `@_noAllocation` — and it is held to the offline form, *to the
-bit* where the arithmetic allows, so that nothing shown against the browser has to be shown again.
-
-The real-time forms, held to their offline ones: `VoicePool` (the drum voices; **to the bit**),
-`RealtimeBassline` (the 303; **to the bit**, on catalogue lines), `PartitionedConvolver` (the
-reverb, with no latency; within single precision) and `SongEngine`, which plays a `CompiledSong` —
-every hit and note worked out ahead of time on a thread that may allocate — through all of them
-and the master chain, with a transport that loops: within -90dB of `SongRenderer` on four songs,
-and the same whatever block size the host asks for. `EngineHost` puts a lock-free command ring in
-front of it, and `DriftboxAudioUnit` makes that an `AUAudioUnit`, which `driftbox-play` hosts in
-an `AVAudioEngine` and plays through the speakers.
-
-`VoicePool` was the first: `VoiceRenderer` for a render thread. A hit is turned into a
-`FixedVoiceSpec` — plain bytes, small enough for a ring — on a thread that may allocate, and
-started and rendered on one that may not. All 22 voices, struck on and between frames, rendered in
-blocks of 97 frames, match `VoiceRenderer` exactly; so does an open hat choked by a closed one.
-
-Three things the compiler taught along the way, all of which are rules now: an array cannot be
-read from a function that promises not to allocate, so storage is pointers owned by a
-non-copyable type; nor can a generic type be touched, so fixed arrays are written out; and such a
-function can only call what makes the same promise, across files as well as modules — which
-includes reading a `static let`, because that is initialised on first use, behind a lock.
-
-### The app
-
-```bash
-scripts/bundle-app.sh && open .build-release/Driftbox.app
-```
-
-The Mac app: the catalogue as a library, a transport, the step and 303 grids of the pattern the
-transport is in, live and editable, the voice and effects panels, the pad, open, save and export,
-MIDI in from the sources chosen in Settings and clock out, and the visuals — in a pane, and in a
-window of their own (⌘2) that goes full screen on a named display from View ▸ Visuals Full Screen
-On. One renderer draws each frame once and every view shows it, so the pane previews exactly what
-the window is showing. The song and the visuals window come back at the next launch. A SwiftPM executable rather than an Xcode project for
-now, which is why it announces itself to the system by hand on launch, and why a script has to
-wrap it into a bundle: `swift run Driftbox` also works, but the catalogue lives in a resource
-bundle that `Bundle.module` looks for beside the executable and in `Contents/Resources`, and the
-script puts a copy in both.
-
-### Releases
-
-A release is Developer ID-signed and notarised on this Mac by `scripts/release.py`, which leaves a
-stapled app, zipped, with its checksum and a manifest, in `dist/` for review, and tags, uploads and
-publishes nothing. `scripts/android-release.py` does the same for Android: an APK and an App Bundle
-signed with the upload key. [docs/RELEASING.md](docs/RELEASING.md) has the one-time setup and the
-steps for both.
-
-### Visuals
-
-`DriftboxScenes` is phase 6: a `Scene` protocol that keeps the web scenes' ids and accent
-colours, so a song's `visual` hint resolves here too, and draws whatever it likes; a renderer
-over one shader library compiled at launch; the fallback scene, driven by the engine's events
-ring, the block peaks and the pad; and the web's nine *surface* scenes — Orrery, Switchback,
-Daydream, Small Hours, Paper Cities, Weave, Frost, Hothouse and Night Bus — which are each one
-fragment shader over the screen (two of them with a layer of instanced cards on top), fed the
-same handful of numbers. Their GLSL carries to Metal almost line for line, under the web's own
-uniform names, so those eight look exactly as they do there.
-
-What they are fed is what the web feeds them. `Analyser` is Web Audio's `AnalyserNode` as the
-web engine configures it — 2048 frames, Blackman window, 0.75 smoothing, -100 to -30 dB as
-bytes — over a mono tap of the mix the host keeps for it, and then the web's `readBands`: eight
-bands of constant ratio, three for bass, three for mids, two for highs. The score position
-comes straight from the engine's atomics at the display's rate, smooth between steps, which is
-one better than the web's.
-
-The three.js scenes go over a geometry layer instead — `Camera`, three's projection and view
-matrices with Metal's depth range, and `GeometryScene`, which owns buffers and pipelines under
-three's blend modes — with each scene's vertex and fragment shaders carried over as the
-surfaces' are. Wireframe, Sunset and Web are the first three; between them they
-need a camera that looks and unprojects, model matrices, plane geometry and indexed draws.
-
-A scene cannot be looked at from a test, but it can be drawn into a texture and read back:
-every scene draws something that is not black and moves, and with `DRIFTBOX_SCENE_SHOTS` set
-to a directory the test writes each one there as PNGs at three moments — which is how the
-ports were checked by eye.
-
-### Playing
-
-```bash
-swift run -c release driftbox-play conformance/fixtures/documents/acid.song.json --start-bar 8
-```
-
-The engine as an Audio Unit in an `AVAudioEngine`, through the speakers, printing what reaches
-the output once a second. `--bench` runs the same engine with no device, as fast as it goes:
-**3.3% of real time** on this machine, of which the reverb — now in two stages, the tail in
-partitions eight blocks long, its work on each spread over the block after — is about a third. Live, the render callback reports a fifth of
-the audio's time on its own clock, and the difference is the platform, not the code: `--bench`
-also runs the same calls paced as a device paces them, one every 10.7ms with a sleep between,
-and they cost **16%** that way — five times the loop — because a core woken every ten
-milliseconds does its first millisecond of work cold and slow. That is the number to budget
-for, and it is fine.
-
-On Windows the same command plays through WASAPI instead, and says which device and how far behind
-the speakers are: 10ms on a laptop's own. The render call costs **8 to 13%** of the audio's time
-there, its longest 2.8ms of a 10ms period — measured by wall time on the performance counter,
-since Windows keeps a thread's own time only to its 15.6ms scheduler tick.
-
-On a phone, a Fairphone 6 with a Snapdragon 7s Gen 3, `--bench` costs **13 to 16%** of real time
-on a big core across the catalogue. That is four and a half times the Mac. On a little core it
-costs **69%**, so a render thread must never land on one. Paced, the big core costs **67%**, its
-longest call 9.7ms of a 10.7ms period. That number is the phone, not the code: with the rest of
-the cluster kept busy, the same paced run costs **17.7%** and its longest call 2.5ms. It is not the
-clock, either, though that was the first guess. Played through AAudio, in 2ms bursts, the render
-costs about **60%** of each burst whether a performance hint holds the cluster at 2.2 GHz or lets
-it fall to 0.6; with the other big cores kept busy it costs **15 to 18%**. Nor is it the waking:
-asked for callbacks four bursts long, a quarter as many, it costs the same **53 to 57%**, each call
-four times as long. A call runs slowly the whole way through while the rest of its cluster idles,
-not only as its core wakes. It is still in time: the heaviest song played for thirty
-seconds without an underrun, its longest call 3.4ms, the speaker 4.8ms behind the render.
-
-### Listening
-
-```bash
-swift run -c release driftbox-render conformance/fixtures/documents/smallhours.song.json smallhours.wav
-swift run -c release driftbox-render song.json out.wav --start 15.2 --duration 8 --rate 48000
-```
-
-A song document in, a 32-bit float WAV out, at about thirty times real time. This is the native
-render as the engine means it — without the browser's faults switched on.
-
-### Exactness
-
-The Swift ladder is the reference's arithmetic line for line, with `Double` state because
-JavaScript computes in doubles whatever it stores. Against the fixture it differs by **1.8e-15**
-at double precision — not zero, because `exp` and `tanh` come from two different maths libraries
-(V8's and the platform's), and a resonant loop feeds a last-bit disagreement back. The test
-allows 1e-12. On Linux, against glibc, it passes inside the same bound.
-
-**The reference does not agree with itself, either.** The same TypeScript rendering the same
-ladder gives different last bits under Node on an arm64 Mac and on an x64 Linux runner — found
-when the first CI run called a freshly generated fixture stale. Documents, events and PRNG bits
-did come out byte-identical across the two, so `--check` holds text fixtures to the byte and audio
-fixtures to the same 1e-12.
-
-Writing `exp` and `tanh` in Swift would make every native render bit-exact on every platform;
-that is worth doing when a second one needs to agree.
-
-## Conventions
-
-Swift 6.4, Swift Testing, `swift format` (config in `.swift-format`; CI lints with `--strict`).
-macOS 26 and iOS 26 are the floors: the first with `InlineArray`, which needs the runtime
-they ship and cannot be deployed back to an older one.
+- [docs/architecture.md](docs/architecture.md): the targets, the constrained core, the ports, the
+  shared sessions, conventions.
+- [docs/conformance.md](docs/conformance.md): the fixtures, the audio against the browser, the
+  offline and real-time forms, exactness.
+- [docs/gpu.md](docs/gpu.md): the GPU layer, its backends and shaders, type, and the canvas.
+- [docs/visuals.md](docs/visuals.md): the scenes, how they are fed and tested.
+- [docs/performance.md](docs/performance.md): playing, rendering, and what the render costs.
+- [docs/mac.md](docs/mac.md), [docs/windows.md](docs/windows.md),
+  [docs/android.md](docs/android.md), [docs/LINUX.md](docs/LINUX.md): each platform.
+- [docs/RELEASING.md](docs/RELEASING.md) and [CODE_SIGNING.md](CODE_SIGNING.md): releases.
+- [ROADMAP.md](ROADMAP.md): what is done and what is next.
 
 ## Licence
 
@@ -956,18 +118,3 @@ meant to be picked up, and that is the licence that gets least in the way of doi
 Steinberg's VST 3 SDK, in `Sources/VST3SDK` and `Tests/DriftboxVST3Fixture`, is theirs, under
 [its own MIT licence](Sources/VST3SDK/LICENSE-VST3SDK.txt). VST is a trademark of Steinberg Media
 Technologies GmbH.
-
-## Linux development
-
-Linux runs the shared groovebox and rack through a native GTK 4/Pango shell, GLES renderer,
-PipeWire audio and ALSA MIDI adapters. The Ubuntu ARM64 development VM, architecture work,
-validation and remaining release criteria are recorded in [docs/LINUX.md](docs/LINUX.md).
-Inside a Linux checkout, `scripts/linux-build.sh` provides build, test, render, playback and
-`desktop` entry points. The Ubuntu VM currently uses XWayland for a native Wayland menu issue.
-
-`scripts/linux-package.py` packages a release desktop build with its Swift runtime and resources.
-The extracted [Linux preview](linux/README.md) runs without a compiler and supports per-user app-menu
-registration. CI also builds Ubuntu 24.04 ARM64 and x86-64 [`.deb` packages](linux/packaging/README-deb.md)
-with APT dependencies and system app-menu registration; both formats are tested in clean runtime
-containers. This remains a preview: other distributions, physical audio/MIDI hardware and the
-remaining desktop interactions still need qualification.

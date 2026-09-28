@@ -28,8 +28,8 @@ notarisation requires:
    it, and read access to files the user chooses.
 2. `Driftbox.app` around it, with `scripts/app.entitlements`. That has one exception to the
    hardened runtime, `com.apple.security.cs.disable-library-validation`. The rack loads Audio
-   Units and VST 3 plug-ins into its own process, and they are signed by other developers or not
-   at all, which library validation would refuse.
+   Units into its own process (and VST 3 plug-ins, once the Mac hosts them as Windows does), and
+   they are signed by other developers or not at all, which library validation would refuse.
 
 The resource bundles in `Contents/Resources` hold no code, and are sealed by the signatures around
 them.
@@ -84,13 +84,14 @@ a browser would be:
 - first launch;
 - the visuals;
 - MIDI in;
-- a hosted Audio Unit, and a VST 3;
+- a hosted Audio Unit, effect and instrument;
 - the AUv3 instruments in a host such as Logic or GarageBand, which registers them when the app
   first launches;
 - a song saved and opened again.
 
-The repository is private until the port reaches parity, so where and how a release is published
-is still to be decided. Whatever it is, nothing here does it on its own.
+Where and how a Mac release is published is still to be decided. Whatever it is, nothing here
+does it on its own. (Windows releases are drafted on GitHub by the release workflow; see
+[windows.md](windows.md#releasing).)
 
 `python3 scripts/test-release.py` checks all of this without signing or uploading anything, and CI
 runs it.

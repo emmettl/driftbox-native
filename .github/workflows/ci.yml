@@ -196,7 +196,7 @@ jobs:
 
   # The Windows host is the one target Linux cannot build, so it is built and tested here, over
   # everything else as well: the core is meant to be platform-free, and this is where that is kept.
-  # Release, because a debug build does not link on Windows yet (see the README's "Windows").
+  # Release, because a debug build does not link on Windows yet (see docs/windows.md, "Building").
   windows:
     name: Windows
     needs: [fixtures, scope]
