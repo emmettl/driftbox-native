@@ -385,8 +385,11 @@ module reaching an Out, a knob or a trim moved), in each platform's words. `Rack
 every step looked at on each tick, done ones ticked for good, a skipped one ticked if done later, never
 moving back, the rack's own patch kept to go back to and a tour taken to the end remembered. On the
 Mac, Help ▸ Rack Tours starts one, the rack offers the first once, and its panel sits in the rack's
-corner, the control a step names breathing a ring. Left: the tours on the drawn rack, on Windows and
-Android; and the rest of what the web app teaches with, and what a Mac does better:
+corner, the control a step names breathing a ring. On Windows and Android the drawn rack has the same
+panel, painted: in its corner, or across the top of a phone with room for the step it is on, its
+buttons its own and read by a screen reader, a ring round the chip or module a step names, and the
+first tour offered once; Help ▸ Rack Tours on Windows, and the patch chip's menu on Android. Left: the
+rest of what the web app teaches with, and what a Mac does better:
 
 - **The reference's teaching, ported:** its help dialog, the first-run offer of a tour, the guided
   tour and tutorial coach that walk a patch being built, and each module's guide. The words carry

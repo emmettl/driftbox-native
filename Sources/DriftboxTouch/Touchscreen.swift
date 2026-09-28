@@ -159,6 +159,7 @@ public final class Touchscreen {
     let shown = RackInterface(rack: rack)
     shown.touch = true
     shown.helpGuide = RackHelp.guide(for: .android)
+    shown.tours = RackTour.all(for: .android)
     shown.showGroovebox = { [weak self] in self?.show(rack: false) }
     shown.groovebox = session
     interface.showRack = { [weak self] in self?.show(rack: true) }

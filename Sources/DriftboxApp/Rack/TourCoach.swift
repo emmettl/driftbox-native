@@ -11,8 +11,6 @@
     @State private var folded = false
     /// Ended before its steps were: the same choice as at the end, of this patch or the one before.
     @State private var ending = false
-    /// A tour taken is an offer taken up.
-    @AppStorage("rack.tours.offered") private var offered = false
 
     var body: some View {
       if let run = model.tourRun {
@@ -45,7 +43,6 @@
         )
         .shadow(color: .black.opacity(0.5), radius: 18, y: 8)
         .transition(.move(edge: .trailing).combined(with: .opacity))
-        .onAppear { offered = true }
         .onChange(of: run.tour.id) { ending = false }
       }
     }
@@ -133,12 +130,9 @@
   /// few minutes, or not now.
   struct TourOffer: View {
     let model: RackSession
-    @AppStorage("rack.tours.offered") private var offered = false
 
     var body: some View {
-      if !offered, model.tourRun == nil, model.finishedTours.isEmpty,
-        let first = RackTour.all(for: .mac).first
-      {
+      if model.offersFirstTour, let first = RackTour.all(for: .mac).first {
         VStack(alignment: .leading, spacing: 8) {
           Text("New to the rack?").font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.ink)
           Text(
@@ -148,13 +142,10 @@
           .fixedSize(horizontal: false, vertical: true)
           HStack {
             Spacer()
-            Button("Not Now") { offered = true }
+            Button("Not Now") { model.tourOffered = true }
               .buttonStyle(.chip(on: false, tint: Theme.dim, size: 10))
-            Button("Take the Tour") {
-              offered = true
-              model.startTour(first)
-            }
-            .buttonStyle(.chip(on: true, tint: Theme.nine, size: 10))
+            Button("Take the Tour") { model.startTour(first) }
+              .buttonStyle(.chip(on: true, tint: Theme.nine, size: 10))
           }
           Text("Every tour is in Help ▸ Rack Tours.").font(Theme.mono(9)).foregroundStyle(Theme.dim)
         }
@@ -182,14 +173,6 @@
           .allowsHitTesting(false)
         }
       }
-    }
-  }
-
-  extension RackSession {
-    /// What the tour's step on now points at, if it points.
-    var tourSpot: RackTourSpot? {
-      guard let run = tourRun, run.at < run.tour.steps.count else { return nil }
-      return run.tour.steps[run.at].spot
     }
   }
 #endif

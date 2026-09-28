@@ -1,3 +1,4 @@
+import DriftboxHelp
 import DriftboxRack
 import DriftboxRackSession
 import DriftboxScenes
@@ -75,6 +76,8 @@ public enum DesktopMenus {
   public static let rackAudioPrefix = "rackAudio."
   static let audioModuleTypes: Set<String> = ["sampler", "audio-track", "multisampler"]
   public static let patchPrefix = "patch."
+  /// A guided tour of the rack, by its id.
+  public static let tourPrefix = "tour."
   /// A catalogue song into the rack, by its id; and the groovebox's own song into it.
   public static let rackSongPrefix = "rackSong."
   public static let rackSongFromGroovebox = "rack.songFromGroovebox"
@@ -241,7 +244,11 @@ public enum DesktopMenus {
                 ? []
                 : [
                   .command(
-                    "Rack Guide", id: rackGuide, shortcut: showsRack ? Shortcut(.function(1), []) : nil)
+                    "Rack Guide", id: rackGuide, shortcut: showsRack ? Shortcut(.function(1), []) : nil),
+                  .submenu(
+                    Menu(
+                      "Rack Tours",
+                      RackTour.all(for: .windows).map { .command($0.name, id: tourPrefix + $0.id) })),
                 ])),
         ])
   }

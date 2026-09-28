@@ -105,6 +105,7 @@ public final class Desktop {
     makeVisualsSurface = visualsSurface
     self.rack = rack
     rackInterface = rack.map(RackInterface.init)
+    rackInterface?.tours = RackTour.all(for: .windows)
     // The rack lets go of a song it had linked here, as when another patch is opened in it.
     rack?.onUnlinkSong = { [weak session] in session?.unlinkRack() }
     // The MIDI that arrives is the rack's while it shows, and the groovebox's otherwise.
@@ -407,6 +408,13 @@ public final class Desktop {
       setShowsRack(true)
       return
     }
+    if let tourID = DesktopMenus.value(id, after: DesktopMenus.tourPrefix) {
+      guard let tour = rackInterface?.tours.first(where: { $0.id == tourID }) else { return }
+      help = nil
+      rackInterface?.take(tour)
+      setShowsRack(true)
+      return
+    }
     if let patchID = DesktopMenus.value(id, after: DesktopMenus.patchPrefix) {
       guard let entry = PatchEntry.all.first(where: { $0.id == patchID }) else { return }
       rack?.open(entry)
@@ -490,6 +498,9 @@ public final class Desktop {
     default: break
     }
     if let scene = DesktopMenus.value(id, after: DesktopMenus.scenePrefix) { return chosenScene == scene }
+    if let tour = DesktopMenus.value(id, after: DesktopMenus.tourPrefix) {
+      return rack?.finishedTours.contains(tour) == true
+    }
     if let display = DesktopMenus.value(id, after: DesktopMenus.visualsOnPrefix) {
       return visuals?.isFullScreen == true && visuals?.display == display
     }

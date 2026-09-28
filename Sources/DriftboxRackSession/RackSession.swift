@@ -309,6 +309,7 @@ public final class RackSession: MIDIListener {
     patch = saved ?? first?.load() ?? Patch(modules: [], cables: [])
     name = saved == nil ? first?.name ?? "Untitled" : memory?.string(forKey: Self.savedNameKey) ?? "Untitled"
     ccBindings = RackCC.load(memory)
+    tourOffered = ["1", "true"].contains(memory?.string(forKey: Self.offeredKey) ?? "")
     patch = applyModulation(patch, registry: RackModules.registry)
     if let input {
       inputDevice = memory?.string(forKey: Self.inputKey).flatMap { $0.isEmpty ? nil : $0 }
@@ -1472,6 +1473,25 @@ public final class RackSession: MIDIListener {
   }
   static let toursKey = "rack.tours.finished"
 
+  /// The first tour offered already, taken or turned down: the rack offers it once, and a tour taken
+  /// is the offer taken up.
+  public var tourOffered: Bool {
+    didSet { memory?.set(tourOffered ? "1" : "0", forKey: Self.offeredKey) }
+  }
+  static let offeredKey = "rack.tours.offered"
+
+  /// Whether to offer the first tour: to somebody it has not been offered, who has taken none and is
+  /// not taking one. Never by a rack that remembers nothing, which would offer it every time.
+  public var offersFirstTour: Bool {
+    memory != nil && !tourOffered && tourRun == nil && finishedTours.isEmpty
+  }
+
+  /// What the step the tour is on points at, if it points.
+  public var tourSpot: RackTourSpot? {
+    guard let run = tourRun, run.at < run.tour.steps.count else { return nil }
+    return run.tour.steps[run.at].spot
+  }
+
   /// The rack as a tour sees it.
   public var tourState: RackTourState {
     RackTourState(patch: patch, playing: running, flipped: flipped, sounding: sounding.count)
@@ -1480,6 +1500,7 @@ public final class RackSession: MIDIListener {
   /// Take `tour`: from its own small patch, stopped and facing front, with the rack's own patch kept
   /// to go back to; or, `fromItsPatch` false, from the rack as it is.
   public func startTour(_ tour: RackTour, fromItsPatch: Bool = true) {
+    tourOffered = true
     var before: (Patch, String)?
     if fromItsPatch {
       if !patch.modules.isEmpty { before = (patch, name) }
