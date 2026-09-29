@@ -73,7 +73,7 @@ struct TouchscreenHelpTests {
     #expect(shown?.commands.contains { $0.id == "help.rack" } == true)
     screen.choose("help.rack")
     #expect(face.guide?.title == "Rack guide")
-    #expect(face.guide?.guide.topics.count == 6)
+    #expect(face.guide?.guide.topic("learning") != nil)
     #expect(face.menu(at: SIMD2(186, 400)) == nil, "no module's menu while it is open")
   }
 }

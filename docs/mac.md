@@ -49,6 +49,14 @@ resources at their build paths.
   module's guide, first in its menu, as a sheet over the rack; and Help ▸ Rack Tours, guided tours
   of the rack whose panel sits in the rack's corner, the control a step names breathing a ring.
 
+Both guide windows have a search field that finds matching sections in headings, instructions,
+control descriptions and notes. The groovebox's Walkthroughs topic builds a drum variation, a
+303 phrase, a two-section arrangement and a recorded filter sweep, with listening checks and a
+Troubleshooting topic. The rack's Learning path explains the five tours, gives a listening exercise
+after each, and explains how to recover when a step does not complete. The same lessons are in
+the drawn guides, using each platform's controls; automation recording requires the tablet layout
+on Android.
+
 The song and the visuals window come back where they were at the next launch.
 
 ## Audio Units

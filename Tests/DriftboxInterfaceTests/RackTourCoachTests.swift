@@ -122,6 +122,50 @@ struct RackTourCoachTests {
     #expect(face.tourSpotFrame(stage)?.x == stage.origin.x + ladder.frame.x * stage.scale)
   }
 
+  /// Long racks and phone zoom must expose the target below the coach, then leave a deliberate
+  /// manual scroll alone. Finishing a tour removes the extra scrolling room.
+  @Test(arguments: [false, true]) func aNewStepRevealsItsModule(touch: Bool) throws {
+    let face = Self.rack(touch: touch, width: touch ? 390 : 1000)
+    face.take(try #require(face.tours.first(where: { $0.id == "patch-by-hand" })))
+    for _ in 0..<12 { face.rack.add("voice") }
+    face.rack.add("ladder")
+    face.rack.flip()
+    face.rack.tick()
+    #expect(face.rack.tourRun?.at == 2)
+    face.revealTourStep()
+    let stage = face.stage
+    let spot = try #require(face.tourSpotFrame(stage))
+    let panel = try Self.panel(face)
+    #expect(spot.y >= panel.frame.maxY)
+    #expect(spot.y < stage.area.maxY)
+    #expect(spot.maxX > 0 && spot.x < face.size.x)
+    #expect(face.scroll > 0)
+    if touch { #expect(face.zoom > 1) }
+
+    face.scroll(ScrollEvent(location: .zero, delta: SIMD2(0, -80)))
+    let moved = face.scroll
+    face.revealTourStep()
+    #expect(face.scroll == moved, "do not fight the person's navigation on every frame")
+
+    face.rack.closeTour()
+    face.revealTourStep()
+    #expect(face.stage.topPadding == 0)
+  }
+
+  @Test func theFirstModuleCanBeRevealedAndResized() throws {
+    let face = Self.rack(touch: true, width: 390)
+    face.take(try #require(face.tours.first))
+    face.rack.add("voice")
+    face.rack.tick()
+    for size: SIMD2<Float> in [SIMD2(390, 700), SIMD2(760, 700), SIMD2(760, 400)] {
+      face.size = size
+      face.revealTourStep()
+      let spot = try #require(face.tourSpotFrame(face.stage))
+      #expect(spot.y >= (try Self.panel(face)).frame.maxY)
+      #expect(spot.y < face.stage.area.maxY)
+    }
+  }
+
   /// A touchscreen's patches' menu has every tour, those finished ticked, and one chosen is taken.
   @Test func theToursAreInThePatchesMenu() throws {
     let face = Self.rack(touch: true, width: 390)

@@ -3,11 +3,15 @@
 /// in the browser, a link to share — it is left out rather than described.
 public enum GrooveboxHelp {
   public static func guide(for platform: HelpPlatform) -> HelpGuide {
-    switch platform {
-    case .mac: mac
-    case .windows: windows
-    case .android: android
-    }
+    var guide =
+      switch platform {
+      case .mac: mac
+      case .windows: windows
+      case .android: android
+      }
+    guide.topics.insert(walkthroughs(for: platform), at: 1)
+    guide.topics.append(troubleshooting(for: platform))
+    return guide
   }
 
   static let mac = HelpGuide(

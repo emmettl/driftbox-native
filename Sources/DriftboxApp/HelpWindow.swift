@@ -7,6 +7,10 @@
   public struct HelpWindow: View {
     let guide: HelpGuide
     @State private var topic: String?
+    @State private var query = ""
+
+    private var matches: [HelpTopic] { guide.matching(query) }
+    private var shown: HelpTopic? { matches.first { $0.id == topic } ?? matches.first }
 
     /// Which of the app's guides a window shows.
     public enum Which: Sendable {
@@ -27,19 +31,26 @@
 
     public var body: some View {
       NavigationSplitView {
-        List(guide.topics, selection: $topic) { topic in
+        List(matches, selection: $topic) { topic in
           Text(topic.label).tag(topic.id)
         }
         .navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 220)
+        .searchable(text: $query, prompt: "Search this guide")
       } detail: {
-        ScrollView {
-          if let shown = guide.topic(topic ?? guide.topics.first?.id ?? "") {
+        if let shown {
+          ScrollView {
             HelpTopicView(topic: shown, title: guide.title)
           }
+          .id(shown.id + query)
+          .background(Theme.ground)
+        } else {
+          ContentUnavailableView.search(text: query)
         }
-        .background(Theme.ground)
       }
       .onAppear { if topic == nil { topic = guide.topics.first?.id } }
+      .onChange(of: query) {
+        if !matches.contains(where: { $0.id == topic }) { topic = matches.first?.id }
+      }
     }
   }
 

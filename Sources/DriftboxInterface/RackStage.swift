@@ -279,6 +279,8 @@ public struct RackStage {
   public var height: Float
   public var scroll: Float
   public var maxScroll: Float
+  /// Scrollable space above the first module, for an overlaid tour coach.
+  public var topPadding: Float
   /// On a touchscreen: the rack drawn for fingers, which zoom it and pan it about.
   public var touch = false
   /// How far the rack is zoomed past fitting the window's width, on a touchscreen; 1 on a desktop.
@@ -310,9 +312,10 @@ public struct RackStage {
   /// fingers, `zoom` past fitting the width and panned `pan` points from its left.
   public init(
     rack: RackSession, size: SIMD2<Float>, scroll: Float = 0, pages: [String: Int] = [:], touch: Bool = false,
-    zoom: Float = 1, pan: Float = 0, keys showsKeys: Bool = false
+    zoom: Float = 1, pan: Float = 0, keys showsKeys: Bool = false, topPadding: Float = 0
   ) {
     self.size = size
+    self.topPadding = topPadding
     self.touch = touch
     let margin = Self.margin
     header = Rect(margin, margin, max(0, size.x - margin * 2), Self.headerHeight)
@@ -398,16 +401,16 @@ public struct RackStage {
       scale = fitScale * self.zoom
       maxPan = max(0, width * scale - across)
       self.pan = min(max(0, pan), maxPan)
-      maxScroll = max(0, (height + 24) * scale - area.height)
+      maxScroll = max(0, (height + 24) * scale + topPadding - area.height)
       self.scroll = min(max(0, scroll), maxScroll)
       let spare = max(0, across - width * scale)
-      origin = SIMD2(Self.inset + spare / 2 - self.pan, area.y - self.scroll)
+      origin = SIMD2(Self.inset + spare / 2 - self.pan, area.y + topPadding - self.scroll)
     } else {
       scale = max(0.5, min(Self.largest, (room - 48) / width))
       fitScale = scale
-      maxScroll = max(0, (height + 24) * scale - area.height)
+      maxScroll = max(0, (height + 24) * scale + topPadding - area.height)
       self.scroll = min(max(0, scroll), maxScroll)
-      origin = SIMD2((room - width * scale) / 2, area.y - self.scroll)
+      origin = SIMD2((room - width * scale) / 2, area.y + topPadding - self.scroll)
     }
 
     let modules = Dictionary(rack.patch.modules.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
