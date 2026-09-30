@@ -1,0 +1,77 @@
+{
+  "date": "2026-09-30",
+  "host": "Louiss-Mac-mini",
+  "guest": {
+    "guest": "Ubuntu 24.04 ARM64",
+    "ram_mib": 4096,
+    "vcpus": 4,
+    "build_jobs": 2,
+    "disk_gib": 100,
+    "hypervisor": "QEMU HVF"
+  },
+  "source_revision": "e985faf9b850728532a5ce3aee0e3e016be8c157",
+  "reference_revision": "872bcca1a90723ca15f3a3d2fed0ad244eb7aa96",
+  "swift_cases": {
+    "passed": 645,
+    "failed": 1,
+    "skipped": 12
+  },
+  "swift_elapsed_seconds": 586.65,
+  "cold_build_elapsed_seconds": 65.12,
+  "cold_build_swift_reported_seconds": 64.4,
+  "integration_exit_codes": {
+    "isolated-reverb": 1,
+    "gpu": 0,
+    "dialogs": 0,
+    "window": 0,
+    "desktop": 0,
+    "pipewire-routes": 0,
+    "release-scripts": 0,
+    "android-release-scripts": 0,
+    "linux-package-scripts": 0,
+    "linux-deb-scripts": 0,
+    "constrained-audio": 0
+  },
+  "host_memory": [
+    {
+      "file": "memory-20260930-145255.jsonl",
+      "samples": 125,
+      "started": "2026-09-30T14:52:55+0200",
+      "ended": "2026-09-30T15:03:22+0200",
+      "peak_qemu_rss_mib": 3404.73,
+      "pressure_levels": [
+        "1"
+      ],
+      "swap_used_min_mib": 612.88,
+      "swap_used_max_mib": 612.88
+    },
+    {
+      "file": "memory-20260930-150625.jsonl",
+      "samples": 75,
+      "started": "2026-09-30T15:06:25+0200",
+      "ended": "2026-09-30T15:12:39+0200",
+      "peak_qemu_rss_mib": 5963.12,
+      "pressure_levels": [
+        "1"
+      ],
+      "swap_used_min_mib": 612.88,
+      "swap_used_max_mib": 612.88
+    }
+  ],
+  "known_failure": {
+    "test": "DriftboxEngineTests.SendAudioTests.theReverbSoundsLikeTheReference",
+    "case": "reverb large and damped",
+    "measured_db": -90.66163478562112,
+    "required_max_db": -95,
+    "isolated_reproduction": true,
+    "root_cause": "Not established; no implementation or tolerance change made."
+  },
+  "guard_live_pause_resume_test": "passed",
+  "final_state": {
+    "vm": "powered off",
+    "ci_slots": "released",
+    "recorder_collectors_running": 5,
+    "recorder_storage_error": null
+  },
+  "github_runner_registered": false
+}
