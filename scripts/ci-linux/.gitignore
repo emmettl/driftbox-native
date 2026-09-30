@@ -1,0 +1,15 @@
+# Runtime belongs in ~/ci/linux-vm on the mini, outside this checkout.
+/images/
+/keys/
+/logs/
+/results/
+/seed/
+/pilot.json
+/*.sock
+/*.pid
+/*.iso
+/*.qcow2
+/*.fd
+/*.bundle
+/*.tar
+__pycache__/

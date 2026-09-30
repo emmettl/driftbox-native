@@ -112,6 +112,13 @@ for the built-in rack. Current VST3 loading is Windows-specific.
 6. **Viable release.** Clean installation on ARM64/x86-64, GNOME/KDE and Wayland/X11 checks,
    hardware audio/MIDI and Intel/AMD/NVIDIA graphics checks, documented limitations, packaging.
 
+## On-demand CI on the Mac mini
+
+The [Linux CI pilot](LINUX-CI-PILOT.md) records the 4 GiB ARM64 guest on the
+shared CI Mac mini, including resource admission, measured results and a known
+reverb comparison failure. Its [harness and operating instructions](../scripts/ci-linux/README.md)
+are versioned here; VM disks, credentials and raw logs remain on the mini.
+
 ## Development environment
 
 The first local VM is named **Driftbox Linux**, hosted by UTM with QEMU/HVF ARM64 virtualization,
