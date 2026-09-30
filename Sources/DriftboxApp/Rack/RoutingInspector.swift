@@ -22,6 +22,7 @@
               .foregroundStyle(Theme.ink)
             Text(combi.id).font(Theme.mono(9)).foregroundStyle(Theme.dim)
             Spacer()
+            ContextHelp(destination: .routing, label: "Help with Combinator routing")
             Button {
               model.editRoutes(nil)
             } label: {
@@ -48,7 +49,8 @@
               .disabled(model.defaultTarget(combi.id) == nil)
               .help(
                 model.defaultTarget(combi.id) == nil
-                  ? "Nothing else in the rack has a knob to drive: add a module first" : "")
+                  ? "Nothing else in the rack has a knob to drive: add a module first"
+                  : "Connect a Combinator rotary or button to a knob on another module")
             Spacer()
           }
           Text("4 rotaries and 4 buttons · a later routing wins a shared target")
@@ -88,6 +90,7 @@
           }
           .labelsHidden()
           .fixedSize()
+          .help("The Combinator rotary or button that drives this routing")
           Image(systemName: "arrow.right").font(.system(size: 10)).foregroundStyle(Theme.dim)
           Picker("Target module", selection: module) {
             ForEach(targets, id: \.id) { Text($0.id).tag($0.id) }
@@ -95,6 +98,7 @@
             if target == nil { Text("\(route.to.module) (not here)").tag(route.to.module) }
           }
           .labelsHidden()
+          .help("The module whose knob this routing controls")
           Spacer(minLength: 0)
           Button {
             model.removeRoute(index)
@@ -114,6 +118,7 @@
             if param == nil { Text("\(route.to.port) (unknown)").tag(route.to.port) }
           }
           .labelsHidden()
+          .help("The knob to control on the target module")
         }
         HStack(spacing: 8) {
           Color.clear.frame(width: 14, height: 1)
@@ -196,6 +201,10 @@
           .textFieldStyle(.roundedBorder)
           .font(Theme.mono(10))
           .frame(width: 76)
+          .help(
+            label == "Min"
+              ? "Target value when the source is at zero; leave blank to use the knob’s lower limit"
+              : "Target value when the source is at one; leave blank to use the knob’s upper limit")
         }
       }
     }

@@ -145,6 +145,7 @@ def release(args):
         if run("lipo", "-archs", str(executable), capture=True).strip() != "arm64":
             raise ValueError("This release channel expects an arm64 build.")
 
+    run("python3", str(ROOT / "scripts/check-help-book.py"), str(app))
     for command in signing_order(app, identity):
         run(*command)
     run("codesign", "--verify", "--deep", "--strict", str(app))

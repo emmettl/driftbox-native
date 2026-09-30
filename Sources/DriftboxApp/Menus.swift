@@ -123,6 +123,10 @@
       }
 
       CommandGroup(replacing: .help) {
+        Button("Driftbox Help") {
+          if MacHelp.isAvailable { MacHelp.open() } else { openWindow(id: "help") }
+        }
+        Divider()
         Button("Groovebox Guide") { openWindow(id: "help") }
           .keyboardShortcut("?", modifiers: .command)
         Button("Rack Guide") { openWindow(id: "rack-help") }

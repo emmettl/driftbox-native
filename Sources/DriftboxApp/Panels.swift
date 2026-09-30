@@ -49,6 +49,9 @@
         }
         Spacer()
         trailing()
+        if machine != "MASTER" {
+          ContextHelp(destination: .sound, label: "Help with voices and sound controls")
+        }
       }
     }
   }
@@ -168,6 +171,7 @@
             ForEach(["303.a", "303.b"], id: \.self) { id in
               Button(id == "303.a" ? "A" : "B") { player.selectedVoice = id }
                 .buttonStyle(.chip(on: id == voiceId, tint: Theme.three))
+                .help("Show the controls for \(id == "303.a" ? "303 A" : "303 B"); both lines still play")
             }
             CloseButton { player.selectedVoice = nil }
           }
@@ -245,7 +249,9 @@
 
     var body: some View {
       VStack(alignment: .leading, spacing: 12) {
-        PanelHead(machine: "MASTER", title: "Effects", tint: Theme.dim) { EmptyView() }
+        PanelHead(machine: "MASTER", title: "Effects", tint: Theme.dim) {
+          ContextHelp(destination: .sound, label: "Help with effects, sends and the filter")
+        }
         ForEach(KnobSpec.fxGroups, id: \.name) { group in
           VStack(alignment: .leading, spacing: 6) {
             FieldLabel(group.name)
@@ -275,6 +281,7 @@
       VStack(alignment: .leading, spacing: 8) {
         HStack {
           FieldLabel("Filter pad")
+          ContextHelp(destination: .sound, label: "Help with the performance filter pad")
           Spacer()
           Text(touch == nil ? "drag to sweep" : "cutoff → · reso ↑")
             .font(Theme.mono(9)).foregroundStyle(Theme.dim.opacity(0.8))

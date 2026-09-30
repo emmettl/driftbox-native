@@ -45,7 +45,9 @@ resources at their build paths.
 - **The rack** (⌘3), in a window of its own: the patch's modules, their faces and backs, the
   cables, the keys, the catalogue of patches, the controllers learnt onto it, and the Audio Input
   module hearing live input.
-- **Help:** Help ▸ Groovebox Guide (⌘?) and Rack Guide (⌥⌘?), each a window of its own; a
+- **Help:** Help ▸ Driftbox Help opens the searchable, offline system Help Book. The song controls,
+  sound panels, Settings, rack and routing inspector have `?` buttons to open their topic.
+  Help ▸ Groovebox Guide (⌘?) and Rack Guide (⌥⌘?) remain windows of their own; a
   module's guide, first in its menu, as a sheet over the rack; and Help ▸ Rack Tours, guided tours
   of the rack whose panel sits in the rack's corner, the control a step names breathing a ring.
 
@@ -56,6 +58,13 @@ Troubleshooting topic. The rack's Learning path explains the five tours, gives a
 after each, and explains how to recover when a step does not complete. The same lessons are in
 the drawn guides, using each platform's controls; automation recording requires the tablet layout
 on Android.
+
+`scripts/bundle-app.sh` generates `Contents/Resources/Driftbox.help` from `DriftboxHelp` and
+builds its native search index with `hiutil`. There is no separate copy of the guide text to edit.
+To rebuild and validate just the book, run `scripts/build-help-book.sh`; the default output is
+`.build-release/Driftbox.help`. The validator checks local links, named anchors and indexed pages.
+The app's Info.plist registers the book. A bare `swift run Driftbox` or an AU host has no registered
+book of its own, so contextual help opens the matching topic in a guide sheet instead.
 
 The song and the visuals window come back where they were at the next launch.
 

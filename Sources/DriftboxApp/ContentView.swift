@@ -340,7 +340,9 @@
         .help(showsVisuals ? "Stop the visuals behind the editor" : "Run the visuals behind the editor")
         Menu {
           Button("Export Mix…") { files.exportMix() }
+            .help("Render the complete song to one WAV file, including master effects")
           Button("Export Stems…") { files.exportStems() }
+            .help("Render a separate WAV for each voice, before the master effects")
         } label: {
           Label("Export", systemImage: "square.and.arrow.up")
         }
@@ -460,7 +462,9 @@
         Button(lanes > 0 ? "● auto \(lanes)" : "● auto") { player.recordsAutomation.toggle() }
           .buttonStyle(.chip(on: player.recordsAutomation, tint: Theme.eight, size: 10))
           .disabled(player.song == nil)
-          .help("Record automation: a knob turned while the song plays is written into it, where it is")
+          .help(
+            "Record knob, tempo and swing changes at the current song position. Turn recording off to replay without overwriting them"
+          )
         if let loop = player.loop {
           Button {
             player.loop = nil
@@ -475,6 +479,7 @@
           .help("Looping bars \(loop.start + 1) to \(loop.end). Click to stop looping.")
           .transition(.scale.combined(with: .opacity))
         }
+        ContextHelp(destination: .song, label: "Help with arrangement, looping and automation")
       }
       .animation(.spring(response: 0.3, dampingFraction: 0.75), value: player.loop)
     }

@@ -127,7 +127,11 @@ layer. The Mac app still draws through its own Metal scenes.
   `HelpSheet`. On Android they are in the song's and patch's chips.
 - **Module guides:** first in a module's menu everywhere.
 - **Tours:** from Help ▸ Rack Tours, or the patch chip on Android. The first one is offered once.
-- **Help tags:** most of the Mac's controls have one.
+- **Mac Help Book:** Help ▸ Driftbox Help opens an offline, indexed copy of the shared guides.
+  Contextual `?` buttons open the relevant topic from the song controls, sound panels, Settings,
+  rack and routing inspector. Bare SwiftPM and AU-hosted views open the same topic in a guide sheet.
+- **Help tags:** the Mac's controls explain behaviour beyond their labels, including automation,
+  exports, audio devices, MIDI clock, bass layers and Combinator routing ranges.
 - **Learning:** practical groovebox walkthroughs cover drums, bass, arrangement and automation,
   with troubleshooting; the rack's learning path adds listening exercises to all five tours.
   The Mac's guide windows search their full text. Drawn rack tours bring each step's module into
@@ -185,9 +189,10 @@ The repository is public.
 
 ### Help
 
-- [ ] **(code)** A Mac Help Book, so the Help menu's search finds topics as well as menu items, with
-  anchors so that a `?` beside a panel opens its page.
-- [ ] **(code)** Help tags where a control's purpose is not its label.
+- [x] **(code)** A Mac Help Book with native topic search and anchors so that a `?` beside a panel
+  opens its page. Generated from the shared guides and validated before signing.
+- [x] **(code)** Help tags where a control's purpose is not its label: audio/MIDI settings,
+  automation, exports, bass layers and routing endpoints.
 - [x] **(code)** On the drawn rack (Windows, Android, Linux), have a tour step scroll or zoom its
   module into view, with room below the instruction panel.
 

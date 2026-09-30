@@ -25,8 +25,9 @@
       }
     }
 
-    init(guide: HelpGuide) {
+    init(guide: HelpGuide, topic: String? = nil) {
       self.guide = guide
+      _topic = State(initialValue: topic)
     }
 
     public var body: some View {

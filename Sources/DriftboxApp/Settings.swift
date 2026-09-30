@@ -109,6 +109,8 @@
               Text("\(outputName.isEmpty ? "A device" : outputName) (not connected)").tag(output)
             }
           }
+          .help(
+            "Choose the output device. If it disconnects, playback uses the system output until it returns.")
           if !output.isEmpty, let playing = player.playingThrough, playing.id != output {
             Text("Playing through \(playing.name) until it is back.").foregroundStyle(.secondary)
           }
@@ -122,6 +124,7 @@
                 Text("\(rack.inputDeviceName ?? "A device") (not connected)").tag(chosen)
               }
             }
+            .help("Choose what the rack’s Audio Input modules hear; this does not record into the groovebox.")
             if let error = rack.inputError {
               Text(error).foregroundStyle(.secondary)
             } else if let chosen = rack.inputDevice, let hearing = rack.hearing, hearing.id != chosen {
@@ -134,6 +137,9 @@
         }
         Section("MIDI In") {
           Toggle("Play notes and follow clock from MIDI", isOn: $listens)
+            .help(
+              "Allow incoming MIDI. Enable Follow MIDI Clock in Transport to let it control playback and tempo."
+            )
           // One switch per source, under the one over all of them. A source that is gone keeps
           // its choice, so plugging it back in does not undo it.
           if player.midiSources.isEmpty {
@@ -141,20 +147,30 @@
           }
           ForEach(player.midiSources, id: \.self) { name in
             Toggle(name, isOn: hearing(name)).disabled(!listens)
+              .help("Listen to notes and clock from this MIDI source")
           }
         }
         Section("Clock Out") {
           Toggle("Send MIDI clock", isOn: $sends)
+            .help(
+              "Send the song’s tempo and transport to the chosen destination. Clock is not sent while following external clock."
+            )
           Picker("Destination", selection: $destination) {
             Text("Driftbox Clock").tag("")
             ForEach(player.clockDestinations, id: \.self) { name in Text(name).tag(name) }
           }
+          .help(
+            "Driftbox Clock is a virtual port for other apps; choose a hardware port for external equipment")
         }
         Section("Visuals") {
           Toggle("Run the visuals", isOn: $visuals)
+            .help("Animate the song’s scene behind the editor")
         }
       }
       .formStyle(.grouped)
+      .toolbar {
+        ContextHelp(destination: .sound, label: "Help with audio devices and MIDI")
+      }
       .frame(width: 440)
       .fixedSize()
     }

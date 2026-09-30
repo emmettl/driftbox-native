@@ -121,6 +121,7 @@
     var body: some View {
       HStack(spacing: 10) {
         PatchMenu(rack: rack)
+        ContextHelp(destination: .rack, label: "Help with the rack and its connections")
         if let failure = rack.startFailure {
           Label("No sound", systemImage: "exclamationmark.triangle.fill")
             .font(Theme.mono(10)).foregroundStyle(Theme.eight)
