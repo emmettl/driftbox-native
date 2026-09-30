@@ -21,6 +21,7 @@ cp .build-release/release/Driftbox "$app/Contents/MacOS/Driftbox"
 for bundle in .build-release/release/DriftboxKit_*.bundle; do
   cp -R "$bundle" "$app/Contents/Resources/"
 done
+scripts/build-help-book.sh "$app/Contents/Resources/Driftbox.help"
 # The icon, where the Finder and the Dock look for one. `scripts/make-icon.swift` draws it.
 cp Sources/DriftboxApp/Resources/AppIcon.icns "$app/Contents/Resources/"
 cat > "$app/Contents/Info.plist" <<PLIST
@@ -30,6 +31,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>Driftbox</string>
   <key>CFBundleIdentifier</key><string>app.driftbox.native</string>
   <key>CFBundleName</key><string>Driftbox</string>
+  <key>CFBundleHelpBookFolder</key><string>Driftbox.help</string>
+  <key>CFBundleHelpBookName</key><string>app.driftbox.native.help</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$DRIFTBOX_VERSION</string>
   <key>CFBundleVersion</key><string>$DRIFTBOX_BUILD</string>

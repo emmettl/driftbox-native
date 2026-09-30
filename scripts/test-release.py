@@ -150,6 +150,10 @@ class ReleaseTests(unittest.TestCase):
         names = [" ".join(call[:3]) for call in calls]
         # Tested strictly, built, signed inside out, notarised, stapled, then archived.
         self.assertIn("swift test", names)
+        help_check = next(i for i, call in enumerate(calls) if len(call) > 1
+                          and call[1].endswith("check-help-book.py"))
+        first_sign = next(i for i, call in enumerate(calls) if call[0] == "codesign")
+        self.assertLess(help_check, first_sign)
         signs = [call for call in calls if call[:2] == ("codesign", "--force")]
         self.assertEqual([call[-1] for call in signs],
                          [str(self.root / "dist/Driftbox.app" / release.EXTENSION), str(self.root / "dist/Driftbox.app")])

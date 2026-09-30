@@ -32,7 +32,8 @@ notarisation requires:
    they are signed by other developers or not at all, which library validation would refuse.
 
 The resource bundles in `Contents/Resources` hold no code, and are sealed by the signatures around
-them.
+them. This includes `Driftbox.help`, generated from the shared guides and indexed by `hiutil`
+during bundling. Its pages, local links and native search index are validated before signing.
 
 ## Build a candidate
 
@@ -59,6 +60,7 @@ checkout, and a version file in order. The profile's credentials are first tried
 - builds the app with `scripts/bundle-app.sh`, and copies it to `dist/Driftbox.app`, so the build
   this Mac has registered to develop with is left as it was;
 - checks that both bundles carry the release's version and build, and are arm64;
+- validates the generated Help Book, its registration and version, and its search index;
 - signs them inside out, and verifies the signature;
 - submits a ZIP to Apple and waits up to half an hour;
 - staples the ticket, validates it, verifies the signature again, and asks Gatekeeper;
@@ -87,7 +89,8 @@ a browser would be:
 - a hosted Audio Unit, effect and instrument;
 - the AUv3 instruments in a host such as Logic or GarageBand, which registers them when the app
   first launches;
-- a song saved and opened again.
+- a song saved and opened again;
+- Help ▸ Driftbox Help, a search for “automation”, and a panel's contextual `?` link.
 
 Where and how a Mac release is published is still to be decided. Whatever it is, nothing here
 does it on its own. (Windows releases are drafted on GitHub by the release workflow; see
