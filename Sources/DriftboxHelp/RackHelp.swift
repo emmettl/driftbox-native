@@ -3,11 +3,14 @@
 /// link to share, its automation desk and performance views — is left out rather than described.
 public enum RackHelp {
   public static func guide(for platform: HelpPlatform) -> HelpGuide {
-    switch platform {
-    case .mac: mac
-    case .windows: windows
-    case .android: android
-    }
+    var guide =
+      switch platform {
+      case .mac: mac
+      case .windows: windows
+      case .android: android
+      }
+    guide.topics.insert(learningPath(for: platform), at: 1)
+    return guide
   }
 
   static let mac = HelpGuide(

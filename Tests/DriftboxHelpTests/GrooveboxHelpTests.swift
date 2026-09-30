@@ -8,7 +8,10 @@ struct GrooveboxHelpTests {
 
   @Test func theTopicsAreTheReferences() {
     #expect(Self.mac.title == "Groovebox guide")
-    #expect(Self.mac.topics.map(\.id) == ["start", "patterns", "song", "sound", "keys"])
+    #expect(
+      Self.mac.topics.map(\.id) == [
+        "start", "walkthroughs", "patterns", "song", "sound", "keys", "troubleshooting",
+      ])
     for topic in Self.mac.topics {
       #expect(!topic.parts.isEmpty, "\(topic.id)")
       #expect(Set(topic.parts.map(\.heading)).count == topic.parts.count, "\(topic.id)'s headings differ")
@@ -50,7 +53,8 @@ struct RackHelpTests {
 
   @Test func theTopicsAreTheReferences() {
     #expect(Self.mac.title == "Rack guide")
-    #expect(Self.mac.topics.map(\.id) == ["start", "patching", "modules", "playing", "silence", "keys"])
+    #expect(
+      Self.mac.topics.map(\.id) == ["start", "learning", "patching", "modules", "playing", "silence", "keys"])
     for topic in Self.mac.topics {
       #expect(!topic.parts.isEmpty, "\(topic.id)")
       #expect(Set(topic.parts.map(\.heading)).count == topic.parts.count, "\(topic.id)'s headings differ")

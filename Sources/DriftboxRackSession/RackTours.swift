@@ -186,7 +186,7 @@ extension RackTour {
           step(
             "play", say.keysPlace, say.playKeys,
             "The first note makes a MIDI module and wires it to the newest instrument, which is why this works "
-              + "before anything is patched."
+              + "before anything is patched.", spot: .module("voice")
           ) { state, _ in state.sounding > 0 && RackTourChecks.audible(state.patch, "voice") },
           step(
             "flip", say.flipPlace, say.flip,
@@ -265,7 +265,7 @@ extension RackTour {
           step(
             "trim", "The back", "Turn down the trim beside the Cutoff input.",
             "The pot beside every input scales what arrives, and past the middle turns it over. It is how to have "
-              + "some of the movement rather than all of it."
+              + "some of the movement rather than all of it.", spot: .module("ladder")
           ) { state, baseline in RackTourChecks.trimmedDown(state.patch, from: baseline.patch) },
         ]),
       RackTour(

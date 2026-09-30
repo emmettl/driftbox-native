@@ -76,10 +76,12 @@ extension RackInterface {
   }
 
   private func layTour(_ stage: RackStage, measure: HelpSheet.Measure) -> TourPanel {
-    let compact = touch && size.x < RackStage.compactWidth
+    let compact = (touch && size.x < RackStage.compactWidth) || stage.area.height < 520
     let margin = RackStage.margin
     let width =
-      compact ? max(0, size.x - margin * 2) : min(Self.tourWidth, max(0, stage.area.width - margin * 2))
+      compact
+      ? max(0, stage.area.width - margin * 2)
+      : min(Self.tourWidth, max(0, stage.area.width - margin * 2))
     let x = compact ? margin : stage.area.maxX - margin - width
     let pad = Self.tourPad
     let inner = max(0, width - pad * 2)
@@ -287,6 +289,7 @@ extension RackInterface {
   /// `tour` taken, from its own patch, facing front and unfolded, with nothing open over the rack.
   public func take(_ tour: RackTour) {
     guide = nil
+    revealedTourStep = nil
     tourFolded = false
     tourEnding = nil
     rack.startTour(tour)

@@ -67,9 +67,45 @@ public final class RackInterface {
   }
 
   public var stage: RackStage {
-    RackStage(
-      rack: rack, size: size, scroll: scroll, pages: pages, touch: touch, zoom: zoom, pan: pan,
-      keys: showsKeys)
+    func layout(padding: Float = 0) -> RackStage {
+      RackStage(
+        rack: rack, size: size, scroll: scroll, pages: pages, touch: touch, zoom: zoom, pan: pan,
+        keys: showsKeys, topPadding: padding)
+    }
+    let base = layout()
+    // Space above the first module lets even that module be revealed below the coach. The user
+    // can still scroll through the whole rack, and hit testing uses exactly the drawn layout.
+    guard case .module = rack.tourSpot, tourEnding == nil, let panel = tourPanel(base) else {
+      return base
+    }
+    return layout(padding: panel.frame.maxY - base.area.y + RackStage.margin)
+  }
+
+  var revealedTourStep: String?
+
+  /// Reveal once per step/layout change, after a gesture ends. Subsequent panning belongs to the
+  /// user, even when it moves the highlight away. A large module remains scrollable below its top.
+  func revealTourStep() {
+    guard let run = rack.tourRun, run.at < run.tour.steps.count, tourEnding == nil else {
+      revealedTourStep = nil
+      return
+    }
+    guard pressed == nil, turning == nil, back == nil, fingers.isEmpty, guide == nil else { return }
+    let before = stage
+    let panel = tourPanel(before)
+    let key =
+      "\(run.tour.id)|\(run.at)|\(size)|\(rack.flipped)|\(String(describing: panel?.frame))|\(before.area)"
+    guard key != revealedTourStep else { return }
+    guard case .module(let type) = rack.tourSpot else {
+      revealedTourStep = key
+      return
+    }
+    guard let face = before.faces.first(where: { $0.module.type == type }) else { return }
+    if touch { fit(face.module.id) }
+    let fitted = stage
+    // topPadding already places the first row below the panel; scroll to this module's row.
+    scroll = min(fitted.maxScroll, max(0, face.frame.y * fitted.scale - 4))
+    revealedTourStep = key
   }
 
   /// Whether the keys show, where a finger has said; otherwise whether the patch has a MIDI module
@@ -188,14 +224,9 @@ public final class RackInterface {
         if !slide.moved, (moved * moved).sum() > Self.slop * Self.slop { slide.moved = true }
         if slide.moved {
           let step = event.location - slide.last
-          scroll =
-            RackStage(
-              rack: rack, size: size, scroll: scroll - step.y, pages: pages, touch: true, zoom: zoom, pan: pan
-            ).scroll
-          pan =
-            RackStage(
-              rack: rack, size: size, scroll: scroll, pages: pages, touch: true, zoom: zoom, pan: pan - step.x
-            ).pan
+          let current = stage
+          scroll = min(current.maxScroll, max(0, scroll - step.y))
+          pan = min(current.maxPan, max(0, pan - step.x))
           fitted = nil
         }
         slide.last = event.location
@@ -273,11 +304,7 @@ public final class RackInterface {
       left = RackStage.inset + before.design(point).x * zoomed.scale - point.x
     }
     pan = RackStage(rack: rack, size: size, pages: pages, touch: true, zoom: zoom, pan: left).pan
-    scroll =
-      RackStage(
-        rack: rack, size: size, scroll: Float(placement.y) * zoomed.scale, pages: pages, touch: true,
-        zoom: zoom, pan: pan
-      ).scroll
+    scroll = min(stage.maxScroll, max(0, Float(placement.y) * zoomed.scale))
     fitted = module
   }
 
@@ -286,7 +313,7 @@ public final class RackInterface {
     let ratio = 1 / zoom
     zoom = 1
     pan = 0
-    scroll = RackStage(rack: rack, size: size, scroll: scroll * ratio, pages: pages, touch: true).scroll
+    scroll = min(stage.maxScroll, max(0, scroll * ratio))
     fitted = nil
   }
 
@@ -315,12 +342,12 @@ public final class RackInterface {
         rack: rack, size: size, pages: pages, touch: true, zoom: zoom,
         pan: RackStage.inset + pinch.anchor.x * zoomed.scale - middle.x
       ).pan
-    scroll =
-      RackStage(
-        rack: rack, size: size, scroll: pinch.anchor.y * zoomed.scale - (middle.y - zoomed.area.y),
-        pages: pages,
-        touch: true, zoom: zoom, pan: pan
-      ).scroll
+    let current = stage
+    scroll = min(
+      current.maxScroll,
+      max(
+        0,
+        pinch.anchor.y * current.scale + current.topPadding - (middle.y - current.area.y)))
     fitted = nil
   }
 
@@ -686,7 +713,7 @@ public final class RackInterface {
 
   public func scroll(_ event: ScrollEvent) {
     if let guide { return guide.scroll(event) }
-    scroll = RackStage(rack: rack, size: size, scroll: scroll + event.delta.y).scroll
+    scroll = min(stage.maxScroll, max(0, scroll + event.delta.y))
   }
 
   /// The rack's guide, where the patches' menu offers it — a touchscreen's; a desktop has its Help
@@ -972,6 +999,7 @@ public final class RackInterface {
   /// scaled into its space, then the header over it.
   public func draw(on canvas: Canvas) {
     rack.tick()
+    revealTourStep()
     let stage = stage
     scroll = stage.scroll
     canvas.fill = Theme.ground

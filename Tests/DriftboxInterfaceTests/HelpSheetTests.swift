@@ -35,6 +35,21 @@ struct HelpSheetTests {
     return face
   }
 
+  /// The added lessons remain reachable on a phone, with room to read beneath the wrapped tabs.
+  @Test func lessonsFitOnAPhoneAndScrollToTheEnd() {
+    for guide in [GrooveboxHelp.guide(for: .android), RackHelp.guide(for: .android)] {
+      let sheet = HelpSheet(guide: guide)
+      sheet.size = SIMD2(390, 600)
+      for topic in guide.topics {
+        #expect(sheet.perform(.press("help.topic." + topic.id)))
+        #expect(sheet.room.height > 200)
+        #expect(sheet.room.width > 300)
+        sheet.scroll(ScrollEvent(location: .zero, delta: SIMD2(0, 100_000)))
+        #expect(sheet.scroll == max(0, sheet.contentHeight - sheet.room.height))
+      }
+    }
+  }
+
   static func centre(_ node: AccessibilityNode) -> SIMD2<Float> {
     SIMD2(node.frame.x + node.frame.z / 2, node.frame.y + node.frame.w / 2)
   }
@@ -65,7 +80,7 @@ struct HelpSheetTests {
     #expect(page.node("help.close")?.role == .button)
     let tabs = page.children.filter { $0.id.hasPrefix("help.topic.") }
     #expect(tabs.map(\.name) == sheet.guide.topics.map(\.label))
-    #expect(tabs.map(\.isOn) == [true, false, false, false, false])
+    #expect(tabs.map(\.isOn) == sheet.guide.topics.indices.map { $0 == 0 })
 
     let words = page.children.filter { $0.role == .text }
     let first = try #require(sheet.guide.topics.first)

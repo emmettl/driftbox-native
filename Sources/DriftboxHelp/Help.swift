@@ -12,6 +12,22 @@ public struct HelpGuide: Equatable, Sendable {
   }
 
   public func topic(_ id: String) -> HelpTopic? { topics.first { $0.id == id } }
+
+  /// Search headings and the complete text, retaining each matching part's context. Whitespace
+  /// alone restores the guide; multiple words must all occur in the same part or its topic label.
+  /// Standard-library text operations keep this available to the Android build too.
+  public func matching(_ query: String) -> [HelpTopic] {
+    let words = query.lowercased().split(whereSeparator: { $0.isWhitespace })
+    guard !words.isEmpty else { return topics }
+    return topics.compactMap { topic in
+      let parts = topic.parts.filter { part in
+        let text = ([topic.label, part.heading, part.note ?? ""] + part.body.searchText)
+          .joined(separator: " ").lowercased()
+        return words.allSatisfy { text.contains($0) }
+      }
+      return parts.isEmpty ? nil : HelpTopic(topic.id, topic.label, parts)
+    }
+  }
 }
 
 public struct HelpTopic: Equatable, Sendable, Identifiable {
@@ -51,6 +67,15 @@ public enum HelpBody: Equatable, Sendable {
   case keys([HelpKey])
   /// Points, in no order.
   case notes([String])
+
+  var searchText: [String] {
+    switch self {
+    case .prose(let paragraphs), .notes(let paragraphs): paragraphs
+    case .terms(let terms): terms.flatMap { [$0.term, $0.meaning] }
+    case .steps(let steps): steps.flatMap { [$0.lead, $0.rest] }
+    case .keys(let keys): keys.flatMap { [$0.keys, $0.does] }
+    }
+  }
 }
 
 public struct HelpTerm: Equatable, Sendable {

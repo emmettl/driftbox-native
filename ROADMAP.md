@@ -128,6 +128,10 @@ layer. The Mac app still draws through its own Metal scenes.
 - **Module guides:** first in a module's menu everywhere.
 - **Tours:** from Help ▸ Rack Tours, or the patch chip on Android. The first one is offered once.
 - **Help tags:** most of the Mac's controls have one.
+- **Learning:** practical groovebox walkthroughs cover drums, bass, arrangement and automation,
+  with troubleshooting; the rack's learning path adds listening exercises to all five tours.
+  The Mac's guide windows search their full text. Drawn rack tours bring each step's module into
+  view below the coach, zooming it on touchscreens, without repeatedly overriding manual scrolling.
 
 ### Releases
 
@@ -184,8 +188,8 @@ The repository is public.
 - [ ] **(code)** A Mac Help Book, so the Help menu's search finds topics as well as menu items, with
   anchors so that a `?` beside a panel opens its page.
 - [ ] **(code)** Help tags where a control's purpose is not its label.
-- [ ] **(code)** On the drawn rack (Windows, Android, Linux), have a tour step scroll or zoom its
-  module into view. The ring is drawn, but it can be off screen.
+- [x] **(code)** On the drawn rack (Windows, Android, Linux), have a tour step scroll or zoom its
+  module into view, with room below the instruction panel.
 
 ### Linux
 
